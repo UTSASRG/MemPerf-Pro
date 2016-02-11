@@ -1,0 +1,20 @@
+\section{Related Work}
+
+\cite{1291361} develops two simply analytical model to evaluate the performance impact on large application, based on an application's interaction with the memory system. The observation is that a regular application has continuous and stride memory accesses, while an irregular application has three memory access types: continuous accesses, accesses within the same L1/L2 cache line, and random accesses. This is actually not that related to our system. 
+
+%Potential projects: is there possible to monitor memory accesses pattern and then report irregular pattern and report problems with call site information. 
+
+\cite{Barroso:1998:MSC:279358.279363}: This paper presents a detailed performance study of three important classes of commercial workloads: online transaction processing (OLTP), decision support systems (DSS), and Web index search.  This study characterizes the memory system behavior of these workloads through a large number of architectural experiments on Alpha multiprocessors augmented with full system simulations to determine the impact of architectural trends. We also identify a set of simplifications that make these workloads more amenable to monitoring and simulation without affecting representative memory system behavior. We observe that systems optimized for OLTP versus DSS and index search workloads may lead to diverging designs, specifically in the size and speed requirements for off-chip caches.
+
+Mtrace~\cite{mtrace} traces the events of \texttt{malloc}, \texttt{realloc}, and \texttt{free}, and then post-proposes them. If we can not find its \texttt{free} operations related to a \texttt{malloc}, then this object is considered to be leaked. However, Mtrace can not report the severity of memory leak problems, although this is an engineering problem. \todo{ How is its performance overhead? Maybe we should compare it with \HeapPerf{}?}   
+
+Mtrace++~\cite{Lee:2000:DMM:786772.787150} is a source code level instrumentation that traces the memory allocations and deallocations. Mtrace++ identifies originations of allocated memories and life spans of objects. But it can not point out whether problems may occur inside programs. 
+
+\cite{846583}
+
+\cite{1190248}
+
+LeakPoint\cite{Clause:2010:LPC:1806799.1806874} shares the similar target as \HeapPerf{} on memory leak detection that memory leaks of larger size
+are more important than leaks of smaller area. However, LeakPoint imposes between $100\times$ and $300\times$ overhead, while only less than 5\% overhead for \HeapPerf{}. It do not focus on another source of performance problems, those unnecessary memory allocations and deallocations. 
+
+

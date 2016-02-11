@@ -1,0 +1,252 @@
+% \documentclass[10pt,preprint,nocopyrightspace]{sigplanconf}
+% \documentclass{acm_proc_article-sp}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\documentclass[preprint,10pt]{sigplanconf}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Load basic packages
+\usepackage{balance}  % to better equalize the last page
+\usepackage{graphics} % for EPS, load graphicx instead 
+%\usepackage[T1]{fontenc}
+\usepackage{txfonts}
+\usepackage{pslatex}    % comment if you want LaTeX's default font
+%\usepackage[pdftex]{hyperref}
+\usepackage{dingbat}
+% \usepackage{url}      % llt: nicely formatted URLs
+\usepackage{color}
+\usepackage{textcomp}
+\usepackage{booktabs}
+\usepackage{ccicons}
+\usepackage{subfigure}
+\usepackage{authblk}
+\usepackage[shortlabels]{enumitem}
+%\usepackage{todonotes}
+\usepackage[hyphens]{url}
+\usepackage[draft]{hyperref}
+\usepackage{pifont}
+\newcommand{\numcircled}[1]{\ding{\numexpr191+#1\relax}}
+\usepackage{multirow}
+
+\usepackage{xspace}
+
+\usepackage{tikz}
+\usepackage{calc}
+\def\checkmark{\tikz\fill[scale=0.4](0,.35) -- (.25,0) -- (1,.7) -- (.25,.15) -- cycle;} 
+\def\scalecheck{\resizebox{\widthof{\checkmark}*\ratio{\widthof{x}}{\widthof{\normalsize x}}}{!}{\checkmark}}
+
+%that'
+% llt: Define a global style for URLs, rather that the default one
+\makeatletter
+\def\url@leostyle{%
+  \@ifundefined{selectfont}{\def\UrlFont{\sf}}{\def\UrlFont{\small\bf\ttfamily}}}
+\makeatother
+\urlstyle{leo}
+
+% To make various LaTeX processors do the right thing with page size.
+\def\pprw{8.5in}
+\def\pprh{11in}
+\special{papersize=\pprw,\pprh}
+\setlength{\paperwidth}{\pprw}
+\setlength{\paperheight}{\pprh}
+\setlength{\pdfpagewidth}{\pprw}
+\setlength{\pdfpageheight}{\pprh}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Useful reviewing/feedback annotations
+%\input{annotations}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\usepackage{xcolor}
+
+\newcommand{\todo}[1]{{\color{red}\bfseries [[#1]]}}
+\newcommand{\alam}[1]{{\color{red}\bfseries [[#1]]}}
+\newcommand{\TP}[1]{{\color{red}\bfseries [[#1]]}}
+\newcommand{\AM}[1]{{\color{red}\bfseries [[#1]]}}
+\newcommand{\rpm}{\raisebox{.2ex}{$\scriptstyle\pm$}}
+
+% create a shortcut to typeset table headings
+% \newcommand\tabhead[1]{\small\textbf{#1}}
+
+\newcommand{\permitbreak}{\discretionary{}{}{}}
+
+% Make sure hyperref comes last of your loaded packages, to give it a
+% fighting chance of not being over-written, since its job is to
+% redefine many LaTeX commands.
+\definecolor{linkColor}{RGB}{6,125,233}
+\hypersetup{%
+  pdftitle={Syncperf},
+  pdfauthor={},
+  pdfkeywords={},
+  bookmarksnumbered,
+  pdfstartview={FitH},
+  colorlinks,
+  citecolor=black,
+  filecolor=black,
+  linkcolor=black,
+  urlcolor=linkColor,
+  breaklinks=true,
+}
+
+\newcommand{\spaceneedle}{\raisebox{3pt}{\includegraphics[width=6pt]{spaceneedle}}}
+\newcommand{\mass}{\raisebox{5pt}{\includegraphics[width=8pt]{mass}}}
+\newcommand{\texas}{\raisebox{5pt}{\includegraphics[width=8pt]{texas-orange}}}
+\newcommand{\maple}{\raisebox{4pt}{\includegraphics[width=5.5pt]{maple}}}
+% we need ones for Grinnell and UTSA!
+%\newcommand{\google}{\raisebox{4pt}G}
+
+\hyphenation{light-weight}
+\hyphenation{e-vi-dence}
+
+%\hyphenation{time-stamp time-stamps Shi-Vec-tor Shi-Viz}
+
+\newcommand{\punt}[1]{}
+
+\newcommand{\HeapPerf}{{\scshape HeapPerf}}
+\newcommand{\Heapperf}{{\scshape HeapPerf}}
+\newcommand{\pthread}{\texttt{pthread}}
+\newcommand{\pthreads}{\texttt{pthreads}}
+\newcommand{\specialcell}[2][c]{%
+  \begin{tabular}[#1]{@{}c@{}}#2\end{tabular}}
+
+%\newcommand{\specificthanks}[1]{\@fnsymbol{#1}}
+
+% \newcommand{\todox}[1]{\textcolor{red}{TODO: {#1}}}
+
+\definecolor{lightgray}{rgb}{.9,.9,.9}
+\definecolor{darkgray}{rgb}{.4,.4,.4}
+\definecolor{purple}{rgb}{0.65, 0.12, 0.82}
+
+\usepackage{comment} 
+\usepackage{listings}
+
+\lstdefinelanguage{c++threads}[]{c++}{
+  morekeywords={pthread_create,pthread_join},
+  keywordstyle=\color{blue}\bfseries,
+  ndkeywords={class, export, boolean, throw, implements, import, this},
+  ndkeywordstyle=\color{darkgray}\bfseries,
+  identifierstyle=\color{black},
+  sensitive=false,
+  comment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  commentstyle=\color{purple}\ttfamily,
+  stringstyle=\color{red}\ttfamily,
+  morestring=[b]',
+  morestring=[b]"
+}
+
+\lstset{
+   language=c++threads,
+   backgroundcolor=\color{lightgray},
+   extendedchars=true,
+   basicstyle=\footnotesize\ttfamily,
+   showstringspaces=false,
+   showspaces=false,
+   numbers=none,
+   numberstyle=\footnotesize,
+   numbersep=9pt,
+   tabsize=2,
+   breaklines=true,
+   showtabs=false,
+   captionpos=b
+}
+
+\definecolor{Gray}{cmyk}{0,0,0,0.5}
+
+\makeatletter
+\let\@copyrightspace\relax
+\makeatletter
+
+\begin{document}
+
+\special{papersize=8.5in,11in}
+\setlength{\pdfpageheight}{\paperheight}
+\setlength{\pdfpagewidth}{\paperwidth}
+
+\CopyrightYear{2015}
+\copyrightdata{XXX-X-XXXXX-XXX-X/XX/XX}
+
+\title{{\huge \bf \HeapPerf{}}: Diagnosing Heap Related Performance Bugs}%\vspace{-1.2cm}}
+
+%\numberofauthors{1}
+
+% Get the idea from http://tex.stackexchange.com/questions/9594/adding-more-than-one-author-with-different-affiliation
+
+%\authorinfo{removdouble-blind reviewing}
+\authorinfo{Tongping Liu\vspace{-1cm}}
+%Dept. of Computer Science, University of Texas at San Antonio}
+
+
+%\begin{comment}
+%\authorinfo{
+%Mejbah ul Alam, Guangming Zeng, Tongping Liu, Abdullah Muzahid
+%\author[1] {\rm Mejbah~ul~Alam}
+%\author[2] {\rm Guangming~Zeng}
+%\author[1]{\rm Tongping~Liu}
+%\author[1]{\rm Abdullah~Muzahid}
+%\affil[1]{Dept. of Computer Science, University of Texas at San Antonio}
+%\affil[2]{Shanghai R\&D Center, Synopsys Corp.}
+%\affil[ ]{\textit{{alam, Tongping.Liu, Abdullah.Muzahid}@utsa.edu}, \textit{zenggming@hotmail.com}}
+%}
+%\end{comment}
+
+\maketitle
+
+\begin{abstract}
+\input{abstract}
+\end{abstract}
+
+%\category{D.1.3}{Programming Techniques}{Concurrent Programming--Parallel Programming} \category{D.2.5}{Software Engineering}{Testing and Debugging--Debugging Aids, Monitors, Tracing}\category{D.3.4}{Programming Languages}{Run-time environments}
+
+\keywords
+Performance, Synchronization, Multithreaded Programs, Profiling, Instrumentation
+
+%\keywords
+%Dynamic Analysis, Software Quality, Concurrency Performance
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\input{introduction}
+
+%\input{overview}
+
+
+
+%\input{implementation}
+
+%\section{\Syncperf{} for Multithreading Programs}
+%\input{multithreading}
+
+%\section{Optimization}
+%\input{optimization}
+
+%\section{Evaluation}
+%\input{evaluation}
+
+%\section{Limitations and Future Work}
+%\input{discussion}
+
+\input{relatedwork}
+%\input{related_notes.tex}
+% eliminate global lock
+% possibly adopting a page-ownership protocol as used by ...
+
+%\newpage
+
+\input{conclusion}
+
+%\section{Acknowledgements}
+%\input{acknowledge}
+
+
+%\newpage
+
+{
+\bibliographystyle{abbrv}
+\bibliography{refs, tongping}
+}
+
+\end{document}

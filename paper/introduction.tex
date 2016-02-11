@@ -1,0 +1,42 @@
+\section{Introduction}
+
+Heap memory related performance bugs can be from the following categories, if only think about applications. 
+
+\begin{itemize}
+\item: Too many allocations and deallocations. Based on ~\cite{Lee:2000:DMM:786772.787150}, the total run time spending in memory allocation and liberation may take up to 30\% execution time. 
+
+\item: Too many memory usages: this can actually affect the performance when there are too much memory that has been allocated but not used.  
+
+\item: 
+\end{itemize}
+
+
+What we can do for heap memory management?
+
+First, we can point out the unnecessary memory allocations and deallocations. For example, we can malloc a large object, and then assign to different small projects. Some of them may be called inside the internal level of loop functions, we can move up. 
+By reducing unnecessary memory allocations, we expect to improve the performance. 
+
+Second, we can give a statistics on the life-span of objects. Whether we can find out some problems inside? For example, we can use stack variables instead of heap. 
+
+Third, we can actually give the statistics on each callsite. Some callsites may have larger number of allocations. Check whether we can use . 
+
+
+Can we evaluate the performance related to heap allocations? For example, how much time is spending on memory allocation. 
+We can approximate the time of spending on each allocation. Then we can distribute the time to different statements, just similar to gprof. Then maybe it is obvious that we can reduce the overhead by reducing the memory allocations. Then it is possible that a separate paper by using the 
+
+
+In the end, although not every interested, it is to check the overhead of every memory allocation on each popular memory allocation. Thus, pointing out that the memory allocation actually should pay attention to the level of stacks. Thus, it is possible that we can design a new memory allocator by reducing the level of memory allocation. This is a reverse to HeapLayer. It is great to have an survey paper on this:
+
+A. How is the overhead of memory allocation in large applications? How we can evaluate it? 
+B. How is the overhead that comes from memory management? We evaluate this on some popular benchmarks. 
+C. Whether the overhead comes from different cache uses? or other things. 
+D. It will shed a light whether we need to re-design the memory allocator. 
+It will be a perfect paper for ICSE or SC.
+
+%%%%%%%%%%%%%%%%%%%%%%%
+% Possible solutions:
+% (1) We will check the malloc and free are allocated in sequence. For example, we are always doing the malloc(8) and free(8) in sequence. Given the number of these allocations is large. Then it is much possible that it is a problem. However, it can be a problem for the performance reason. But we can basically maintain a stack that maintains five possible allocations. 
+%% Should we just use a two-phase solution? That is, we can use a hash-table to identify different allocation site with their memory uses: how many times for memory allocations? How many times for related free operations? If there are a lot of memory allocations that are not freed, then it is possible a memory leak. We could also identify whether those memory are actually touched or not by using the watchpoint mechanisms? Also, we may try to check whether memory allocation are in the same sequence, for example, alloc-free-alloc-free, and with the same size. If yes, then it is possible that is unnecessary memory operations. 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%
+Typically, I think that mtrace utilizes  
