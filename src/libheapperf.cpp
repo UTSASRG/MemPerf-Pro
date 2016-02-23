@@ -23,6 +23,8 @@
 using namespace std;
 enum { InitialMallocSize = 1024 * 1024 * 1024 };
 
+bool initialized = false;
+
 __attribute__((destructor)) void finalizer() {
   xmemory::getInstance().finalize();
 }
@@ -34,6 +36,8 @@ main_fn_t real_main;
 int doubletake_main(int argc, char** argv, char** envp) {
   /******** Do doubletake initialization here (runs after ctors) *********/
   xmemory::getInstance().initialize();
+	
+	initialized = true;
 
   // Call the program's main function
   return real_main(argc, argv, envp);

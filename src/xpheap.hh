@@ -47,7 +47,7 @@ public:
     objectHeader* o = getObject(ptr);
     size_t sz = o->getSize();
     if(sz == 0) {
-			PRINT("Object size cannot be zero\n");
+			fprintf(stderr, "Object size cannot be zero\n");
 			abort();
 		}
     return sz;
@@ -88,11 +88,11 @@ private:
 template <int NumHeaps, class TheHeapType> class PerThreadHeap {
 public:
   PerThreadHeap() {
-    //  PRINF("TheHeapType size is %ld\n", sizeof(TheHeapType));
+    //  fprintf(stderr, "TheHeapType size is %ld\n", sizeof(TheHeapType));
   }
 
   void* malloc(int ind, size_t sz) {
-    //    PRINF("PerThreadheap malloc ind %d sz %d _heap[ind] %p\n", ind, sz, &_heap[ind]);
+    //    fprintf(stderr, "PerThreadheap malloc ind %d sz %d _heap[ind] %p\n", ind, sz, &_heap[ind]);
     // Try to get memory from the local heap first.
     void* ptr = _heap[ind].malloc(sz);
     return ptr;
@@ -100,9 +100,8 @@ public:
 
   // Here, we will give one block of memory back to the originated process related heap.
   void free(int ind, void* ptr) {
-    REQUIRE(ind < NumHeaps, "Invalid free status");
     _heap[ind].free(ptr);
-    // PRINF("now first word is %lx\n", *((unsigned long*)ptr));
+    // fprintf(stderr, "now first word is %lx\n", *((unsigned long*)ptr));
   }
 
   // For getSize, it doesn't matter which heap is used
@@ -132,7 +131,6 @@ public:
 
     // Initialize the SourceHeap before malloc from there.
     char* base = (char*)SourceHeap::initialize(start, heapsize, metasize);
-    REQUIRE(base != NULL, "Failed to allocate memory for heap metadata");
 
     _heap = new (base) SuperHeap;
 
@@ -153,7 +151,6 @@ public:
   void free(void* ptr) {
     int tid = getThreadIndex();
 
-    size_t size = getSize(ptr);
     // If an object is too large, we simply freed this object.
     _heap->free(tid, ptr);
   }

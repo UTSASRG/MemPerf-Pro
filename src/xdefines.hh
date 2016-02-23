@@ -1,6 +1,8 @@
-#if !defined(DOUBLETAKE_XDEFINES_H)
-#define DOUBLETAKE_XDEFINES_H
+#if !defined(_XDEFINES_H)
+#define _XDEFINES_H
 
+#include <unistd.h>
+#include <sys/syscall.h>
 #include <stddef.h>
 #include <ucontext.h>
 
@@ -16,7 +18,7 @@ extern "C" {
 	}
 
 	inline int gettid(void) {
-		return syscall(SYS_gettid());
+		return (int)syscall(SYS_gettid);
 	}
   
 	typedef void * threadFunction (void *);
@@ -39,6 +41,9 @@ extern "C" {
 extern __thread thread_t * current;
 inline size_t aligndown(size_t addr, size_t alignto) { return (addr & ~(alignto - 1)); }
 
+	inline int getThreadIndex() {
+		return current->index;
+	}
 	
 };
 #define WP_START_OFFSET sizeof(unsigned long)

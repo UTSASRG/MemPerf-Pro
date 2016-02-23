@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
+#include "real.hh"
 
 class MM {
 public:
@@ -32,7 +33,7 @@ private:
 
     void* ptr = mmap(startaddr, sz, protInfo, sharedInfo, fd, 0);
     if(ptr == MAP_FAILED) {
-      PRERR("Couldn't do mmap (%s) : startaddr %p, sz %lu, protInfo=%d, sharedInfo=%d\n",
+      fprintf(stderr, "Couldn't do mmap (%s) : startaddr %p, sz %lu, protInfo=%d, sharedInfo=%d\n",
             strerror(errno), startaddr, sz, protInfo, sharedInfo);
       abort();
     } else {

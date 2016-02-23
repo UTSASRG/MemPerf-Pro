@@ -16,11 +16,9 @@
 
 #include "mm.hh"
 #include "xdefines.hh"
-#include "xmapping.hh"
 
 // template <unsigned long Size>
-class xheap : public xmapping {
-  typedef xmapping parent;
+class xheap {
 
 public:
   // It is very very important to put the first page in a separate
@@ -38,7 +36,7 @@ public:
     // We must initialize the heap now.
     void* startHeap = (void*)((unsigned long)xdefines::USER_HEAP_BASE - (unsigned long)metasize);
 
-    //    PRINF("heap size %lx metasize %lx, startHeap %p\n", startsize, metasize, startHeap);
+    //    fprintf(stderr, "heap size %lx metasize %lx, startHeap %p\n", startsize, metasize, startHeap);
     ptr = MM::mmapAllocatePrivate(startsize + metasize, startHeap);
 
     // Initialize the lock.
@@ -51,10 +49,7 @@ public:
     _remaining = startsize;
     _magic = 0xCAFEBABE;
 
-    // Register this heap so that they can be recoved later.
-    parent::initialize(ptr, startsize + metasize, (void*)_start);
-
-    PRINF("XHEAP %p - %p, position: %p, remaining: %#lx", _start, _end, _position, _remaining);
+    fprintf(stderr, "XHEAP %p - %p, position: %p, remaining: %#lx", _start, _end, _position, _remaining);
 
     return (void*)ptr;
   }
@@ -73,7 +68,7 @@ public:
   inline void saveHeapMetadata() {
     _positionBackup = _position;
     _remainingBackup = _remaining;
-    PRINF("save heap metadata, _position %p remaining %#lx\n", _position, _remaining);
+    fprintf(stderr, "save heap metadata, _position %p remaining %#lx\n", _position, _remaining);
   }
 
   /// We will overlap the metadata with the saved ones
@@ -81,7 +76,7 @@ public:
   inline void recoverHeapMetadata() {
     _position = _positionBackup;
     _remaining = _remainingBackup;
-    PRINF("in recover, now _position %p remaining 0x%lx\n", _position, _remaining);
+    fprintf(stderr, "in recover, now _position %p remaining 0x%lx\n", _position, _remaining);
   }
 
   inline void* getHeapStart() { return (void*)_start; }
@@ -91,7 +86,7 @@ public:
   // Get current heap position
   // We only need to do the sanity check until current position.
   inline void* getHeapPosition() {
-    // PRINF("GetHeapPosition %p\n", _position);
+    // fprintf(stderr, "GetHeapPosition %p\n", _position);
     return _position;
   }
 
@@ -118,11 +113,6 @@ public:
 
     unlock();
 
-		//fprintf(stderr, "malloc sz %lx returnptr %p : _position %p remaining %lx\n", sz, p, _position, _remaining);
-#if defined(DETECT_OVERFLOW) || defined(DETECT_MEMORY_LEAKS)
-    // We must cleanup corresponding bitmap
-    sentinelmap::getInstance().cleanup(p, sz);
-#endif
     // Now we cleanup the corresponding
     // printf("%d: XHEAP malloc: ptr %p end 0x%lx size %x. Heappoition %p\n", getpid(),  p,
     // (intptr_t)p + sz,  sz, _position);
@@ -142,7 +132,7 @@ private:
 
   void unlock() { pthread_mutex_unlock(&_lock); }
 
-  void sanityCheck() { REQUIRE(_magic == 0xCAFEBABE, "Sanity check failed for xheap"); }
+  void sanityCheck() { if(_magic != 0xCAFEBABE) fprintf(stderr, "Sanity check failed for xheap"); }
 
   /// The start of the heap area.
   volatile char* _start;

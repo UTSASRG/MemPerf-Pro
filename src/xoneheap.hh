@@ -19,23 +19,6 @@ public:
   void* initialize(void* start, size_t size, size_t metasize) {
     return getHeap()->initialize(start, size, metasize);
   }
-  void sanitycheckInitialize(void* ptr, size_t size) {
-    getHeap()->sanitycheckInitialize(ptr, size);
-  }
-  void finalize() { getHeap()->finalize(); }
-
-  void recoverMemory(void* ptr) { getHeap()->recoverMemory(ptr); }
-  void backup(void* end) { getHeap()->backup(end); }
-
-  /// Check the buffer overflow.
-  bool checkHeapOverflow(void* end) { return getHeap()->checkHeapOverflow(end); }
-
-  void stats() { getHeap()->stats(); }
-
-  // Handling those metadata for rollback purpose
-  void recoverHeapMetadata() { getHeap()->recoverHeapMetadata(); }
-  void saveHeapMetadata() { getHeap()->saveHeapMetadata(); }
-
   // Get heap start and end, this is used to check range.
   void* getHeapStart() { return getHeap()->getHeapStart(); }
   void* getHeapEnd() { return getHeap()->getHeapEnd(); }

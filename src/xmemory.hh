@@ -54,7 +54,6 @@ public:
   }
 
   void finalize() {
-    _pheap.finalize();
   }
 
   /* Heap-related functions. */
