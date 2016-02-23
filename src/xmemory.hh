@@ -128,6 +128,14 @@ public:
     return ptr;
   }
 
+  // We are trying to find the aligned address starting from ptr
+  // to ptr+boundary.
+  inline void* getAlignedAddress(void* ptr, size_t boundary) {
+    return ((intptr_t)ptr % boundary == 0)
+               ? ptr
+               : ((void*)(((intptr_t)ptr + boundary) & (~(boundary - 1))));
+  }
+
   inline void* memalign(size_t boundary, size_t sz) {
     // Actually, malloc is easy. Just have more memory at first.
     void* ptr = malloc(boundary + sz);

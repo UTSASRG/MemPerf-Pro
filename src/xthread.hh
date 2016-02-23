@@ -40,6 +40,7 @@ Second, try to maintain a thread local variable to save some thread local inform
 #include <fstream>
 #include <iostream>
 #include "xdefines.hh"
+#include "real.hh"
 
 class xthread {
 private:
@@ -57,6 +58,8 @@ public:
   void initialize()
   {
     _heapid = 0;
+	  _aliveThreads = 0;
+    _threadIndex = 0;
 
     // Shared the threads information. 
     memset(&_threads, 0, sizeof(_threads));
@@ -130,8 +133,10 @@ public:
   int allocThreadIndex(void) {
 		int index = __atomic_fetch_add(&_threadIndex, 1, __ATOMIC_RELAXED);
 
+    int alivethreads = _aliveThreads++;
+
 		// Check whether we have created too many threads or there are too many alive threads now.
-    if(index >= xdefines::MAX_THREADS || _alivethreads >= xdefines::MAX_ALIVE_THREADS) {
+    if(index >= xdefines::MAX_THREADS || alivethreads >= xdefines::MAX_ALIVE_THREADS) {
       fprintf(stderr, "Set xdefines::MAX_THREADS to larger. _alivethreads %ld totalthreads %ld maximum alive threads %d", _aliveThreads, _threadIndex, xdefines::MAX_ALIVE_THREADS);
       abort(); 
     } 
@@ -148,7 +153,6 @@ public:
   /// Create the wrapper 
   /// @ Intercepting the thread_creation operation.
   int thread_create(pthread_t * tid, const pthread_attr_t * attr, threadFunction * fn, void * arg) {
-    void * ptr = NULL;
     int tindex;
     int result;
 
@@ -160,22 +164,34 @@ public:
     children->startRoutine = fn;
     children->startArg = arg;
 	
-    result =  WRAP(pthread_create)(tid, attr, startThread, (void *)children);
+    result =  Real::pthread_create(tid, attr, startThread, (void *)children);
 
     return result;
   }      
+
+  inline thread_t* getThread(pthread_t thread) {
+		thread_t * thisThread = NULL;
+
+		for(int index = 0; index < xdefines::MAX_THREADS; index++) {
+			thisThread = getThreadInfoByIndex(index);
+			if(thisThread->self == thread) {
+				break;
+			}
+		}
+    return thisThread;
+  }
 
 
   int thread_join(pthread_t thread, void **retval)  {
     int ret;
 
-    ret = WRAP(pthread_join(thread, retval));
+    ret = Real::pthread_join(thread, retval);
 
     if(ret == 0) {
       thread_t * thisThread;
 
       // Finding out the thread with this pthread_t 
-      thisThread = getChildThreadStruct(thread);
+      thisThread = getThread(thread);
 
       markThreadExit(thisThread);
     }
@@ -202,10 +218,6 @@ public:
 
     // from the TLS storage.
     result = current->startRoutine(current->startArg);
-
-		// Get the stop time.
-		current->actualRuntime = elapsed2ms(stop(&current->startTime, NULL));
-		//fprintf(stderr, "tid %d index %d latency %lx actualRuntime %ld\n", current->tid, current->index, current->latency, current->actualRuntime);
 
     return result;
   }
