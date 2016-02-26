@@ -1,7 +1,7 @@
-SRCS =  libheapperf.cpp 
+SRCS =  libheapperf.cpp \
+				real.cpp 
 
-INCS =  xmapping.hh     \
-        xdefines.hh     \
+INCS =         xdefines.hh     \
         xthread.hh      \
         xheap.hh        \
         xoneheap.hh     \
