@@ -44,8 +44,8 @@ public:
   }
 
   void initialize() {
-    // Install a handler to intercept SEGV signals (used for trapping initial reads and
-    // writes to pages).
+		xthread::getInstance().initialize();
+	
     // Call _pheap so that xheap.h can be initialized at first and then can work normally.
     _heapBegin =
         (intptr_t)_pheap.initialize((void*)xdefines::USER_HEAP_BASE, xdefines::USER_HEAP_SIZE);
@@ -59,7 +59,7 @@ public:
   /* Heap-related functions. */
   inline void* malloc(size_t sz) {
     void* ptr = NULL;
-
+		fprintf(stderr, "malloc sz %ld\n", sz);
 	  ptr = realmalloc(sz);
     //  PRINT("malloc, current %p ptr %p sz %ld\n", current, ptr, sz);
     return ptr;

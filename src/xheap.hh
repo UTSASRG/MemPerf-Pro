@@ -49,7 +49,7 @@ public:
     _remaining = startsize;
     _magic = 0xCAFEBABE;
 
-    fprintf(stderr, "XHEAP %p - %p, position: %p, remaining: %#lx", _start, _end, _position, _remaining);
+//    fprintf(stderr, "XHEAP %p - %p, position: %p, remaining: %#lx", _start, _end, _position, _remaining);
 
     return (void*)ptr;
   }
@@ -68,7 +68,7 @@ public:
   inline void saveHeapMetadata() {
     _positionBackup = _position;
     _remainingBackup = _remaining;
-    fprintf(stderr, "save heap metadata, _position %p remaining %#lx\n", _position, _remaining);
+ //   fprintf(stderr, "save heap metadata, _position %p remaining %#lx\n", _position, _remaining);
   }
 
   /// We will overlap the metadata with the saved ones

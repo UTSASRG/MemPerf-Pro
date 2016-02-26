@@ -110,6 +110,7 @@ public:
 		// We know that we will going to execute     
     current = getThreadInfoByIndex(tindex);
 
+		fprintf(stderr, "Initialize initial thread\n");
 		assert(tindex == 0);
 
     // Get corresponding thread_t structure.

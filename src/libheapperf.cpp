@@ -24,6 +24,8 @@ using namespace std;
 enum { InitialMallocSize = 1024 * 1024 * 1024 };
 
 bool initialized = false;
+__thread thread_t * current;
+xpheap<xoneheap<xheap>> xmemory::_pheap;
 
 __attribute__((destructor)) void finalizer() {
   xmemory::getInstance().finalize();
