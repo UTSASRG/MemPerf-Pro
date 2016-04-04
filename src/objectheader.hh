@@ -32,11 +32,7 @@ public:
   }
 
   bool isGoodObject() {
-#if defined(DETECT_OVERFLOW) || defined(DETECT_MEMORY_LEAKS)
     return (_sentinel == xdefines::SENTINEL_WORD ? true : false);
-#else
-    return true;
-#endif
   }
 
   void* getStartPtr() { return ((void*)((intptr_t) & _sentinel + xdefines::SENTINEL_SIZE)); }

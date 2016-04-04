@@ -159,12 +159,12 @@ public:
 
     // Allocate a global thread index for current thread.
     tindex = allocThreadIndex();
-		//printf("pthread create  index : %d\n", tindex);
     thread_t * children = getThreadInfoByIndex(tindex);
     
     children->startRoutine = fn;
     children->startArg = arg;
 	
+		fprintf(stderr, "pthread create  index : %d. Real::pthread_create %p\n", tindex, Real::pthread_create);
     result =  Real::pthread_create(tid, attr, startThread, (void *)children);
 
     return result;
@@ -211,6 +211,7 @@ public:
   static void * startThread(void * arg) {
     void * result;
 
+		fprintf(stderr, "In the beginning of startThread\n");
     current = (thread_t *)arg;
 
     current->self = pthread_self();

@@ -27,6 +27,10 @@ bool initialized = false;
 __thread thread_t * current;
 xpheap<xoneheap<xheap>> xmemory::_pheap;
 
+__attribute__((constructor)) void initializer() {
+	Real::initializer();	
+}
+
 __attribute__((destructor)) void finalizer() {
   xmemory::getInstance().finalize();
 }
@@ -36,7 +40,6 @@ main_fn_t real_main;
 
 // Doubletake's main function
 int doubletake_main(int argc, char** argv, char** envp) {
-  /******** Do doubletake initialization here (runs after ctors) *********/
   xmemory::getInstance().initialize();
 	
 	initialized = true;
@@ -74,6 +77,11 @@ static void* tempmalloc(int size) {
 
 // Memory management functions
 extern "C" {
+	struct stack_frame {
+  	struct stack_frame * prev;/* pointing to previous stack_frame */
+  	void* caller_address;/* the address of caller */
+	};
+
   void* xxmalloc(size_t sz) {
     void* ptr = NULL;
 

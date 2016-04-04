@@ -59,7 +59,7 @@ public:
   /* Heap-related functions. */
   inline void* malloc(size_t sz) {
     void* ptr = NULL;
-		fprintf(stderr, "malloc sz %ld\n", sz);
+//		fprintf(stderr, "malloc sz %ld\n", sz);
 	  ptr = realmalloc(sz);
     //  PRINT("malloc, current %p ptr %p sz %ld\n", current, ptr, sz);
     return ptr;
