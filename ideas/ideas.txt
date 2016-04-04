@@ -1,0 +1,49 @@
+Can we identify the possible locality issues, instead of computation issue.
+Thus, we will only care about those allocations that are not alligned.
+Then for every callsite, we will have a corresponding rate of "efficiency and how many times 
+they have accessed?"
+ 
+
+Project 1: 
+Two problems:
+(1) CPU utilization problem, unnecessary allocations and deallocations.
+(2) Locality problem: small objects, with lots of trash inside
+
+Memory Allocation Problems. If too many small objects in a callsite (locality problem), that may cause a bigger problem in performance. 
+As memslim, we could also utilize the collected latency as one of indicators.
+We can analyze the pencentage of memory efficiency of different callsites, by utilizing the sampling technique.
+For example, we can have the following pattern like this:
+The first four bytes is not accessed, but other bytes are accessed 100 times. 
+Thus, the memory efficiency will be 
+1/16 * 0 + 15/16*100% = 15/16
+
+
+
+ 
+
+Project 2:
+Evaluate existing allocators, check whether they are efficient enough in case of memory use efficiency (locality). 
+Thus, we can possibly provide a new allocator that combining with embedded metadata and one without metadata, based on the profiling mechanism.
+What can impact most on the performance? Every object memory efficiency, or total memory efficiency, or instructions of memory allocator itself.  
+
+
+Check whether the performance related to memory allocations? We could have two different approaches: One approach is to avoid this performance problems automatically. Another approach is to detect this problem. This can actually introduce the memory overhead since a lot of metadata are required. It can also introduce performance problems. 
+For example, a lot of small memory allocations from the same placement may indicate a problem of memory allocations. Actually, we have found out some weird memory allocation either from PARSEC or SPEC 2006. 
+The other one is too much short life objects. Actually, many heap objects can be replaced by the stack objects and this could actually improve the performance. Or a lot of memory allocations places can actually be put outside the loop. That will actually improve the performance as well. 
+The third one is actually related to memory leak. Actually, we may be able to test memory leak based on the anomaly detection. 
+We could also combine this with our memory-accesses sampling: then we we can find out how many percentage of time is spending inside the memory allocations. Should we count per-thread information? Then we could possibly predict the performance impact. 
+For example, if 10% time is spending inside the memory allocations on every thread, then possibly we can save 10\% time by removing those operations. Or we could utilize the Coz to estimate this. 
+Another benefit may come from the cache locality since it greatly avoids unnecessary data inside the cache line. This will be true for small objects. 
+
+Thus, there are several questions that has to be answered:
+Whether we can reduce the number of memory allocations by allocating once? 
+Whether we can utilize the stack variables, instead of heap allocation. Stack can better benefit the effect of cache since almost those content are always staying inside the cache. But we should also consider that not all of them can utilize the stack variables. Thus, it will be better to provide suggestions by tracking the relationship between heap objects. More importantly, how is the relationship between uses, deallocation and allocation. How these allocation can affect the performance also relates to whether these objects are frequently accessed or not. If they can only provide 20% memory uses, then their memory uses is questionable. 
+
+
+The other related project is to measure the memory efficiency of heap objects? Thus, we are able to identify the most important memory objects. 
+For example, we can provide a picture of these memory uses. If an object has lots of memory accesses, but only 30% is actually useful data. Then the memory utilization is very low. Possibly, we should utilize a different memory allocator that will not have memory uses. Then we can actually measure the memory efficiency of different types of memory allocator. Then we can understand why some memory allocator have better performance than the others. 
+http://dl.acm.org/citation.cfm?id=2854053
+
+Possibly, we can provide a memory allocator that combines the one embedded with metadata and the one without metadata, although that also means the overhead of allocation. 
+
+Possibly, we will have new discoveries on NUMA systems.  
