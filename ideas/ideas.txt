@@ -16,16 +16,19 @@ For example, we can have the following pattern like this:
 The first four bytes is not accessed, but other bytes are accessed 100 times. 
 Thus, the memory efficiency will be 
 1/16 * 0 + 15/16*100% = 15/16
+We will utilize the highest one as the 100%, others, with relative percentages. 
 
-
-
- 
+In the end, we can have the memory utilization for different callsites. How about we are utilizing the compiler-instrumentation first? Then we can collect the information.   
 
 Project 2:
 Evaluate existing allocators, check whether they are efficient enough in case of memory use efficiency (locality). 
 Thus, we can possibly provide a new allocator that combining with embedded metadata and one without metadata, based on the profiling mechanism.
 What can impact most on the performance? Every object memory efficiency, or total memory efficiency, or instructions of memory allocator itself.  
 
+For example, how many page faults are an important factor. 
+
+Project 3: 
+How we can utilize this information for NUMA achitecture? Do we get the similar information?
 
 Check whether the performance related to memory allocations? We could have two different approaches: One approach is to avoid this performance problems automatically. Another approach is to detect this problem. This can actually introduce the memory overhead since a lot of metadata are required. It can also introduce performance problems. 
 For example, a lot of small memory allocations from the same placement may indicate a problem of memory allocations. Actually, we have found out some weird memory allocation either from PARSEC or SPEC 2006. 
