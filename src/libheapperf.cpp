@@ -16,6 +16,7 @@
 
 #include "xmemory.hh"
 #include "xthread.hh"
+#include "memsample.h"
 
 // Install xxmalloc, xxfree, etc. as custom allocator
 #include "wrappers/gnuwrapper.cpp"
@@ -43,6 +44,8 @@ int doubletake_main(int argc, char** argv, char** envp) {
   xmemory::getInstance().initialize();
 	
 	initialized = true;
+
+	initSampling();
 
   // Call the program's main function
   return real_main(argc, argv, envp);

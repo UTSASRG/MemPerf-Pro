@@ -41,6 +41,7 @@ Second, try to maintain a thread local variable to save some thread local inform
 #include <iostream>
 #include "xdefines.hh"
 #include "real.hh"
+#include "memsample.h"
 
 class xthread {
 private:
@@ -209,6 +210,8 @@ public:
 
   // @Global entry of all entry function.
   static void * startThread(void * arg) {
+		initSampling();
+
     void * result;
 
 		fprintf(stderr, "In the beginning of startThread\n");
