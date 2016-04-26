@@ -1,14 +1,15 @@
 SRCS =  libheapperf.cpp \
 				real.cpp 
 
-INCS =         xdefines.hh     \
+INCS =  xdefines.hh     \
         xthread.hh      \
         xheap.hh        \
         xoneheap.hh     \
         xpheap.hh     \
 	      xmemory.hh      \
 	      objectheader.hh \
-	      mm.hh           
+	      mm.hh          \
+				memsample.h 
 
 DEPS = $(SRCS) $(INCS)
 
@@ -20,7 +21,8 @@ DEPS = $(SRCS) $(INCS)
 # When we evaluate performance, there is no need to rollback.
 #-DEVALUATING_PERF
 
-CFLAGS +=-O2 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -I$(ROOT)/heaplayers -fno-omit-frame-pointer -Werror -DDETECT_OVERFLOW -DDETECT_USAGE_AFTER_FREE -DDEBUG_LEVEL=1
+CFLAGS +=-O0 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -I$(ROOT)/heaplayers -fno-omit-frame-pointer -DDETECT_OVERFLOW -DDETECT_USAGE_AFTER_FREE -DDEBUG_LEVEL=1
+#CFLAGS +=-O2 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -I$(ROOT)/heaplayers -fno-omit-frame-pointer -Werror -DDETECT_OVERFLOW -DDETECT_USAGE_AFTER_FREE -DDEBUG_LEVEL=1
 #-DDETECT_MEMORY_LEAKAGE -DDETECT_USAGE_AFTER_FREE
 # CFLAGS += -DDETECT_OVERFLOW -DDETECT_MEMORY_LEAKAGE -DDETECT_USAGE_AFTER_FREE
 # -DEVALUATING_PERF
@@ -51,9 +53,8 @@ all: $(TARGETS)
 
 #gcc -fPIC -std=c99 -c pthread_create.c
 libheapperf.so: $(DEPS)
-	$(CXX) $(CFLAGS) $(INCLUDE_DIRS) -shared -fPIC $(SRCS) -o libheapperf.so -ldl -lpthread
+	$(CXX) $(CFLAGS) $(INCLUDE_DIRS) -shared -fPIC $(SRCS) memsample.c -o libheapperf.so -ldl -lpthread
+	$(CXX) $(CFLAGS) -rdynamic ./libheapperf.so -o test/test test/alloc.cpp
 
 clean:
-	rm -f $(TARGETS)
-
-
+	rm -f $(TARGETS) test/test

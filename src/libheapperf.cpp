@@ -13,6 +13,8 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <unordered_map>
+#include <tuple>
 
 #include "xmemory.hh"
 #include "xthread.hh"
@@ -25,8 +27,11 @@ using namespace std;
 enum { InitialMallocSize = 1024 * 1024 * 1024 };
 
 bool initialized = false;
+__thread bool insideHashMap = false;
+
 __thread thread_t * current;
 xpheap<xoneheap<xheap>> xmemory::_pheap;
+thread_local std::unordered_map<void*, std::tuple<int, int>> u;
 
 __attribute__((constructor)) void initializer() {
 	Real::initializer();	
@@ -88,7 +93,33 @@ extern "C" {
   void* xxmalloc(size_t sz) {
     void* ptr = NULL;
 
-		//printf("xxmalloc sz %ld \n", sz);
+		printf("inside xxmalloc(%ld), initialized=%d \n", sz, initialized);
+		if(initialized && !insideHashMap) {
+			insideHashMap = true;
+			void *callsite = __builtin_extract_return_addr(__builtin_return_address(1));
+
+			std::unordered_map<void*, std::tuple<int, int>>::iterator search = u.find(callsite);
+			if(search != u.end()) {
+				std::tuple<int, int> found = search->second;
+				int oldCount = std::get<0>(found);
+				int oldSize = std::get<1>(found);
+				//printf("found existing callsite: %p! old count =  %d; old allocation size = %d; old map size = %lu\n", callsite, oldCount, oldSize, u.size());
+				search->second = std::make_tuple((oldCount+1), (oldSize+sz));
+			} else {
+				//printf("adding new callsite: %p! old map size = %lu\n", callsite, u.size());
+				std::tuple<int, int> newTuple(std::make_tuple(1, sz));
+				u.insert({callsite, newTuple});
+			}
+			printf("Hash map updated; new contents:\n");
+			for(const auto& n : u) {
+				std::tuple<int, int> tuple = n.second;
+				int count = std::get<0>(tuple);
+				int size = std::get<1>(tuple);
+				printf("Key:[%p] Value:[(%d, %d)]\n", n.first, count, size);
+			}
+			printf("\n");
+		}
+		insideHashMap = false;
 
 		if(sz == 0) {
 			sz = 1;

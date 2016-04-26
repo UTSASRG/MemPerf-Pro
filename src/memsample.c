@@ -533,7 +533,8 @@ long long perf_mmap_read(long long prev_head, long long reg_mask, void *validate
 
 				snprintf(output_buffer, 512, "\tPERF_SAMPLE_IP, IP: %lx\n", ip);
 				lenDetails = strlen(output_buffer);
-				write(STDOUT_FILENO, output_buffer, lenDetails);
+				if(!quiet)
+					write(STDOUT_FILENO, output_buffer, lenDetails);
 
 				offset += sizeof(uint64_t);
 			}
@@ -545,7 +546,8 @@ long long perf_mmap_read(long long prev_head, long long reg_mask, void *validate
 
 				snprintf(output_buffer, 512, "\tPERF_SAMPLE_TID, pid: %d, tid: %d\n", pid, tid);
 				lenDetails = strlen(output_buffer);
-				write(STDOUT_FILENO, output_buffer, lenDetails);
+				if(!quiet)
+					write(STDOUT_FILENO, output_buffer, lenDetails);
 
 				offset += 2 * sizeof(uint32_t);
 			}
@@ -556,7 +558,8 @@ long long perf_mmap_read(long long prev_head, long long reg_mask, void *validate
 
 				snprintf(output_buffer, 512, "\tPERF_SAMPLE_TIME, time: %lu\n", time);
 				lenDetails = strlen(output_buffer);
-				write(STDOUT_FILENO, output_buffer, lenDetails);
+				if(!quiet)
+					write(STDOUT_FILENO, output_buffer, lenDetails);
 
 				offset += sizeof(uint64_t);
 			}
@@ -567,7 +570,8 @@ long long perf_mmap_read(long long prev_head, long long reg_mask, void *validate
 
 				snprintf(output_buffer, 512, "\tPERF_SAMPLE_ADDR, addr: %lx\n", addr);
 				lenDetails = strlen(output_buffer);
-				write(STDOUT_FILENO, output_buffer, lenDetails);
+				if(!quiet)
+					write(STDOUT_FILENO, output_buffer, lenDetails);
 
 				offset += sizeof(uint64_t);
 
@@ -576,12 +580,14 @@ long long perf_mmap_read(long long prev_head, long long reg_mask, void *validate
 					unsigned long *word = (unsigned long *) addr;
 					snprintf(output_buffer, 512, "\tmemory at this addr =\n");
 					lenDetails = strlen(output_buffer);
-					write(STDOUT_FILENO, output_buffer, lenDetails);
+					if(!quiet)
+						write(STDOUT_FILENO, output_buffer, lenDetails);
 					int k;
 					for(k = 0; k < 4; k++, word++) {
 						snprintf(output_buffer, 512, "\t\t%p: %lx\n", word, *word);
 						lenDetails = strlen(output_buffer);
-						write(STDOUT_FILENO, output_buffer, lenDetails);
+						if(!quiet)
+							write(STDOUT_FILENO, output_buffer, lenDetails);
 					}
 				}
 			}
@@ -592,7 +598,8 @@ long long perf_mmap_read(long long prev_head, long long reg_mask, void *validate
 
 				snprintf(output_buffer, 512, "\tPERF_SAMPLE_ID, sample_id: %lu. Offset %llx\n", sample_id, offset);
 				lenDetails = strlen(output_buffer);
-				write(STDOUT_FILENO, output_buffer, lenDetails);
+				if(!quiet)
+					write(STDOUT_FILENO, output_buffer, lenDetails);
 
 				offset += sizeof(uint64_t);
 			}
@@ -610,7 +617,9 @@ long long perf_mmap_read(long long prev_head, long long reg_mask, void *validate
 				memcpy(&res, &data[(offset + sizeof(uint32_t))], sizeof(uint32_t));
 				snprintf(output_buffer, 512, "\tPERF_SAMPLE_CPU, cpu: %d, res: %d\n", cpu, res);
 				lenDetails = strlen(output_buffer);
-				write(STDOUT_FILENO, output_buffer, lenDetails);
+
+				if(!quiet)
+					write(STDOUT_FILENO, output_buffer, lenDetails);
 
 				offset += 2 * sizeof(uint32_t);
 			}
@@ -765,7 +774,7 @@ long long perf_mmap_read(long long prev_head, long long reg_mask, void *validate
 				long long weight;
 
 				memcpy(&weight,&data[offset],sizeof(long long));
-				if(debug) printf("\tPERF_SAMPLE_WEIGHT, Weight: %lld\n",weight);
+				if(!quiet) printf("\tPERF_SAMPLE_WEIGHT, Weight: %lld\n",weight);
 				offset+=8;
 			}
 
@@ -773,10 +782,10 @@ long long perf_mmap_read(long long prev_head, long long reg_mask, void *validate
 				uint64_t src;
 
 				memcpy(&src, &data[offset], sizeof(uint64_t));
-				if (!debug) printf("\tPERF_SAMPLE_DATA_SRC, Raw: %lx\n", src);
+				if (!quiet) printf("\tPERF_SAMPLE_DATA_SRC, Raw: %lx\n", src);
 				offset += sizeof(uint64_t);
 
-				if (!debug) {
+				if (!quiet) {
 					if (src!=0) printf("\t\t");
 					if (src & (PERF_MEM_OP_NA))
 						printf("Op Not available ");

@@ -4,12 +4,16 @@
 #include <stdlib.h>
 
 int main() {
+	int i;
+	int *ptr;
 
-	int * ptr;
-	fprintf(stderr, "\nIn the beginning of main\n");
-	ptr = (int *) malloc(8);
-	* ptr = 4;
+	printf("In the beginning of main\n");
 
-	free(ptr);
+	for(i  = 0; i < 10; i++) {
+		ptr = (int *) malloc(10 * sizeof(int));
+		*ptr = i;
+		free(ptr);
+	}
 
+	return 0;
 }
