@@ -44,7 +44,10 @@ __attribute__((destructor)) void finalizer() {
 
 typedef int (*main_fn_t)(int, char**, char**);
 main_fn_t real_main;
+
 extern "C" void printHashMap();
+extern "C" int addr2line(void *addr);
+extern char * program_invocation_name;
 
 // Doubletake's main function
 int doubletake_main(int argc, char** argv, char** envp) {
@@ -171,22 +174,60 @@ extern "C" {
 
 	void printHashMap() {
 		printf("Hash map contents:\n");
+		printf("--------------------------------\n");
 		for(const auto& level1_entry : memAllocCountMap) {
-			bool isFirstEntry = true;
 			void *callsite1 = level1_entry.first;
 			std::unordered_map<void*, tuple<int, int>> level2_map = level1_entry.second;
+
+			printf("First callsite: %p (line=%d)\n", callsite1, addr2line(callsite1));
 			for(const auto& level2_entry : level2_map) {
 				void *callsite2 = level2_entry.first;
 				std::tuple<int, int> tuple = level2_entry.second;
 				int count = std::get<0>(tuple);
 				int size = std::get<1>(tuple);
-				if(isFirstEntry)
-					printf("   (%-18p, (%p, (%d, %d)))\n", callsite1, callsite2, count, size);
-				else
-					printf("   (                  , (%p, (%d, %d)))\n", callsite2, count, size);
-				isFirstEntry = false;
+				printf("\tSecond callsite: %-18p (line=%4d) -> (%d, %d)\n", callsite2,
+						addr2line(callsite2), count, size);
 			}
 		}
+	}
+
+	int addr2line(void *addr) {
+		int fd[2];
+		int iLineNum = -1;
+		char strCallsite[16];
+		char strAddr2Line[1024];
+
+		if(pipe(fd) == -1) {
+			printf("ERROR: unable to create pipe\n");
+			return -1;
+		}
+
+		switch(fork()) {
+			case -1:
+				printf("ERROR: unable to fork child process\n");
+				break;
+			case 0:		// child
+				close(fd[0]);
+				dup2(fd[1], STDOUT_FILENO);
+				sprintf(strCallsite, "%p", addr);
+				execlp("addr2line", "addr2line", "-e", program_invocation_name, strCallsite, (char *)NULL);
+				exit(EXIT_FAILURE);		// if we're still here, then exec failed
+				break;
+			default:	// parent
+				close(fd[1]);
+				if(read(fd[0], strAddr2Line, 1024) == -1) {
+					printf("ERROR: unable to read from pipe\n");
+					return -1;
+				}
+
+				// Tokenize the return string, breaking apart by ':'
+				// Take the second token, which will be the line number.
+				char *token = strtok(strAddr2Line, ":");
+				token = strtok(NULL, ":");
+				iLineNum = atoi(token);
+		}
+
+		return iLineNum;
 	}
 
   void xxfree(void* ptr) {
