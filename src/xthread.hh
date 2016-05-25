@@ -39,7 +39,6 @@ Second, try to maintain a thread local variable to save some thread local inform
 #include <assert.h> //mejbah
 #include <fstream>
 #include <iostream>
-#include "xdefines.hh"
 #include "real.hh"
 #include "memsample.h"
 
@@ -49,6 +48,7 @@ private:
     { }
 		
 public:
+	typedef void * threadFunction (void *);
   static xthread& getInstance() {
     static char buf[sizeof(xthread)];
     static xthread * theOneTrueObject = new (buf) xthread();
@@ -56,188 +56,18 @@ public:
   }
 
   /// @brief Initialize the system.
-  void initialize()
-  {
-    _heapid = 0;
-	  _aliveThreads = 0;
-    _threadIndex = 0;
-
-    // Shared the threads information. 
-    memset(&_threads, 0, sizeof(_threads));
-
-		// Set all entries to be available initially 
-    for(int i = 0; i < xdefines::NUM_HEAPS; i++) {
-			_HeapAvailable[i] = true;
-    }
-
-    // Allocate the threadindex for current thread.
-    initInitialThread();
-  }
+  void initialize() { }
 
 	// The end of system. 
-	void finalize(void) {
-	}
-
-
-    /// @ Allocation should be always successful.
-  int allocHeapId(void) {
-    int heapid;
-
-    while(true) {
-      if(_HeapAvailable[_heapid] == true) {
-        heapid = _heapid;
-        _HeapAvailable[_heapid] = false;
-        _heapid = (_heapid+1)%xdefines::NUM_HEAPS;
-        break;
-      }
-      _heapid = (_heapid+1)%xdefines::NUM_HEAPS;
-    }
-
-    return heapid;
-  }
-
-  // Set the heap to be available if the thread is exiting.
-  void releaseHeap(int heapid) {
-    _HeapAvailable[heapid] = true;
-  }
-
-  // Initialize the first threadd
-  void initInitialThread(void) {
-    int tindex;
-
-    // Allocate a global thread index for current thread.
-    tindex = allocThreadIndex();
-
-		// We know that we will going to execute     
-    current = getThreadInfoByIndex(tindex);
-
-		fprintf(stderr, "Initialize initial thread\n");
-		assert(tindex == 0);
-
-    // Get corresponding thread_t structure.
-		current->index = tindex;
-    current->self  = pthread_self();
-    current->tid  = gettid();
-    current->stackTop =(void*)(((intptr_t)current->self + xdefines::PageSize) & ~xdefines::PAGE_SIZE_MASK);
-  }
-
-  thread_t * getThreadInfoByIndex(int index) {
-		assert(index < xdefines::MAX_THREADS);
-
-    return &_threads[index];
-  }
-
-	unsigned long getMaxThreadIndex(void) {
-		return _threadIndex;
-  }
-	
-  // Allocate a thread index under the protection of global lock
-  int allocThreadIndex(void) {
-		int index = __atomic_fetch_add(&_threadIndex, 1, __ATOMIC_RELAXED);
-
-    int alivethreads = _aliveThreads++;
-
-		// Check whether we have created too many threads or there are too many alive threads now.
-    if(index >= xdefines::MAX_THREADS || alivethreads >= xdefines::MAX_ALIVE_THREADS) {
-      fprintf(stderr, "Set xdefines::MAX_THREADS to larger. _alivethreads %ld totalthreads %ld maximum alive threads %d", _aliveThreads, _threadIndex, xdefines::MAX_ALIVE_THREADS);
-      abort(); 
-    } 
-
-		    // Initialize 
-    thread_t * thread = getThreadInfoByIndex(index);
-    thread->index = index;
-
-    // Now find one available heapid for this thread.
-    thread->heapid = allocHeapId();
-    return index; 
-  }
+	void finalize(void) { }
 
   /// Create the wrapper 
   /// @ Intercepting the thread_creation operation.
-  int thread_create(pthread_t * tid, const pthread_attr_t * attr, threadFunction * fn, void * arg) {
-    int tindex;
-    int result;
-
-    // Allocate a global thread index for current thread.
-    tindex = allocThreadIndex();
-    thread_t * children = getThreadInfoByIndex(tindex);
-    
-    children->startRoutine = fn;
-    children->startArg = arg;
-	
-		fprintf(stderr, "pthread create  index : %d. Real::pthread_create %p\n", tindex, Real::pthread_create);
-    result =  Real::pthread_create(tid, attr, startThread, (void *)children);
-
-    return result;
+  int thread_create(pthread_t * tid, const pthread_attr_t * attr,
+										threadFunction * fn, void * arg) {
+		// TODO: Need to initialize sampling for this thread here.  -- Sam
+    return Real::pthread_create(tid, attr, fn, arg);
   }      
-
-  inline thread_t* getThread(pthread_t thread) {
-		thread_t * thisThread = NULL;
-
-		for(int index = 0; index < xdefines::MAX_THREADS; index++) {
-			thisThread = getThreadInfoByIndex(index);
-			if(thisThread->self == thread) {
-				break;
-			}
-		}
-    return thisThread;
-  }
-
-
-  int thread_join(pthread_t thread, void **retval)  {
-    int ret;
-
-    ret = Real::pthread_join(thread, retval);
-
-    if(ret == 0) {
-      thread_t * thisThread;
-
-      // Finding out the thread with this pthread_t 
-      thisThread = getThread(thread);
-
-      markThreadExit(thisThread);
-    }
-
-    return ret;
-  }
-
-	void markThreadExit(thread_t * thread) {
-    --_aliveThreads;
-		    
-		// Release the heap id for this thread.
-    releaseHeap(thread->heapid);
-	}
-
-  // @Global entry of all entry function.
-  static void * startThread(void * arg) {
-		initSampling();
-
-    void * result;
-
-		fprintf(stderr, "In the beginning of startThread\n");
-    current = (thread_t *)arg;
-
-    current->self = pthread_self();
-		current->tid = gettid();
-    current->stackTop =(void*)(((intptr_t)current->self + xdefines::PageSize) & ~xdefines::PAGE_SIZE_MASK);
-
-    // from the TLS storage.
-    result = current->startRoutine(current->startArg);
-
-    return result;
-  }
-
-	void* getPrivateStackTop() {return current->stackTop;}
-	
-private:
-	volatile unsigned long _aliveThreads;
-  volatile unsigned long _threadIndex;
-	int _heapid;	
-
-	bool     _HeapAvailable[xdefines::NUM_HEAPS];
-  // Total threads we can support is MAX_THREADS
-  thread_t  _threads[xdefines::MAX_THREADS];
-
 };
 #endif
 

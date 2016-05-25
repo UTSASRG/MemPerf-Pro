@@ -3,6 +3,8 @@
  * @author Tongping Liu <http://www.cs.utsa.edu/~tongpingliu>
  */
 
+#pragma GCC diagnostic ignored "-Wreturn-type-c-linkage"
+
 #include <dlfcn.h>
 #include <pthread.h>
 #include <stdarg.h>
@@ -16,78 +18,68 @@
 #include <unordered_map>
 #include <tuple>
 
-#include "xmemory.hh"
+#include "real.hh"
 #include "xthread.hh"
 #include "memsample.h"
-
-// Install xxmalloc, xxfree, etc. as custom allocator
-#include "wrappers/gnuwrapper.cpp"
 
 using namespace std;
 enum { InitialMallocSize = 1024 * 1024 * 1024 };
 
-bool initialized = false;
 __thread bool insideHashMap = false;
 
-__thread thread_t * current;
-xpheap<xoneheap<xheap>> xmemory::_pheap;
-//thread_local std::unordered_map<void*, std::tuple<int, int>> memAllocCountMap;
-thread_local std::unordered_map<void*, std::unordered_map<void*, tuple<int, int>>> memAllocCountMap;
-
-__attribute__((constructor)) void initializer() {
-	Real::initializer();	
-}
-
-__attribute__((destructor)) void finalizer() {
-  xmemory::getInstance().finalize();
-}
+thread_local std::unordered_map<void*, std::unordered_map<void*, tuple<int, long long>>> memAllocCountMap;
 
 typedef int (*main_fn_t)(int, char**, char**);
 main_fn_t real_main;
 
+extern "C" struct addr2line_info {
+	char exename[256];
+	unsigned int lineNum;
+	bool error = false;
+};
 extern "C" void printHashMap();
-extern "C" int addr2line(void *addr);
+extern "C" struct addr2line_info addr2line(void *addr);
 extern char * program_invocation_name;
 
-// Doubletake's main function
-int doubletake_main(int argc, char** argv, char** envp) {
-  xmemory::getInstance().initialize();
-	
-	initialized = true;
+extern "C" {
+	void free(void *) __THROW __attribute__ ((weak, alias("xxfree")));
+	void *calloc(size_t, size_t) __THROW __attribute__ ((weak, alias("xxcalloc")));
+	void *malloc(size_t) __THROW __attribute__ ((weak, alias("xxmalloc")));
+	//void *realloc(void *, size_t) __THROW WEAK(xxrealloc);
+}
 
+char tmpbuff[100000];
+unsigned long tmppos = 0;
+unsigned long tmpallocs = 0;
+
+extern "C" void * xxcalloc(size_t nelem, size_t elsize);
+__attribute__((constructor)) void initializer() {
+	Real::initializer();
+	Real::initialized = true;
+}
+
+__attribute__((destructor)) void finalizer() { }
+
+// MemPerf's main function
+int libheapperf_main(int argc, char** argv, char** envp) {
 	initSampling();
 
 	int main_ret_val = real_main(argc, argv, envp);
+
 	printHashMap();
 
   return main_ret_val;
 }
 
-extern "C" int __libc_start_main(main_fn_t, int, char**, void (*)(), void (*)(), void (*)(), void*) __attribute__((weak, alias("doubletake_libc_start_main")));
+extern "C" int __libc_start_main(main_fn_t, int, char**, void (*)(), void (*)(), void (*)(), void*) __attribute__((weak, alias("libheapperf_libc_start_main")));
 
-extern "C" int doubletake_libc_start_main(main_fn_t main_fn, int argc, char** argv, void (*init)(), void (*fini)(), void (*rtld_fini)(), void* stack_end) {
+extern "C" int libheapperf_libc_start_main(main_fn_t main_fn, int argc, char** argv, void (*init)(), void (*fini)(), void (*rtld_fini)(), void* stack_end) {
   // Find the real __libc_start_main
   auto real_libc_start_main = (decltype(__libc_start_main)*)dlsym(RTLD_NEXT, "__libc_start_main");
   // Save the program's real main function
   real_main = main_fn;
   // Run the real __libc_start_main, but pass in doubletake's main function
-  return real_libc_start_main(doubletake_main, argc, argv, init, fini, rtld_fini, stack_end);
-}
-
-
-// Temporary bump-pointer allocator for malloc() calls before DoubleTake is initialized
-static void* tempmalloc(int size) {
-  static char _buf[InitialMallocSize];
-  static int _allocated = 0;
-
-  if(_allocated + size > InitialMallocSize) {
-    fprintf(stderr, "Not enough space for tempmalloc");
-    abort();
-  } else {
-    void* p = (void*)&_buf[_allocated];
-    _allocated += size;
-    return p;
-  }
+  return real_libc_start_main(libheapperf_main, argc, argv, init, fini, rtld_fini, stack_end);
 }
 
 // Memory management functions
@@ -100,11 +92,20 @@ extern "C" {
 	extern void *__libc_stack_end;
 
   void* xxmalloc(size_t sz) {
-    void* ptr = NULL;
+		//fprintf(stderr, ">>> value of Real::initialized == %d\n", Real::initialized);
+		if(!Real::initialized) {
+			if(tmppos + sz < sizeof(tmpbuff)) {
+				void *retptr = tmpbuff + tmppos;
+				tmppos += sz;
+				++tmpallocs;
+				return retptr;
+			} else {
+				fprintf(stderr, "error: too much memory requested, sz=%zu\n", sz);
+				exit(1);
+			}
+		}
 
-		//printf("inside xxmalloc(%ld), initialized=%d, insideHashMap=%d\n", sz, initialized, insideHashMap);
-
-		if(initialized && !insideHashMap) {
+		if(!insideHashMap) {
 			insideHashMap = true;
 
 			struct stack_frame *current_frame;
@@ -113,93 +114,98 @@ extern "C" {
 			current_frame = current_frame->prev;
 			void *callsite2 = current_frame->caller_address;
 
-			//printf(">>> debug: callsite1, callsite2 == %p, %p\n", callsite1, callsite2);
-
-			std::unordered_map<void*, std::unordered_map<void*, tuple<int, int>>>::iterator search_level1 =
+			std::unordered_map<void*, std::unordered_map<void*, tuple<int, long long>>>::iterator search_level1 =
 							memAllocCountMap.find(callsite1);
 	
 			// If we found a match on callsite1...
 			if(search_level1 != memAllocCountMap.end()) {
-				//printf(">>> found key=%p in level 1 map\n", callsite1);
-				std::unordered_map<void*, tuple<int, int>> found_level1 = search_level1->second;
-				std::unordered_map<void*, tuple<int, int>>::iterator search_level2 = found_level1.find(callsite2);
+				std::unordered_map<void*, tuple<int, long long>> found_level1 = search_level1->second;
+				std::unordered_map<void*, tuple<int, long long>>::iterator search_level2 = found_level1.find(callsite2);
 
 				// If we found a match on callsite2...
 				if(search_level2 != found_level1.end()) {
-					//printf(">>> found key=%p in level 2 map for key=%p in level 1\n", callsite2, callsite1);
-					std::tuple<int, int> found_level2 = search_level2->second;
+					std::tuple<int, long long> found_level2 = search_level2->second;
 					int oldCount = std::get<0>(found_level2);
-					int oldSize = std::get<1>(found_level2);
-					//search_level2->second = std::make_tuple((oldCount+1), (oldSize+sz));
+					long long oldSize = std::get<1>(found_level2);
 					memAllocCountMap[callsite1][callsite2] = std::make_tuple((oldCount+1), (oldSize+sz));
 				} else {	// If we did NOT find a match on callsite2...
-					//printf(">>> did NOT find key=%p in level 2 map for key=%p in level 1\n", callsite2, callsite1);
-					std::tuple<int, int> new_tuple(std::make_tuple(1, sz));
-					//found_level1.insert({callsite2, new_tuple});
+					std::tuple<int, long long> new_tuple(std::make_tuple(1, sz));
 					memAllocCountMap[callsite1].insert({callsite2, new_tuple});
 				}
 			} else {	// If we did NOT find a match on callsite1...
-				//printf(">>> did NOT find key=%p in level 1 map\n", callsite1);
-				std::unordered_map<void*, tuple<int, int>> new_level2_map;
-				std::tuple<int, int> newTuple(std::make_tuple(1, sz));
+				std::unordered_map<void*, tuple<int, long long>> new_level2_map;
+				std::tuple<int, long long> newTuple(std::make_tuple(1, sz));
 				new_level2_map.insert({callsite2, newTuple});
 				memAllocCountMap.insert({callsite1, new_level2_map});
 			}
 			insideHashMap = false;
 		}
 
-		if(sz == 0) {
-			sz = 1;
-		}
-
-    // Align the object size. FIXME for now, just use 16 byte alignment and min size.
-    if(!initialized) {
-    	if (sz < 16) {
-      	sz = 16;
-   		}
-    	sz = (sz + 15) & ~15;
-      ptr = tempmalloc(sz);
-    } 
-		else {
-      ptr = xmemory::getInstance().malloc(sz);
-    }
-    if(ptr == NULL) {
-    	fprintf(stderr, "Out of memory with initialized %d!\n", initialized);
-      ::abort();
-    }
-		
-		//fprintf(stderr, "MEMORY allocation with ptr %p to %lx\n", ptr, ((intptr_t)ptr + sz));
-    return ptr;
+		return Real::malloc(sz);
   }
 
 	void printHashMap() {
-		printf("Hash map contents:\n");
-		printf("--------------------------------\n");
-		for(const auto& level1_entry : memAllocCountMap) {
-			void *callsite1 = level1_entry.first;
-			std::unordered_map<void*, tuple<int, int>> level2_map = level1_entry.second;
+		char outputFile[256];
+		strcpy(outputFile, program_invocation_name);
+		strcat(outputFile, "_libheapperf.txt");
 
-			printf("First callsite: %p (line=%d)\n", callsite1, addr2line(callsite1));
+		FILE *output = fopen(outputFile, "a");
+		if(output == NULL) {
+			fprintf(stderr, "ERROR: unable to open output file for writing hash map\n");
+			return;
+		}
+
+		fprintf(output, "Hash map contents:\n");
+		fprintf(output, "--------------------------------\n");
+		fprintf(output, "%-18s %-18s %5s %-64s %5s %-64s %6s %8s %14s\n", "callsite1", "callsite2",
+						"line1", "exename1", "line2", "exename2", "allocs", "total sz", "avg sz");
+		bool firstLine;
+		for(const auto& level1_entry : memAllocCountMap) {
+			firstLine = true;
+			void *callsite1 = level1_entry.first;
+			struct addr2line_info addrInfo1, addrInfo2;
+			std::unordered_map<void*, tuple<int, long long>> level2_map = level1_entry.second;
+
+			addrInfo1 = addr2line(callsite1);
 			for(const auto& level2_entry : level2_map) {
 				void *callsite2 = level2_entry.first;
-				std::tuple<int, int> tuple = level2_entry.second;
+				std::tuple<int, long long> tuple = level2_entry.second;
 				int count = std::get<0>(tuple);
-				int size = std::get<1>(tuple);
-				printf("\tSecond callsite: %-18p (line=%4d) -> (%d, %d)\n", callsite2,
-						addr2line(callsite2), count, size);
+				long long size = std::get<1>(tuple);
+				addrInfo2 = addr2line(callsite2);
+				float avgSize = size / (float) count;
+				if(firstLine)
+					fprintf(output, "%-18p ", callsite1);
+				else
+					fprintf(output, "%-18s ", "\"");
+				fprintf(output, "%-18p ", callsite2);
+				fprintf(output, "%5d ", addrInfo1.lineNum);
+				fprintf(output, "%-64s ", addrInfo1.exename);
+				fprintf(output, "%5d ", addrInfo2.lineNum);
+				fprintf(output, "%-64s ", addrInfo2.exename);
+				fprintf(output, "%6d ", count);
+				fprintf(output, "%8lld ", size);
+				fprintf(output, "%14.1f", avgSize);
+				fprintf(output, "\n");
+				firstLine = false;
 			}
 		}
+		fprintf(output, "\n\n");
+		fclose(output);
 	}
 
-	int addr2line(void *addr) {
+	struct addr2line_info addr2line(void *addr) {
 		int fd[2];
-		int iLineNum = -1;
 		char strCallsite[16];
-		char strAddr2Line[1024];
+		char strInfo[512];
+		struct addr2line_info info;
 
 		if(pipe(fd) == -1) {
 			printf("ERROR: unable to create pipe\n");
-			return -1;
+			strcpy(info.exename, "error");
+			info.lineNum = 0;
+			info.error = true;
+			return info;
 		}
 
 		switch(fork()) {
@@ -215,42 +221,52 @@ extern "C" {
 				break;
 			default:	// parent
 				close(fd[1]);
-				if(read(fd[0], strAddr2Line, 1024) == -1) {
+				if(read(fd[0], strInfo, 512) == -1) {
 					printf("ERROR: unable to read from pipe\n");
-					return -1;
+					strcpy(info.exename, "error");
+					info.lineNum = 0;
+					info.error = true;
+					return info;
 				}
 
 				// Tokenize the return string, breaking apart by ':'
 				// Take the second token, which will be the line number.
-				char *token = strtok(strAddr2Line, ":");
+				char *token = strtok(strInfo, ":");
+				strncpy(info.exename, token, 256);
 				token = strtok(NULL, ":");
-				iLineNum = atoi(token);
+				info.lineNum = atoi(token);
 		}
 
-		return iLineNum;
+		return info;
 	}
 
   void xxfree(void* ptr) {
-    if(initialized && ptr) {
-      xmemory::getInstance().free(ptr);
-    }
+		if(ptr >= (void *)tmpbuff && ptr <= (void *)(tmpbuff + tmppos))
+			fprintf(stderr, "info: freeing temp memory\n");
+		else
+			Real::free(ptr);
   }
 
-  size_t xxmalloc_usable_size(void* ptr) {
-    if(initialized) {
-      return xmemory::getInstance().getSize(ptr);
-    }
-    return 0;
-  }
+	void * xxcalloc(size_t nelem, size_t elsize) {
+		if(!Real::initialized) {
+			void *ptr = malloc(nelem*elsize);
+			if(ptr)
+				memset(ptr, 0, nelem*elsize);
+			return ptr;
+		}
+
+		void *ptr = Real::calloc(nelem, elsize);
+		return ptr;
+	}
 
 	void * xxrealloc(void * ptr, size_t sz) {
-    if(initialized) {
-      return xmemory::getInstance().realloc(ptr, sz);
-		}
-		else {
-			void * newptr = tempmalloc(sz);
-			return newptr;
-		}
+		//return Real::realloc(ptr, sz);
+		return NULL;
+	}
+
+	size_t xxmalloc_usable_size(void *ptr) {
+		//return Real::malloc_usable_size(ptr);
+		return 0;
 	}
 }
 
@@ -261,4 +277,3 @@ extern "C" {
     return xthread::getInstance().thread_create(tid, attr, start_routine, arg);
   }
 }
-

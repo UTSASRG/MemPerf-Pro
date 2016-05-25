@@ -512,7 +512,7 @@ void setupSampling(void) {
 
 	//Sample_period/freq: Setting the rate of recording. 
 	//For perf, it generates an overflow and start writing to mmap buffer in a fixed frequency set here.
-  pe.sample_period = 1000;
+  //pe.sample_period = 1000;
   pe.sample_freq = 1000;
 
 	//Sample_type: Specifies which should be sampled in an access. 
