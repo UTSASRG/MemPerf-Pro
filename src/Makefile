@@ -49,7 +49,7 @@ all: $(TARGETS)
 libheapperf.so: $(DEPS)
 	$(CXX) $(CFLAGS) $(INCLUDE_DIRS) -shared -fPIC $(SRCS) memsample.c -o libheapperf.so -ldl -lpthread
 
-test/test: libheapperf.so
+test/test: libheapperf.so test/alloc.cpp
 	$(CXX) $(CFLAGS) -g -rdynamic ./libheapperf.so -o test/test test/alloc.cpp
 
 clean:
