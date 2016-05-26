@@ -44,7 +44,7 @@ extern "C" {
 }
 
 bool initialized = false;
-char tmpbuf[102400];		// 100 KB global buffer
+char tmpbuf[10240];		// 10KB global buffer
 unsigned int tmppos = 0;
 unsigned int tmpallocs = 0;
 
@@ -56,7 +56,7 @@ __attribute__((constructor)) void initializer() {
 __attribute__((destructor)) void finalizer() { }
 
 // MemPerf's main function
-int libheapperf_main(int argc, char** argv, char** envp) {
+int libheapperf_main(int argc, char ** argv, char ** envp) {
 	initSampling();
 
 	int main_ret_val = real_main(argc, argv, envp);
@@ -66,10 +66,10 @@ int libheapperf_main(int argc, char** argv, char** envp) {
   return main_ret_val;
 }
 
-extern "C" int __libc_start_main(main_fn_t, int, char**, void (*)(), void (*)(), void (*)(), void*) __attribute__((weak, alias("libheapperf_libc_start_main")));
+extern "C" int __libc_start_main(main_fn_t, int, char **, void (*)(), void (*)(), void (*)(), void *) __attribute__((weak, alias("libheapperf_libc_start_main")));
 
-extern "C" int libheapperf_libc_start_main(main_fn_t main_fn, int argc, char** argv, void (*init)(), void (*fini)(), void (*rtld_fini)(), void* stack_end) {
-  auto real_libc_start_main = (decltype(__libc_start_main)*)dlsym(RTLD_NEXT, "__libc_start_main");
+extern "C" int libheapperf_libc_start_main(main_fn_t main_fn, int argc, char ** argv, void (*init)(), void (*fini)(), void (*rtld_fini)(), void * stack_end) {
+  auto real_libc_start_main = (decltype(__libc_start_main) *)dlsym(RTLD_NEXT, "__libc_start_main");
   real_main = main_fn;
   return real_libc_start_main(libheapperf_main, argc, argv, init, fini, rtld_fini, stack_end);
 }
@@ -84,6 +84,16 @@ extern "C" {
 	extern void * _libc_stack_end;
 
 	void * xxmalloc(size_t sz) {
+		// Small allocation routine designed to service malloc requests made by the
+		// dlsym() function. Due to our linkage aliasing which redirects calls to
+		// malloc to xxmalloc in this file, when dlsym calls malloc, xxmalloc is
+		// called instead. xxmalloc then relies on Real::malloc to fulfill the
+		// request, however, Real::malloc has not yet been assigned until the dlsym
+		// call returns. This results in a segmentation fault. To remedy the problem,
+		// we detect whether Real has finished initializing; if it has not, when
+		// fulfill malloc requests using a small global buffer. Once dlsym finishes,
+		// all future malloc requests will be fulfilled by Real::malloc, which
+		// contains a reference to the real libc malloc routine.  - Sam
 		if(!initialized) {
 			if(tmppos + sz < sizeof(tmpbuf)) {
 				void * retptr = tmpbuf + tmppos;
@@ -92,7 +102,7 @@ extern "C" {
 				return retptr;
 			} else {
 				fprintf(stderr, "error: too much memory requested, sz=%zu\n", sz);
-				exit(1);
+				exit(EXIT_FAILURE);
 			}
 		}
 
@@ -100,7 +110,7 @@ extern "C" {
 			insideHashMap = true;
 
 			struct stack_frame * current_frame;
-			current_frame = (struct stack_frame*)(__builtin_frame_address(0));
+			current_frame = (struct stack_frame *)(__builtin_frame_address(0));
 			void * callsite1 = current_frame->caller_address;
 			current_frame = current_frame->prev;
 			void * callsite2 = current_frame->caller_address;
@@ -129,18 +139,49 @@ extern "C" {
 				new_level2_map.insert({callsite2, newTuple});
 				memAllocCountMap.insert({callsite1, new_level2_map});
 			}
+
 			insideHashMap = false;
 		}
 
 		return Real::malloc(sz);
   }
 
+	void * xxcalloc(size_t nelem, size_t elsize) {
+		// If Real has not yet finished initializing, fulfill the calloc request
+		// ourselves by issuing appropriate calls to malloc and memset. The
+		// malloc request will be fulfilled using memory from our global buffer.
+		if(!initialized) {
+			void * ptr = malloc(nelem * elsize);
+			if(ptr)
+				memset(ptr, 0, nelem * elsize);
+			return ptr;
+		}
+
+		return Real::calloc(nelem, elsize);
+	}
+
+  void xxfree(void * ptr) {
+		// Determine whether the specified object came from our global buffer;
+		// only call Real::free() if the object did not come from here.
+		if(ptr >= (void *)tmpbuf && ptr <= (void *)(tmpbuf + tmppos))
+			fprintf(stderr, "info: freeing temp memory\n");
+		else
+			Real::free(ptr);
+  }
+
+	/*
+	void * xxrealloc(void * ptr, size_t sz) {
+		return Real::realloc(ptr, sz);
+	}
+	*/
+
 	void printHashMap() {
 		char outputFile[256];
 		strcpy(outputFile, program_invocation_name);
 		strcat(outputFile, "_libheapperf.txt");
 
-		FILE * output = fopen(outputFile, "a");
+		// Presently set to overwrite file; change fopen flag to "a" for append.
+		FILE * output = fopen(outputFile, "w");
 		if(output == NULL) {
 			fprintf(stderr, "ERROR: unable to open output file for writing hash map\n");
 			return;
@@ -151,11 +192,12 @@ extern "C" {
 		fprintf(output, "%-18s %-18s %5s %-64s %5s %-64s %6s %8s %14s\n", "callsite1", "callsite2",
 						"line1", "exename1", "line2", "exename2", "allocs", "total sz", "avg sz");
 		bool firstLine;
+
 		for(const auto& level1_entry : memAllocCountMap) {
 			firstLine = true;
 			void * callsite1 = level1_entry.first;
 			struct addr2line_info addrInfo1, addrInfo2;
-			std::unordered_map<void*, tuple<int, long long>> level2_map = level1_entry.second;
+			std::unordered_map<void *, tuple<int, long long>> level2_map = level1_entry.second;
 
 			addrInfo1 = addr2line(callsite1);
 			for(const auto& level2_entry : level2_map) {
@@ -230,30 +272,6 @@ extern "C" {
 
 		return info;
 	}
-
-  void xxfree(void * ptr) {
-		if(ptr >= (void *)tmpbuf && ptr <= (void *)(tmpbuf + tmppos))
-			fprintf(stderr, "info: freeing temp memory\n");
-		else
-			Real::free(ptr);
-  }
-
-	void * xxcalloc(size_t nelem, size_t elsize) {
-		if(!initialized) {
-			void * ptr = malloc(nelem * elsize);
-			if(ptr)
-				memset(ptr, 0, nelem * elsize);
-			return ptr;
-		}
-
-		return Real::calloc(nelem, elsize);
-	}
-
-	/*
-	void * xxrealloc(void * ptr, size_t sz) {
-		return Real::realloc(ptr, sz);
-	}
-	*/
 }
 
 // Thread functions

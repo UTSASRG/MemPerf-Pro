@@ -53,4 +53,4 @@ test/test: libheapperf.so test/alloc.cpp
 	$(CXX) $(CFLAGS) -g -rdynamic ./libheapperf.so -o test/test test/alloc.cpp
 
 clean:
-	rm -f $(TARGETS) test/test
+	rm -f $(TARGETS)
