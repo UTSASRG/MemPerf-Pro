@@ -40,7 +40,7 @@ extern "C" {
 	void * malloc(size_t) __THROW __attribute__ ((weak, alias("xxmalloc")));
 
 	// TODO: How to handle realloc?	-Sam
-	//void * ealloc(void *, size_t) __THROW __attribute__ ((weak, alias("xxrealloc")));
+	//void * realloc(void *, size_t) __THROW __attribute__ ((weak, alias("xxrealloc")));
 }
 
 bool initialized = false;
@@ -63,15 +63,15 @@ int libmemperf_main(int argc, char ** argv, char ** envp) {
 
 	printHashMap();
 
-  return main_ret_val;
+	return main_ret_val;
 }
 
 extern "C" int __libc_start_main(main_fn_t, int, char **, void (*)(), void (*)(), void (*)(), void *) __attribute__((weak, alias("libmemperf_libc_start_main")));
 
 extern "C" int libmemperf_libc_start_main(main_fn_t main_fn, int argc, char ** argv, void (*init)(), void (*fini)(), void (*rtld_fini)(), void * stack_end) {
-  auto real_libc_start_main = (decltype(__libc_start_main) *)dlsym(RTLD_NEXT, "__libc_start_main");
-  real_main = main_fn;
-  return real_libc_start_main(libmemperf_main, argc, argv, init, fini, rtld_fini, stack_end);
+	auto real_libc_start_main = (decltype(__libc_start_main) *)dlsym(RTLD_NEXT, "__libc_start_main");
+	real_main = main_fn;
+	return real_libc_start_main(libmemperf_main, argc, argv, init, fini, rtld_fini, stack_end);
 }
 
 // Memory management functions
@@ -278,6 +278,6 @@ extern "C" {
 extern "C" {
   int pthread_create(pthread_t * tid, const pthread_attr_t * attr, void * (*start_routine)(void *),
 		     void * arg) {
-    return xthread::getInstance().thread_create(tid, attr, start_routine, arg);
+    return xthread::thread_create(tid, attr, start_routine, arg);
   }
 }

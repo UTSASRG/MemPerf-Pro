@@ -1,38 +1,42 @@
-#ifndef _XTHREAD_H_
-#define _XTHREAD_H_
-
-#include <pthread.h>
-#include <unistd.h>
+#include <errno.h>
 #include <stdlib.h>
-#include <stdio.h>
+#include <unistd.h>
+#include <sys/syscall.h>
+
 #include "real.hh"
 #include "memsample.h"
 
 class xthread {
-private:
-	xthread() 
-		{ }
-		
-public:
-	typedef void * threadFunction (void *);
-	static xthread& getInstance() {
-		static char buf[sizeof(xthread)];
-		static xthread * theOneTrueObject = new (buf) xthread();
-		return *theOneTrueObject;
+	typedef void * threadFunction(void *);
+	typedef struct thread {
+		pid_t tid;
+		threadFunction * startRoutine;
+		void * startArg;
+		void * result;
+	} thread_t;
+
+	public:
+	static int thread_create(pthread_t * tid, const pthread_attr_t * attr, threadFunction * fn, void * arg) {
+		thread_t * children = (thread_t *) malloc(sizeof(thread_t));
+		children->startArg = arg;
+		children->startRoutine = fn;
+		int result = Real::pthread_create(tid, attr, xthread::startThread, (void *)children);
+		if(result != 0) {
+			fprintf(stderr, "ERROR: pthread_create failed with errno=%d: %s\n", errno, strerror(errno));
+			abort();
+		}
+		return result;
 	}
 
-	/// @brief Initialize the system.
-	void initialize() { }
+	static void * startThread(void * arg) {
+		initSampling();
 
-	// The end of system. 
-	void finalize(void) { }
+		void * result = NULL;
+		thread_t * current = (thread_t *) arg;
+		pid_t tid = syscall(__NR_gettid);
+		current->tid = tid;
 
-	/// Create the wrapper 
-	/// @ Intercepting the thread_creation operation.
-	int thread_create(pthread_t * tid, const pthread_attr_t * attr,
-										threadFunction * fn, void * arg) {
-		// TODO: Need to initialize sampling for this thread here.  -- Sam
-		return Real::pthread_create(tid, attr, fn, arg);
-	}    
+		result = current->startRoutine(current->startArg);
+		return result;
+	}
 };
-#endif

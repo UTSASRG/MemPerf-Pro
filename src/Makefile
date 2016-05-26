@@ -1,5 +1,6 @@
 SRCS =  libmemperf.cpp \
 				real.cpp \
+				memsample.c
 
 INCS =  xthread.hh     \
 				memsample.h 	 \
@@ -15,7 +16,7 @@ DEPS = $(SRCS) $(INCS)
 # When we evaluate performance, there is no need to rollback.
 #-DEVALUATING_PERF
 
-CFLAGS +=-O0 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-frame-pointer -DDETECT_OVERFLOW -DDETECT_USAGE_AFTER_FREE -DDEBUG_LEVEL=1
+CFLAGS += -O0 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-frame-pointer -DDETECT_OVERFLOW -DDETECT_USAGE_AFTER_FREE -DDEBUG_LEVEL=1
 #-DDETECT_MEMORY_LEAKAGE -DDETECT_USAGE_AFTER_FREE
 # CFLAGS += -DDETECT_OVERFLOW -DDETECT_MEMORY_LEAKAGE -DDETECT_USAGE_AFTER_FREE
 # -DEVALUATING_PERF
@@ -44,9 +45,8 @@ TARGETS = libmemperf.so test/test
 
 all: $(TARGETS)
 
-#gcc -fPIC -std=c99 -c pthread_create.c
 libmemperf.so: $(DEPS)
-	$(CXX) $(CFLAGS) $(INCLUDE_DIRS) -shared -fPIC $(SRCS) memsample.c -o libmemperf.so -ldl -lpthread
+	$(CXX) $(CFLAGS) $(INCLUDE_DIRS) -shared -fPIC $(SRCS) -o libmemperf.so -ldl -lpthread
 
 test/test: libmemperf.so test/alloc.cpp
 	$(CXX) $(CFLAGS) -g -rdynamic ./libmemperf.so -o test/test test/alloc.cpp
