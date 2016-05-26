@@ -14,14 +14,14 @@ namespace Real {
 	DEFINE_WRAPPER(pthread_create);
 
 	void initializer() {
- 		INIT_WRAPPER(free, RTLD_NEXT);
+		INIT_WRAPPER(free, RTLD_NEXT);
 		INIT_WRAPPER(calloc, RTLD_NEXT);
- 		INIT_WRAPPER(malloc, RTLD_NEXT);
+		INIT_WRAPPER(malloc, RTLD_NEXT);
 		
- 		//INIT_WRAPPER(malloc_usable_size, RTLD_NEXT);
- 		//INIT_WRAPPER(realloc, RTLD_NEXT);
+		//INIT_WRAPPER(malloc_usable_size, RTLD_NEXT);
+		//INIT_WRAPPER(realloc, RTLD_NEXT);
 
- 		void *pthread_handle = dlopen("libpthread.so.0", RTLD_NOW | RTLD_GLOBAL | RTLD_NOLOAD);
- 		INIT_WRAPPER(pthread_create, pthread_handle);
+		void *pthread_handle = dlopen("libpthread.so.0", RTLD_NOW | RTLD_GLOBAL | RTLD_NOLOAD);
+		INIT_WRAPPER(pthread_create, pthread_handle);
 	}
 }

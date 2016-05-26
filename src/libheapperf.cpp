@@ -45,17 +45,19 @@ extern "C" {
 	void free(void *) __THROW __attribute__ ((weak, alias("xxfree")));
 	void *calloc(size_t, size_t) __THROW __attribute__ ((weak, alias("xxcalloc")));
 	void *malloc(size_t) __THROW __attribute__ ((weak, alias("xxmalloc")));
-	//void *realloc(void *, size_t) __THROW WEAK(xxrealloc);
+
+	// TODO: How to handle realloc?	-Sam
+	//void *realloc(void *, size_t) __THROW __attribute__ ((weak, alias("xxrealloc")));
 }
 
-char tmpbuff[100000];
-unsigned long tmppos = 0;
-unsigned long tmpallocs = 0;
+bool initialized = false;
+char tmpbuf[102400];		// 100 KB global buffer
+unsigned int tmppos = 0;
+unsigned int tmpallocs = 0;
 
-extern "C" void * xxcalloc(size_t nelem, size_t elsize);
 __attribute__((constructor)) void initializer() {
 	Real::initializer();
-	Real::initialized = true;
+	initialized = true;
 }
 
 __attribute__((destructor)) void finalizer() { }
@@ -92,10 +94,9 @@ extern "C" {
 	extern void *__libc_stack_end;
 
   void* xxmalloc(size_t sz) {
-		//fprintf(stderr, ">>> value of Real::initialized == %d\n", Real::initialized);
-		if(!Real::initialized) {
-			if(tmppos + sz < sizeof(tmpbuff)) {
-				void *retptr = tmpbuff + tmppos;
+		if(!initialized) {
+			if(tmppos + sz < sizeof(tmpbuf)) {
+				void *retptr = tmpbuf + tmppos;
 				tmppos += sz;
 				++tmpallocs;
 				return retptr;
@@ -194,7 +195,7 @@ extern "C" {
 		fclose(output);
 	}
 
-	struct addr2line_info addr2line(void *addr) {
+	struct addr2line_info addr2line(void * addr) {
 		int fd[2];
 		char strCallsite[16];
 		char strInfo[512];
@@ -240,15 +241,15 @@ extern "C" {
 		return info;
 	}
 
-  void xxfree(void* ptr) {
-		if(ptr >= (void *)tmpbuff && ptr <= (void *)(tmpbuff + tmppos))
+  void xxfree(void * ptr) {
+		if(ptr >= (void *)tmpbuf && ptr <= (void *)(tmpbuf + tmppos))
 			fprintf(stderr, "info: freeing temp memory\n");
 		else
 			Real::free(ptr);
   }
 
 	void * xxcalloc(size_t nelem, size_t elsize) {
-		if(!Real::initialized) {
+		if(!initialized) {
 			void *ptr = malloc(nelem*elsize);
 			if(ptr)
 				memset(ptr, 0, nelem*elsize);
@@ -259,15 +260,11 @@ extern "C" {
 		return ptr;
 	}
 
+	/*
 	void * xxrealloc(void * ptr, size_t sz) {
-		//return Real::realloc(ptr, sz);
-		return NULL;
+		return Real::realloc(ptr, sz);
 	}
-
-	size_t xxmalloc_usable_size(void *ptr) {
-		//return Real::malloc_usable_size(ptr);
-		return 0;
-	}
+	*/
 }
 
 // Thread functions

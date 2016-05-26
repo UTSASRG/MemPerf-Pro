@@ -1,4 +1,4 @@
-#if !defined(DOUBLETAKE_REAL_H)
+#ifndef DOUBLETAKE_REAL_H
 #define DOUBLETAKE_REAL_H
 
 #include <malloc.h>
@@ -7,8 +7,6 @@
 #define DECLARE_WRAPPER(name) extern decltype(::name) * name;
 
 namespace Real {
-	static bool initialized = false;
-
 	void initializer();
 	DECLARE_WRAPPER(free);
 	DECLARE_WRAPPER(calloc);
