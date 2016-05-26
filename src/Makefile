@@ -1,4 +1,4 @@
-SRCS =  libheapperf.cpp \
+SRCS =  libmemperf.cpp \
 				real.cpp \
 
 INCS =  xthread.hh     \
@@ -16,7 +16,6 @@ DEPS = $(SRCS) $(INCS)
 #-DEVALUATING_PERF
 
 CFLAGS +=-O0 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-frame-pointer -DDETECT_OVERFLOW -DDETECT_USAGE_AFTER_FREE -DDEBUG_LEVEL=1
-#CFLAGS +=-O2 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -I$(ROOT)/heaplayers -fno-omit-frame-pointer -Werror -DDETECT_OVERFLOW -DDETECT_USAGE_AFTER_FREE -DDEBUG_LEVEL=1
 #-DDETECT_MEMORY_LEAKAGE -DDETECT_USAGE_AFTER_FREE
 # CFLAGS += -DDETECT_OVERFLOW -DDETECT_MEMORY_LEAKAGE -DDETECT_USAGE_AFTER_FREE
 # -DEVALUATING_PERF
@@ -38,19 +37,19 @@ CFLAGS +=-O0 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-fra
 # Memory Leakage
 #CFLAGS   = -g -O2 -DSSE_SUPPORT -fno-omit-frame-pointer -DHANDLE_SYSCALL -DDETECT_MEMORY_LEAKAGE -DEVALUATING_PERF
 
-INCLUDE_DIRS = -I. -I./heaplayers -I./heaplayers/util -I/usr/include/x86_64-linux-gnu/c++/4.8/
+INCLUDE_DIRS = -I. -I/usr/include/x86_64-linux-gnu/c++/4.8/
 LIBS     := dl pthread
 
-TARGETS = libheapperf.so test/test
+TARGETS = libmemperf.so test/test
 
 all: $(TARGETS)
 
 #gcc -fPIC -std=c99 -c pthread_create.c
-libheapperf.so: $(DEPS)
-	$(CXX) $(CFLAGS) $(INCLUDE_DIRS) -shared -fPIC $(SRCS) memsample.c -o libheapperf.so -ldl -lpthread
+libmemperf.so: $(DEPS)
+	$(CXX) $(CFLAGS) $(INCLUDE_DIRS) -shared -fPIC $(SRCS) memsample.c -o libmemperf.so -ldl -lpthread
 
-test/test: libheapperf.so test/alloc.cpp
-	$(CXX) $(CFLAGS) -g -rdynamic ./libheapperf.so -o test/test test/alloc.cpp
+test/test: libmemperf.so test/alloc.cpp
+	$(CXX) $(CFLAGS) -g -rdynamic ./libmemperf.so -o test/test test/alloc.cpp
 
 clean:
 	rm -f $(TARGETS)
