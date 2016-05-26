@@ -1,5 +1,5 @@
 /**
- * @file libheapperf.cpp
+ * @file libmemperf.cpp
  * @author Tongping Liu <http://www.cs.utsa.edu/~tongpingliu>
  */
 
@@ -56,7 +56,7 @@ __attribute__((constructor)) void initializer() {
 __attribute__((destructor)) void finalizer() { }
 
 // MemPerf's main function
-int libheapperf_main(int argc, char ** argv, char ** envp) {
+int libmemperf_main(int argc, char ** argv, char ** envp) {
 	initSampling();
 
 	int main_ret_val = real_main(argc, argv, envp);
@@ -66,12 +66,12 @@ int libheapperf_main(int argc, char ** argv, char ** envp) {
   return main_ret_val;
 }
 
-extern "C" int __libc_start_main(main_fn_t, int, char **, void (*)(), void (*)(), void (*)(), void *) __attribute__((weak, alias("libheapperf_libc_start_main")));
+extern "C" int __libc_start_main(main_fn_t, int, char **, void (*)(), void (*)(), void (*)(), void *) __attribute__((weak, alias("libmemperf_libc_start_main")));
 
-extern "C" int libheapperf_libc_start_main(main_fn_t main_fn, int argc, char ** argv, void (*init)(), void (*fini)(), void (*rtld_fini)(), void * stack_end) {
+extern "C" int libmemperf_libc_start_main(main_fn_t main_fn, int argc, char ** argv, void (*init)(), void (*fini)(), void (*rtld_fini)(), void * stack_end) {
   auto real_libc_start_main = (decltype(__libc_start_main) *)dlsym(RTLD_NEXT, "__libc_start_main");
   real_main = main_fn;
-  return real_libc_start_main(libheapperf_main, argc, argv, init, fini, rtld_fini, stack_end);
+  return real_libc_start_main(libmemperf_main, argc, argv, init, fini, rtld_fini, stack_end);
 }
 
 // Memory management functions
@@ -178,7 +178,7 @@ extern "C" {
 	void printHashMap() {
 		char outputFile[256];
 		strcpy(outputFile, program_invocation_name);
-		strcat(outputFile, "_libheapperf.txt");
+		strcat(outputFile, "_libmemperf.txt");
 
 		// Presently set to overwrite file; change fopen flag to "a" for append.
 		FILE * output = fopen(outputFile, "w");
