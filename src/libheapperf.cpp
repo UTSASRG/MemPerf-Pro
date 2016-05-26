@@ -7,14 +7,8 @@
 
 #include <dlfcn.h>
 #include <pthread.h>
-#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <cstddef>
-#include <iostream>
-#include <fstream>
-#include <sstream>
-#include <string>
 #include <unordered_map>
 #include <tuple>
 
@@ -23,31 +17,30 @@
 #include "memsample.h"
 
 using namespace std;
-enum { InitialMallocSize = 1024 * 1024 * 1024 };
 
 __thread bool insideHashMap = false;
+thread_local std::unordered_map<void *, std::unordered_map<void *, tuple<int, long long>>> memAllocCountMap;
 
-thread_local std::unordered_map<void*, std::unordered_map<void*, tuple<int, long long>>> memAllocCountMap;
-
-typedef int (*main_fn_t)(int, char**, char**);
+typedef int (*main_fn_t)(int, char **, char **);
 main_fn_t real_main;
 
-extern "C" struct addr2line_info {
-	char exename[256];
-	unsigned int lineNum;
-	bool error = false;
-};
-extern "C" void printHashMap();
-extern "C" struct addr2line_info addr2line(void *addr);
 extern char * program_invocation_name;
 
 extern "C" {
+	struct addr2line_info {
+		char exename[256];
+		unsigned int lineNum;
+		bool error = false;
+	};
+	void printHashMap();
+	struct addr2line_info addr2line(void * ddr);
+
 	void free(void *) __THROW __attribute__ ((weak, alias("xxfree")));
-	void *calloc(size_t, size_t) __THROW __attribute__ ((weak, alias("xxcalloc")));
-	void *malloc(size_t) __THROW __attribute__ ((weak, alias("xxmalloc")));
+	void * calloc(size_t, size_t) __THROW __attribute__ ((weak, alias("xxcalloc")));
+	void * malloc(size_t) __THROW __attribute__ ((weak, alias("xxmalloc")));
 
 	// TODO: How to handle realloc?	-Sam
-	//void *realloc(void *, size_t) __THROW __attribute__ ((weak, alias("xxrealloc")));
+	//void * ealloc(void *, size_t) __THROW __attribute__ ((weak, alias("xxrealloc")));
 }
 
 bool initialized = false;
@@ -76,27 +69,24 @@ int libheapperf_main(int argc, char** argv, char** envp) {
 extern "C" int __libc_start_main(main_fn_t, int, char**, void (*)(), void (*)(), void (*)(), void*) __attribute__((weak, alias("libheapperf_libc_start_main")));
 
 extern "C" int libheapperf_libc_start_main(main_fn_t main_fn, int argc, char** argv, void (*init)(), void (*fini)(), void (*rtld_fini)(), void* stack_end) {
-  // Find the real __libc_start_main
   auto real_libc_start_main = (decltype(__libc_start_main)*)dlsym(RTLD_NEXT, "__libc_start_main");
-  // Save the program's real main function
   real_main = main_fn;
-  // Run the real __libc_start_main, but pass in doubletake's main function
   return real_libc_start_main(libheapperf_main, argc, argv, init, fini, rtld_fini, stack_end);
 }
 
 // Memory management functions
 extern "C" {
 	struct stack_frame {
-  	struct stack_frame * prev;/* pointing to previous stack_frame */
-  	void* caller_address;/* the address of caller */
+		struct stack_frame * prev;	/* pointing to previous stack_frame */
+		void * caller_address;	/* the address of caller */
 	};
 
-	extern void *__libc_stack_end;
+	extern void * _libc_stack_end;
 
-  void* xxmalloc(size_t sz) {
+	void * xxmalloc(size_t sz) {
 		if(!initialized) {
 			if(tmppos + sz < sizeof(tmpbuf)) {
-				void *retptr = tmpbuf + tmppos;
+				void * retptr = tmpbuf + tmppos;
 				tmppos += sz;
 				++tmpallocs;
 				return retptr;
@@ -109,19 +99,19 @@ extern "C" {
 		if(!insideHashMap) {
 			insideHashMap = true;
 
-			struct stack_frame *current_frame;
+			struct stack_frame * current_frame;
 			current_frame = (struct stack_frame*)(__builtin_frame_address(0));
-			void *callsite1 = current_frame->caller_address;
+			void * callsite1 = current_frame->caller_address;
 			current_frame = current_frame->prev;
-			void *callsite2 = current_frame->caller_address;
+			void * callsite2 = current_frame->caller_address;
 
-			std::unordered_map<void*, std::unordered_map<void*, tuple<int, long long>>>::iterator search_level1 =
+			std::unordered_map<void *, std::unordered_map<void *, tuple<int, long long>>>::iterator search_level1 =
 							memAllocCountMap.find(callsite1);
 	
 			// If we found a match on callsite1...
 			if(search_level1 != memAllocCountMap.end()) {
-				std::unordered_map<void*, tuple<int, long long>> found_level1 = search_level1->second;
-				std::unordered_map<void*, tuple<int, long long>>::iterator search_level2 = found_level1.find(callsite2);
+				std::unordered_map<void *, tuple<int, long long>> found_level1 = search_level1->second;
+				std::unordered_map<void *, tuple<int, long long>>::iterator search_level2 = found_level1.find(callsite2);
 
 				// If we found a match on callsite2...
 				if(search_level2 != found_level1.end()) {
@@ -134,7 +124,7 @@ extern "C" {
 					memAllocCountMap[callsite1].insert({callsite2, new_tuple});
 				}
 			} else {	// If we did NOT find a match on callsite1...
-				std::unordered_map<void*, tuple<int, long long>> new_level2_map;
+				std::unordered_map<void *, tuple<int, long long>> new_level2_map;
 				std::tuple<int, long long> newTuple(std::make_tuple(1, sz));
 				new_level2_map.insert({callsite2, newTuple});
 				memAllocCountMap.insert({callsite1, new_level2_map});
@@ -150,7 +140,7 @@ extern "C" {
 		strcpy(outputFile, program_invocation_name);
 		strcat(outputFile, "_libheapperf.txt");
 
-		FILE *output = fopen(outputFile, "a");
+		FILE * output = fopen(outputFile, "a");
 		if(output == NULL) {
 			fprintf(stderr, "ERROR: unable to open output file for writing hash map\n");
 			return;
@@ -163,13 +153,13 @@ extern "C" {
 		bool firstLine;
 		for(const auto& level1_entry : memAllocCountMap) {
 			firstLine = true;
-			void *callsite1 = level1_entry.first;
+			void * callsite1 = level1_entry.first;
 			struct addr2line_info addrInfo1, addrInfo2;
 			std::unordered_map<void*, tuple<int, long long>> level2_map = level1_entry.second;
 
 			addrInfo1 = addr2line(callsite1);
 			for(const auto& level2_entry : level2_map) {
-				void *callsite2 = level2_entry.first;
+				void * callsite2 = level2_entry.first;
 				std::tuple<int, long long> tuple = level2_entry.second;
 				int count = std::get<0>(tuple);
 				long long size = std::get<1>(tuple);
@@ -232,7 +222,7 @@ extern "C" {
 
 				// Tokenize the return string, breaking apart by ':'
 				// Take the second token, which will be the line number.
-				char *token = strtok(strInfo, ":");
+				char * token = strtok(strInfo, ":");
 				strncpy(info.exename, token, 256);
 				token = strtok(NULL, ":");
 				info.lineNum = atoi(token);
@@ -250,14 +240,13 @@ extern "C" {
 
 	void * xxcalloc(size_t nelem, size_t elsize) {
 		if(!initialized) {
-			void *ptr = malloc(nelem*elsize);
+			void * ptr = malloc(nelem * elsize);
 			if(ptr)
-				memset(ptr, 0, nelem*elsize);
+				memset(ptr, 0, nelem * elsize);
 			return ptr;
 		}
 
-		void *ptr = Real::calloc(nelem, elsize);
-		return ptr;
+		return Real::calloc(nelem, elsize);
 	}
 
 	/*
@@ -269,8 +258,8 @@ extern "C" {
 
 // Thread functions
 extern "C" {
-  int pthread_create(pthread_t* tid, const pthread_attr_t* attr, void* (*start_routine)(void*),
-		     void* arg) {
+  int pthread_create(pthread_t * tid, const pthread_attr_t * attr, void * (*start_routine)(void *),
+		     void * arg) {
     return xthread::getInstance().thread_create(tid, attr, start_routine, arg);
   }
 }
