@@ -37,6 +37,8 @@ pid_t gettid() {
 	return syscall(__NR_gettid);
 }
 
+extern void * shadow_mem;
+
 __thread int perf_fd, perf_fd2;
 __thread void *our_mmap;
 __thread long long prev_head;

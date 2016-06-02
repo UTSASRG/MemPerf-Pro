@@ -11,15 +11,31 @@
 #include <stdlib.h>
 #include <unordered_map>
 #include <tuple>
+#include <malloc.h>
+#include <sys/mman.h>
+#include <string.h>
+#include <errno.h>
+#include <unistd.h>
 
 #include "real.hh"
 #include "xthread.hh"
 #include "memsample.h"
 
+#define HEADER_SIZE (sizeof(size_t))
+
 using namespace std;
 
+// This map will go from id keys to a tuple containing:
+//	(1) the first callsite
+//	(2) the second callsite
+//	(3) the total number of allocations originating from this callsite pair
+//	(4) the total size of these allocations (i.e., when using glibc malloc, header size plus usable size)
+//	(5) the used size of these allocations (i.e., a sum of sz from malloc(sz) calls)
+thread_local std::unordered_map<uint64_t, tuple<void *, void *, int, long long, long long>> mapCallsiteStats;
+thread_local std::unordered_map<size_t, size_t> mapTotalAllocSz;
 __thread bool insideHashMap = false;
-thread_local std::unordered_map<void *, std::unordered_map<void *, tuple<int, long long>>> memAllocCountMap;
+
+void * shadow_mem;
 
 typedef int (*main_fn_t)(int, char **, char **);
 main_fn_t real_main;
@@ -33,6 +49,7 @@ extern "C" {
 		bool error = false;
 	};
 	void printHashMap();
+	size_t getTotalAllocSize(void * objAlloc, size_t sz);
 	struct addr2line_info addr2line(void * ddr);
 
 	void free(void *) __THROW __attribute__ ((weak, alias("xxfree")));
@@ -44,13 +61,28 @@ extern "C" {
 }
 
 bool initialized = false;
-char tmpbuf[10240];		// 10KB global buffer
+char tmpbuf[16384];		// 16KB global buffer
 unsigned int tmppos = 0;
 unsigned int tmpallocs = 0;
 
 __attribute__((constructor)) void initializer() {
+	// Ensure we are operating on a system using 64-bit pointers.
+	size_t ptrSize = sizeof(void *);
+	if(ptrSize != 8) {
+		fprintf(stderr, "error: unsupported pointer size: %zu\n", ptrSize);
+		abort();
+	}
+
 	Real::initializer();
 	initialized = true;
+
+	// Allocate shadow memory
+	int pagesize = getpagesize();
+	if((shadow_mem = mmap(NULL, pagesize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) == (void *) -1) {
+		fprintf(stderr, "error: unable to map shadow memory: %s\n", strerror(errno));
+		abort();
+	}
+	printf(">>> shadow mem allocated @ %p\n", shadow_mem);
 }
 
 __attribute__((destructor)) void finalizer() { }
@@ -58,11 +90,8 @@ __attribute__((destructor)) void finalizer() { }
 // MemPerf's main function
 int libmemperf_main(int argc, char ** argv, char ** envp) {
 	initSampling();
-
 	int main_ret_val = real_main(argc, argv, envp);
-
 	printHashMap();
-
 	return main_ret_val;
 }
 
@@ -77,8 +106,8 @@ extern "C" int libmemperf_libc_start_main(main_fn_t main_fn, int argc, char ** a
 // Memory management functions
 extern "C" {
 	struct stack_frame {
-		struct stack_frame * prev;	/* pointing to previous stack_frame */
-		void * caller_address;	/* the address of caller */
+		struct stack_frame * prev;	// pointing to previous stack_frame
+		void * caller_address;		// the address of caller
 	};
 
 	extern void * _libc_stack_end;
@@ -115,36 +144,37 @@ extern "C" {
 			current_frame = current_frame->prev;
 			void * callsite2 = current_frame->caller_address;
 
-			std::unordered_map<void *, std::unordered_map<void *, tuple<int, long long>>>::iterator search_level1 =
-							memAllocCountMap.find(callsite1);
-	
-			// If we found a match on callsite1...
-			if(search_level1 != memAllocCountMap.end()) {
-				std::unordered_map<void *, tuple<int, long long>> found_level1 = search_level1->second;
-				std::unordered_map<void *, tuple<int, long long>>::iterator search_level2 = found_level1.find(callsite2);
+			uint64_t lowWord1 = (uint64_t) callsite1 & 0xFFFFFFFF;
+			uint64_t lowWord2 = (uint64_t) callsite2 & 0xFFFFFFFF;
+			uint64_t callsite_id = (lowWord1 << 32) | lowWord2;
 
-				// If we found a match on callsite2...
-				if(search_level2 != found_level1.end()) {
-					std::tuple<int, long long> found_level2 = search_level2->second;
-					int oldCount = std::get<0>(found_level2);
-					long long oldSize = std::get<1>(found_level2);
-					memAllocCountMap[callsite1][callsite2] = std::make_tuple((oldCount+1), (oldSize+sz));
-				} else {	// If we did NOT find a match on callsite2...
-					std::tuple<int, long long> new_tuple(std::make_tuple(1, sz));
-					memAllocCountMap[callsite1].insert({callsite2, new_tuple});
-				}
-			} else {	// If we did NOT find a match on callsite1...
-				std::unordered_map<void *, tuple<int, long long>> new_level2_map;
-				std::tuple<int, long long> newTuple(std::make_tuple(1, sz));
-				new_level2_map.insert({callsite2, newTuple});
-				memAllocCountMap.insert({callsite1, new_level2_map});
+			// Do the allocation and fetch the object's real total size.
+			void * objAlloc = Real::malloc(sz);
+			size_t totalSz = getTotalAllocSize(objAlloc, sz);
+
+			std::unordered_map<uint64_t, tuple<void *, void *, int, long long, long long>>::iterator search_map_for_id =
+							mapCallsiteStats.find(callsite_id);
+	
+			// If we found a match on callsite_id...
+			if(search_map_for_id != mapCallsiteStats.end()) {
+				std::tuple<void *, void *, int, long long, long long> found_value = search_map_for_id->second;
+				int oldCount = std::get<2>(found_value);
+				long long oldUsedSize = std::get<3>(found_value);
+				long long oldTotalSize = std::get<4>(found_value);
+				mapCallsiteStats[callsite_id] = std::make_tuple(callsite1, callsite2,
+					(oldCount+1), (oldUsedSize+sz), (oldTotalSize+totalSz));
+			} else {	// If we did NOT find a match on callsite_id...
+				std::tuple<void *, void *, int, long long, long long> new_value(std::make_tuple(callsite1,
+					callsite2, 1, sz, totalSz));
+				mapCallsiteStats.insert({callsite_id, new_value});
 			}
 
 			insideHashMap = false;
+			return objAlloc;
 		}
 
 		return Real::malloc(sz);
-  }
+	}
 
 	void * xxcalloc(size_t nelem, size_t elsize) {
 		// If Real has not yet finished initializing, fulfill the calloc request
@@ -160,20 +190,31 @@ extern "C" {
 		return Real::calloc(nelem, elsize);
 	}
 
-  void xxfree(void * ptr) {
+	void xxfree(void * ptr) {
 		// Determine whether the specified object came from our global buffer;
 		// only call Real::free() if the object did not come from here.
 		if(ptr >= (void *)tmpbuf && ptr <= (void *)(tmpbuf + tmppos))
 			fprintf(stderr, "info: freeing temp memory\n");
 		else
 			Real::free(ptr);
-  }
+	}
 
 	/*
+	// TODO: will have to handle this eventually...   - Sam
 	void * xxrealloc(void * ptr, size_t sz) {
 		return Real::realloc(ptr, sz);
 	}
 	*/
+
+	size_t getTotalAllocSize(void * objAlloc, size_t sz) {
+		size_t curSz = mapTotalAllocSz[sz];
+		if(curSz == 0) {
+			size_t newSz = malloc_usable_size(objAlloc) + HEADER_SIZE;
+			mapTotalAllocSz[sz] = newSz;
+			return newSz;
+		}
+		return curSz;
+	}
 
 	void printHashMap() {
 		char outputFile[256];
@@ -183,45 +224,40 @@ extern "C" {
 		// Presently set to overwrite file; change fopen flag to "a" for append.
 		FILE * output = fopen(outputFile, "w");
 		if(output == NULL) {
-			fprintf(stderr, "ERROR: unable to open output file for writing hash map\n");
+			fprintf(stderr, "error: unable to open output file for writing hash map\n");
 			return;
 		}
 
 		fprintf(output, "Hash map contents:\n");
 		fprintf(output, "--------------------------------\n");
-		fprintf(output, "%-18s %-18s %5s %-64s %5s %-64s %6s %8s %14s\n", "callsite1", "callsite2",
-						"line1", "exename1", "line2", "exename2", "allocs", "total sz", "avg sz");
-		bool firstLine;
+		fprintf(output, "%-18s %-18s %5s %-64s %5s %-64s %6s %8s %8s %14s\n", "callsite1", "callsite2",
+						"line1", "exename1", "line2", "exename2", "allocs", "used sz", "total sz", "avg sz");
 
-		for(const auto& level1_entry : memAllocCountMap) {
-			firstLine = true;
-			void * callsite1 = level1_entry.first;
+		for(const auto& level1_entry : mapCallsiteStats) {
+			auto& value = level1_entry.second;
+			void * callsite1 = std::get<0>(value);
+			void * callsite2 = std::get<1>(value);
+
 			struct addr2line_info addrInfo1, addrInfo2;
-			std::unordered_map<void *, tuple<int, long long>> level2_map = level1_entry.second;
-
 			addrInfo1 = addr2line(callsite1);
-			for(const auto& level2_entry : level2_map) {
-				void * callsite2 = level2_entry.first;
-				std::tuple<int, long long> tuple = level2_entry.second;
-				int count = std::get<0>(tuple);
-				long long size = std::get<1>(tuple);
-				addrInfo2 = addr2line(callsite2);
-				float avgSize = size / (float) count;
-				if(firstLine)
-					fprintf(output, "%-18p ", callsite1);
-				else
-					fprintf(output, "%-18s ", "\"");
-				fprintf(output, "%-18p ", callsite2);
-				fprintf(output, "%5d ", addrInfo1.lineNum);
-				fprintf(output, "%-64s ", addrInfo1.exename);
-				fprintf(output, "%5d ", addrInfo2.lineNum);
-				fprintf(output, "%-64s ", addrInfo2.exename);
-				fprintf(output, "%6d ", count);
-				fprintf(output, "%8lld ", size);
-				fprintf(output, "%14.1f", avgSize);
-				fprintf(output, "\n");
-				firstLine = false;
-			}
+			addrInfo2 = addr2line(callsite2);
+
+			int count = std::get<2>(value);
+			long long usedSize = std::get<3>(value);
+			long long totalSize = std::get<4>(value);
+			float avgSize = usedSize / (float) count;
+
+			fprintf(output, "%-18p ", callsite1);
+			fprintf(output, "%-18p ", callsite2);
+			fprintf(output, "%5d ", addrInfo1.lineNum);
+			fprintf(output, "%-64s ", addrInfo1.exename);
+			fprintf(output, "%5d ", addrInfo2.lineNum);
+			fprintf(output, "%-64s ", addrInfo2.exename);
+			fprintf(output, "%6d ", count);
+			fprintf(output, "%8lld ", usedSize);
+			fprintf(output, "%8lld ", totalSize);
+			fprintf(output, "%14.1f", avgSize);
+			fprintf(output, "\n");
 		}
 		fprintf(output, "\n\n");
 		fclose(output);
@@ -234,7 +270,7 @@ extern "C" {
 		struct addr2line_info info;
 
 		if(pipe(fd) == -1) {
-			printf("ERROR: unable to create pipe\n");
+			printf("error: unable to create pipe\n");
 			strcpy(info.exename, "error");
 			info.lineNum = 0;
 			info.error = true;
@@ -243,7 +279,7 @@ extern "C" {
 
 		switch(fork()) {
 			case -1:
-				printf("ERROR: unable to fork child process\n");
+				printf("error: unable to fork child process\n");
 				break;
 			case 0:		// child
 				close(fd[0]);
@@ -255,7 +291,7 @@ extern "C" {
 			default:	// parent
 				close(fd[1]);
 				if(read(fd[0], strInfo, 512) == -1) {
-					printf("ERROR: unable to read from pipe\n");
+					printf("error: unable to read from pipe\n");
 					strcpy(info.exename, "error");
 					info.lineNum = 0;
 					info.error = true;
