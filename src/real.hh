@@ -7,6 +7,8 @@
 
 namespace Real {
 	void initializer();
+	DECLARE_WRAPPER(brk);
+	DECLARE_WRAPPER(sbrk);
 	DECLARE_WRAPPER(free);
 	DECLARE_WRAPPER(calloc);
 	DECLARE_WRAPPER(malloc);

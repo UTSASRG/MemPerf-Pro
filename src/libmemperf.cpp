@@ -21,7 +21,7 @@
 #include "xthread.hh"
 #include "memsample.h"
 
-#define HEADER_SIZE (sizeof(size_t))
+#define MALLOC_HEADER_SIZE (sizeof(size_t))
 
 using namespace std;
 
@@ -52,12 +52,12 @@ extern "C" {
 	size_t getTotalAllocSize(void * objAlloc, size_t sz);
 	struct addr2line_info addr2line(void * ddr);
 
-	void free(void *) __THROW __attribute__ ((weak, alias("xxfree")));
-	void * calloc(size_t, size_t) __THROW __attribute__ ((weak, alias("xxcalloc")));
-	void * malloc(size_t) __THROW __attribute__ ((weak, alias("xxmalloc")));
+	void free(void *) __attribute__ ((weak, alias("xxfree")));
+	void * calloc(size_t, size_t) __attribute__ ((weak, alias("xxcalloc")));
+	void * malloc(size_t) __attribute__ ((weak, alias("xxmalloc")));
 
 	// TODO: How to handle realloc?	-Sam
-	//void * realloc(void *, size_t) __THROW __attribute__ ((weak, alias("xxrealloc")));
+	//void * realloc(void *, size_t) __attribute__ ((weak, alias("xxrealloc")));
 }
 
 bool initialized = false;
@@ -209,7 +209,7 @@ extern "C" {
 	size_t getTotalAllocSize(void * objAlloc, size_t sz) {
 		size_t curSz = mapTotalAllocSz[sz];
 		if(curSz == 0) {
-			size_t newSz = malloc_usable_size(objAlloc) + HEADER_SIZE;
+			size_t newSz = malloc_usable_size(objAlloc) + MALLOC_HEADER_SIZE;
 			mapTotalAllocSz[sz] = newSz;
 			return newSz;
 		}
