@@ -22,20 +22,34 @@
 #include "memsample.h"
 
 #define MALLOC_HEADER_SIZE (sizeof(size_t))
+#define FIVE_MB 5242880
 
 using namespace std;
 
-// This map will go from id keys to a tuple containing:
+// This map will go from the callsite id key to a tuple containing:
 //	(1) the first callsite
 //	(2) the second callsite
 //	(3) the total number of allocations originating from this callsite pair
 //	(4) the total size of these allocations (i.e., when using glibc malloc, header size plus usable size)
 //	(5) the used size of these allocations (i.e., a sum of sz from malloc(sz) calls)
-thread_local std::unordered_map<uint64_t, tuple<void *, void *, int, long long, long long>> mapCallsiteStats;
-thread_local std::unordered_map<size_t, size_t> mapTotalAllocSz;
-__thread bool insideHashMap = false;
+//	(6) the total number of accesses on objects spawned from this callsite id
+thread_local unordered_map<uint64_t, tuple<void *, void *, int, long long, long long, long long>> mapCallsiteStats;
 
-void * shadow_mem;
+// This map will maintain mappings between requested malloc sizes and the
+// actual usable size of fulfilled requests.
+thread_local unordered_map<size_t, size_t> mapRealAllocSize;
+
+__thread bool insideHashMap = false;
+__thread bool isMainThread = false;
+__thread char * shadow_mem;
+__thread char * stackStart;
+__thread char * stackEnd;
+__thread char * watchStartByte;
+__thread char * watchEndByte;
+__thread void * highestObjAddr = (void *)0x0;
+
+void * program_break;
+extern void * __libc_stack_end;
 
 typedef int (*main_fn_t)(int, char **, char **);
 main_fn_t real_main;
@@ -51,6 +65,8 @@ extern "C" {
 	void printHashMap();
 	size_t getTotalAllocSize(void * objAlloc, size_t sz);
 	struct addr2line_info addr2line(void * ddr);
+	bool isWordMallocHeader(long *word);
+	void doCountRemainingAccesses();
 
 	void free(void *) __attribute__ ((weak, alias("xxfree")));
 	void * calloc(size_t, size_t) __attribute__ ((weak, alias("xxcalloc")));
@@ -59,14 +75,15 @@ extern "C" {
 	// TODO: How to handle realloc?	-Sam
 	//void * realloc(void *, size_t) __attribute__ ((weak, alias("xxrealloc")));
 }
-
 bool initialized = false;
 char tmpbuf[16384];		// 16KB global buffer
 unsigned int tmppos = 0;
-unsigned int tmpallocs = 0;
 
 __attribute__((constructor)) void initializer() {
 	// Ensure we are operating on a system using 64-bit pointers.
+	// We need to do this because we will later be taking the low 8-byte word
+	// of callsites. This could obviously be expanded to support 32-bit systems
+	// as well, in the future.
 	size_t ptrSize = sizeof(void *);
 	if(ptrSize != 8) {
 		fprintf(stderr, "error: unsupported pointer size: %zu\n", ptrSize);
@@ -75,14 +92,23 @@ __attribute__((constructor)) void initializer() {
 
 	Real::initializer();
 	initialized = true;
+	isMainThread = true;
+	program_break = sbrk(0);
+	stackStart = (char *)__builtin_frame_address(0);
+	stackEnd = stackStart + FIVE_MB;
+	watchStartByte = (char *)program_break;
+	watchEndByte = watchStartByte + SHADOW_MEM_SIZE;
 
 	// Allocate shadow memory
-	int pagesize = getpagesize();
-	if((shadow_mem = mmap(NULL, pagesize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) == (void *) -1) {
-		fprintf(stderr, "error: unable to map shadow memory: %s\n", strerror(errno));
+	if((shadow_mem = (char *)mmap(NULL, SHADOW_MEM_SIZE, PROT_READ | PROT_WRITE,
+		MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) == (void *) -1) {
+		fprintf(stderr, "error: unable to allocate shadow memory: %s\n", strerror(errno));
 		abort();
 	}
-	printf(">>> shadow mem allocated @ %p\n", shadow_mem);
+	printf(">>> shadow memory allocated for main thread @ %p ~ %p, size=0x%x\n", shadow_mem,
+			shadow_mem + SHADOW_MEM_SIZE, SHADOW_MEM_SIZE);
+	printf(">>> stack start @ %p, stack+5MB @ %p\n", stackStart, stackEnd);
+	printf(">>> program break @ %p\n", program_break);
 }
 
 __attribute__((destructor)) void finalizer() { }
@@ -91,6 +117,8 @@ __attribute__((destructor)) void finalizer() { }
 int libmemperf_main(int argc, char ** argv, char ** envp) {
 	initSampling();
 	int main_ret_val = real_main(argc, argv, envp);
+	stopSampling();
+	doCountRemainingAccesses();
 	printHashMap();
 	return main_ret_val;
 }
@@ -110,8 +138,6 @@ extern "C" {
 		void * caller_address;		// the address of caller
 	};
 
-	extern void * _libc_stack_end;
-
 	void * xxmalloc(size_t sz) {
 		// Small allocation routine designed to service malloc requests made by the
 		// dlsym() function. Due to our linkage aliasing which redirects calls to
@@ -127,7 +153,6 @@ extern "C" {
 			if(tmppos + sz < sizeof(tmpbuf)) {
 				void * retptr = tmpbuf + tmppos;
 				tmppos += sz;
-				++tmpallocs;
 				return retptr;
 			} else {
 				fprintf(stderr, "error: too much memory requested, sz=%zu\n", sz);
@@ -150,22 +175,41 @@ extern "C" {
 
 			// Do the allocation and fetch the object's real total size.
 			void * objAlloc = Real::malloc(sz);
-			size_t totalSz = getTotalAllocSize(objAlloc, sz);
+			size_t totalObjSz = getTotalAllocSize(objAlloc, sz);
 
-			std::unordered_map<uint64_t, tuple<void *, void *, int, long long, long long>>::iterator search_map_for_id =
+			if(objAlloc > highestObjAddr) {
+				long long access_byte_offset = (char *)objAlloc - (char *)watchStartByte;
+				// Only update the highestObjAddr variable if this object could be
+				// tracked given the limited size of shadow memory
+				if(access_byte_offset >= 0 && access_byte_offset < SHADOW_MEM_SIZE)
+					highestObjAddr = (void *)((char *)objAlloc + totalObjSz);
+			}
+
+			// Store the contrived callsite_id in the shadow memory location that
+			// corresponds to the object's malloc header.
+			long long object_offset = (char *)objAlloc - (char *)watchStartByte;
+
+			// Record the callsite_id to the shadow memory corresponding
+			// to the object's malloc header.
+			uint64_t *id_in_shadow_mem = (uint64_t *)(shadow_mem + object_offset - MALLOC_HEADER_SIZE);
+			//printf(">>> writing callsite id 0x%lx to %p, shadow@%p, offset=0x%llx\n", callsite_id,
+			//		id_in_shadow_mem, shadow_mem, object_offset-MALLOC_HEADER_SIZE);
+			*id_in_shadow_mem = callsite_id;
+
+			unordered_map<uint64_t, tuple<void *, void *, int, long long, long long, long long>>::iterator search_map_for_id =
 							mapCallsiteStats.find(callsite_id);
 	
-			// If we found a match on callsite_id...
+			// If we found a match on the callsite_id ...
 			if(search_map_for_id != mapCallsiteStats.end()) {
-				std::tuple<void *, void *, int, long long, long long> found_value = search_map_for_id->second;
-				int oldCount = std::get<2>(found_value);
-				long long oldUsedSize = std::get<3>(found_value);
-				long long oldTotalSize = std::get<4>(found_value);
-				mapCallsiteStats[callsite_id] = std::make_tuple(callsite1, callsite2,
-					(oldCount+1), (oldUsedSize+sz), (oldTotalSize+totalSz));
-			} else {	// If we did NOT find a match on callsite_id...
-				std::tuple<void *, void *, int, long long, long long> new_value(std::make_tuple(callsite1,
-					callsite2, 1, sz, totalSz));
+				tuple<void *, void *, int, long long, long long, long long> found_value = search_map_for_id->second;
+				int oldCount = get<2>(found_value);
+				long long oldUsedSize = get<3>(found_value);
+				long long oldTotalSize = get<4>(found_value);
+				mapCallsiteStats[callsite_id] = make_tuple(callsite1, callsite2,
+					(oldCount+1), (oldUsedSize+sz), (oldTotalSize+totalObjSz), 0);
+			} else {	// If we did NOT find a match on callsite_id ...
+				tuple<void *, void *, int, long long, long long, long long> new_value(make_tuple(callsite1,
+					callsite2, 1, sz, totalObjSz, 0));
 				mapCallsiteStats.insert({callsite_id, new_value});
 			}
 
@@ -176,6 +220,8 @@ extern "C" {
 		return Real::malloc(sz);
 	}
 
+	// TODO need to make this function work -- copy or factor out code from
+	// xxmalloc for use here (and possibly future functions such as realloc).
 	void * xxcalloc(size_t nelem, size_t elsize) {
 		// If Real has not yet finished initializing, fulfill the calloc request
 		// ourselves by issuing appropriate calls to malloc and memset. The
@@ -193,10 +239,25 @@ extern "C" {
 	void xxfree(void * ptr) {
 		// Determine whether the specified object came from our global buffer;
 		// only call Real::free() if the object did not come from here.
-		if(ptr >= (void *)tmpbuf && ptr <= (void *)(tmpbuf + tmppos))
+		if(ptr >= (void *)tmpbuf && ptr <= (void *)(tmpbuf + tmppos)) {
 			fprintf(stderr, "info: freeing temp memory\n");
-		else
+		} else if(!insideHashMap) {
+			long long shadow_mem_offset = ((char *)ptr - (char *)watchStartByte) / WORD_SIZE;
+
+			// Fetch object's size from malloc header
+			long *objHeader = (long *)ptr - 1;
+			unsigned int objSize = *objHeader - 1;
+
+			int i = 0;
+			long long count = 0;
+			for(i = 0; i < objSize; i += 8) {
+				long *next_word = (long *)(shadow_mem + shadow_mem_offset + i);
+				count += *next_word;
+				*next_word = 0;		// zero out the word after counting it
+			}
+
 			Real::free(ptr);
+		}
 	}
 
 	/*
@@ -207,16 +268,18 @@ extern "C" {
 	*/
 
 	size_t getTotalAllocSize(void * objAlloc, size_t sz) {
-		size_t curSz = mapTotalAllocSz[sz];
+		size_t curSz = mapRealAllocSize[sz];
 		if(curSz == 0) {
 			size_t newSz = malloc_usable_size(objAlloc) + MALLOC_HEADER_SIZE;
-			mapTotalAllocSz[sz] = newSz;
+			mapRealAllocSize[sz] = newSz;
 			return newSz;
 		}
 		return curSz;
 	}
 
 	void printHashMap() {
+		insideHashMap = true;
+
 		char outputFile[256];
 		strcpy(outputFile, program_invocation_name);
 		strcat(outputFile, "_libmemperf.txt");
@@ -230,22 +293,24 @@ extern "C" {
 
 		fprintf(output, "Hash map contents:\n");
 		fprintf(output, "--------------------------------\n");
-		fprintf(output, "%-18s %-18s %5s %-64s %5s %-64s %6s %8s %8s %14s\n", "callsite1", "callsite2",
-						"line1", "exename1", "line2", "exename2", "allocs", "used sz", "total sz", "avg sz");
+		fprintf(output, "%-18s %-18s %5s %-64s %5s %-64s %6s %8s %8s %8s %8s\n",
+				"callsite1", "callsite2", "line1", "exename1", "line2", "exename2",
+				"allocs", "used sz", "total sz", "avg sz", "accesses");
 
 		for(const auto& level1_entry : mapCallsiteStats) {
 			auto& value = level1_entry.second;
-			void * callsite1 = std::get<0>(value);
-			void * callsite2 = std::get<1>(value);
+			void * callsite1 = get<0>(value);
+			void * callsite2 = get<1>(value);
 
 			struct addr2line_info addrInfo1, addrInfo2;
 			addrInfo1 = addr2line(callsite1);
 			addrInfo2 = addr2line(callsite2);
 
-			int count = std::get<2>(value);
-			long long usedSize = std::get<3>(value);
-			long long totalSize = std::get<4>(value);
+			int count = get<2>(value);
+			long long usedSize = get<3>(value);
+			long long totalSize = get<4>(value);
 			float avgSize = usedSize / (float) count;
+			long long totalAccesses = get<5>(value);
 
 			fprintf(output, "%-18p ", callsite1);
 			fprintf(output, "%-18p ", callsite2);
@@ -256,11 +321,13 @@ extern "C" {
 			fprintf(output, "%6d ", count);
 			fprintf(output, "%8lld ", usedSize);
 			fprintf(output, "%8lld ", totalSize);
-			fprintf(output, "%14.1f", avgSize);
+			fprintf(output, "%8.1f", avgSize);
+			fprintf(output, "%8lld", totalAccesses);
 			fprintf(output, "\n");
 		}
 		fprintf(output, "\n\n");
 		fclose(output);
+		insideHashMap = false;
 	}
 
 	struct addr2line_info addr2line(void * addr) {
@@ -308,12 +375,68 @@ extern "C" {
 
 		return info;
 	}
+
+	bool isWordMallocHeader(long *word) {
+		long access_byte_offset = (char *)word - shadow_mem;
+		long access_word_offset = access_byte_offset / WORD_SIZE;
+		return ((*word > LOWEST_POS_CALLSITE_ID) &&
+				(access_word_offset % 2 == 1) &&
+				mapCallsiteStats.count(*word) > 0);
+	}
+
+	void doCountRemainingAccesses() {
+		long *sweepStart = (long *)shadow_mem;
+
+		long long highest_byte_offset = (char *)highestObjAddr - (char *)watchStartByte;
+		long *sweepEnd = (long *)(shadow_mem + highest_byte_offset);
+
+		long *sweepCurrent;
+
+		//printf("sweepStart = %p, sweepEnd = %p\n", sweepStart, sweepEnd);
+
+		for(sweepCurrent = sweepStart; sweepCurrent <= sweepEnd; sweepCurrent++) {
+			long long current_byte_offset = (char *)sweepCurrent - (char *)sweepStart;
+
+			// If the current word corresponds to an object's malloc header then check
+			// real header in the heap to determine the object's size. We will then
+			// use this size to sum over the corresponding number of words in shadow
+			// memory.
+			if(isWordMallocHeader(sweepCurrent)) {
+				long long callsite_id = *sweepCurrent;
+				long *realObjHeader = (long *)(watchStartByte + current_byte_offset);
+				long objSizeInBytes = *realObjHeader;
+				long objSizeInWords = *realObjHeader / 8;
+				long access_count = 0;
+				int i;
+				//printf("found malloc header @ %p w/ callsite_id=0x%llx, total size=%ld (words=%ld)\n",
+				//	sweepCurrent, callsite_id, objSizeInBytes, objSizeInWords);
+				for(i = 0; i < objSizeInWords-1; i++) {
+					sweepCurrent++;
+					access_count += *sweepCurrent;
+					//printf("\t value @ %p = 0x%lx\n", sweepCurrent, *sweepCurrent);
+				}
+				//printf("\t finished with count = %ld, sweepCurrent will start next time @ %p\n", access_count, sweepCurrent+1);
+
+				if(access_count > 0) {
+					tuple<void *, void *, int, long long, long long, long long> found_value = mapCallsiteStats[callsite_id];
+					void *callsite1 = get<0>(found_value);
+					void *callsite2 = get<1>(found_value);
+					int count = get<2>(found_value);
+					long long usedSize = get<3>(found_value);
+					long long totalSize = get<4>(found_value);
+					long long totalAccesses = get<5>(found_value);
+					mapCallsiteStats[callsite_id] = make_tuple(callsite1, callsite2,
+							count, usedSize, totalSize, (totalAccesses + access_count));
+				}
+			}
+		}
+	}
 }
 
 // Thread functions
 extern "C" {
-  int pthread_create(pthread_t * tid, const pthread_attr_t * attr, void * (*start_routine)(void *),
-		     void * arg) {
-    return xthread::thread_create(tid, attr, start_routine, arg);
-  }
+	int pthread_create(pthread_t * tid, const pthread_attr_t * attr, void * (*start_routine)(void *),
+			void * arg) {
+		return xthread::thread_create(tid, attr, start_routine, arg);
+	}
 }
