@@ -21,10 +21,9 @@
 #include "xthread.hh"
 #include "memsample.h"
 
-#define MALLOC_HEADER_SIZE (sizeof(size_t))
-#define FIVE_MB 5242880
-
 using namespace std;
+
+typedef tuple<void *, void *, int, long, long, long> statTuple;
 
 // This map will go from the callsite id key to a tuple containing:
 //	(1) the first callsite
@@ -33,7 +32,7 @@ using namespace std;
 //	(4) the total size of these allocations (i.e., when using glibc malloc, header size plus usable size)
 //	(5) the used size of these allocations (i.e., a sum of sz from malloc(sz) calls)
 //	(6) the total number of accesses on objects spawned from this callsite id
-thread_local unordered_map<uint64_t, tuple<void *, void *, int, long long, long long, long long>> mapCallsiteStats;
+thread_local unordered_map<uint64_t, statTuple> mapCallsiteStats;
 
 // This map will maintain mappings between requested malloc sizes and the
 // actual usable size of fulfilled requests.
@@ -46,15 +45,14 @@ __thread char * stackStart;
 __thread char * stackEnd;
 __thread char * watchStartByte;
 __thread char * watchEndByte;
-__thread void * highestObjAddr = (void *)0x0;
+__thread void * maxObjAddr = (void *)0x0;
 
 void * program_break;
 extern void * __libc_stack_end;
+extern char * program_invocation_name;
 
 typedef int (*main_fn_t)(int, char **, char **);
 main_fn_t real_main;
-
-extern char * program_invocation_name;
 
 extern "C" {
 	struct addr2line_info {
@@ -66,7 +64,7 @@ extern "C" {
 	size_t getTotalAllocSize(void * objAlloc, size_t sz);
 	struct addr2line_info addr2line(void * ddr);
 	bool isWordMallocHeader(long *word);
-	void doCountRemainingAccesses();
+	void countUnfreedObjAccesses();
 
 	void free(void *) __attribute__ ((weak, alias("xxfree")));
 	void * calloc(size_t, size_t) __attribute__ ((weak, alias("xxcalloc")));
@@ -78,6 +76,7 @@ extern "C" {
 bool initialized = false;
 char tmpbuf[16384];		// 16KB global buffer
 unsigned int tmppos = 0;
+const bool debug = false;
 
 __attribute__((constructor)) void initializer() {
 	// Ensure we are operating on a system using 64-bit pointers.
@@ -105,20 +104,20 @@ __attribute__((constructor)) void initializer() {
 		fprintf(stderr, "error: unable to allocate shadow memory: %s\n", strerror(errno));
 		abort();
 	}
-	printf(">>> shadow memory allocated for main thread @ %p ~ %p, size=0x%x\n", shadow_mem,
+	printf(">>> shadow memory allocated for main thread @ %p ~ %p (size=0x%x)\n", shadow_mem,
 			shadow_mem + SHADOW_MEM_SIZE, SHADOW_MEM_SIZE);
-	printf(">>> stack start @ %p, stack+5MB @ %p\n", stackStart, stackEnd);
-	printf(">>> program break @ %p\n", program_break);
+	printf(">>> stack start @ %p, stack+5MB = %p\n", stackStart, stackEnd);
+	printf(">>> program break @ %p\n\n", program_break);
 }
 
-__attribute__((destructor)) void finalizer() { }
+__attribute__((destructor)) void finalizer() {}
 
 // MemPerf's main function
 int libmemperf_main(int argc, char ** argv, char ** envp) {
 	initSampling();
 	int main_ret_val = real_main(argc, argv, envp);
 	stopSampling();
-	doCountRemainingAccesses();
+	countUnfreedObjAccesses();
 	printHashMap();
 	return main_ret_val;
 }
@@ -177,17 +176,17 @@ extern "C" {
 			void * objAlloc = Real::malloc(sz);
 			size_t totalObjSz = getTotalAllocSize(objAlloc, sz);
 
-			if(objAlloc > highestObjAddr) {
-				long long access_byte_offset = (char *)objAlloc - (char *)watchStartByte;
-				// Only update the highestObjAddr variable if this object could be
+			if(objAlloc > maxObjAddr) {
+				long access_byte_offset = (char *)objAlloc - (char *)watchStartByte;
+				// Only update the maxObjAddr variable if this object could be
 				// tracked given the limited size of shadow memory
 				if(access_byte_offset >= 0 && access_byte_offset < SHADOW_MEM_SIZE)
-					highestObjAddr = (void *)((char *)objAlloc + totalObjSz);
+					maxObjAddr = (void *)((char *)objAlloc + totalObjSz);
 			}
 
 			// Store the contrived callsite_id in the shadow memory location that
 			// corresponds to the object's malloc header.
-			long long object_offset = (char *)objAlloc - (char *)watchStartByte;
+			long object_offset = (char *)objAlloc - (char *)watchStartByte;
 
 			// Record the callsite_id to the shadow memory corresponding
 			// to the object's malloc header.
@@ -196,19 +195,19 @@ extern "C" {
 			//		id_in_shadow_mem, shadow_mem, object_offset-MALLOC_HEADER_SIZE);
 			*id_in_shadow_mem = callsite_id;
 
-			unordered_map<uint64_t, tuple<void *, void *, int, long long, long long, long long>>::iterator search_map_for_id =
+			unordered_map<uint64_t, statTuple>::iterator search_map_for_id =
 							mapCallsiteStats.find(callsite_id);
 	
 			// If we found a match on the callsite_id ...
 			if(search_map_for_id != mapCallsiteStats.end()) {
-				tuple<void *, void *, int, long long, long long, long long> found_value = search_map_for_id->second;
+				statTuple found_value = search_map_for_id->second;
 				int oldCount = get<2>(found_value);
-				long long oldUsedSize = get<3>(found_value);
-				long long oldTotalSize = get<4>(found_value);
+				long oldUsedSize = get<3>(found_value);
+				long oldTotalSize = get<4>(found_value);
 				mapCallsiteStats[callsite_id] = make_tuple(callsite1, callsite2,
 					(oldCount+1), (oldUsedSize+sz), (oldTotalSize+totalObjSz), 0);
 			} else {	// If we did NOT find a match on callsite_id ...
-				tuple<void *, void *, int, long long, long long, long long> new_value(make_tuple(callsite1,
+				statTuple new_value(make_tuple(callsite1,
 					callsite2, 1, sz, totalObjSz, 0));
 				mapCallsiteStats.insert({callsite_id, new_value});
 			}
@@ -242,14 +241,14 @@ extern "C" {
 		if(ptr >= (void *)tmpbuf && ptr <= (void *)(tmpbuf + tmppos)) {
 			fprintf(stderr, "info: freeing temp memory\n");
 		} else if(!insideHashMap) {
-			long long shadow_mem_offset = ((char *)ptr - (char *)watchStartByte) / WORD_SIZE;
+			long shadow_mem_offset = ((char *)ptr - (char *)watchStartByte) / WORD_SIZE;
 
 			// Fetch object's size from malloc header
 			long *objHeader = (long *)ptr - 1;
 			unsigned int objSize = *objHeader - 1;
 
 			int i = 0;
-			long long count = 0;
+			long count = 0;
 			for(i = 0; i < objSize; i += 8) {
 				long *next_word = (long *)(shadow_mem + shadow_mem_offset + i);
 				count += *next_word;
@@ -307,10 +306,10 @@ extern "C" {
 			addrInfo2 = addr2line(callsite2);
 
 			int count = get<2>(value);
-			long long usedSize = get<3>(value);
-			long long totalSize = get<4>(value);
+			long usedSize = get<3>(value);
+			long totalSize = get<4>(value);
 			float avgSize = usedSize / (float) count;
-			long long totalAccesses = get<5>(value);
+			long totalAccesses = get<5>(value);
 
 			fprintf(output, "%-18p ", callsite1);
 			fprintf(output, "%-18p ", callsite2);
@@ -319,10 +318,10 @@ extern "C" {
 			fprintf(output, "%5d ", addrInfo2.lineNum);
 			fprintf(output, "%-64s ", addrInfo2.exename);
 			fprintf(output, "%6d ", count);
-			fprintf(output, "%8lld ", usedSize);
-			fprintf(output, "%8lld ", totalSize);
+			fprintf(output, "%8ld ", usedSize);
+			fprintf(output, "%8ld ", totalSize);
 			fprintf(output, "%8.1f", avgSize);
-			fprintf(output, "%8lld", totalAccesses);
+			fprintf(output, "%8ld", totalAccesses);
 			fprintf(output, "\n");
 		}
 		fprintf(output, "\n\n");
@@ -384,47 +383,55 @@ extern "C" {
 				mapCallsiteStats.count(*word) > 0);
 	}
 
-	void doCountRemainingAccesses() {
+	void countUnfreedObjAccesses() {
+		long max_byte_offset = (char *)maxObjAddr - (char *)watchStartByte;
 		long *sweepStart = (long *)shadow_mem;
-
-		long long highest_byte_offset = (char *)highestObjAddr - (char *)watchStartByte;
-		long *sweepEnd = (long *)(shadow_mem + highest_byte_offset);
-
+		long *sweepEnd = (long *)(shadow_mem + max_byte_offset);
 		long *sweepCurrent;
 
-		//printf("sweepStart = %p, sweepEnd = %p\n", sweepStart, sweepEnd);
+		if(debug)
+			printf(">>> sweepStart = %p, sweepEnd = %p\n", sweepStart, sweepEnd);
 
 		for(sweepCurrent = sweepStart; sweepCurrent <= sweepEnd; sweepCurrent++) {
-			long long current_byte_offset = (char *)sweepCurrent - (char *)sweepStart;
+			long current_byte_offset = (char *)sweepCurrent - (char *)sweepStart;
 
 			// If the current word corresponds to an object's malloc header then check
 			// real header in the heap to determine the object's size. We will then
 			// use this size to sum over the corresponding number of words in shadow
 			// memory.
 			if(isWordMallocHeader(sweepCurrent)) {
-				long long callsite_id = *sweepCurrent;
+				long callsite_id = *sweepCurrent;
 				long *realObjHeader = (long *)(watchStartByte + current_byte_offset);
 				long objSizeInBytes = *realObjHeader;
 				long objSizeInWords = *realObjHeader / 8;
 				long access_count = 0;
 				int i;
-				//printf("found malloc header @ %p w/ callsite_id=0x%llx, total size=%ld (words=%ld)\n",
-				//	sweepCurrent, callsite_id, objSizeInBytes, objSizeInWords);
+
+				if(debug) {
+					printf(">>> found malloc header @ %p, callsite_id=0x%lx, object size=%ld "
+						"(%ld words)\n", sweepCurrent, callsite_id, objSizeInBytes,
+						objSizeInWords);
+				}
+
 				for(i = 0; i < objSizeInWords-1; i++) {
 					sweepCurrent++;
 					access_count += *sweepCurrent;
-					//printf("\t value @ %p = 0x%lx\n", sweepCurrent, *sweepCurrent);
+					if(debug)
+						printf("\t shadow mem value @ %p = 0x%lx\n", sweepCurrent, *sweepCurrent);
 				}
-				//printf("\t finished with count = %ld, sweepCurrent will start next time @ %p\n", access_count, sweepCurrent+1);
+				if(debug) {
+					printf("\t finished with object count = %ld, sweepCurrent's next "
+							"value = %p\n", access_count, (sweepCurrent + 1));
+				}
 
 				if(access_count > 0) {
-					tuple<void *, void *, int, long long, long long, long long> found_value = mapCallsiteStats[callsite_id];
-					void *callsite1 = get<0>(found_value);
-					void *callsite2 = get<1>(found_value);
-					int count = get<2>(found_value);
-					long long usedSize = get<3>(found_value);
-					long long totalSize = get<4>(found_value);
-					long long totalAccesses = get<5>(found_value);
+					statTuple map_value = mapCallsiteStats[callsite_id];
+					void *callsite1 = get<0>(map_value);
+					void *callsite2 = get<1>(map_value);
+					int count = get<2>(map_value);
+					long usedSize = get<3>(map_value);
+					long totalSize = get<4>(map_value);
+					long totalAccesses = get<5>(map_value);
 					mapCallsiteStats[callsite_id] = make_tuple(callsite1, callsite2,
 							count, usedSize, totalSize, (totalAccesses + access_count));
 				}

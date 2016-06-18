@@ -32,19 +32,16 @@ pid_t gettid() {
 	return syscall(__NR_gettid);
 }
 
-thread_local extern std::unordered_map<void *, tuple<void *, size_t, void *, bool>> mapAllocs;
-thread_local extern unordered_map<uint64_t, tuple<void *, void *, int, long long, long long>> mapCallsiteStats;
 extern void * program_break;
 extern "C" bool isWordMallocHeader(long *word);
-__thread extern char * shadow_mem;
 __thread extern bool isMainThread;
+__thread extern char * shadow_mem;
 __thread extern void * stackStart;
 __thread extern void * stackEnd;
 __thread extern void * watchStartByte;
 __thread extern void * watchEndByte;
 __thread extern void * highestObjAddr;
 
-__thread char output_buffer[512];
 __thread int perf_fd, perf_fd2;
 __thread long long prev_head;
 __thread pid_t tid;
@@ -52,35 +49,42 @@ __thread unsigned char *data;
 __thread void *our_mmap;
 
 int sample_type = PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_TIME | PERF_SAMPLE_ADDR |
-				PERF_SAMPLE_CPU | PERF_SAMPLE_CALLCHAIN | PERF_SAMPLE_DATA_SRC | PERF_SAMPLE_WEIGHT;
+					PERF_SAMPLE_CPU | PERF_SAMPLE_CALLCHAIN | PERF_SAMPLE_DATA_SRC | PERF_SAMPLE_WEIGHT;
 
 int read_format = PERF_FORMAT_GROUP;
 //                 PERF_FORMAT_ID |
 //                 PERF_FORMAT_TOTAL_TIME_ENABLED |
 //                 PERF_FORMAT_TOTAL_TIME_RUNNING;
 
+long long perf_mmap_read(long long prev_head, long long reg_mask, void *validate);
+
 void startSampling() {
 	// Start the event
 	/*
 	if(ioctl(perf_fd, PERF_EVENT_IOC_RESET, 0) == -1) {
-		fprintf(stderr, "Failed to reset perf event w/ fd %d: %s\n", perf_fd, strerror(errno));
+		fprintf(stderr, "Failed to reset perf event w/ fd %d: %s\n",
+			perf_fd, strerror(errno));
 		abort();
 	}
 	*/
 	if(ioctl(perf_fd, PERF_EVENT_IOC_REFRESH, OVERFLOW_INTERVAL) == -1) {
-		fprintf(stderr, "Failed to refresh perf event w/ fd %d, line %d: %s\n", perf_fd, __LINE__, strerror(errno));
+		fprintf(stderr, "Failed to refresh perf event w/ fd %d, line %d: %s\n",
+			perf_fd, __LINE__, strerror(errno));
 		abort();
 	}
 	if(ioctl(perf_fd2, PERF_EVENT_IOC_REFRESH, OVERFLOW_INTERVAL) == -1) {
-		fprintf(stderr, "Failed to refresh perf event w/ fd %d, line %d: %s\n", perf_fd2, __LINE__, strerror(errno));
+		fprintf(stderr, "Failed to refresh perf event w/ fd %d, line %d: %s\n",
+			perf_fd2, __LINE__, strerror(errno));
 		abort();
 	}
 	if(ioctl(perf_fd, PERF_EVENT_IOC_ENABLE, PERF_IOC_FLAG_GROUP) == -1) {
-		fprintf(stderr, "Failed to enable perf event w/ fd %d, line %d: %s\n", perf_fd, __LINE__, strerror(errno));
+		fprintf(stderr, "Failed to enable perf event w/ fd %d, line %d: %s\n",
+			perf_fd, __LINE__, strerror(errno));
 		abort();
 	}
 	if(ioctl(perf_fd2, PERF_EVENT_IOC_ENABLE, PERF_IOC_FLAG_GROUP) == -1) {
-		fprintf(stderr, "Failed to enable perf event w/ fd %d, line %d: %s\n", perf_fd2, __LINE__, strerror(errno));
+		fprintf(stderr, "Failed to enable perf event w/ fd %d, line %d: %s\n",
+			perf_fd2, __LINE__, strerror(errno));
 		abort();
 	}
 }
@@ -94,6 +98,9 @@ void stopSampling() {
 		fprintf(stderr, "Failed to disable perf event: %s\n", strerror(errno));
 		abort();
 	}
+
+	// process any sample data still remaining in the ring buffer
+	prev_head = perf_mmap_read(prev_head, 0, NULL);
 }
 
 static int handle_struct_read_format(unsigned char *sample, int read_format,
@@ -101,7 +108,7 @@ static int handle_struct_read_format(unsigned char *sample, int read_format,
 	int i;
 	int offset = 0;
 
-	if (read_format & PERF_FORMAT_GROUP) {
+	if(read_format & PERF_FORMAT_GROUP) {
 		long long nr,time_enabled,time_running;
 
 		memcpy(&nr,&sample[offset],sizeof(long long));
@@ -153,12 +160,13 @@ static int handle_struct_read_format(unsigned char *sample, int read_format,
 
 long long perf_mmap_read(long long prev_head, long long reg_mask, void *validate) {
 	struct perf_event_header *event;
-	struct perf_event_mmap_page *control_page = (struct perf_event_mmap_page *) our_mmap;
+	struct perf_event_mmap_page *control_page = (struct perf_event_mmap_page *)our_mmap;
 	long long head, offset;
-	int i, size;
 	long long copy_amt, prev_head_wrap;
 	void *data_mmap = (void *)((size_t)our_mmap + getpagesize());
 	bool debug = false;
+	int i, size;
+	static int numSamples;
 
 	if(control_page == NULL) {
 		fprintf(stderr, "ERROR: control_page=%p, our_mmap=%p, data_mmap=%p\n", control_page, our_mmap, data_mmap);
@@ -198,7 +206,7 @@ long long perf_mmap_read(long long prev_head, long long reg_mask, void *validate
 
 		event = (struct perf_event_header *) &data[offset];
 
-		// skip over the header we just read from above
+		// move position past the header we just read above
 		offset += sizeof(struct perf_event_header); 
 
 		switch(event->type) {
@@ -230,9 +238,11 @@ long long perf_mmap_read(long long prev_head, long long reg_mask, void *validate
 				offset += sizeof(uint64_t);
 				void *paddr = (void *)addr;
 
-				if(debug) {
-					//printf("access @ %p, watchStartByte=%p, watchEndByte=%p\n", paddr, watchStartByte, watchEndByte);
-				}
+				/*
+				printf("> sampled address @ %p\n", paddr);
+				printf("             data = 0x%lx\n", *((long *)paddr));
+				*/
+
 				// If we are not sampling a stack address then proceed within...
 				if((paddr >= watchStartByte && paddr <= watchEndByte) &&
 					!(paddr >= stackStart && paddr <= stackEnd)) {
@@ -380,6 +390,8 @@ long long perf_mmap_read(long long prev_head, long long reg_mask, void *validate
 		}
 		// Move the offset counter ahead by the size given in the event header.
 		offset = starting_offset + event->size;
+
+		//printf(">>> finished reading sample, total so far = %d\n", ++numSamples);
 	}
 
 	// Tell perf where we left off reading; this prevents
@@ -415,8 +427,11 @@ void setupSampling(void) {
 
 	//Sample_period/freq: Setting the rate of recording. 
 	//For perf, it generates an overflow and start writing to mmap buffer in a fixed frequency set here.
-	pe_load.sample_period = 5500;
-	//pe_load.sample_freq = 4000;
+	pe_load.sample_period = 100;
+	//pe_load.sample_freq = 2000;
+
+	//Set this field to use frequency instead of period, see above.
+	pe_load.freq = 0;
 
 	//Sample_type: Specifies which should be sampled in an access. 
 	pe_load.sample_type = sample_type;
@@ -465,9 +480,6 @@ void setupSampling(void) {
 	// FIXME
 	pe_load.comm = 0;
 
-	//Set this field to use frequency instead of period, see above.
-	pe_load.freq = 1;
-
 	//Inherit_stat: This bit enables saving of event counts on context switch for
 	//inherited tasks. So it is only useful when 'inherit' set to 1.
 	pe_load.inherit_stat = 0;
@@ -495,7 +507,7 @@ void setupSampling(void) {
 
 	//Exclude_xxx: Sample guest/host instances or not.
 	pe_load.exclude_host = 0;
-	pe_load.exclude_guest = 0;
+	pe_load.exclude_guest = 1;
 
 	//Exclude_callchain_xxx: exclude callchains from kernel/user.
 	pe_load.exclude_callchain_kernel = 1; // exclude kernel callchains
@@ -540,8 +552,9 @@ void setupSampling(void) {
 	//PERF_SAMPLE_STACK_USER is specified.
 	pe_load.sample_stack_user = 0;
 
+	// Make an exact copy of the pe_load attributes to be used for the
+	// corresponding store events' attributes.
 	memcpy(&pe_store, &pe_load, sizeof(struct perf_event_attr));
-	pe_store.disabled = 1;
 	pe_store.config = STORE_ACCESS;
 
 	// Create the perf_event for this thread on all CPUs with no event group
