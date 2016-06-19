@@ -50,6 +50,8 @@ __thread void * maxObjAddr = (void *)0x0;
 void * program_break;
 extern void * __libc_stack_end;
 extern char * program_invocation_name;
+extern int numSamples;
+extern int numSignals;
 
 typedef int (*main_fn_t)(int, char **, char **);
 main_fn_t real_main;
@@ -104,7 +106,7 @@ __attribute__((constructor)) void initializer() {
 		fprintf(stderr, "error: unable to allocate shadow memory: %s\n", strerror(errno));
 		abort();
 	}
-	printf(">>> shadow memory allocated for main thread @ %p ~ %p (size=0x%x)\n", shadow_mem,
+	printf(">>> shadow memory allocated for main thread @ %p ~ %p (size=%d bytes)\n", shadow_mem,
 			shadow_mem + SHADOW_MEM_SIZE, SHADOW_MEM_SIZE);
 	printf(">>> stack start @ %p, stack+5MB = %p\n", stackStart, stackEnd);
 	printf(">>> program break @ %p\n\n", program_break);
@@ -117,6 +119,7 @@ int libmemperf_main(int argc, char ** argv, char ** envp) {
 	initSampling();
 	int main_ret_val = real_main(argc, argv, envp);
 	stopSampling();
+	printf(">>> numSamples = %d, numSignals = %d\n", numSamples, numSignals);
 	countUnfreedObjAccesses();
 	printHashMap();
 	return main_ret_val;
@@ -188,28 +191,39 @@ extern "C" {
 			// corresponds to the object's malloc header.
 			long object_offset = (char *)objAlloc - (char *)watchStartByte;
 
-			// Record the callsite_id to the shadow memory corresponding
-			// to the object's malloc header.
-			uint64_t *id_in_shadow_mem = (uint64_t *)(shadow_mem + object_offset - MALLOC_HEADER_SIZE);
-			//printf(">>> writing callsite id 0x%lx to %p, shadow@%p, offset=0x%llx\n", callsite_id,
-			//		id_in_shadow_mem, shadow_mem, object_offset-MALLOC_HEADER_SIZE);
-			*id_in_shadow_mem = callsite_id;
+            // Check to see whether this object is mappable to shadow memory. Reasons
+            // it may not include malloc utilizing mmap to fulfill the request, or
+            // the heap possibly having outgrown the size of shadow memory. We only
+            // want to track objects that are so mappable.
+            if(object_offset >= 0 && object_offset < SHADOW_MEM_SIZE) {
+				if(objAlloc > maxObjAddr) {
+					// Only update the maxObjAddr variable if this object could be
+					// tracked given the limited size of shadow memory
+					if(object_offset >= 0 && object_offset < SHADOW_MEM_SIZE)
+						maxObjAddr = (void *)((char *)objAlloc + totalObjSz);
+				}
 
-			unordered_map<uint64_t, statTuple>::iterator search_map_for_id =
-							mapCallsiteStats.find(callsite_id);
-	
-			// If we found a match on the callsite_id ...
-			if(search_map_for_id != mapCallsiteStats.end()) {
-				statTuple found_value = search_map_for_id->second;
-				int oldCount = get<2>(found_value);
-				long oldUsedSize = get<3>(found_value);
-				long oldTotalSize = get<4>(found_value);
-				mapCallsiteStats[callsite_id] = make_tuple(callsite1, callsite2,
-					(oldCount+1), (oldUsedSize+sz), (oldTotalSize+totalObjSz), 0);
-			} else {	// If we did NOT find a match on callsite_id ...
-				statTuple new_value(make_tuple(callsite1,
-					callsite2, 1, sz, totalObjSz, 0));
-				mapCallsiteStats.insert({callsite_id, new_value});
+				// Record the callsite_id to the shadow memory corresponding
+				// to the object's malloc header.
+				uint64_t *id_in_shadow_mem = (uint64_t *)(shadow_mem + object_offset - MALLOC_HEADER_SIZE);
+				*id_in_shadow_mem = callsite_id;
+
+				unordered_map<uint64_t, statTuple>::iterator search_map_for_id =
+					mapCallsiteStats.find(callsite_id);
+
+				// If we found a match on the callsite_id ...
+				if(search_map_for_id != mapCallsiteStats.end()) {
+					statTuple found_value = search_map_for_id->second;
+					int oldCount = get<2>(found_value);
+					long oldUsedSize = get<3>(found_value);
+					long oldTotalSize = get<4>(found_value);
+					mapCallsiteStats[callsite_id] = make_tuple(callsite1, callsite2,
+							(oldCount+1), (oldUsedSize+sz), (oldTotalSize+totalObjSz), 0);
+				} else {	// If we did NOT find a match on callsite_id ...
+					statTuple new_value(make_tuple(callsite1,
+								callsite2, 1, sz, totalObjSz, 0));
+					mapCallsiteStats.insert({callsite_id, new_value});
+				}
 			}
 
 			insideHashMap = false;

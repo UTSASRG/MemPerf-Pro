@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MMAP_PAGES 5	// must be in the form of 2^N + 1
+#define MMAP_PAGES 33	// must be in the form of 2^N + 1
 #define DATA_MMAP_PAGES (MMAP_PAGES - 1)
 #define MAPSIZE (MMAP_PAGES * getpagesize())
 #define DATA_MAPSIZE (DATA_MMAP_PAGES * getpagesize())

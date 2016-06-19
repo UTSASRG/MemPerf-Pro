@@ -42,6 +42,9 @@ __thread extern void * watchStartByte;
 __thread extern void * watchEndByte;
 __thread extern void * highestObjAddr;
 
+int numSamples;
+int numSignals;
+
 __thread int perf_fd, perf_fd2;
 __thread long long prev_head;
 __thread pid_t tid;
@@ -166,12 +169,10 @@ long long perf_mmap_read(long long prev_head, long long reg_mask, void *validate
 	void *data_mmap = (void *)((size_t)our_mmap + getpagesize());
 	bool debug = false;
 	int i, size;
-	static int numSamples;
 
 	if(control_page == NULL) {
 		fprintf(stderr, "ERROR: control_page=%p, our_mmap=%p, data_mmap=%p\n", control_page, our_mmap, data_mmap);
-		raise(SIGUSR1);
-		return -1;
+		abort();
 	}
 
 	head = control_page->data_head;
@@ -180,6 +181,10 @@ long long perf_mmap_read(long long prev_head, long long reg_mask, void *validate
 	if(head < prev_head)
 		prev_head = 0;
 
+    if(DATA_MAPSIZE - size < 128) {
+        fprintf(stderr, "warning: sample data size is dangerously close to buffer size;"
+                "data loss is likely to occur\n");
+    }
 	if(size > DATA_MAPSIZE)
 		fprintf(stderr, "error: we overflowed the mmap buffer with %d > %d bytes\n", size, DATA_MAPSIZE);
 
@@ -392,6 +397,7 @@ long long perf_mmap_read(long long prev_head, long long reg_mask, void *validate
 		offset = starting_offset + event->size;
 
 		//printf(">>> finished reading sample, total so far = %d\n", ++numSamples);
+		numSamples++;
 	}
 
 	// Tell perf where we left off reading; this prevents
@@ -402,6 +408,8 @@ long long perf_mmap_read(long long prev_head, long long reg_mask, void *validate
 }
 
 void sampleHandler(int signum, siginfo_t *info, void *p) {
+	numSignals++;
+
 	// If the overflow counter has reached zero (indicated by the POLL_HUP code),
 	// read the sample data and reset the overflow counter to start again.
 	if(info->si_code == POLL_HUP) {
@@ -427,7 +435,7 @@ void setupSampling(void) {
 
 	//Sample_period/freq: Setting the rate of recording. 
 	//For perf, it generates an overflow and start writing to mmap buffer in a fixed frequency set here.
-	pe_load.sample_period = 100;
+	pe_load.sample_period = 1000;
 	//pe_load.sample_freq = 2000;
 
 	//Set this field to use frequency instead of period, see above.
