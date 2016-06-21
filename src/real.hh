@@ -12,7 +12,7 @@ namespace Real {
 	DECLARE_WRAPPER(free);
 	DECLARE_WRAPPER(calloc);
 	DECLARE_WRAPPER(malloc);
-	//DECLARE_WRAPPER(realloc);
+	DECLARE_WRAPPER(realloc);
 	DECLARE_WRAPPER(pthread_create);
 };
 

@@ -46,6 +46,7 @@ __thread char * stackEnd;
 __thread char * watchStartByte;
 __thread char * watchEndByte;
 __thread void * maxObjAddr = (void *)0x0;
+__thread FILE * output;
 
 void * program_break;
 extern void * __libc_stack_end;
@@ -57,6 +58,10 @@ typedef int (*main_fn_t)(int, char **, char **);
 main_fn_t real_main;
 
 extern "C" {
+	pid_t gettid() {
+		return syscall(__NR_gettid);
+	}
+
 	struct addr2line_info {
 		char exename[256];
 		unsigned int lineNum;
@@ -76,9 +81,9 @@ extern "C" {
 	//void * realloc(void *, size_t) __attribute__ ((weak, alias("xxrealloc")));
 }
 bool initialized = false;
-char tmpbuf[16384];		// 16KB global buffer
+char tmpbuf[262144];		// 256KB global buffer
 unsigned int tmppos = 0;
-const bool debug = false;
+const bool debug = true;
 
 __attribute__((constructor)) void initializer() {
 	// Ensure we are operating on a system using 64-bit pointers.
@@ -106,20 +111,35 @@ __attribute__((constructor)) void initializer() {
 		fprintf(stderr, "error: unable to allocate shadow memory: %s\n", strerror(errno));
 		abort();
 	}
-	printf(">>> shadow memory allocated for main thread @ %p ~ %p (size=%d bytes)\n", shadow_mem,
+
+	char outputFile[MAX_FILENAME_LEN];
+	snprintf(outputFile, MAX_FILENAME_LEN, "%s_libmemperf.txt",
+		program_invocation_name);
+
+	// Presently set to overwrite file; change fopen flag to "a" for append.
+	output = fopen(outputFile, "w");
+	if(output == NULL) {
+		fprintf(stderr, "error: unable to open output file for writing debug data\n");
+		return;
+	}
+
+	fprintf(output, ">>> shadow memory allocated for main thread @ %p ~ %p (size=%d bytes)\n", shadow_mem,
 			shadow_mem + SHADOW_MEM_SIZE, SHADOW_MEM_SIZE);
-	printf(">>> stack start @ %p, stack+5MB = %p\n", stackStart, stackEnd);
-	printf(">>> program break @ %p\n\n", program_break);
+	fprintf(output, ">>> stack start @ %p, stack+5MB = %p\n", stackStart, stackEnd);
+	fprintf(output, ">>> watch start @ %p, watch end @ %p\n", watchStartByte, watchEndByte);
+	fprintf(output, ">>> program break @ %p\n\n", program_break);
 }
 
-__attribute__((destructor)) void finalizer() {}
+__attribute__((destructor)) void finalizer() {
+	fclose(output);
+}
 
 // MemPerf's main function
 int libmemperf_main(int argc, char ** argv, char ** envp) {
 	initSampling();
 	int main_ret_val = real_main(argc, argv, envp);
 	stopSampling();
-	printf(">>> numSamples = %d, numSignals = %d\n", numSamples, numSignals);
+	fprintf(output, ">>> numSamples = %d, numSignals = %d\n", numSamples, numSignals);
 	countUnfreedObjAccesses();
 	printHashMap();
 	return main_ret_val;
@@ -165,15 +185,30 @@ extern "C" {
 		if(!insideHashMap) {
 			insideHashMap = true;
 
-			struct stack_frame * current_frame;
-			current_frame = (struct stack_frame *)(__builtin_frame_address(0));
+			struct stack_frame * current_frame =
+							(struct stack_frame *)(__builtin_frame_address(0));
 			void * callsite1 = current_frame->caller_address;
-			current_frame = current_frame->prev;
-			void * callsite2 = current_frame->caller_address;
+			struct stack_frame * prev_frame = current_frame->prev;
+			// We cannot assume that a previous stack frame exists; doing so, and then
+			// attempting to dereference its address will result in a segfault.
+			// Therefore, we first determine whether its address is a valid stack
+			// address. If so, then we proceed by deferencing it. If it is NOT a
+			// stack address, then we will use NO_CALLSITE as a placeholder value.
+			void * callsite2 = (void *)NO_CALLSITE;
+			if(((void *)prev_frame >= (void *)stackStart) &&
+					((void *)prev_frame <= (void *)current_frame))
+				callsite2 = prev_frame->caller_address;
 
 			uint64_t lowWord1 = (uint64_t) callsite1 & 0xFFFFFFFF;
 			uint64_t lowWord2 = (uint64_t) callsite2 & 0xFFFFFFFF;
 			uint64_t callsite_id = (lowWord1 << 32) | lowWord2;
+
+			// Now that we have computed the callsite ID, if there is no second
+			// callsite we can replace its pointer with a more obvious choice,
+			// such as 0x0. This is the value that will appear in the output
+			// file. 
+			if(callsite2 == (void *)NO_CALLSITE)
+				callsite2 = (void *)0x0;
 
 			// Do the allocation and fetch the object's real total size.
 			void * objAlloc = Real::malloc(sz);
@@ -254,31 +289,39 @@ extern "C" {
 		// only call Real::free() if the object did not come from here.
 		if(ptr >= (void *)tmpbuf && ptr <= (void *)(tmpbuf + tmppos)) {
 			fprintf(stderr, "info: freeing temp memory\n");
-		} else if(!insideHashMap) {
-			long shadow_mem_offset = ((char *)ptr - (char *)watchStartByte) / WORD_SIZE;
+		} else {
+			if(!insideHashMap &&
+					(ptr >= (void *)watchStartByte && ptr <= (void *)watchEndByte)) {
 
-			// Fetch object's size from malloc header
-			long *objHeader = (long *)ptr - 1;
-			unsigned int objSize = *objHeader - 1;
+				long shadow_mem_offset = (char *)ptr - (char *)watchStartByte;
+				if(shadow_mem_offset % WORD_SIZE != 0)
+					fprintf(output, ">>> free(%p) object is not word aligned!\n", ptr);
 
-			int i = 0;
-			long count = 0;
-			for(i = 0; i < objSize; i += 8) {
-				long *next_word = (long *)(shadow_mem + shadow_mem_offset + i);
-				count += *next_word;
-				*next_word = 0;		// zero out the word after counting it
+				// Fetch object's size from malloc header
+				long *objHeader = (long *)ptr - 1;
+				unsigned int objSize = *objHeader - 1;
+
+				// Zero out the malloc header area manually.
+				long *callsiteHeader = (long *)(shadow_mem + shadow_mem_offset - WORD_SIZE);
+				*callsiteHeader = 0;
+
+				int i = 0;
+				long count = 0;
+				for(i = 0; i < objSize; i += 8) {
+					long *next_word = (long *)(shadow_mem + shadow_mem_offset + i);
+					count += *next_word;
+					*next_word = 0;		// zero out the word after counting it
+				}
 			}
 
 			Real::free(ptr);
 		}
 	}
 
-	/*
 	// TODO: will have to handle this eventually...   - Sam
 	void * xxrealloc(void * ptr, size_t sz) {
 		return Real::realloc(ptr, sz);
 	}
-	*/
 
 	size_t getTotalAllocSize(void * objAlloc, size_t sz) {
 		size_t curSz = mapRealAllocSize[sz];
@@ -293,20 +336,9 @@ extern "C" {
 	void printHashMap() {
 		insideHashMap = true;
 
-		char outputFile[256];
-		strcpy(outputFile, program_invocation_name);
-		strcat(outputFile, "_libmemperf.txt");
-
-		// Presently set to overwrite file; change fopen flag to "a" for append.
-		FILE * output = fopen(outputFile, "w");
-		if(output == NULL) {
-			fprintf(stderr, "error: unable to open output file for writing hash map\n");
-			return;
-		}
-
-		fprintf(output, "Hash map contents:\n");
-		fprintf(output, "--------------------------------\n");
-		fprintf(output, "%-18s %-18s %5s %-64s %5s %-64s %6s %8s %8s %8s %8s\n",
+		fprintf(output, "Hash map contents\n");
+		fprintf(output, "------------------------------------------\n");
+		fprintf(output, "%-18s %-18s %5s %-100s %5s %-100s %6s %8s %8s %8s %8s\n",
 				"callsite1", "callsite2", "line1", "exename1", "line2", "exename2",
 				"allocs", "used sz", "total sz", "avg sz", "accesses");
 
@@ -328,18 +360,16 @@ extern "C" {
 			fprintf(output, "%-18p ", callsite1);
 			fprintf(output, "%-18p ", callsite2);
 			fprintf(output, "%5d ", addrInfo1.lineNum);
-			fprintf(output, "%-64s ", addrInfo1.exename);
+			fprintf(output, "%-100s ", addrInfo1.exename);
 			fprintf(output, "%5d ", addrInfo2.lineNum);
-			fprintf(output, "%-64s ", addrInfo2.exename);
+			fprintf(output, "%-100s ", addrInfo2.exename);
 			fprintf(output, "%6d ", count);
 			fprintf(output, "%8ld ", usedSize);
 			fprintf(output, "%8ld ", totalSize);
-			fprintf(output, "%8.1f", avgSize);
+			fprintf(output, "%8.1f ", avgSize);
 			fprintf(output, "%8ld", totalAccesses);
 			fprintf(output, "\n");
 		}
-		fprintf(output, "\n\n");
-		fclose(output);
 		insideHashMap = false;
 	}
 
@@ -350,7 +380,7 @@ extern "C" {
 		struct addr2line_info info;
 
 		if(pipe(fd) == -1) {
-			printf("error: unable to create pipe\n");
+			fprintf(stderr, "error: unable to create pipe\n");
 			strcpy(info.exename, "error");
 			info.lineNum = 0;
 			info.error = true;
@@ -359,7 +389,7 @@ extern "C" {
 
 		switch(fork()) {
 			case -1:
-				printf("error: unable to fork child process\n");
+				fprintf(stderr, "error: unable to fork child process\n");
 				break;
 			case 0:		// child
 				close(fd[0]);
@@ -371,7 +401,7 @@ extern "C" {
 			default:	// parent
 				close(fd[1]);
 				if(read(fd[0], strInfo, 512) == -1) {
-					printf("error: unable to read from pipe\n");
+					fprintf(stderr, "error: unable to read from pipe\n");
 					strcpy(info.exename, "error");
 					info.lineNum = 0;
 					info.error = true;
@@ -404,7 +434,7 @@ extern "C" {
 		long *sweepCurrent;
 
 		if(debug)
-			printf(">>> sweepStart = %p, sweepEnd = %p\n", sweepStart, sweepEnd);
+			fprintf(output, ">>> sweepStart = %p, sweepEnd = %p\n", sweepStart, sweepEnd);
 
 		for(sweepCurrent = sweepStart; sweepCurrent <= sweepEnd; sweepCurrent++) {
 			long current_byte_offset = (char *)sweepCurrent - (char *)sweepStart;
@@ -417,12 +447,12 @@ extern "C" {
 				long callsite_id = *sweepCurrent;
 				long *realObjHeader = (long *)(watchStartByte + current_byte_offset);
 				long objSizeInBytes = *realObjHeader;
-				long objSizeInWords = *realObjHeader / 8;
+				long objSizeInWords = (*realObjHeader - 1) / 8;
 				long access_count = 0;
 				int i;
 
 				if(debug) {
-					printf(">>> found malloc header @ %p, callsite_id=0x%lx, object size=%ld "
+					fprintf(output, ">>> found malloc header @ %p, callsite_id=0x%lx, object size=%ld "
 						"(%ld words)\n", sweepCurrent, callsite_id, objSizeInBytes,
 						objSizeInWords);
 				}
@@ -431,10 +461,10 @@ extern "C" {
 					sweepCurrent++;
 					access_count += *sweepCurrent;
 					if(debug)
-						printf("\t shadow mem value @ %p = 0x%lx\n", sweepCurrent, *sweepCurrent);
+						fprintf(output, "\t shadow mem value @ %p = 0x%lx\n", sweepCurrent, *sweepCurrent);
 				}
 				if(debug) {
-					printf("\t finished with object count = %ld, sweepCurrent's next "
+					fprintf(output, "\t finished with object count = %ld, sweepCurrent's next "
 							"value = %p\n", access_count, (sweepCurrent + 1));
 				}
 

@@ -28,12 +28,9 @@ long perf_event_open(struct perf_event_attr *hw_event, pid_t pid, int cpu, int g
 	return syscall(__NR_perf_event_open, hw_event, pid, cpu, group_fd, flags);
 }
 
-pid_t gettid() {
-	return syscall(__NR_gettid);
-}
-
 extern void * program_break;
 extern "C" bool isWordMallocHeader(long *word);
+extern "C" pid_t gettid();
 __thread extern bool isMainThread;
 __thread extern char * shadow_mem;
 __thread extern void * stackStart;
@@ -435,11 +432,11 @@ void setupSampling(void) {
 
 	//Sample_period/freq: Setting the rate of recording. 
 	//For perf, it generates an overflow and start writing to mmap buffer in a fixed frequency set here.
-	pe_load.sample_period = 1000;
-	//pe_load.sample_freq = 2000;
+	//pe_load.sample_period = 1000;
+	pe_load.sample_freq = 4000;
 
 	//Set this field to use frequency instead of period, see above.
-	pe_load.freq = 0;
+	pe_load.freq = 1;
 
 	//Sample_type: Specifies which should be sampled in an access. 
 	pe_load.sample_type = sample_type;
