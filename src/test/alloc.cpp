@@ -9,11 +9,13 @@ int main() {
 
 	for(i  = 0; i < 100; i++) {
 		ptr = (int *) malloc(sizeof(int));
-		for(j = 0; j < 100000; j++)
-			*ptr = i * j;
-		//free(ptr);
+		*ptr = 0;
+		for(j = 0; j < 100000; j++) {
+			(void)*ptr;
+			*ptr = 1;
+		}
+		free(ptr);
 	}
-	free(ptr);		// free last object used
 
 	printf("exiting...\n");
 	return EXIT_SUCCESS;

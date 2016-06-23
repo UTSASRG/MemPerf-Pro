@@ -40,6 +40,7 @@ thread_local unordered_map<size_t, size_t> mapRealAllocSize;
 
 __thread bool insideHashMap = false;
 __thread bool isMainThread = false;
+__thread bool shadowMemZeroedOut = false;
 __thread char * shadow_mem;
 __thread char * stackStart;
 __thread char * stackEnd;
@@ -72,18 +73,17 @@ extern "C" {
 	struct addr2line_info addr2line(void * ddr);
 	bool isWordMallocHeader(long *word);
 	void countUnfreedObjAccesses();
+	void mallocShadowMem(void * objAlloc, size_t sz, void * callsite1, void * callsite2);
 
 	void free(void *) __attribute__ ((weak, alias("xxfree")));
 	void * calloc(size_t, size_t) __attribute__ ((weak, alias("xxcalloc")));
 	void * malloc(size_t) __attribute__ ((weak, alias("xxmalloc")));
-
-	// TODO: How to handle realloc?	-Sam
-	//void * realloc(void *, size_t) __attribute__ ((weak, alias("xxrealloc")));
+	void * realloc(void *, size_t) __attribute__ ((weak, alias("xxrealloc")));
 }
 bool initialized = false;
 char tmpbuf[262144];		// 256KB global buffer
 unsigned int tmppos = 0;
-const bool debug = true;
+const bool debug = false;
 
 __attribute__((constructor)) void initializer() {
 	// Ensure we are operating on a system using 64-bit pointers.
@@ -183,10 +183,8 @@ extern "C" {
 		}
 
 		if(!insideHashMap) {
-			insideHashMap = true;
-
 			struct stack_frame * current_frame =
-							(struct stack_frame *)(__builtin_frame_address(0));
+				(struct stack_frame *)(__builtin_frame_address(0));
 			void * callsite1 = current_frame->caller_address;
 			struct stack_frame * prev_frame = current_frame->prev;
 			// We cannot assume that a previous stack frame exists; doing so, and then
@@ -199,89 +197,153 @@ extern "C" {
 					((void *)prev_frame <= (void *)current_frame))
 				callsite2 = prev_frame->caller_address;
 
-			uint64_t lowWord1 = (uint64_t) callsite1 & 0xFFFFFFFF;
-			uint64_t lowWord2 = (uint64_t) callsite2 & 0xFFFFFFFF;
-			uint64_t callsite_id = (lowWord1 << 32) | lowWord2;
-
-			// Now that we have computed the callsite ID, if there is no second
-			// callsite we can replace its pointer with a more obvious choice,
-			// such as 0x0. This is the value that will appear in the output
-			// file. 
-			if(callsite2 == (void *)NO_CALLSITE)
-				callsite2 = (void *)0x0;
-
 			// Do the allocation and fetch the object's real total size.
 			void * objAlloc = Real::malloc(sz);
-			size_t totalObjSz = getTotalAllocSize(objAlloc, sz);
 
-			if(objAlloc > maxObjAddr) {
-				long access_byte_offset = (char *)objAlloc - (char *)watchStartByte;
-				// Only update the maxObjAddr variable if this object could be
-				// tracked given the limited size of shadow memory
-				if(access_byte_offset >= 0 && access_byte_offset < SHADOW_MEM_SIZE)
-					maxObjAddr = (void *)((char *)objAlloc + totalObjSz);
-			}
+			mallocShadowMem(objAlloc, sz, callsite1, callsite2);
 
-			// Store the contrived callsite_id in the shadow memory location that
-			// corresponds to the object's malloc header.
-			long object_offset = (char *)objAlloc - (char *)watchStartByte;
-
-            // Check to see whether this object is mappable to shadow memory. Reasons
-            // it may not include malloc utilizing mmap to fulfill the request, or
-            // the heap possibly having outgrown the size of shadow memory. We only
-            // want to track objects that are so mappable.
-            if(object_offset >= 0 && object_offset < SHADOW_MEM_SIZE) {
-				if(objAlloc > maxObjAddr) {
-					// Only update the maxObjAddr variable if this object could be
-					// tracked given the limited size of shadow memory
-					if(object_offset >= 0 && object_offset < SHADOW_MEM_SIZE)
-						maxObjAddr = (void *)((char *)objAlloc + totalObjSz);
-				}
-
-				// Record the callsite_id to the shadow memory corresponding
-				// to the object's malloc header.
-				uint64_t *id_in_shadow_mem = (uint64_t *)(shadow_mem + object_offset - MALLOC_HEADER_SIZE);
-				*id_in_shadow_mem = callsite_id;
-
-				unordered_map<uint64_t, statTuple>::iterator search_map_for_id =
-					mapCallsiteStats.find(callsite_id);
-
-				// If we found a match on the callsite_id ...
-				if(search_map_for_id != mapCallsiteStats.end()) {
-					statTuple found_value = search_map_for_id->second;
-					int oldCount = get<2>(found_value);
-					long oldUsedSize = get<3>(found_value);
-					long oldTotalSize = get<4>(found_value);
-					mapCallsiteStats[callsite_id] = make_tuple(callsite1, callsite2,
-							(oldCount+1), (oldUsedSize+sz), (oldTotalSize+totalObjSz), 0);
-				} else {	// If we did NOT find a match on callsite_id ...
-					statTuple new_value(make_tuple(callsite1,
-								callsite2, 1, sz, totalObjSz, 0));
-					mapCallsiteStats.insert({callsite_id, new_value});
-				}
-			}
-
-			insideHashMap = false;
 			return objAlloc;
 		}
 
 		return Real::malloc(sz);
 	}
 
-	// TODO need to make this function work -- copy or factor out code from
-	// xxmalloc for use here (and possibly future functions such as realloc).
-	void * xxcalloc(size_t nelem, size_t elsize) {
-		// If Real has not yet finished initializing, fulfill the calloc request
-		// ourselves by issuing appropriate calls to malloc and memset. The
-		// malloc request will be fulfilled using memory from our global buffer.
-		if(!initialized) {
-			void * ptr = malloc(nelem * elsize);
-			if(ptr)
-				memset(ptr, 0, nelem * elsize);
-			return ptr;
+	/*
+	* This routine is responsible for computing a callsite ID based on the two
+	* callsite parameters, then writing this ID to the shadow memory which
+	* corresponds to the given object's malloc header. Additionally, this
+	* allocation is recorded in the global stats hash map.
+	* Callers include xxmalloc and xxrealloc.
+	*/
+	void mallocShadowMem(void * objAlloc, size_t sz, void * callsite1, void * callsite2) {
+		insideHashMap = true;
+		size_t totalObjSz = getTotalAllocSize(objAlloc, sz);
+
+		uint64_t lowWord1 = (uint64_t) callsite1 & 0xFFFFFFFF;
+		uint64_t lowWord2 = (uint64_t) callsite2 & 0xFFFFFFFF;
+		uint64_t callsite_id = (lowWord1 << 32) | lowWord2;
+
+		// Now that we have computed the callsite ID, if there is no second
+		// callsite we can replace its pointer with a more obvious choice,
+		// such as 0x0. This is the value that will appear in the output
+		// file. 
+		if(callsite2 == (void *)NO_CALLSITE)
+			callsite2 = (void *)0x0;
+
+		if(objAlloc > maxObjAddr) {
+			long access_byte_offset = (char *)objAlloc - (char *)watchStartByte;
+			// Only update the maxObjAddr variable if this object could be
+			// tracked given the limited size of shadow memory
+			if(access_byte_offset >= 0 && access_byte_offset < SHADOW_MEM_SIZE)
+				maxObjAddr = (void *)((char *)objAlloc + totalObjSz);
 		}
 
-		return Real::calloc(nelem, elsize);
+		// Store the contrived callsite_id in the shadow memory location that
+		// corresponds to the object's malloc header.
+		long object_offset = (char *)objAlloc - (char *)watchStartByte;
+
+		// Check to see whether this object is mappable to shadow memory. Reasons
+		// it may not include malloc utilizing mmap to fulfill the request, or
+		// the heap possibly having outgrown the size of shadow memory. We only
+		// want to track objects that are so mappable.
+		if(object_offset >= 0 && object_offset < SHADOW_MEM_SIZE) {
+			if(objAlloc > maxObjAddr) {
+				// Only update the maxObjAddr variable if this object could be
+				// tracked given the limited size of shadow memory
+				if(object_offset >= 0 && object_offset < SHADOW_MEM_SIZE)
+					maxObjAddr = (void *)((char *)objAlloc + totalObjSz);
+			}
+
+			// Record the callsite_id to the shadow memory corresponding
+			// to the object's malloc header.
+			uint64_t *id_in_shadow_mem = (uint64_t *)(shadow_mem + object_offset - MALLOC_HEADER_SIZE);
+			*id_in_shadow_mem = callsite_id;
+
+			unordered_map<uint64_t, statTuple>::iterator search_map_for_id =
+				mapCallsiteStats.find(callsite_id);
+
+			// If we found a match on the callsite_id ...
+			if(search_map_for_id != mapCallsiteStats.end()) {
+				statTuple found_value = search_map_for_id->second;
+				int oldCount = get<2>(found_value);
+				long oldUsedSize = get<3>(found_value);
+				long oldTotalSize = get<4>(found_value);
+				long oldAccessCount = get<5>(found_value);
+				mapCallsiteStats[callsite_id] = make_tuple(callsite1, callsite2,
+						(oldCount+1), (oldUsedSize+sz), (oldTotalSize+totalObjSz),
+						oldAccessCount);
+			} else {	// If we did NOT find a match on callsite_id ...
+				statTuple new_value(make_tuple(callsite1,
+							callsite2, 1, sz, totalObjSz, 0));
+				mapCallsiteStats.insert({callsite_id, new_value});
+			}
+		}
+		insideHashMap = false;
+	}
+
+	void * xxcalloc(size_t nelem, size_t elsize) {
+		void * ptr = NULL;
+		if((ptr = malloc(nelem * elsize)))
+			memset(ptr, 0, nelem * elsize);
+		return ptr;
+	}
+
+	/*
+	* This routine is responsible for summing the access counts for allocated
+	* objects that are being tracked using shadow memory. Additionally, the
+	* objects' shadow memory is zeroed out in preparation for later reuse.
+	* Callers include xxfree and xxrealloc.
+	*/
+	void freeShadowMem(void * ptr) {
+		long shadow_mem_offset = (char *)ptr - (char *)watchStartByte;
+		long *callsiteHeader = (long *)(shadow_mem + shadow_mem_offset - MALLOC_HEADER_SIZE);
+
+		// Fetch object's size from its malloc header
+		long *objHeader = (long *)ptr - 1;
+		unsigned int objSize = *objHeader - 1;
+
+		// This check is particularly necessary while we are not
+		// properly nor completely in control of calls to realloc, as
+		// well as other memory-related system and library calls.
+		if(isWordMallocHeader(callsiteHeader)) {
+			long callsite_id = *callsiteHeader;
+			if(debug) {
+				fprintf(output, ">>> found malloc header @ %p, callsite_id=0x%lx, object size=%u\n",
+						objHeader, callsite_id, objSize);
+			}
+
+			// Zero-out the malloc header area of the object's shadow memory.
+			*callsiteHeader = 0;
+
+			int i = 0;
+			long access_count = 0;
+			long *next_word = (long *)(shadow_mem + shadow_mem_offset);
+			for(i = 0; i < objSize / WORD_SIZE - 1; i++) {
+				if(debug)
+					fprintf(output, "\t shadow mem value @ %p = 0x%lx\n", next_word, *next_word);
+				access_count += *next_word;
+				*next_word = 0;		// zero out the word after counting it
+				next_word++;
+			}
+			if(debug) {
+				fprintf(output, "\t finished with object count = %ld of ptr @ %p\n",
+						access_count, ptr);
+			}
+
+			if(callsite_id > LOWEST_POS_CALLSITE_ID && access_count > 0) {
+				insideHashMap = true;
+				statTuple map_value = mapCallsiteStats[callsite_id];
+				void *callsite1 = get<0>(map_value);
+				void *callsite2 = get<1>(map_value);
+				int count = get<2>(map_value);
+				long usedSize = get<3>(map_value);
+				long totalSize = get<4>(map_value);
+				long totalAccesses = get<5>(map_value);
+				mapCallsiteStats[callsite_id] = make_tuple(callsite1, callsite2,
+						count, usedSize, totalSize, (totalAccesses + access_count));
+				insideHashMap = false;
+			}
+		}
 	}
 
 	void xxfree(void * ptr) {
@@ -290,37 +352,38 @@ extern "C" {
 		if(ptr >= (void *)tmpbuf && ptr <= (void *)(tmpbuf + tmppos)) {
 			fprintf(stderr, "info: freeing temp memory\n");
 		} else {
-			if(!insideHashMap &&
+			if(!shadowMemZeroedOut && !insideHashMap &&
 					(ptr >= (void *)watchStartByte && ptr <= (void *)watchEndByte)) {
-
-				long shadow_mem_offset = (char *)ptr - (char *)watchStartByte;
-				if(shadow_mem_offset % WORD_SIZE != 0)
-					fprintf(output, ">>> free(%p) object is not word aligned!\n", ptr);
-
-				// Fetch object's size from malloc header
-				long *objHeader = (long *)ptr - 1;
-				unsigned int objSize = *objHeader - 1;
-
-				// Zero out the malloc header area manually.
-				long *callsiteHeader = (long *)(shadow_mem + shadow_mem_offset - WORD_SIZE);
-				*callsiteHeader = 0;
-
-				int i = 0;
-				long count = 0;
-				for(i = 0; i < objSize; i += 8) {
-					long *next_word = (long *)(shadow_mem + shadow_mem_offset + i);
-					count += *next_word;
-					*next_word = 0;		// zero out the word after counting it
-				}
+				freeShadowMem(ptr);
 			}
-
 			Real::free(ptr);
 		}
 	}
 
-	// TODO: will have to handle this eventually...   - Sam
 	void * xxrealloc(void * ptr, size_t sz) {
-		return Real::realloc(ptr, sz);
+		if(!shadowMemZeroedOut && !insideHashMap &&
+				(ptr >= (void *)watchStartByte && ptr <= (void *)watchEndByte))
+			freeShadowMem(ptr);
+
+		void * reptr = Real::realloc(ptr, sz);
+
+		struct stack_frame * current_frame =
+			(struct stack_frame *)(__builtin_frame_address(0));
+		void * callsite1 = current_frame->caller_address;
+		struct stack_frame * prev_frame = current_frame->prev;
+		// We cannot assume that a previous stack frame exists; doing so, and then
+		// attempting to dereference its address will result in a segfault.
+		// Therefore, we first determine whether its address is a valid stack
+		// address. If so, then we proceed by deferencing it. If it is NOT a
+		// stack address, then we will use NO_CALLSITE as a placeholder value.
+		void * callsite2 = (void *)NO_CALLSITE;
+		if(((void *)prev_frame >= (void *)stackStart) &&
+				((void *)prev_frame <= (void *)current_frame))
+			callsite2 = prev_frame->caller_address;
+
+		mallocShadowMem(reptr, sz, callsite1, callsite2);
+
+		return reptr;
 	}
 
 	size_t getTotalAllocSize(void * objAlloc, size_t sz) {
@@ -338,8 +401,8 @@ extern "C" {
 
 		fprintf(output, "Hash map contents\n");
 		fprintf(output, "------------------------------------------\n");
-		fprintf(output, "%-18s %-18s %5s %-100s %5s %-100s %6s %8s %8s %8s %8s\n",
-				"callsite1", "callsite2", "line1", "exename1", "line2", "exename2",
+		fprintf(output, "%-18s %-18s %-18s %-20s %-20s %6s %8s %8s %8s %8s\n",
+				"id", "callsite1", "callsite2", "src1", "src2",
 				"allocs", "used sz", "total sz", "avg sz", "accesses");
 
 		for(const auto& level1_entry : mapCallsiteStats) {
@@ -357,12 +420,11 @@ extern "C" {
 			float avgSize = usedSize / (float) count;
 			long totalAccesses = get<5>(value);
 
+			fprintf(output, "%-18lx ", level1_entry.first);
 			fprintf(output, "%-18p ", callsite1);
 			fprintf(output, "%-18p ", callsite2);
-			fprintf(output, "%5d ", addrInfo1.lineNum);
-			fprintf(output, "%-100s ", addrInfo1.exename);
-			fprintf(output, "%5d ", addrInfo2.lineNum);
-			fprintf(output, "%-100s ", addrInfo2.exename);
+			fprintf(output, "%-14s:%-5d ", addrInfo1.exename, addrInfo1.lineNum);
+			fprintf(output, "%-14s:%-5d ", addrInfo2.exename, addrInfo2.lineNum);
 			fprintf(output, "%6d ", count);
 			fprintf(output, "%8ld ", usedSize);
 			fprintf(output, "%8ld ", totalSize);
@@ -395,7 +457,7 @@ extern "C" {
 				close(fd[0]);
 				dup2(fd[1], STDOUT_FILENO);
 				sprintf(strCallsite, "%p", addr);
-				execlp("addr2line", "addr2line", "-e", program_invocation_name, strCallsite, (char *)NULL);
+				execlp("addr2line", "addr2line", "-s", "-e", program_invocation_name, strCallsite, (char *)NULL);
 				exit(EXIT_FAILURE);		// if we're still here, then exec failed
 				break;
 			default:	// parent
@@ -433,6 +495,8 @@ extern "C" {
 		long *sweepEnd = (long *)(shadow_mem + max_byte_offset);
 		long *sweepCurrent;
 
+		shadowMemZeroedOut = true;
+
 		if(debug)
 			fprintf(output, ">>> sweepStart = %p, sweepEnd = %p\n", sweepStart, sweepEnd);
 
@@ -459,9 +523,11 @@ extern "C" {
 
 				for(i = 0; i < objSizeInWords-1; i++) {
 					sweepCurrent++;
+					if(debug)
+						fprintf(output, "\t shadow mem value @ %p ", sweepCurrent);
 					access_count += *sweepCurrent;
 					if(debug)
-						fprintf(output, "\t shadow mem value @ %p = 0x%lx\n", sweepCurrent, *sweepCurrent);
+						fprintf(output, " = 0x%lx\n", *sweepCurrent);
 				}
 				if(debug) {
 					fprintf(output, "\t finished with object count = %ld, sweepCurrent's next "
@@ -469,7 +535,9 @@ extern "C" {
 				}
 
 				if(access_count > 0) {
+					insideHashMap = true;
 					statTuple map_value = mapCallsiteStats[callsite_id];
+					insideHashMap = false;
 					void *callsite1 = get<0>(map_value);
 					void *callsite2 = get<1>(map_value);
 					int count = get<2>(map_value);

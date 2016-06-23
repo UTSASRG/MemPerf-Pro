@@ -22,6 +22,7 @@
 
 using namespace std;
 
+void haltSampling();
 int64_t get_trace_count(int fd);
 
 long perf_event_open(struct perf_event_attr *hw_event, pid_t pid, int cpu, int group_fd, unsigned long flags) {
@@ -89,7 +90,7 @@ void startSampling() {
 	}
 }
 
-void stopSampling() {
+void haltSampling() {
 	if(ioctl(perf_fd, PERF_EVENT_IOC_DISABLE, 0) == -1) {
 		fprintf(stderr, "Failed to disable perf event: %s\n", strerror(errno));
 		abort();
@@ -98,6 +99,11 @@ void stopSampling() {
 		fprintf(stderr, "Failed to disable perf event: %s\n", strerror(errno));
 		abort();
 	}
+}
+
+
+void stopSampling() {
+	haltSampling();
 
 	// process any sample data still remaining in the ring buffer
 	prev_head = perf_mmap_read(prev_head, 0, NULL);
@@ -164,7 +170,7 @@ long long perf_mmap_read(long long prev_head, long long reg_mask, void *validate
 	long long head, offset;
 	long long copy_amt, prev_head_wrap;
 	void *data_mmap = (void *)((size_t)our_mmap + getpagesize());
-	bool debug = false;
+	const bool debug = false;
 	int i, size;
 
 	if(control_page == NULL) {
@@ -234,16 +240,12 @@ long long perf_mmap_read(long long prev_head, long long reg_mask, void *validate
 				offset += sizeof(uint64_t);
 			}
 
+			void *paddr;
 			if(sample_type & PERF_SAMPLE_ADDR) {
 				uint64_t addr;
 				memcpy(&addr, &data[offset], sizeof(uint64_t));
 				offset += sizeof(uint64_t);
-				void *paddr = (void *)addr;
-
-				/*
-				printf("> sampled address @ %p\n", paddr);
-				printf("             data = 0x%lx\n", *((long *)paddr));
-				*/
+				paddr = (void *)addr;
 
 				// If we are not sampling a stack address then proceed within...
 				if((paddr >= watchStartByte && paddr <= watchEndByte) &&
@@ -374,6 +376,17 @@ long long perf_mmap_read(long long prev_head, long long reg_mask, void *validate
 				uint64_t src;
 				memcpy(&src, &data[offset], sizeof(uint64_t));
 				offset += sizeof(uint64_t);
+
+				/*
+				printf("> sampled address @ %p", paddr);
+				if(src & PERF_MEM_OP_LOAD)
+					printf(" [Load]");
+				if(src & PERF_MEM_OP_STORE)
+					printf(" [Store]");
+				printf("\n");
+				if(paddr != NULL)
+					printf("             data = 0x%lx\n", *((long *)paddr));
+				*/
 			}
 
 			if(sample_type & PERF_SAMPLE_IDENTIFIER) {
@@ -410,6 +423,7 @@ void sampleHandler(int signum, siginfo_t *info, void *p) {
 	// If the overflow counter has reached zero (indicated by the POLL_HUP code),
 	// read the sample data and reset the overflow counter to start again.
 	if(info->si_code == POLL_HUP) {
+		//haltSampling();		// TODO not 100% sure if this call is necessary
 		prev_head = perf_mmap_read(prev_head, 0, NULL);
 		ioctl(perf_fd, PERF_EVENT_IOC_REFRESH, OVERFLOW_INTERVAL);
 		ioctl(perf_fd2, PERF_EVENT_IOC_REFRESH, OVERFLOW_INTERVAL);
@@ -433,7 +447,7 @@ void setupSampling(void) {
 	//Sample_period/freq: Setting the rate of recording. 
 	//For perf, it generates an overflow and start writing to mmap buffer in a fixed frequency set here.
 	//pe_load.sample_period = 1000;
-	pe_load.sample_freq = 4000;
+	pe_load.sample_freq = 50000;
 
 	//Set this field to use frequency instead of period, see above.
 	pe_load.freq = 1;
