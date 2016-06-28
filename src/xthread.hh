@@ -84,7 +84,6 @@ class xthread {
 		result = current->startRoutine(current->startArg);
 
 		stopSampling();
-		printHashMap();
 		fclose(output);
 		return result;
 	}

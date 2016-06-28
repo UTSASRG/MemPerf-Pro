@@ -32,11 +32,7 @@ typedef tuple<void *, void *, int, long, long, long> statTuple;
 //	(4) the total size of these allocations (i.e., when using glibc malloc, header size plus usable size)
 //	(5) the used size of these allocations (i.e., a sum of sz from malloc(sz) calls)
 //	(6) the total number of accesses on objects spawned from this callsite id
-thread_local unordered_map<uint64_t, statTuple> mapCallsiteStats;
-
-// This map will maintain mappings between requested malloc sizes and the
-// actual usable size of fulfilled requests.
-thread_local unordered_map<size_t, size_t> mapRealAllocSize;
+unordered_map<uint64_t, statTuple> mapCallsiteStats;
 
 __thread bool insideHashMap = false;
 __thread bool isMainThread = false;
@@ -47,7 +43,7 @@ __thread char * stackEnd;
 __thread char * watchStartByte;
 __thread char * watchEndByte;
 __thread void * maxObjAddr = (void *)0x0;
-__thread FILE * output;
+__thread FILE * output = NULL;
 
 void * program_break;
 extern void * __libc_stack_end;
@@ -69,7 +65,7 @@ extern "C" {
 		bool error = false;
 	};
 	void printHashMap();
-	size_t getTotalAllocSize(void * objAlloc, size_t sz);
+	size_t getTotalAllocSize(size_t sz);
 	struct addr2line_info addr2line(void * ddr);
 	bool isWordMallocHeader(long *word);
 	void countUnfreedObjAccesses();
@@ -79,6 +75,11 @@ extern "C" {
 	void * calloc(size_t, size_t) __attribute__ ((weak, alias("xxcalloc")));
 	void * malloc(size_t) __attribute__ ((weak, alias("xxmalloc")));
 	void * realloc(void *, size_t) __attribute__ ((weak, alias("xxrealloc")));
+	void * valloc(size_t) __attribute__ ((weak, alias("xxvalloc")));
+	int posix_memalign(void **, size_t, size_t) __attribute__ ((weak, alias("xxposix_memalign")));
+	void * aligned_alloc(size_t, size_t) __attribute__ ((weak, alias("xxaligned_alloc")));
+	void * memalign(size_t, size_t) __attribute__ ((weak, alias("xxmemalign")));
+	void * pvalloc(size_t) __attribute__ ((weak, alias("xxpvalloc")));
 }
 bool initialized = false;
 char tmpbuf[262144];		// 256KB global buffer
@@ -95,6 +96,8 @@ __attribute__((constructor)) void initializer() {
 		fprintf(stderr, "error: unsupported pointer size: %zu\n", ptrSize);
 		abort();
 	}
+
+	mapCallsiteStats = unordered_map<uint64_t, statTuple>();
 
 	Real::initializer();
 	initialized = true;
@@ -134,14 +137,19 @@ __attribute__((destructor)) void finalizer() {
 	fclose(output);
 }
 
-// MemPerf's main function
-int libmemperf_main(int argc, char ** argv, char ** envp) {
-	initSampling();
-	int main_ret_val = real_main(argc, argv, envp);
+void exitHandler() {
 	stopSampling();
 	fprintf(output, ">>> numSamples = %d, numSignals = %d\n", numSamples, numSignals);
 	countUnfreedObjAccesses();
 	printHashMap();
+}
+
+// MemPerf's main function
+int libmemperf_main(int argc, char ** argv, char ** envp) {
+	initSampling();
+	atexit(exitHandler);
+	int main_ret_val = real_main(argc, argv, envp);
+	//exitHandler();
 	return main_ret_val;
 }
 
@@ -194,7 +202,7 @@ extern "C" {
 			// stack address, then we will use NO_CALLSITE as a placeholder value.
 			void * callsite2 = (void *)NO_CALLSITE;
 			if(((void *)prev_frame >= (void *)stackStart) &&
-					((void *)prev_frame <= (void *)current_frame))
+					((void *)prev_frame <= (void *)&current_frame))
 				callsite2 = prev_frame->caller_address;
 
 			// Do the allocation and fetch the object's real total size.
@@ -217,7 +225,7 @@ extern "C" {
 	*/
 	void mallocShadowMem(void * objAlloc, size_t sz, void * callsite1, void * callsite2) {
 		insideHashMap = true;
-		size_t totalObjSz = getTotalAllocSize(objAlloc, sz);
+		size_t totalObjSz = getTotalAllocSize(sz);
 
 		uint64_t lowWord1 = (uint64_t) callsite1 & 0xFFFFFFFF;
 		uint64_t lowWord2 = (uint64_t) callsite2 & 0xFFFFFFFF;
@@ -230,15 +238,15 @@ extern "C" {
 		if(callsite2 == (void *)NO_CALLSITE)
 			callsite2 = (void *)0x0;
 
-		if(objAlloc > maxObjAddr) {
+		if(((char *)objAlloc + totalObjSz) > maxObjAddr) {
 			long access_byte_offset = (char *)objAlloc - (char *)watchStartByte;
 			// Only update the maxObjAddr variable if this object could be
-			// tracked given the limited size of shadow memory
+			// tracked given the limited size of shadow memory.
 			if(access_byte_offset >= 0 && access_byte_offset < SHADOW_MEM_SIZE)
 				maxObjAddr = (void *)((char *)objAlloc + totalObjSz);
 		}
 
-		// Store the contrived callsite_id in the shadow memory location that
+		// Store the callsite_id in the shadow memory location that
 		// corresponds to the object's malloc header.
 		long object_offset = (char *)objAlloc - (char *)watchStartByte;
 
@@ -295,6 +303,9 @@ extern "C" {
 	* Callers include xxfree and xxrealloc.
 	*/
 	void freeShadowMem(void * ptr) {
+		if(ptr == NULL)
+			return;
+
 		long shadow_mem_offset = (char *)ptr - (char *)watchStartByte;
 		long *callsiteHeader = (long *)(shadow_mem + shadow_mem_offset - MALLOC_HEADER_SIZE);
 
@@ -347,6 +358,9 @@ extern "C" {
 	}
 
 	void xxfree(void * ptr) {
+		if(ptr == NULL)
+			return;
+
 		// Determine whether the specified object came from our global buffer;
 		// only call Real::free() if the object did not come from here.
 		if(ptr >= (void *)tmpbuf && ptr <= (void *)(tmpbuf + tmppos)) {
@@ -358,6 +372,27 @@ extern "C" {
 			}
 			Real::free(ptr);
 		}
+	}
+
+	void * xxvalloc(size_t) {
+		fprintf(output, "ERROR: call to unsupported memory function %s\n", __FUNCTION__);
+		return NULL;
+	}
+	int xxposix_memalign(void **, size_t, size_t) {
+		fprintf(output, "ERROR: call to unsupported memory function %s\n", __FUNCTION__);
+		return -1;
+	}
+	void * xxaligned_alloc(size_t, size_t) {
+		fprintf(output, "ERROR: call to unsupported memory function %s\n", __FUNCTION__);
+		return NULL;
+	}
+	void * xxmemalign(size_t, size_t) {
+		fprintf(output, "ERROR: call to unsupported memory function %s\n", __FUNCTION__);
+		return NULL;
+	}
+	void * xxpvalloc(size_t) {
+		fprintf(output, "ERROR: call to unsupported memory function %s\n", __FUNCTION__);
+		return NULL;
 	}
 
 	void * xxrealloc(void * ptr, size_t sz) {
@@ -386,14 +421,23 @@ extern "C" {
 		return reptr;
 	}
 
-	size_t getTotalAllocSize(void * objAlloc, size_t sz) {
-		size_t curSz = mapRealAllocSize[sz];
-		if(curSz == 0) {
-			size_t newSz = malloc_usable_size(objAlloc) + MALLOC_HEADER_SIZE;
-			mapRealAllocSize[sz] = newSz;
-			return newSz;
+	size_t getTotalAllocSize(size_t sz) {
+		size_t totalSize, usableSize;
+
+		// Smallest possible total object size is 32 bytes, thus total usable
+		// object size is 32 - 8 = 24 bytes.
+		if(sz <= 16)
+			return 24;
+
+		// Calculate a total object size that is double-word aligned.
+		if((sz + 8) % 16 != 0) {
+			totalSize = 16 * (((sz + 8) / 16) + 1);
+			usableSize = totalSize - 8;
+		} else {
+			usableSize = sz;
 		}
-		return curSz;
+
+		return usableSize;
 	}
 
 	void printHashMap() {
@@ -401,8 +445,8 @@ extern "C" {
 
 		fprintf(output, "Hash map contents\n");
 		fprintf(output, "------------------------------------------\n");
-		fprintf(output, "%-18s %-18s %-18s %-20s %-20s %6s %8s %8s %8s %8s\n",
-				"id", "callsite1", "callsite2", "src1", "src2",
+		fprintf(output, "%-18s %-18s %-20s %-20s %6s %8s %8s %8s %8s\n",
+				"callsite1", "callsite2", "src1", "src2",
 				"allocs", "used sz", "total sz", "avg sz", "accesses");
 
 		for(const auto& level1_entry : mapCallsiteStats) {
@@ -420,7 +464,6 @@ extern "C" {
 			float avgSize = usedSize / (float) count;
 			long totalAccesses = get<5>(value);
 
-			fprintf(output, "%-18lx ", level1_entry.first);
 			fprintf(output, "%-18p ", callsite1);
 			fprintf(output, "%-18p ", callsite2);
 			fprintf(output, "%-14s:%-5d ", addrInfo1.exename, addrInfo1.lineNum);
