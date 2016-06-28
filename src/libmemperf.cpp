@@ -16,6 +16,7 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+#include <alloca.h>
 
 #include "real.hh"
 #include "xthread.hh"
@@ -64,6 +65,7 @@ extern "C" {
 		unsigned int lineNum;
 		bool error = false;
 	};
+	void exitHandler();
 	void printHashMap();
 	size_t getTotalAllocSize(size_t sz);
 	struct addr2line_info addr2line(void * ddr);
@@ -80,10 +82,12 @@ extern "C" {
 	void * aligned_alloc(size_t, size_t) __attribute__ ((weak, alias("xxaligned_alloc")));
 	void * memalign(size_t, size_t) __attribute__ ((weak, alias("xxmemalign")));
 	void * pvalloc(size_t) __attribute__ ((weak, alias("xxpvalloc")));
+	void * alloca(size_t) __attribute__ ((weak, alias("xxalloca")));
 }
 bool initialized = false;
-char tmpbuf[262144];		// 256KB global buffer
+char tmpbuf[524288];		// 512KB global buffer
 unsigned int tmppos = 0;
+unsigned int numTempAllocs = 0;
 const bool debug = false;
 
 __attribute__((constructor)) void initializer() {
@@ -97,7 +101,9 @@ __attribute__((constructor)) void initializer() {
 		abort();
 	}
 
+	insideHashMap = true;
 	mapCallsiteStats = unordered_map<uint64_t, statTuple>();
+	insideHashMap = false;
 
 	Real::initializer();
 	initialized = true;
@@ -115,21 +121,24 @@ __attribute__((constructor)) void initializer() {
 		abort();
 	}
 
+	// Generate the name of our output file, then open it for writing.
 	char outputFile[MAX_FILENAME_LEN];
 	snprintf(outputFile, MAX_FILENAME_LEN, "%s_libmemperf.txt",
 		program_invocation_name);
-
-	// Presently set to overwrite file; change fopen flag to "a" for append.
+	// Will overwrite current file; change the fopen flag to "a" for append.
 	output = fopen(outputFile, "w");
 	if(output == NULL) {
-		fprintf(stderr, "error: unable to open output file for writing debug data\n");
+		fprintf(stderr, "error: unable to open output file to write\n");
 		return;
 	}
 
-	fprintf(output, ">>> shadow memory allocated for main thread @ %p ~ %p (size=%d bytes)\n", shadow_mem,
-			shadow_mem + SHADOW_MEM_SIZE, SHADOW_MEM_SIZE);
-	fprintf(output, ">>> stack start @ %p, stack+5MB = %p\n", stackStart, stackEnd);
-	fprintf(output, ">>> watch start @ %p, watch end @ %p\n", watchStartByte, watchEndByte);
+	fprintf(output, ">>> shadow memory allocated for main thread @ %p ~ %p "
+			"(size=%d bytes)\n", shadow_mem, shadow_mem + SHADOW_MEM_SIZE,
+			SHADOW_MEM_SIZE);
+	fprintf(output, ">>> stack start @ %p, stack+5MB = %p\n",
+			stackStart, stackEnd);
+	fprintf(output, ">>> watch start @ %p, watch end @ %p\n",
+			watchStartByte, watchEndByte);
 	fprintf(output, ">>> program break @ %p\n\n", program_break);
 }
 
@@ -146,11 +155,11 @@ void exitHandler() {
 
 // MemPerf's main function
 int libmemperf_main(int argc, char ** argv, char ** envp) {
-	initSampling();
+	// Register our cleanup routine as an on-exit handler.
 	atexit(exitHandler);
-	int main_ret_val = real_main(argc, argv, envp);
-	//exitHandler();
-	return main_ret_val;
+
+	initSampling();
+	return real_main(argc, argv, envp);
 }
 
 extern "C" int __libc_start_main(main_fn_t, int, char **, void (*)(), void (*)(), void (*)(), void *) __attribute__((weak, alias("libmemperf_libc_start_main")));
@@ -183,10 +192,13 @@ extern "C" {
 			if(tmppos + sz < sizeof(tmpbuf)) {
 				void * retptr = tmpbuf + tmppos;
 				tmppos += sz;
+				numTempAllocs++;
 				return retptr;
 			} else {
-				fprintf(stderr, "error: too much memory requested, sz=%zu\n", sz);
-				exit(EXIT_FAILURE);
+				fprintf(stderr, "error: global allocator out of memory\n");
+				fprintf(stderr, "\t requested size = %zu, total allocs = %u\n",
+					sz, numTempAllocs);
+				abort();
 			}
 		}
 
@@ -201,9 +213,10 @@ extern "C" {
 			// address. If so, then we proceed by deferencing it. If it is NOT a
 			// stack address, then we will use NO_CALLSITE as a placeholder value.
 			void * callsite2 = (void *)NO_CALLSITE;
-			if(((void *)prev_frame >= (void *)stackStart) &&
-					((void *)prev_frame <= (void *)&current_frame))
+			if(((void *)prev_frame <= (void *)stackStart) &&
+					(prev_frame >= current_frame)) {
 				callsite2 = prev_frame->caller_address;
+			}
 
 			// Do the allocation and fetch the object's real total size.
 			void * objAlloc = Real::malloc(sz);
@@ -224,9 +237,12 @@ extern "C" {
 	* Callers include xxmalloc and xxrealloc.
 	*/
 	void mallocShadowMem(void * objAlloc, size_t sz, void * callsite1, void * callsite2) {
-		insideHashMap = true;
-		size_t totalObjSz = getTotalAllocSize(sz);
+		if(insideHashMap)
+			return;
 
+		insideHashMap = true;
+
+		size_t totalObjSz = getTotalAllocSize(sz);
 		uint64_t lowWord1 = (uint64_t) callsite1 & 0xFFFFFFFF;
 		uint64_t lowWord2 = (uint64_t) callsite2 & 0xFFFFFFFF;
 		uint64_t callsite_id = (lowWord1 << 32) | lowWord2;
@@ -250,27 +266,31 @@ extern "C" {
 		// corresponds to the object's malloc header.
 		long object_offset = (char *)objAlloc - (char *)watchStartByte;
 
-		// Check to see whether this object is mappable to shadow memory. Reasons
-		// it may not include malloc utilizing mmap to fulfill the request, or
-		// the heap possibly having outgrown the size of shadow memory. We only
-		// want to track objects that are so mappable.
+		// Check to see whether this object is trackable/mappable to shadow
+		// memory. Reasons it may not be include malloc utilizing mmap to
+		// fulfill certain requests, and the heap may have possibly outgrown
+		// the size of shadow memory. We only want to keep track of objects
+		// that mappable to shadow memory.
 		if(object_offset >= 0 && object_offset < SHADOW_MEM_SIZE) {
 			if(objAlloc > maxObjAddr) {
-				// Only update the maxObjAddr variable if this object could be
-				// tracked given the limited size of shadow memory
+				// Only update the max pointer if this object could be
+				// tracked, given the limited size of our shadow memory.
 				if(object_offset >= 0 && object_offset < SHADOW_MEM_SIZE)
 					maxObjAddr = (void *)((char *)objAlloc + totalObjSz);
 			}
 
-			// Record the callsite_id to the shadow memory corresponding
-			// to the object's malloc header.
+			// Record the callsite_id to the shadow memory word
+			// which corresponds to the object's malloc header.
 			uint64_t *id_in_shadow_mem = (uint64_t *)(shadow_mem + object_offset - MALLOC_HEADER_SIZE);
 			*id_in_shadow_mem = callsite_id;
 
+			// Search the hash map to determine whether
+			// we already have a record of this callsite ID.
 			unordered_map<uint64_t, statTuple>::iterator search_map_for_id =
 				mapCallsiteStats.find(callsite_id);
 
-			// If we found a match on the callsite_id ...
+			// If we found a match for this callsite_id
+			// then update its tuple in the hash map...
 			if(search_map_for_id != mapCallsiteStats.end()) {
 				statTuple found_value = search_map_for_id->second;
 				int oldCount = get<2>(found_value);
@@ -280,7 +300,9 @@ extern "C" {
 				mapCallsiteStats[callsite_id] = make_tuple(callsite1, callsite2,
 						(oldCount+1), (oldUsedSize+sz), (oldTotalSize+totalObjSz),
 						oldAccessCount);
-			} else {	// If we did NOT find a match on callsite_id ...
+			} else {
+				// Otherwise, if we did not find a match for this callsite_id
+				// then create and insert a new tuple into the hash map...
 				statTuple new_value(make_tuple(callsite1,
 							callsite2, 1, sz, totalObjSz, 0));
 				mapCallsiteStats.insert({callsite_id, new_value});
@@ -313,9 +335,9 @@ extern "C" {
 		long *objHeader = (long *)ptr - 1;
 		unsigned int objSize = *objHeader - 1;
 
-		// This check is particularly necessary while we are not
-		// properly nor completely in control of calls to realloc, as
-		// well as other memory-related system and library calls.
+		// This check is necessary because we cannot trust that we are in
+		// control of dynamic memory, as we do not support calls to other
+		// memory-related system or library functions (e.g., valloc).
 		if(isWordMallocHeader(callsiteHeader)) {
 			long callsite_id = *callsiteHeader;
 			if(debug) {
@@ -374,23 +396,27 @@ extern "C" {
 		}
 	}
 
-	void * xxvalloc(size_t) {
+	void * xxalloca(size_t size) {
 		fprintf(output, "ERROR: call to unsupported memory function %s\n", __FUNCTION__);
 		return NULL;
 	}
-	int xxposix_memalign(void **, size_t, size_t) {
+	void * xxvalloc(size_t size) {
+		fprintf(output, "ERROR: call to unsupported memory function %s\n", __FUNCTION__);
+		return NULL;
+	}
+	int xxposix_memalign(void **memptr, size_t alignment, size_t size) {
 		fprintf(output, "ERROR: call to unsupported memory function %s\n", __FUNCTION__);
 		return -1;
 	}
-	void * xxaligned_alloc(size_t, size_t) {
+	void * xxaligned_alloc(size_t alignment, size_t size) {
 		fprintf(output, "ERROR: call to unsupported memory function %s\n", __FUNCTION__);
 		return NULL;
 	}
-	void * xxmemalign(size_t, size_t) {
+	void * xxmemalign(size_t alignment, size_t size) {
 		fprintf(output, "ERROR: call to unsupported memory function %s\n", __FUNCTION__);
 		return NULL;
 	}
-	void * xxpvalloc(size_t) {
+	void * xxpvalloc(size_t size) {
 		fprintf(output, "ERROR: call to unsupported memory function %s\n", __FUNCTION__);
 		return NULL;
 	}
@@ -580,7 +606,6 @@ extern "C" {
 				if(access_count > 0) {
 					insideHashMap = true;
 					statTuple map_value = mapCallsiteStats[callsite_id];
-					insideHashMap = false;
 					void *callsite1 = get<0>(map_value);
 					void *callsite2 = get<1>(map_value);
 					int count = get<2>(map_value);
@@ -589,6 +614,7 @@ extern "C" {
 					long totalAccesses = get<5>(map_value);
 					mapCallsiteStats[callsite_id] = make_tuple(callsite1, callsite2,
 							count, usedSize, totalSize, (totalAccesses + access_count));
+					insideHashMap = false;
 				}
 			}
 		}
