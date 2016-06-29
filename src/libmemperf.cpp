@@ -35,7 +35,7 @@ typedef tuple<void *, void *, int, long, long, long> statTuple;
 //	(6) the total number of accesses on objects spawned from this callsite id
 unordered_map<uint64_t, statTuple> mapCallsiteStats;
 
-__thread bool insideHashMap = false;
+__thread bool insideHashMap = true;
 __thread bool isMainThread = false;
 __thread bool shadowMemZeroedOut = false;
 __thread char * shadow_mem;
@@ -101,13 +101,12 @@ __attribute__((constructor)) void initializer() {
 		abort();
 	}
 
-	insideHashMap = true;
 	mapCallsiteStats = unordered_map<uint64_t, statTuple>();
-	insideHashMap = false;
 
 	Real::initializer();
 	initialized = true;
 	isMainThread = true;
+	insideHashMap = false;
 	program_break = sbrk(0);
 	stackStart = (char *)__builtin_frame_address(0);
 	stackEnd = stackStart + FIVE_MB;
@@ -237,9 +236,6 @@ extern "C" {
 	* Callers include xxmalloc and xxrealloc.
 	*/
 	void mallocShadowMem(void * objAlloc, size_t sz, void * callsite1, void * callsite2) {
-		if(insideHashMap)
-			return;
-
 		insideHashMap = true;
 
 		size_t totalObjSz = getTotalAllocSize(sz);
@@ -423,26 +419,29 @@ extern "C" {
 
 	void * xxrealloc(void * ptr, size_t sz) {
 		if(!shadowMemZeroedOut && !insideHashMap &&
-				(ptr >= (void *)watchStartByte && ptr <= (void *)watchEndByte))
+				(ptr >= (void *)watchStartByte && ptr <= (void *)watchEndByte)) {
 			freeShadowMem(ptr);
+		}
 
 		void * reptr = Real::realloc(ptr, sz);
 
-		struct stack_frame * current_frame =
-			(struct stack_frame *)(__builtin_frame_address(0));
-		void * callsite1 = current_frame->caller_address;
-		struct stack_frame * prev_frame = current_frame->prev;
-		// We cannot assume that a previous stack frame exists; doing so, and then
-		// attempting to dereference its address will result in a segfault.
-		// Therefore, we first determine whether its address is a valid stack
-		// address. If so, then we proceed by deferencing it. If it is NOT a
-		// stack address, then we will use NO_CALLSITE as a placeholder value.
-		void * callsite2 = (void *)NO_CALLSITE;
-		if(((void *)prev_frame >= (void *)stackStart) &&
-				((void *)prev_frame <= (void *)current_frame))
-			callsite2 = prev_frame->caller_address;
+		if(!insideHashMap) {
+			struct stack_frame * current_frame =
+				(struct stack_frame *)(__builtin_frame_address(0));
+			void * callsite1 = current_frame->caller_address;
+			struct stack_frame * prev_frame = current_frame->prev;
+			// We cannot assume that a previous stack frame exists; doing so, and then
+			// attempting to dereference its address will result in a segfault.
+			// Therefore, we first determine whether its address is a valid stack
+			// address. If so, then we proceed by deferencing it. If it is NOT a
+			// stack address, then we will use NO_CALLSITE as a placeholder value.
+			void * callsite2 = (void *)NO_CALLSITE;
+			if(((void *)prev_frame >= (void *)stackStart) &&
+					((void *)prev_frame <= (void *)current_frame))
+				callsite2 = prev_frame->caller_address;
 
-		mallocShadowMem(reptr, sz, callsite1, callsite2);
+			mallocShadowMem(reptr, sz, callsite1, callsite2);
+		}
 
 		return reptr;
 	}
