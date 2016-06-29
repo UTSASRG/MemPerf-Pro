@@ -45,6 +45,8 @@ __thread char * watchStartByte;
 __thread char * watchEndByte;
 __thread void * maxObjAddr = (void *)0x0;
 __thread FILE * output = NULL;
+__thread void * lowMmapAddr = (void *)0x0;
+__thread void * highMmapAddr = (void *)(-1);
 
 void * program_break;
 extern void * __libc_stack_end;
@@ -65,6 +67,7 @@ extern "C" {
 		unsigned int lineNum;
 		bool error = false;
 	};
+	inline void getCallsites(void **callsite1, void **callsite2);
 	void exitHandler();
 	void printHashMap();
 	size_t getTotalAllocSize(size_t sz);
@@ -85,9 +88,6 @@ extern "C" {
 	void * alloca(size_t) __attribute__ ((weak, alias("xxalloca")));
 }
 bool initialized = false;
-char tmpbuf[524288];		// 512KB global buffer
-unsigned int tmppos = 0;
-unsigned int numTempAllocs = 0;
 const bool debug = false;
 
 __attribute__((constructor)) void initializer() {
@@ -176,6 +176,30 @@ extern "C" {
 		void * caller_address;		// the address of caller
 	};
 
+	void * xxmallocPreInit(size_t sz) {
+		void * ptr = mmap(NULL, (sz + sizeof(size_t)), PROT_READ | PROT_WRITE,
+						MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+		size_t * objAlloc = (size_t *)ptr;
+		if(objAlloc == MAP_FAILED) {
+			perror("error: unable to mmap object");
+			return NULL;
+		}
+		objAlloc[0] = sz;
+
+		if(ptr > highMmapAddr)
+			highMmapAddr = ptr;
+		if(ptr < lowMmapAddr)
+			lowMmapAddr = ptr;
+
+		return (void *)(objAlloc + 1);
+	}
+
+	void xxfreePreInit(void * ptr) {
+		size_t * objAlloc = (size_t *)ptr - 1;
+		size_t sz = objAlloc[0];
+		munmap(ptr, sz);
+	}
+
 	void * xxmalloc(size_t sz) {
 		// Small allocation routine designed to service malloc requests made by the
 		// dlsym() function. Due to our linkage aliasing which redirects calls to
@@ -183,25 +207,16 @@ extern "C" {
 		// called instead. xxmalloc then relies on Real::malloc to fulfill the
 		// request, however, Real::malloc has not yet been assigned until the dlsym
 		// call returns. This results in a segmentation fault. To remedy the problem,
-		// we detect whether Real has finished initializing; if it has not, when
-		// fulfill malloc requests using a small global buffer. Once dlsym finishes,
+		// we detect whether Real has finished initializing; if it has not, we
+		// fulfill malloc requests using mmap regions. Once dlsym finishes,
 		// all future malloc requests will be fulfilled by Real::malloc, which
-		// contains a reference to the real libc malloc routine.  - Sam
+		// contains a reference to the real libc malloc routine.
 		if(!initialized) {
-			if(tmppos + sz < sizeof(tmpbuf)) {
-				void * retptr = tmpbuf + tmppos;
-				tmppos += sz;
-				numTempAllocs++;
-				return retptr;
-			} else {
-				fprintf(stderr, "error: global allocator out of memory\n");
-				fprintf(stderr, "\t requested size = %zu, total allocs = %u\n",
-					sz, numTempAllocs);
-				abort();
-			}
+			return xxmallocPreInit(sz);
 		}
 
 		if(!insideHashMap) {
+			//getCallsites(&callsite1, &callsite2);
 			struct stack_frame * current_frame =
 				(struct stack_frame *)(__builtin_frame_address(0));
 			void * callsite1 = current_frame->caller_address;
@@ -381,8 +396,8 @@ extern "C" {
 
 		// Determine whether the specified object came from our global buffer;
 		// only call Real::free() if the object did not come from here.
-		if(ptr >= (void *)tmpbuf && ptr <= (void *)(tmpbuf + tmppos)) {
-			fprintf(stderr, "info: freeing temp memory\n");
+		if(ptr >= lowMmapAddr && ptr <= highMmapAddr) {
+			xxfreePreInit(ptr);
 		} else {
 			if(!shadowMemZeroedOut && !insideHashMap &&
 					(ptr >= (void *)watchStartByte && ptr <= (void *)watchEndByte)) {
@@ -418,14 +433,24 @@ extern "C" {
 	}
 
 	void * xxrealloc(void * ptr, size_t sz) {
-		if(!shadowMemZeroedOut && !insideHashMap &&
-				(ptr >= (void *)watchStartByte && ptr <= (void *)watchEndByte)) {
-			freeShadowMem(ptr);
+		if(!initialized) {
+			if(ptr == NULL)
+				return xxmalloc(sz);
+			xxfree(ptr);
+			return xxmalloc(sz);
+		}
+
+		if(ptr != NULL) {
+			if(!shadowMemZeroedOut && !insideHashMap &&
+					(ptr >= (void *)watchStartByte && ptr <= (void *)watchEndByte)) {
+				freeShadowMem(ptr);
+			}
 		}
 
 		void * reptr = Real::realloc(ptr, sz);
 
 		if(!insideHashMap) {
+			//getCallsites(&callsite1, &callsite2);
 			struct stack_frame * current_frame =
 				(struct stack_frame *)(__builtin_frame_address(0));
 			void * callsite1 = current_frame->caller_address;
@@ -436,14 +461,32 @@ extern "C" {
 			// address. If so, then we proceed by deferencing it. If it is NOT a
 			// stack address, then we will use NO_CALLSITE as a placeholder value.
 			void * callsite2 = (void *)NO_CALLSITE;
-			if(((void *)prev_frame >= (void *)stackStart) &&
-					((void *)prev_frame <= (void *)current_frame))
+			if(((void *)prev_frame <= (void *)stackStart) &&
+					(prev_frame >= current_frame)) {
 				callsite2 = prev_frame->caller_address;
+			}
 
 			mallocShadowMem(reptr, sz, callsite1, callsite2);
 		}
 
 		return reptr;
+	}
+
+	inline void getCallsites(void **callsite1, void **callsite2) {
+		struct stack_frame * current_frame =
+			(struct stack_frame *)(__builtin_frame_address(0));
+		*callsite1 = current_frame->caller_address;
+		struct stack_frame * prev_frame = current_frame->prev;
+		// We cannot assume that a previous stack frame exists; doing so, and then
+		// attempting to dereference its address will result in a segfault.
+		// Therefore, we first determine whether its address is a valid stack
+		// address. If so, then we proceed by deferencing it. If it is NOT a
+		// stack address, then we will use NO_CALLSITE as a placeholder value.
+		*callsite2 = (void *)NO_CALLSITE;
+		if(((void *)prev_frame <= (void *)stackStart) &&
+				(prev_frame >= current_frame)) {
+			*callsite2 = prev_frame->caller_address;
+		}
 	}
 
 	size_t getTotalAllocSize(size_t sz) {

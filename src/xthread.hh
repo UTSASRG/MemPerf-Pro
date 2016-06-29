@@ -60,7 +60,7 @@ class xthread {
 		}
 
 		if((shadow_mem = (char *)mmap(NULL, SHADOW_MEM_SIZE, PROT_READ | PROT_WRITE,
-						MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) == (void *) -1) {
+						MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
 			fprintf(stderr, "error: unable to allocate shadow memory: %s\n", strerror(errno));
 			abort();
 		}
