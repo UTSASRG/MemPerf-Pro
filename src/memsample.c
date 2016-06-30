@@ -22,7 +22,6 @@
 
 using namespace std;
 
-void haltSampling();
 int64_t get_trace_count(int fd);
 
 long perf_event_open(struct perf_event_attr *hw_event, pid_t pid, int cpu, int group_fd, unsigned long flags) {
@@ -39,9 +38,11 @@ __thread extern void * stackEnd;
 __thread extern void * watchStartByte;
 __thread extern void * watchEndByte;
 __thread extern void * highestObjAddr;
+__thread extern FILE * output;
 
 int numSamples;
 int numSignals;
+int numHits;
 
 __thread int perf_fd, perf_fd2;
 __thread long long prev_head;
@@ -90,7 +91,7 @@ void startSampling() {
 	}
 }
 
-void haltSampling() {
+void stopSampling() {
 	if(ioctl(perf_fd, PERF_EVENT_IOC_DISABLE, 0) == -1) {
 		fprintf(stderr, "Failed to disable perf event: %s\n", strerror(errno));
 		abort();
@@ -99,14 +100,11 @@ void haltSampling() {
 		fprintf(stderr, "Failed to disable perf event: %s\n", strerror(errno));
 		abort();
 	}
-}
-
-
-void stopSampling() {
-	haltSampling();
 
 	// process any sample data still remaining in the ring buffer
 	prev_head = perf_mmap_read(prev_head, 0, NULL);
+
+	fprintf(output, ">>> numHits = %d\n", numHits);
 }
 
 static int handle_struct_read_format(unsigned char *sample, int read_format,
@@ -250,6 +248,7 @@ long long perf_mmap_read(long long prev_head, long long reg_mask, void *validate
 				// If we are not sampling a stack address then proceed within...
 				if((paddr >= watchStartByte && paddr <= watchEndByte) &&
 					!(paddr >= stackStart && paddr <= stackEnd)) {
+					numHits++;
 
 					// Calculate the offset from this byte to the start of the heap
 					long long access_byte_offset = (char *)paddr - (char *)watchStartByte;
@@ -273,6 +272,8 @@ long long perf_mmap_read(long long prev_head, long long reg_mask, void *validate
 										access_byte_offset, *current_value);
 							}
 							(*current_value)++;
+						} else {
+							numHits--;  // debug
 						}
 					}
 				}
@@ -423,7 +424,6 @@ void sampleHandler(int signum, siginfo_t *info, void *p) {
 	// If the overflow counter has reached zero (indicated by the POLL_HUP code),
 	// read the sample data and reset the overflow counter to start again.
 	if(info->si_code == POLL_HUP) {
-		//haltSampling();		// TODO not 100% sure if this call is necessary
 		prev_head = perf_mmap_read(prev_head, 0, NULL);
 		ioctl(perf_fd, PERF_EVENT_IOC_REFRESH, OVERFLOW_INTERVAL);
 		ioctl(perf_fd2, PERF_EVENT_IOC_REFRESH, OVERFLOW_INTERVAL);
