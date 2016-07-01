@@ -50,25 +50,15 @@ __thread pid_t tid;
 __thread unsigned char *data;
 __thread void *our_mmap;
 
-int sample_type = PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_TIME | PERF_SAMPLE_ADDR |
-					PERF_SAMPLE_CPU | PERF_SAMPLE_CALLCHAIN | PERF_SAMPLE_DATA_SRC | PERF_SAMPLE_WEIGHT;
+int sample_type = PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_TIME |
+					PERF_SAMPLE_ADDR | PERF_SAMPLE_CPU | PERF_SAMPLE_DATA_SRC |
+					PERF_SAMPLE_WEIGHT;
 
 int read_format = PERF_FORMAT_GROUP;
-//                 PERF_FORMAT_ID |
-//                 PERF_FORMAT_TOTAL_TIME_ENABLED |
-//                 PERF_FORMAT_TOTAL_TIME_RUNNING;
 
-long long perf_mmap_read(long long prev_head, long long reg_mask, void *validate);
+long long perf_mmap_read(long long, long long, void *);
 
 void startSampling() {
-	// Start the event
-	/*
-	if(ioctl(perf_fd, PERF_EVENT_IOC_RESET, 0) == -1) {
-		fprintf(stderr, "Failed to reset perf event w/ fd %d: %s\n",
-			perf_fd, strerror(errno));
-		abort();
-	}
-	*/
 	if(ioctl(perf_fd, PERF_EVENT_IOC_REFRESH, OVERFLOW_INTERVAL) == -1) {
 		fprintf(stderr, "Failed to refresh perf event w/ fd %d, line %d: %s\n",
 			perf_fd, __LINE__, strerror(errno));
@@ -107,64 +97,11 @@ void stopSampling() {
 	fprintf(output, ">>> numHits = %d\n", numHits);
 }
 
-static int handle_struct_read_format(unsigned char *sample, int read_format,
-															void *validation) {
-	int i;
-	int offset = 0;
-
-	if(read_format & PERF_FORMAT_GROUP) {
-		long long nr,time_enabled,time_running;
-
-		memcpy(&nr,&sample[offset],sizeof(long long));
-		offset+=8;
-
-		if(read_format & PERF_FORMAT_TOTAL_TIME_ENABLED) {
-			memcpy(&time_enabled,&sample[offset],sizeof(long long));
-			offset+=8;
-		}
-		if(read_format & PERF_FORMAT_TOTAL_TIME_RUNNING) {
-			memcpy(&time_running,&sample[offset],sizeof(long long));
-			offset+=8;
-		}
-
-		for(i=0;i<nr;i++) {
-			long long value, id;
-
-			memcpy(&value,&sample[offset],sizeof(long long));
-			offset+=8;
-
-			if(read_format & PERF_FORMAT_ID) {
-				memcpy(&id,&sample[offset],sizeof(long long));
-				offset+=8;
-			}
-		}
-	} else {
-		long long value,time_enabled,time_running,id;
-
-		memcpy(&value,&sample[offset],sizeof(long long));
-		offset+=8;
-
-		if (read_format & PERF_FORMAT_TOTAL_TIME_ENABLED) {
-			memcpy(&time_enabled,&sample[offset],sizeof(long long));
-			offset+=8;
-		}
-		if (read_format & PERF_FORMAT_TOTAL_TIME_RUNNING) {
-			memcpy(&time_running,&sample[offset],sizeof(long long));
-			offset+=8;
-		}
-		if (read_format & PERF_FORMAT_ID) {
-			memcpy(&id,&sample[offset],sizeof(long long));
-			offset+=8;
-
-		}
-	}
-
-	return offset;
-}
-
-long long perf_mmap_read(long long prev_head, long long reg_mask, void *validate) {
+long long perf_mmap_read(long long prev_head, long long reg_mask,
+		void *validate) {
 	struct perf_event_header *event;
-	struct perf_event_mmap_page *control_page = (struct perf_event_mmap_page *)our_mmap;
+	struct perf_event_mmap_page *control_page =
+		(struct perf_event_mmap_page *)our_mmap;
 	long long head, offset;
 	long long copy_amt, prev_head_wrap;
 	void *data_mmap = (void *)((size_t)our_mmap + getpagesize());
@@ -172,7 +109,8 @@ long long perf_mmap_read(long long prev_head, long long reg_mask, void *validate
 	int i, size;
 
 	if(control_page == NULL) {
-		fprintf(stderr, "ERROR: control_page=%p, our_mmap=%p, data_mmap=%p\n", control_page, our_mmap, data_mmap);
+		fprintf(stderr, "ERROR: control_page is NULL; our_mmap=%p, "
+					"data_mmap=%p\n", our_mmap, data_mmap);
 		abort();
 	}
 
@@ -182,12 +120,14 @@ long long perf_mmap_read(long long prev_head, long long reg_mask, void *validate
 	if(head < prev_head)
 		prev_head = 0;
 
-    if(DATA_MAPSIZE - size < 128) {
-        fprintf(stderr, "warning: sample data size is dangerously close to buffer size;"
-                "data loss is likely to occur\n");
-    }
-	if(size > DATA_MAPSIZE)
-		fprintf(stderr, "error: we overflowed the mmap buffer with %d > %d bytes\n", size, DATA_MAPSIZE);
+	if(DATA_MAPSIZE - size < 128) {
+		fprintf(stderr, "warning: sample data size is dangerously close to "
+				"buffer size; data loss is likely to occur\n");
+	}
+	if(size > DATA_MAPSIZE) {
+		fprintf(stderr, "error: we overflowed the mmap buffer with %d > %d "
+					"bytes\n", size, DATA_MAPSIZE);
+	}
 
 	prev_head_wrap = prev_head % DATA_MAPSIZE;
 
@@ -202,8 +142,8 @@ long long perf_mmap_read(long long prev_head, long long reg_mask, void *validate
 	memcpy(data, (unsigned char *)data_mmap + prev_head_wrap, copy_amt);
 
 	if(size > (DATA_MAPSIZE - prev_head_wrap)) {
-		memcpy(data + (DATA_MAPSIZE - prev_head_wrap), (unsigned char *)data_mmap,
-				(size - copy_amt));
+		memcpy(data + (DATA_MAPSIZE - prev_head_wrap),
+				(unsigned char *)data_mmap, (size - copy_amt));
 	}
 
 	offset = 0;
@@ -250,30 +190,42 @@ long long perf_mmap_read(long long prev_head, long long reg_mask, void *validate
 					!(paddr >= stackStart && paddr <= stackEnd)) {
 					numHits++;
 
-					// Calculate the offset from this byte to the start of the heap
-					long long access_byte_offset = (char *)paddr - (char *)watchStartByte;
+					// Calculate the offset from this
+					// byte to the start of the heap
+					long long access_byte_offset =
+						(char *)paddr - (char *)watchStartByte;
 
 					if(debug) {
-						printf("access_offset=%lld, watchStartByte=%p, watchEndByte=%p, stackStart=%p, stackEnd=%p\n",
-								access_byte_offset, watchStartByte, watchEndByte, stackStart, stackEnd);
+						printf("access_offset=%lld, watchStartByte=%p, "
+							"watchEndByte=%p, stackStart=%p, stackEnd=%p\n",
+							access_byte_offset, watchStartByte, watchEndByte,
+							stackStart, stackEnd);
 					}
-					if(access_byte_offset >= 0 && access_byte_offset < SHADOW_MEM_SIZE) {
+					if((access_byte_offset >= 0) &&
+							(access_byte_offset < SHADOW_MEM_SIZE)) {
 						// Calculate which word we're in
-						long long access_word_offset = access_byte_offset / WORD_SIZE;
+						long long access_word_offset =
+							access_byte_offset / WORD_SIZE;
 
-						// Check to see if we have sampled the address of an object's header
-						// rather than its body. Increment the corresponding shadow word's
-						// value only if this is not a header.
-						long *current_value = (long *)shadow_mem + access_word_offset;
+						// Check to see if we have sampled the address of an
+						// object's header rather than its body. Increment the
+						// corresponding shadow word's value only if this is
+						// not a header.
+						long *current_value =
+							(long *)shadow_mem + access_word_offset;
 						if(!isWordMallocHeader(current_value)) {
 							if(debug) {
-								printf("attempting to increment %p/%p in [%p,%p), offset=%lld, current value=%ld\n",
-										paddr, current_value, shadow_mem, shadow_mem+SHADOW_MEM_SIZE,
-										access_byte_offset, *current_value);
+								printf("attempting to increment %p/%p in "
+									"[%p,%p), offset=%lld, current value=%ld\n",
+									paddr, current_value, shadow_mem,
+									(shadow_mem + SHADOW_MEM_SIZE),
+									access_byte_offset, *current_value);
 							}
 							(*current_value)++;
 						} else {
-							numHits--;  // debug
+							// Decrement hit counter if we actually sampled a
+							// malloc header.
+							numHits--;
 						}
 					}
 				}
@@ -294,7 +246,8 @@ long long perf_mmap_read(long long prev_head, long long reg_mask, void *validate
 			if(sample_type & PERF_SAMPLE_CPU) {
 				uint32_t cpu, res;
 				memcpy(&cpu, &data[offset], sizeof(uint32_t));
-				memcpy(&res, &data[(offset + sizeof(uint32_t))], sizeof(uint32_t));
+				memcpy(&res, &data[(offset + sizeof(uint32_t))],
+					sizeof(uint32_t));
 				offset += 2 * sizeof(uint32_t);
 			}
 
@@ -302,12 +255,6 @@ long long perf_mmap_read(long long prev_head, long long reg_mask, void *validate
 				uint64_t period;
 				memcpy(&period, &data[offset], sizeof(uint64_t));
 				offset += sizeof(uint64_t);
-			}
-
-			if(sample_type & PERF_SAMPLE_READ) {
-				int length;
-				length = handle_struct_read_format(&data[offset], read_format, validate);
-				if(length >= 0) { offset += length; }
 			}
 
 			if(sample_type & PERF_SAMPLE_CALLCHAIN) {
@@ -325,46 +272,6 @@ long long perf_mmap_read(long long prev_head, long long reg_mask, void *validate
 				uint32_t size;
 				memcpy(&size, &data[offset], sizeof(uint32_t));
 				offset += sizeof(uint32_t);
-			}
-
-			if(sample_type & PERF_SAMPLE_BRANCH_STACK) {
-				long long bnr;
-				memcpy(&bnr,&data[offset],sizeof(long long));
-				offset+=8;
-
-				for(i=0;i<bnr;i++) {
-					long long from,to,flags;
-
-					/* From value */
-					memcpy(&from,&data[offset],sizeof(long long));
-					offset+=8;
-
-
-					/* To Value */
-					memcpy(&to,&data[offset],sizeof(long long));
-					offset+=8;
-
-					/* Flags */
-					memcpy(&flags,&data[offset],sizeof(long long));
-					offset+=8;
-				}
-			}
-
-			if(sample_type & PERF_SAMPLE_STACK_USER) {
-				long long size,dyn_size;
-				int *stack_data;
-
-				memcpy(&size,&data[offset],sizeof(long long));
-				offset+=8;
-
-				stack_data=(int *)malloc(size);
-				memcpy(stack_data,&data[offset],size);
-				offset+=size;
-
-				memcpy(&dyn_size,&data[offset],sizeof(long long));
-				offset+=8;
-
-				free(stack_data);
 			}
 
 			if(sample_type & PERF_SAMPLE_WEIGHT) {
@@ -386,7 +293,7 @@ long long perf_mmap_read(long long prev_head, long long reg_mask, void *validate
 					printf(" [Store]");
 				printf("\n");
 				if(paddr != NULL)
-					printf("             data = 0x%lx\n", *((long *)paddr));
+					printf("\t data = 0x%lx\n", *((long *)paddr));
 				*/
 			}
 
@@ -395,19 +302,12 @@ long long perf_mmap_read(long long prev_head, long long reg_mask, void *validate
 				memcpy(&abi,&data[offset],sizeof(long long));
 				offset+=8;
 			}
-
-			if(sample_type & PERF_SAMPLE_TRANSACTION) {
-				long long abi;
-				memcpy(&abi,&data[offset],sizeof(long long));
-				offset+=8;
-			}
+			break;
 		}
-		break;
 		}
 		// Move the offset counter ahead by the size given in the event header.
 		offset = starting_offset + event->size;
 
-		//printf(">>> finished reading sample, total so far = %d\n", ++numSamples);
 		numSamples++;
 	}
 
