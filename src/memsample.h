@@ -1,11 +1,13 @@
 #ifndef __MEMSAMPLE_H
 #define __MEMSAMPLE_H
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 #include <pthread.h>
 #include <errno.h>
+#include <syscall.h>
 #include <sys/mman.h>
 #include <tuple>
 #include <unordered_map>

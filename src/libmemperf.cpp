@@ -31,14 +31,16 @@ __thread char * watchStartByte;
 __thread char * watchEndByte;
 __thread void * maxObjAddr = (void *)0x0;
 __thread FILE * output = NULL;
-thread_local FreeQueue freeQueue;
+thread_local FreeQueue freeQueue1, freeQueue2;
 
 // This map will go from the callsite id key to a tuple containing:
 //	(1) the first callsite
 //	(2) the second callsite
 //	(3) the total number of allocations originating from this callsite pair
-//	(4) the total size of these allocations (i.e., when using glibc malloc, header size plus usable size)
-//	(5) the used size of these allocations (i.e., a sum of sz from malloc(sz) calls)
+//	(4) the total size of these allocations (i.e., when using glibc malloc,
+//		header size plus usable size)
+//	(5) the used size of these allocations (i.e., a sum of sz from malloc(sz)
+//		calls)
 //	(6) the total number of accesses on objects spawned from this callsite id
 unordered_map<uint64_t, statTuple> mapCallsiteStats;
 
@@ -52,26 +54,25 @@ typedef int (*main_fn_t)(int, char **, char **);
 main_fn_t real_main;
 
 extern "C" {
-	pid_t gettid() {
-		return syscall(__NR_gettid);
-	}
- 
 	struct addr2line_info {
 		char exename[256];
 		unsigned int lineNum;
 		bool error = false;
 	};
-	void processFreeQueue(FreeQueue& queue);
-	inline void getCallsites(void **callsite1, void **callsite2);
-	void exitHandler();
-	void writeHashMap();
+
+	// Function prototypes
+	bool isWordMallocHeader(long *word);
 	size_t getTotalAllocSize(size_t sz);
 	struct addr2line_info addr2line(void * ddr);
-	bool isWordMallocHeader(long *word);
 	void countUnfreedObjAccesses();
-	void mallocShadowMem(void * objAlloc, size_t sz);
+	void exitHandler();
 	void freeShadowMem(void * ptr);
+	void initShadowMem(void * objAlloc, size_t sz);
+	void processFreeQueue();
+	void writeHashMap();
+	inline void getCallsites(void **callsite1, void **callsite2);
 
+	// Function aliases
 	void free(void *) __attribute__ ((weak, alias("xxfree")));
 	void * calloc(size_t, size_t) __attribute__ ((weak, alias("xxcalloc")));
 	void * malloc(size_t) __attribute__ ((weak, alias("xxmalloc")));
@@ -107,6 +108,9 @@ __attribute__((constructor)) void initializer() {
         perror("error: unable to allocate temporary memory");
 		abort();
     }
+
+	freeQueue1 = queue<freeReq>();
+	freeQueue2 = queue<freeReq>();
 
 	Real::initializer();
 	mallocInitialized = true;
@@ -152,6 +156,12 @@ __attribute__((destructor)) void finalizer() {
 
 void exitHandler() {
 	stopSampling();
+
+	// Call processFreeQueue twice in order to ensure both queues containing
+	// free() requests have been purged of their contents prior to exiting.
+	processFreeQueue();
+	processFreeQueue();
+
 	fprintf(output, ">>> numSamples = %d, numSignals = %d\n", numSamples, numSignals);
 	countUnfreedObjAccesses();
 	writeHashMap();
@@ -187,12 +197,20 @@ extern "C" {
 		void * caller_address;		// the address of caller
 	};
 
-	void processFreeQueue(FreeQueue& queue) {
-		while(!queue.empty()) {
-			freeReq free_req = queue.front();
+	void processFreeQueue() {
+		// Process any items in queue1 first.
+		while(!freeQueue1.empty()) {
+			freeReq free_req = freeQueue1.front();
 			freeShadowMem(free_req.ptr);
 			Real::free(free_req.ptr);
-			queue.pop();
+			freeQueue1.pop();
+		}
+
+		// Move anything from queue2 into queue1 to be processed next time.
+		while(!freeQueue2.empty()) {
+			freeReq free_req = freeQueue2.front();
+			freeQueue1.push(free_req);
+			freeQueue2.pop();
 		}
 	}
 
@@ -224,7 +242,7 @@ extern "C" {
 		void * objAlloc = Real::malloc(sz);
 
 		if(hashmapInitialized && !insideHashMap && !shadowMemZeroedOut) {
-			mallocShadowMem(objAlloc, sz);
+			initShadowMem(objAlloc, sz);
 		}
 
 		return objAlloc;
@@ -237,7 +255,7 @@ extern "C" {
 	* allocation is recorded in the global stats hash map.
 	* Callers include xxmalloc and xxrealloc.
 	*/
-	void mallocShadowMem(void * objAlloc, size_t sz) {
+	void initShadowMem(void * objAlloc, size_t sz) {
 		insideHashMap = true;
 
 		void * callsite1;
@@ -401,8 +419,7 @@ extern "C" {
 			if(hashmapInitialized && !shadowMemZeroedOut && !insideHashMap &&
 					(ptr >= (void *)watchStartByte && ptr <= (void *)watchEndByte)) {
 				freeReq free_req = {ptr};
-				freeQueue.push(free_req);
-				//freeShadowMem(ptr);
+				freeQueue2.push(free_req);
 			} else {
 				Real::free(ptr);
 			}
@@ -452,7 +469,7 @@ extern "C" {
 		void * reptr = Real::realloc(ptr, sz);
 
 		if(hashmapInitialized && !insideHashMap && !shadowMemZeroedOut) {
-			mallocShadowMem(reptr, sz);
+			initShadowMem(reptr, sz);
 		}
 
 		return reptr;
@@ -554,7 +571,8 @@ extern "C" {
 				close(fd[0]);
 				dup2(fd[1], STDOUT_FILENO);
 				sprintf(strCallsite, "%p", addr);
-				execlp("addr2line", "addr2line", "-s", "-e", program_invocation_name, strCallsite, (char *)NULL);
+				execlp("addr2line", "addr2line", "-s", "-e", program_invocation_name,
+					strCallsite, (char *)NULL);
 				exit(EXIT_FAILURE);		// if we're still here, then exec failed
 				break;
 			default:	// parent
@@ -661,10 +679,8 @@ extern "C" {
 			}
 		}
 	}
-}
 
-// Thread functions
-extern "C" {
+	// Intercept thread creation
 	int pthread_create(pthread_t * tid, const pthread_attr_t * attr, void * (*start_routine)(void *),
 			void * arg) {
 		return xthread::thread_create(tid, attr, start_routine, arg);

@@ -10,8 +10,8 @@ __thread extern char * watchStartByte;
 __thread extern char * watchEndByte;
 __thread extern FILE * output;
 
-extern "C" pid_t gettid();
 extern "C" void printHashMap();
+extern "C" pid_t gettid();
 
 class xthread {
 	typedef void * threadFunction(void *);

@@ -21,9 +21,11 @@ long perf_event_open(struct perf_event_attr *hw_event, pid_t pid, int cpu, int g
 
 extern void * program_break;
 extern "C" {
+	pid_t gettid() {
+		return syscall(__NR_gettid);
+	}
 	bool isWordMallocHeader(long *word);
-	pid_t gettid();
-	void processFreeQueue(FreeQueue& queue);
+	void processFreeQueue();
 }
 __thread extern bool isMainThread;
 __thread extern char * shadow_mem;
@@ -96,7 +98,7 @@ void stopSampling() {
 void doSampleRead() {
 	prev_head = perf_mmap_read(prev_head, 0, NULL);
 
-	processFreeQueue(freeQueue);
+	processFreeQueue();
 }
 
 long long perf_mmap_read(long long prev_head, long long reg_mask,
