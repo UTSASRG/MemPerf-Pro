@@ -1,6 +1,15 @@
+#ifndef __MEMSAMPLE_H
+#define __MEMSAMPLE_H
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
+#include <pthread.h>
+#include <errno.h>
+#include <sys/mman.h>
+#include <tuple>
+#include <unordered_map>
+#include <queue>
 
 #define MMAP_PAGES 33	// must be in the form of 2^N + 1
 #define DATA_MMAP_PAGES (MMAP_PAGES - 1)
@@ -22,7 +31,13 @@
 #define ONE_HUNDRED_MB 104857600
 #define MAX_FILENAME_LEN 128
 
+typedef struct {
+    void * ptr;
+} freeReq;
+typedef std::queue<freeReq> FreeQueue;
+
 int initSampling(void);
 void setupSampling(void);
 void startSampling(void);
 void stopSampling(void);
+#endif

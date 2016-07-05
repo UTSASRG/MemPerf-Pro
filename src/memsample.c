@@ -2,22 +2,13 @@
 #define _GNU_SOURCE
 #endif
 
-#include <unordered_map>
-#include <tuple>
 #include <asm/unistd.h>
-#include <errno.h>
 #include <fcntl.h>
 #include <linux/hw_breakpoint.h>
 #include <linux/perf_event.h>
 #include <signal.h>
-#include <stdlib.h>
-#include <stdio.h>
 #include <stdint.h>
-#include <string.h>
 #include <sys/ioctl.h>
-#include <unistd.h>
-#include <sys/mman.h>
-#include <pthread.h>
 #include "memsample.h"
 
 using namespace std;
@@ -29,8 +20,11 @@ long perf_event_open(struct perf_event_attr *hw_event, pid_t pid, int cpu, int g
 }
 
 extern void * program_break;
-extern "C" bool isWordMallocHeader(long *word);
-extern "C" pid_t gettid();
+extern "C" {
+	bool isWordMallocHeader(long *word);
+	pid_t gettid();
+	void processFreeQueue(FreeQueue& queue);
+}
 __thread extern bool isMainThread;
 __thread extern char * shadow_mem;
 __thread extern void * stackStart;
@@ -39,6 +33,7 @@ __thread extern void * watchStartByte;
 __thread extern void * watchEndByte;
 __thread extern void * highestObjAddr;
 __thread extern FILE * output;
+thread_local extern FreeQueue freeQueue;
 
 int numSamples;
 int numSignals;
@@ -56,6 +51,7 @@ int sample_type = PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_TIME |
 
 int read_format = PERF_FORMAT_GROUP;
 
+void doSampleRead();
 long long perf_mmap_read(long long, long long, void *);
 
 void startSampling() {
@@ -92,9 +88,15 @@ void stopSampling() {
 	}
 
 	// process any sample data still remaining in the ring buffer
-	prev_head = perf_mmap_read(prev_head, 0, NULL);
+	doSampleRead();
 
 	fprintf(output, ">>> numHits = %d\n", numHits);
+}
+
+void doSampleRead() {
+	prev_head = perf_mmap_read(prev_head, 0, NULL);
+
+	processFreeQueue(freeQueue);
 }
 
 long long perf_mmap_read(long long prev_head, long long reg_mask,
@@ -120,7 +122,7 @@ long long perf_mmap_read(long long prev_head, long long reg_mask,
 	if(head < prev_head)
 		prev_head = 0;
 
-	if(DATA_MAPSIZE - size < 128) {
+	if((DATA_MAPSIZE - size) < 128) {
 		fprintf(stderr, "warning: sample data size is dangerously close to "
 				"buffer size; data loss is likely to occur\n");
 	}
@@ -139,7 +141,7 @@ long long perf_mmap_read(long long prev_head, long long reg_mask,
 	if(size > (DATA_MAPSIZE - prev_head_wrap))
 		copy_amt = DATA_MAPSIZE - prev_head_wrap;
 
-	memcpy(data, (unsigned char *)data_mmap + prev_head_wrap, copy_amt);
+	memcpy(data, ((unsigned char *)data_mmap + prev_head_wrap), copy_amt);
 
 	if(size > (DATA_MAPSIZE - prev_head_wrap)) {
 		memcpy(data + (DATA_MAPSIZE - prev_head_wrap),
@@ -150,7 +152,7 @@ long long perf_mmap_read(long long prev_head, long long reg_mask,
 	while(offset < size) {
 		long long starting_offset = offset;
 
-		event = (struct perf_event_header *) &data[offset];
+		event = (struct perf_event_header *)&data[offset];
 
 		// move position past the header we just read above
 		offset += sizeof(struct perf_event_header); 
@@ -159,8 +161,8 @@ long long perf_mmap_read(long long prev_head, long long reg_mask,
 
 		// Sample data
 		case PERF_RECORD_SAMPLE: {
- 			if(sample_type & PERF_SAMPLE_IP) {
-				uint64_t ip;
+			uint64_t ip;
+			if(sample_type & PERF_SAMPLE_IP) {
 				memcpy(&ip, &data[offset], sizeof(uint64_t));
 				offset += sizeof(uint64_t);
 			}
@@ -178,20 +180,20 @@ long long perf_mmap_read(long long prev_head, long long reg_mask,
 				offset += sizeof(uint64_t);
 			}
 
-			void *paddr;
 			if(sample_type & PERF_SAMPLE_ADDR) {
 				uint64_t addr;
 				memcpy(&addr, &data[offset], sizeof(uint64_t));
 				offset += sizeof(uint64_t);
-				paddr = (void *)addr;
+				void * paddr = (void *)addr;
 
-				// If we are not sampling a stack address then proceed within...
+				// If we have sampled an address in our watch range, and it does
+				// not belong to the stack, then proceed...
 				if((paddr >= watchStartByte && paddr <= watchEndByte) &&
-					!(paddr >= stackStart && paddr <= stackEnd)) {
+						!(paddr >= stackStart && paddr <= stackEnd)) {
 					numHits++;
 
-					// Calculate the offset from this
-					// byte to the start of the heap
+					// Calculate the offset of this
+					// byte from the start of the heap.
 					long long access_byte_offset =
 						(char *)paddr - (char *)watchStartByte;
 
@@ -210,7 +212,7 @@ long long perf_mmap_read(long long prev_head, long long reg_mask,
 						// Check to see if we have sampled the address of an
 						// object's header rather than its body. Increment the
 						// corresponding shadow word's value only if this is
-						// not a header.
+						// NOT an object header.
 						long *current_value =
 							(long *)shadow_mem + access_word_offset;
 						if(!isWordMallocHeader(current_value)) {
@@ -222,9 +224,41 @@ long long perf_mmap_read(long long prev_head, long long reg_mask,
 									access_byte_offset, *current_value);
 							}
 							(*current_value)++;
+
+							/*
+							// DEBUG BLOCK, USED TO DETECT ORPHAN SAMPLE HITS
+							char * accessShadowByte = (char *)shadow_mem + access_byte_offset;
+							current_value--;
+							while(current_value > (long *)shadow_mem) {
+								if(isWordMallocHeader(current_value)) {
+									long current_byte_offset = (char *)current_value - (char *)shadow_mem;
+									long callsite_id = *current_value;
+									long * realObjHeader =
+										(long *)((char *)watchStartByte + current_byte_offset);
+									long objSizeInBytes = *realObjHeader - 1;
+									char * highObjectBoundary = (char *)current_value + objSizeInBytes;
+
+									if(debug && (accessShadowByte > highObjectBoundary)) {
+										fprintf(output, "sampled byte %p/%p does not belong to the nearest "
+											"object @ %p + %ld(0x%lx)\n", paddr, accessShadowByte,
+											current_value, objSizeInBytes, objSizeInBytes);
+										fprintf(output, "callsite_id = 0x%lx, ip = 0x%lx\n\n", callsite_id,
+											ip);
+									}
+									break;
+								} else {
+									if(*current_value != 0) {
+										fprintf(output, "! no malloc header @ %p, value = 0x%lx\n",
+											current_value, *current_value);
+									}
+								}
+								current_value--;
+							}
+							// END OF DEBUG BLOCK
+							*/
 						} else {
-							// Decrement hit counter if we actually sampled a
-							// malloc header.
+							// Decrement the hit counter if what we have sampled
+							// is actually a malloc header.
 							numHits--;
 						}
 					}
@@ -286,14 +320,18 @@ long long perf_mmap_read(long long prev_head, long long reg_mask,
 				offset += sizeof(uint64_t);
 
 				/*
+				// DEBUG BLOCK, USED TO PRINT LOAD/STORE STATUS AS WELL AS
+				// PEAK AT THE FIRST EIGHT BYTES OF DATA AT THE SAMPLED
+				// MEMORY ADDRESS.
 				printf("> sampled address @ %p", paddr);
 				if(src & PERF_MEM_OP_LOAD)
 					printf(" [Load]");
 				if(src & PERF_MEM_OP_STORE)
 					printf(" [Store]");
 				printf("\n");
-				if(paddr != NULL)
+				if(paddr)
 					printf("\t data = 0x%lx\n", *((long *)paddr));
+				// END DEBUG BLOCK
 				*/
 			}
 
@@ -303,8 +341,8 @@ long long perf_mmap_read(long long prev_head, long long reg_mask,
 				offset+=8;
 			}
 			break;
-		}
-		}
+		} // end case block
+		} // end switch statement
 		// Move the offset counter ahead by the size given in the event header.
 		offset = starting_offset + event->size;
 
@@ -324,7 +362,7 @@ void sampleHandler(int signum, siginfo_t *info, void *p) {
 	// If the overflow counter has reached zero (indicated by the POLL_HUP code),
 	// read the sample data and reset the overflow counter to start again.
 	if(info->si_code == POLL_HUP) {
-		prev_head = perf_mmap_read(prev_head, 0, NULL);
+		doSampleRead();
 		ioctl(perf_fd, PERF_EVENT_IOC_REFRESH, OVERFLOW_INTERVAL);
 		ioctl(perf_fd2, PERF_EVENT_IOC_REFRESH, OVERFLOW_INTERVAL);
 	}

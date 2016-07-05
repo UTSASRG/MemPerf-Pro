@@ -1,11 +1,7 @@
-#include <pthread.h>
-#include <errno.h>
-#include <stdlib.h>
-#include <unistd.h>
 #include <sys/syscall.h>
 
-#include "real.hh"
 #include "memsample.h"
+#include "real.hh"
 
 __thread extern char * shadow_mem;
 __thread extern char * stackStart;

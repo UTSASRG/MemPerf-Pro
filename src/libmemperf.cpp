@@ -6,21 +6,12 @@
 #pragma GCC diagnostic ignored "-Wreturn-type-c-linkage"
 
 #include <dlfcn.h>
-#include <pthread.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unordered_map>
-#include <tuple>
 #include <malloc.h>
-#include <sys/mman.h>
-#include <string.h>
-#include <errno.h>
-#include <unistd.h>
 #include <alloca.h>
 
+#include "memsample.h"
 #include "real.hh"
 #include "xthread.hh"
-#include "memsample.h"
 
 #define TEMP_BUF_SIZE 33554432
 
@@ -28,11 +19,11 @@ using namespace std;
 
 typedef tuple<void *, void *, int, long, long, long> statTuple;
 
-bool insideHashMap = true;
-//__thread bool insideHashMap = true;
+//bool insideHashMap = true;
+__thread bool insideHashMap = true;
 __thread bool isMainThread = false;
-bool shadowMemZeroedOut = false;
-//__thread bool shadowMemZeroedOut = false;
+//bool shadowMemZeroedOut = false;
+__thread bool shadowMemZeroedOut = false;
 __thread char * shadow_mem;
 __thread char * stackStart;
 __thread char * stackEnd;
@@ -40,6 +31,7 @@ __thread char * watchStartByte;
 __thread char * watchEndByte;
 __thread void * maxObjAddr = (void *)0x0;
 __thread FILE * output = NULL;
+thread_local FreeQueue freeQueue;
 
 // This map will go from the callsite id key to a tuple containing:
 //	(1) the first callsite
@@ -63,20 +55,22 @@ extern "C" {
 	pid_t gettid() {
 		return syscall(__NR_gettid);
 	}
-
+ 
 	struct addr2line_info {
 		char exename[256];
 		unsigned int lineNum;
 		bool error = false;
 	};
+	void processFreeQueue(FreeQueue& queue);
 	inline void getCallsites(void **callsite1, void **callsite2);
 	void exitHandler();
-	void printHashMap();
+	void writeHashMap();
 	size_t getTotalAllocSize(size_t sz);
 	struct addr2line_info addr2line(void * ddr);
 	bool isWordMallocHeader(long *word);
 	void countUnfreedObjAccesses();
 	void mallocShadowMem(void * objAlloc, size_t sz);
+	void freeShadowMem(void * ptr);
 
 	void free(void *) __attribute__ ((weak, alias("xxfree")));
 	void * calloc(size_t, size_t) __attribute__ ((weak, alias("xxcalloc")));
@@ -160,7 +154,7 @@ void exitHandler() {
 	stopSampling();
 	fprintf(output, ">>> numSamples = %d, numSignals = %d\n", numSamples, numSignals);
 	countUnfreedObjAccesses();
-	printHashMap();
+	writeHashMap();
 }
 
 // MemPerf's main function
@@ -192,6 +186,15 @@ extern "C" {
 		struct stack_frame * prev;	// pointing to previous stack_frame
 		void * caller_address;		// the address of caller
 	};
+
+	void processFreeQueue(FreeQueue& queue) {
+		while(!queue.empty()) {
+			freeReq free_req = queue.front();
+			freeShadowMem(free_req.ptr);
+			Real::free(free_req.ptr);
+			queue.pop();
+		}
+	}
 
 	void * xxmalloc(size_t sz) {
 		// Small allocation routine designed to service malloc requests made by the
@@ -397,9 +400,12 @@ extern "C" {
 		} else {
 			if(hashmapInitialized && !shadowMemZeroedOut && !insideHashMap &&
 					(ptr >= (void *)watchStartByte && ptr <= (void *)watchEndByte)) {
-				freeShadowMem(ptr);
+				freeReq free_req = {ptr};
+				freeQueue.push(free_req);
+				//freeShadowMem(ptr);
+			} else {
+				Real::free(ptr);
 			}
-			Real::free(ptr);
 		}
 	}
 
@@ -488,7 +494,7 @@ extern "C" {
 		return usableSize;
 	}
 
-	void printHashMap() {
+	void writeHashMap() {
 		insideHashMap = true;
 
 		fprintf(output, "Hash map contents\n");
@@ -576,6 +582,17 @@ extern "C" {
 		long access_byte_offset = (char *)word - shadow_mem;
 		long access_word_offset = access_byte_offset / WORD_SIZE;
 
+		/*
+		// DEBUG BLOCK
+		bool bGreater = ((unsigned long)*word > (unsigned long)LOWEST_POS_CALLSITE_ID);
+		bool isMod = (access_word_offset % 2 == 1);
+		int iCount = mapCallsiteStats.count(*word);
+		if(!(bGreater && isMod && (iCount > 0))) {
+			fprintf(output, " >> %p=0x%lx not a malloc header: bGreater=%d, isMod=%d, iCount=%d\n",
+				word, *word, bGreater, isMod, iCount);
+		}
+		*/
+
 		return (((unsigned long)*word > (unsigned long)LOWEST_POS_CALLSITE_ID) &&
 				(access_word_offset % 2 == 1) &&
 				(mapCallsiteStats.count(*word) > 0));
@@ -601,8 +618,8 @@ extern "C" {
 				long current_byte_offset = (char *)sweepCurrent - (char *)sweepStart;
 				long callsite_id = *sweepCurrent;
 				long *realObjHeader = (long *)(watchStartByte + current_byte_offset);
-				long objSizeInBytes = *realObjHeader;
-				long objSizeInWords = (*realObjHeader - 1) / 8;
+				long objSizeInBytes = *realObjHeader - 1;
+				long objSizeInWords = objSizeInBytes / 8;
 				long access_count = 0;
 				int i;
 
