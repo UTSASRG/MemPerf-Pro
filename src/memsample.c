@@ -25,7 +25,6 @@ extern "C" {
 		return syscall(__NR_gettid);
 	}
 	bool isWordMallocHeader(long *word);
-	void processFreeQueue();
 }
 __thread extern bool isMainThread;
 __thread extern char * shadow_mem;
@@ -35,7 +34,6 @@ __thread extern void * watchStartByte;
 __thread extern void * watchEndByte;
 __thread extern void * highestObjAddr;
 __thread extern FILE * output;
-thread_local extern FreeQueue freeQueue;
 
 int numSamples;
 int numSignals;
@@ -97,8 +95,6 @@ void stopSampling() {
 
 void doSampleRead() {
 	prev_head = perf_mmap_read(prev_head, 0, NULL);
-
-	processFreeQueue();
 }
 
 long long perf_mmap_read(long long prev_head, long long reg_mask,

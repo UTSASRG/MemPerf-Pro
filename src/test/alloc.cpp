@@ -12,7 +12,7 @@ int main() {
 		*ptr = 0;
 		for(j = 0; j < 100000; j++) {
 			(void)*ptr;
-			*ptr = 1;
+			*ptr = 7;
 		}
 		free(ptr);
 	}

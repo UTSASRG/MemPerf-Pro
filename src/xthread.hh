@@ -75,7 +75,10 @@ class xthread {
 		watchStartByte = (char *)0x7fff00000000;
 		watchEndByte = watchStartByte + SHADOW_MEM_SIZE;
 
-		fprintf(output, ">>> thread %d stack start @ %p, stack end @ %p\n", tid, stackStart, stackEnd);
+		fprintf(output, ">>> thread %d stack start @ %p, stack end @ %p\n", tid,
+				stackStart, stackEnd);
+		fprintf(output, ">>> watch start @ %p, watch end @ %p\n",
+				watchStartByte, watchEndByte);
 
 		result = current->startRoutine(current->startArg);
 

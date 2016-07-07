@@ -1,15 +1,19 @@
-SRCS =  libmemperf.cpp \
-				real.cpp \
-				memsample.c
+SRCS =  libmemperf.cpp	\
+		real.cpp		\
+		memsample.c
 
-INCS =  xthread.hh     \
-				memsample.h 	 \
-				real.hh
+INCS =  xthread.hh		\
+		memsample.h		\
+		real.hh			\
+		hashmap.hh		\
+		list.hh			\
+		hashfuncs.hh	\
+		spinlock.hh
 
 DEPS = $(SRCS) $(INCS)
 
 #CXX = g++ 
- CXX = clang++ 
+CXX = clang++ 
 #-D_GNU_SOURCE 
 
 # -march=core2 -msse3 -DSSE_SUPPORT
@@ -49,7 +53,7 @@ libmemperf.so: $(DEPS)
 	$(CXX) $(CFLAGS) $(INCLUDE_DIRS) -shared -fPIC $(SRCS) -o libmemperf.so -ldl -lpthread
 
 test/test: libmemperf.so test/alloc.cpp
-	$(CXX) $(CFLAGS) -g -rdynamic ./libmemperf.so -o test/test test/alloc.cpp
+	$(CXX) $(CFLAGS) -rdynamic ./libmemperf.so -o test/test test/alloc.cpp
 
 clean:
 	rm -f $(TARGETS)
