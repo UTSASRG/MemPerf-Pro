@@ -11,8 +11,6 @@
 #include <sys/ioctl.h>
 #include "memsample.h"
 
-using namespace std;
-
 int64_t get_trace_count(int fd);
 
 long perf_event_open(struct perf_event_attr *hw_event, pid_t pid, int cpu, int group_fd, unsigned long flags) {

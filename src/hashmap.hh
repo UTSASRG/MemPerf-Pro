@@ -92,7 +92,7 @@ template <class KeyType,                    // What is the key? A long or string
 				 _keycmp = kcmp;
 
 				 // Allocated predefined size.
-				 _entries = (struct HashEntry*)malloc(size * sizeof(struct HashEntry));
+				 _entries = (struct HashEntry*)Real::malloc(size * sizeof(struct HashEntry));
 				 // getThreadIndex());
 
 				 // Initialize all of these _entries.
@@ -120,7 +120,8 @@ template <class KeyType,                    // What is the key? A long or string
 			 // Look up whether an entry is existing or not.
 			 // If existing, return true. *value should be carried specific value for this key.
 			 // Otherwise, return false.
-			 bool find(const KeyType& key, size_t keylen, ValueType** value) {
+			 bool find(const KeyType& key, ValueType* value) {
+				 size_t keylen = sizeof(key);
 				 assert(_initialized == true);
 				 size_t hindex = hashIndex(key, keylen);
 				 struct HashEntry* first = getHashEntry(hindex);
@@ -128,15 +129,16 @@ template <class KeyType,                    // What is the key? A long or string
 				 bool isFound = false;
 
 				 if(entry) {
-					 *value = &entry->value;
+					 *value = entry->value;
 					 isFound = true;
 				 }
 
 				 return isFound;
 			 }
 
-			 void insert(const KeyType& key, size_t keylen, ValueType value) {
+			 void insert(const KeyType& key, ValueType value) {
 				 assert(_initialized == true);
+				 size_t keylen = sizeof(key);
 				 size_t hindex = hashIndex(key, keylen);
 				 struct HashEntry* first = getHashEntry(hindex);
 
@@ -147,8 +149,9 @@ template <class KeyType,                    // What is the key? A long or string
 
 			 // Insert a hash table entry if it is not existing.
 			 // If the entry is already existing, return true
-			 bool insertIfAbsent(const KeyType& key, size_t keylen, ValueType value) {
+			 bool insertIfAbsent(const KeyType& key, ValueType value) {
 				 assert(_initialized == true);
+				 size_t keylen = sizeof(key);
 				 size_t hindex = hashIndex(key, keylen);
 				 struct HashEntry* first = getHashEntry(hindex);
 				 struct Entry* entry;
@@ -169,8 +172,9 @@ template <class KeyType,                    // What is the key? A long or string
 			 }
 
 			 // Free an entry with specified
-			 bool erase(const KeyType& key, size_t keylen) {
+			 bool erase(const KeyType& key) {
 				 assert(_initialized == true);
+				 size_t keylen = sizeof(key);
 				 size_t hindex = hashIndex(key, keylen);
 				 struct HashEntry* first = getHashEntry(hindex);
 				 struct Entry* entry;
@@ -187,7 +191,7 @@ template <class KeyType,                    // What is the key? A long or string
 					 // Remove this entry if existing.
 					 entry->erase();
 
-					 free(entry);
+					 Real::free(entry);
 				 }
 
 				 first->count--;
@@ -203,7 +207,7 @@ template <class KeyType,                    // What is the key? A long or string
 			 private:
 			 // Create a new Entry with specified key and value.
 			 struct Entry* createNewEntry(const KeyType& key, size_t keylen, ValueType value) {
-				 struct Entry* entry = (struct Entry*)malloc(sizeof(struct Entry));
+				 struct Entry* entry = (struct Entry*)Real::malloc(sizeof(struct Entry));
 
 				 // Initialize this new entry.
 				 entry->initialize(key, keylen, value);

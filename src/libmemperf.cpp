@@ -18,15 +18,9 @@
 
 #define TEMP_BUF_SIZE 5000000
 
-using namespace std;
+typedef HashMap<uint64_t, Tuple *, spinlock> HashMapX;
 
-typedef tuple<void *, void *, int, long, long, long> statTuple;
-typedef HashMap<uint64_t, statTuple, spinlock> HashMapX;
-
-bool hashMapInitialized = false;
 bool shadowMemZeroedOut = false;
-bool insideHashMap = false;
-//__thread bool insideHashMap = true;
 __thread bool isMainThread = false;
 __thread char * shadow_mem;
 __thread char * stackStart;
@@ -35,7 +29,6 @@ __thread char * watchStartByte;
 __thread char * watchEndByte;
 __thread void * maxObjAddr = (void *)0x0;
 __thread FILE * output = NULL;
-__thread char outputBuffer[2048];
 
 // This map will go from the callsite id key to a tuple containing:
 //	(1) the first callsite
@@ -46,7 +39,7 @@ __thread char outputBuffer[2048];
 //	(5) the used size of these allocations (i.e., a sum of sz from malloc(sz)
 //		calls)
 //	(6) the total number of accesses on objects spawned from this callsite id
-HashMap<uint64_t, statTuple, spinlock> mapCallsiteStats;
+HashMap<uint64_t, Tuple *, spinlock> mapCallsiteStats;
 
 void * program_break;
 extern void * __libc_stack_end;
@@ -117,18 +110,17 @@ __attribute__((constructor)) void initializer() {
 		abort();
     }
 
-	// Initialize hashmap
-	mapCallsiteStats.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
-
 	Real::initializer();
 	mallocInitialized = true;
 	isMainThread = true;
-	insideHashMap = false;
 	program_break = sbrk(0);
 	stackStart = (char *)__builtin_frame_address(0);
 	stackEnd = stackStart + FIVE_MB;
 	watchStartByte = (char *)program_break;
 	watchEndByte = watchStartByte + SHADOW_MEM_SIZE;
+
+	// Initialize hashmap
+	mapCallsiteStats.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 
 	// Allocate shadow memory
 	if((shadow_mem = (char *)mmap(NULL, SHADOW_MEM_SIZE, PROT_READ | PROT_WRITE,
@@ -172,11 +164,6 @@ void exitHandler() {
 
 // MemPerf's main function
 int libmemperf_main(int argc, char ** argv, char ** envp) {
-	// Immediately following execution of the class constructor, global
-	// variables (including the hash map) will be initialized. Therefore,
-	// we will now indicate the hash map's readiness.
-	hashMapInitialized = true;
-
 	// Register our cleanup routine as an on-exit handler.
 	atexit(exitHandler);
 
@@ -227,12 +214,23 @@ extern "C" {
 
 		void * objAlloc = Real::malloc(sz);
 
-		if(hashMapInitialized && !insideHashMap &&
-				!shadowMemZeroedOut) {
+		if(!shadowMemZeroedOut) {
 			initShadowMem(objAlloc, sz);
 		}
 
 		return objAlloc;
+	}
+
+	Tuple * newTuple(void * callsite1, void * callsite2, int numAllocs,
+			long szTotal, long szUsed, long numAccesses) {
+		Tuple * new_tuple = (Tuple *)Real::malloc(sizeof(Tuple));
+		new_tuple->callsite1 = callsite1;
+		new_tuple->callsite2 = callsite2;
+		new_tuple->numAllocs = numAllocs;
+		new_tuple->szTotal = szTotal;
+		new_tuple->szUsed = szUsed;
+		new_tuple->numAccesses = numAccesses;
+		return new_tuple;
 	}
 
 	/*
@@ -243,8 +241,6 @@ extern "C" {
 	* Callers include xxmalloc and xxrealloc.
 	*/
 	void initShadowMem(void * objAlloc, size_t sz) {
-		insideHashMap = true;
-
 		void * callsite1;
 		void * callsite2;
 		getCallsites(&callsite1, &callsite2);
@@ -291,20 +287,16 @@ extern "C" {
 			uint64_t *id_in_shadow_mem = (uint64_t *)(shadow_mem + object_offset - MALLOC_HEADER_SIZE);
 			*id_in_shadow_mem = callsite_id;
 
-			statTuple *found_value;
-			if(mapCallsiteStats.find(callsite_id, sizeof(callsite_id), &found_value)) {
-				//int oldCount = get<2>(*found_value);
-				get<2>(*found_value)++;
-				//long oldUsedSize = get<3>(*found_value);
-				get<3>(*found_value) += sz;
-				//long oldTotalSize = get<4>(*found_value);
-				get<4>(*found_value) += totalObjSz;
+			Tuple * found_value;
+			if(mapCallsiteStats.find(callsite_id, &found_value)) {
+				found_value->numAllocs++;
+				found_value->szUsed += sz;
+				found_value->szTotal += totalObjSz;
 			} else {
-				statTuple new_tuple = make_tuple(callsite1, callsite2, 1, sz, totalObjSz, 0);
-				mapCallsiteStats.insertIfAbsent(callsite_id, sizeof(callsite_id), new_tuple);
+				Tuple * new_tuple = newTuple(callsite1, callsite2, 1, sz, totalObjSz, 0);
+				mapCallsiteStats.insertIfAbsent(callsite_id, new_tuple);
 			}
 		}
-		insideHashMap = false;
 	}
 
 	void * xxcalloc(size_t nelem, size_t elsize) {
@@ -363,11 +355,9 @@ extern "C" {
 
 			if(((unsigned long)callsite_id > (unsigned long)min_pos_callsite_id) &&
 					(access_count > 0)) {
-				insideHashMap = true;
-				statTuple * map_value;
-				mapCallsiteStats.find(callsite_id, sizeof(uint64_t), &map_value);
-				get<5>(*map_value) += access_count;
-				insideHashMap = false;
+				Tuple * map_value;
+				mapCallsiteStats.find(callsite_id, &map_value);
+				map_value->numAccesses += access_count;
 			}
 		}
 	}
@@ -388,8 +378,7 @@ extern "C" {
 					tmppos = 0;
 			}
 		} else {
-			if(hashMapInitialized && !insideHashMap &&
-					!shadowMemZeroedOut &&
+			if(!shadowMemZeroedOut &&
 					((ptr >= (void *)watchStartByte) &&
 					(ptr <= (void *)watchEndByte))) {
 				freeShadowMem(ptr);
@@ -432,8 +421,7 @@ extern "C" {
 		}
 
 		if(ptr != NULL) {
-			if(hashMapInitialized && !insideHashMap &&
-					!shadowMemZeroedOut &&
+			if(!shadowMemZeroedOut &&
 					(ptr >= (void *)watchStartByte && ptr <= (void *)watchEndByte)) {
 				freeShadowMem(ptr);
 			}
@@ -441,8 +429,7 @@ extern "C" {
 
 		void * reptr = Real::realloc(ptr, sz);
 
-		if(hashMapInitialized && !insideHashMap &&
-			!shadowMemZeroedOut) {
+		if(!shadowMemZeroedOut) {
 			initShadowMem(reptr, sz);
 		}
 
@@ -486,8 +473,6 @@ extern "C" {
 	}
 
 	void writeHashMap() {
-		insideHashMap = true;
-
 		fprintf(output, "Hash map contents\n");
 		fprintf(output, "------------------------------------------\n");
 		fprintf(output, "%-18s %-18s %-20s %-20s %6s %8s %8s %8s %8s\n",
@@ -495,21 +480,21 @@ extern "C" {
 				"allocs", "used sz", "total sz", "avg sz", "accesses");
 
 
-		HashMap<uint64_t, statTuple, spinlock>::iterator iterator;
+		HashMap<uint64_t, Tuple *, spinlock>::iterator iterator;
 		for(iterator = mapCallsiteStats.begin(); iterator != mapCallsiteStats.end(); iterator++) {
-			statTuple value = iterator.getData();
-			void * callsite1 = get<0>(value);
-			void * callsite2 = get<1>(value);
+			Tuple * value = iterator.getData();
+			void * callsite1 = value->callsite1;
+			void * callsite2 = value->callsite2;
 
 			struct addr2line_info addrInfo1, addrInfo2;
 			addrInfo1 = addr2line(callsite1);
 			addrInfo2 = addr2line(callsite2);
 
-			int count = get<2>(value);
-			long usedSize = get<3>(value);
-			long totalSize = get<4>(value);
+			int count = value->numAllocs;
+			long usedSize = value->szUsed;
+			long totalSize = value->szTotal;
 			float avgSize = usedSize / (float) count;
-			long totalAccesses = get<5>(value);
+			long totalAccesses = value->numAccesses;
 
 			fprintf(output, "%-18p ", callsite1);
 			fprintf(output, "%-18p ", callsite2);
@@ -521,8 +506,9 @@ extern "C" {
 			fprintf(output, "%8.1f ", avgSize);
 			fprintf(output, "%8ld", totalAccesses);
 			fprintf(output, "\n");
+
+			free(value);
 		}
-		insideHashMap = false;
 	}
 
 	struct addr2line_info addr2line(void * addr) {
@@ -587,10 +573,10 @@ extern "C" {
 		}
 		*/
 
-		statTuple * found_item;
+		Tuple * found_item;
 		return (((unsigned long)*word > (unsigned long)min_pos_callsite_id) &&
 				(access_word_offset % 2 == 1) &&
-				(mapCallsiteStats.find(*word, sizeof(uint64_t), &found_item)));
+				(mapCallsiteStats.find(*word, &found_item)));
 	}
 
 	void countUnfreedObjAccesses() {
@@ -646,11 +632,9 @@ extern "C" {
 				}
 
 				if(access_count > 0) {
-					insideHashMap = true;
-					statTuple * map_value;
-					mapCallsiteStats.find(callsite_id, sizeof(uint64_t), &map_value);
-					get<5>(*map_value) += access_count;
-					insideHashMap = false;
+					Tuple * map_value;
+					mapCallsiteStats.find(callsite_id, &map_value);
+					map_value->numAccesses += access_count;
 				}
 			}
 		}

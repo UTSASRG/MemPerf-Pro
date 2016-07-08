@@ -9,7 +9,6 @@
 #include <errno.h>
 #include <syscall.h>
 #include <sys/mman.h>
-#include <tuple>
 
 #define MMAP_PAGES 33	// must be in the form of 2^N + 1
 #define DATA_MMAP_PAGES (MMAP_PAGES - 1)
@@ -29,6 +28,15 @@
 #define FIVE_MB 5242880
 #define ONE_HUNDRED_MB 104857600
 #define MAX_FILENAME_LEN 128
+
+typedef struct {
+    void * callsite1;
+    void * callsite2;
+    int numAllocs;
+    long szTotal;
+    long szUsed;
+    long numAccesses;
+} Tuple;
 
 int initSampling(void);
 void setupSampling(void);
