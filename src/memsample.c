@@ -22,6 +22,7 @@ extern "C" {
 	pid_t gettid() {
 		return syscall(__NR_gettid);
 	}
+	extern void processFreeQueue();
 	bool isWordMallocHeader(long *word);
 }
 __thread extern bool isMainThread;
@@ -93,6 +94,8 @@ void stopSampling() {
 
 void doSampleRead() {
 	prev_head = perf_mmap_read(prev_head, 0, NULL);
+
+	processFreeQueue();
 }
 
 long long perf_mmap_read(long long prev_head, long long reg_mask,
@@ -258,6 +261,9 @@ long long perf_mmap_read(long long prev_head, long long reg_mask,
 							numHits--;
 						}
 					}
+				} else {
+					//printf("watch area miss: watchStart=%p, paddr=%p, watchEnd=%p\n",
+					//	watchStartByte, paddr, watchEndByte);
 				}
 			}
 
@@ -548,9 +554,17 @@ void setupSampling(void) {
 		fprintf(stderr, "Failed to set the owner of the perf event file: %s\n", strerror(errno));
 		abort();
 	}
+	if(fcntl(perf_fd2, F_SETOWN_EX, &owner) == -1) {
+		fprintf(stderr, "Failed to set the owner of the perf event file: %s\n", strerror(errno));
+		abort();
+	}
 
 	// Tell the file to send a SIGIO when an event occurs
 	if(fcntl(perf_fd, F_SETSIG, SIGIO) == -1) {
+		fprintf(stderr, "Failed to set perf event file's async signal: %s\n", strerror(errno));
+		abort();
+	}
+	if(fcntl(perf_fd2, F_SETSIG, SIGIO) == -1) {
 		fprintf(stderr, "Failed to set perf event file's async signal: %s\n", strerror(errno));
 		abort();
 	}

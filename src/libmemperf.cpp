@@ -16,8 +16,6 @@
 #include "hashfuncs.hh"
 #include "spinlock.hh"
 
-#define TEMP_BUF_SIZE 5000000
-
 typedef HashMap<uint64_t, Tuple *, spinlock> HashMapX;
 
 bool shadowMemZeroedOut = false;
@@ -29,6 +27,7 @@ __thread char * watchStartByte;
 __thread char * watchEndByte;
 __thread void * maxObjAddr = (void *)0x0;
 __thread FILE * output = NULL;
+__thread FreeQueue * freeQueue1, * freeQueue2;
 
 // This map will go from the callsite id key to a tuple containing:
 //	(1) the first callsite
@@ -39,7 +38,7 @@ __thread FILE * output = NULL;
 //	(5) the used size of these allocations (i.e., a sum of sz from malloc(sz)
 //		calls)
 //	(6) the total number of accesses on objects spawned from this callsite id
-HashMap<uint64_t, Tuple *, spinlock> mapCallsiteStats;
+HashMapX mapCallsiteStats;
 
 void * program_break;
 extern void * __libc_stack_end;
@@ -61,6 +60,11 @@ extern "C" {
 	};
 
 	// Function prototypes
+    void processFreeQueue();
+	void FreeEnqueue(FreeQueue * queue, QueueItem item);
+	QueueItem FreeDequeue(FreeQueue * queue);
+	bool isFreeQueueEmpty(FreeQueue * queue);
+	FreeQueue * newFreeQueue();
 	bool isWordMallocHeader(long *word);
 	size_t getTotalAllocSize(size_t sz);
 	struct addr2line_info addr2line(void * ddr);
@@ -122,6 +126,10 @@ __attribute__((constructor)) void initializer() {
 	// Initialize hashmap
 	mapCallsiteStats.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 
+	// Initialize free queues.
+	freeQueue1 = newFreeQueue();
+	freeQueue2 = newFreeQueue();
+
 	// Allocate shadow memory
 	if((shadow_mem = (char *)mmap(NULL, SHADOW_MEM_SIZE, PROT_READ | PROT_WRITE,
 		MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
@@ -131,8 +139,9 @@ __attribute__((constructor)) void initializer() {
 
 	// Generate the name of our output file, then open it for writing.
 	char outputFile[MAX_FILENAME_LEN];
-	snprintf(outputFile, MAX_FILENAME_LEN, "%s_libmemperf.txt",
-		program_invocation_name);
+	pid_t pid = getpid();
+	snprintf(outputFile, MAX_FILENAME_LEN, "%s_libmemperf_pid_%d_tid_%d.txt",
+		program_invocation_name, pid, pid);
 	// Will overwrite current file; change the fopen flag to "a" for append.
 	output = fopen(outputFile, "w");
 	if(output == NULL) {
@@ -141,13 +150,14 @@ __attribute__((constructor)) void initializer() {
 	}
 
 	fprintf(output, ">>> shadow memory allocated for main thread @ %p ~ %p "
-			"(size=%d bytes)\n", shadow_mem, shadow_mem + SHADOW_MEM_SIZE,
+			"(size=%ld bytes)\n", shadow_mem, shadow_mem + SHADOW_MEM_SIZE,
 			SHADOW_MEM_SIZE);
 	fprintf(output, ">>> stack start @ %p, stack+5MB = %p\n",
 			stackStart, stackEnd);
 	fprintf(output, ">>> watch start @ %p, watch end @ %p\n",
 			watchStartByte, watchEndByte);
-	fprintf(output, ">>> program break @ %p\n\n", program_break);
+	fprintf(output, ">>> program break @ %p\n", program_break);
+	fflush(output);
 }
 
 __attribute__((destructor)) void finalizer() {
@@ -157,7 +167,15 @@ __attribute__((destructor)) void finalizer() {
 void exitHandler() {
 	stopSampling();
 
+	processFreeQueue();
+	processFreeQueue();
+
+	long access_byte_offset = (char *)maxObjAddr - (char *)watchStartByte;
+	char * maxShadowObjAddr = (char *)shadow_mem + access_byte_offset;
 	fprintf(output, ">>> numSamples = %d, numSignals = %d\n", numSamples, numSignals);
+	fprintf(output, ">>> heap memory used = %ld bytes\n", access_byte_offset);
+	fprintf(output, ">>> maxObjAddr = %p/%p\n\n", maxObjAddr, maxShadowObjAddr);
+	fflush(output);
 	countUnfreedObjAccesses();
 	writeHashMap();
 }
@@ -186,6 +204,54 @@ extern "C" {
 		struct stack_frame * prev;	// pointing to previous stack_frame
 		void * caller_address;		// the address of caller
 	};
+
+	void processFreeQueue() {
+        // Process all items in queue1 first.
+        while(!isFreeQueueEmpty(freeQueue1)) {
+            void * free_req = FreeDequeue(freeQueue1);
+            freeShadowMem(free_req);
+            Real::free(free_req);
+        }
+
+		freeQueue1 = freeQueue2;
+		freeQueue2 = freeQueue1;
+    }
+
+	QueueItem FreeDequeue(FreeQueue * queue) {
+		if(queue->head == NULL)
+			return (QueueItem)NULL;
+		QueueNode * oldHead = queue->head;
+		QueueItem item = oldHead->item;
+		queue->head = oldHead->next;
+		Real::free(oldHead);
+		return item;
+	}
+
+	void FreeEnqueue(FreeQueue * queue, QueueItem item) {
+		QueueNode * node = (QueueNode *)Real::malloc(sizeof(QueueNode));
+
+		if(queue->tail == NULL) {
+			queue->head = node;
+			queue->tail = node;
+		} else {
+			queue->tail->next = node;
+			queue->tail = node;
+		}
+
+		node->next = NULL;
+		node->item = item;
+	}
+
+	bool isFreeQueueEmpty(FreeQueue * queue) {
+		return (queue->head == NULL);
+	}
+
+	FreeQueue * newFreeQueue() {
+		FreeQueue * new_queue = (FreeQueue *)Real::malloc(sizeof(FreeQueue));
+		new_queue->head = NULL;
+		new_queue->tail = NULL;
+		return new_queue;
+	}
 
 	void * xxmalloc(size_t sz) {
 		// Small allocation routine designed to service malloc requests made by the
@@ -293,7 +359,7 @@ extern "C" {
 				found_value->szUsed += sz;
 				found_value->szTotal += totalObjSz;
 			} else {
-				Tuple * new_tuple = newTuple(callsite1, callsite2, 1, sz, totalObjSz, 0);
+				Tuple * new_tuple = newTuple(callsite1, callsite2, 1, totalObjSz, sz, 0);
 				mapCallsiteStats.insertIfAbsent(callsite_id, new_tuple);
 			}
 		}
@@ -381,9 +447,12 @@ extern "C" {
 			if(!shadowMemZeroedOut &&
 					((ptr >= (void *)watchStartByte) &&
 					(ptr <= (void *)watchEndByte))) {
-				freeShadowMem(ptr);
+				FreeEnqueue(freeQueue2, ptr);
+				//freeShadowMem(ptr);
+				//Real::free(ptr);
+			} else {
+				Real::free(ptr);
 			}
-			Real::free(ptr);
 		}
 	}
 
@@ -480,7 +549,7 @@ extern "C" {
 				"allocs", "used sz", "total sz", "avg sz", "accesses");
 
 
-		HashMap<uint64_t, Tuple *, spinlock>::iterator iterator;
+		HashMapX::iterator iterator;
 		for(iterator = mapCallsiteStats.begin(); iterator != mapCallsiteStats.end(); iterator++) {
 			Tuple * value = iterator.getData();
 			void * callsite1 = value->callsite1;
