@@ -170,11 +170,16 @@ void exitHandler() {
 	processFreeQueue();
 	processFreeQueue();
 
-	long access_byte_offset = (char *)maxObjAddr - (char *)watchStartByte;
-	char * maxShadowObjAddr = (char *)shadow_mem + access_byte_offset;
-	fprintf(output, ">>> numSamples = %d, numSignals = %d\n", numSamples, numSignals);
+	long access_byte_offset = (char *)maxObjAddr - watchStartByte;
+	char * shadow_mem_end = shadow_mem + SHADOW_MEM_SIZE;
+	char * maxShadowObjAddr = shadow_mem + access_byte_offset;
+	fprintf(output, ">>> numSamples = %d, numSignals = %d\n", numSamples,
+		numSignals);
 	fprintf(output, ">>> heap memory used = %ld bytes\n", access_byte_offset);
-	fprintf(output, ">>> maxObjAddr = %p/%p\n\n", maxObjAddr, maxShadowObjAddr);
+	if(maxShadowObjAddr >= shadow_mem_end) {
+		fprintf(output, ">>> WARNING: shadow memory was exceeded! "
+			"maxObjAddr = %p (shadow: %p)\n\n", maxObjAddr, maxShadowObjAddr);
+	}
 	fflush(output);
 	countUnfreedObjAccesses();
 	writeHashMap();
