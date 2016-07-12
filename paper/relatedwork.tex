@@ -8,13 +8,28 @@
 
 Mtrace~\cite{mtrace} traces the events of \texttt{malloc}, \texttt{realloc}, and \texttt{free}, and then post-proposes them. If we can not find its \texttt{free} operations related to a \texttt{malloc}, then this object is considered to be leaked. However, Mtrace can not report the severity of memory leak problems, although this is an engineering problem. \todo{ How is its performance overhead? Maybe we should compare it with \HeapPerf{}?}   
 
-Mtrace++~\cite{Lee:2000:DMM:786772.787150} is a source code level instrumentation that traces the memory allocations and deallocations. Mtrace++ identifies originations of allocated memories and life spans of objects. But it can not point out whether problems may occur inside programs. 
+Mtrace++~\cite{Lee:2000:DMM:786772.787150} is a source code level instrumentation that traces the memory allocations and deallocations. Mtrace++ identifies originations of allocated memories and life spans of objects. But it cannot point out whether problems may occur inside programs. 
+
+Mprof~\cite{Zorn:1988:MAP:894814} first collects the information about allocations and deallocations and writes the information into a file. In the end, it uses the offline analysis to print out the following information on memory leaks, an allocation bin table, a direct allocation table, and a dynamic
+call graph. The allocation bin table provides information about what sizes of objects were allocated, and what program types correspond to the sizes listed, so that it helps programmers recognize which data structures consume the most memory and allows him to optimize the space consumption. 
+The direct allocation table shows which functions allocate memory and how much they allocate. Mprof introduces around $2\times$ performance overhead that makes it unsuitable for deployment cases. 
+
+
+mprof presents some information about data structure, thus users can focus on their attention in the future. But that is different from \HeapPerf{}. \HeapPerf{} points out the problem related to the behavior of memory allocation, in which the performance can be improved by changing the behavior of memory allocations, not internal data structure. 
+  
+
 
 \cite{846583}
 
 \cite{1190248}
 
+
+
+WMTrace monitors malloc, calloc, realloc, and free events, together with their timing information~\cite{Perks:2011:WAP:2186355.2186369}. In order to reduce the memory consumption and storage consumption, WMTrace{} utilizes the Z-lib to compress the trace, and writes to storage files at the same time as the monitoring. 
+ 
+
+\subsection{Memory Leak Detector}
+
 LeakPoint\cite{Clause:2010:LPC:1806799.1806874} shares the similar target as \HeapPerf{} on memory leak detection that memory leaks of larger size
 are more important than leaks of smaller area. However, LeakPoint imposes between $100\times$ and $300\times$ overhead, while only less than 5\% overhead for \HeapPerf{}. It do not focus on another source of performance problems, those unnecessary memory allocations and deallocations. 
-
 
