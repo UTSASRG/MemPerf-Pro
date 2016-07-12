@@ -1,11 +1,30 @@
 \section{Introduction}
 
+Dynamic memory management plays an important role in the performance of applications, especially on multithreaded programs. 
+For performance related to memory uses, some work focuses on improving existing memory allocators. Some focuses on a better memory layout among different elements of the same data structure. 
+But there is little work that focuses on the improving the performance by changing the behavior of memory allocations and deallocations. 
+
+\HeapPerf{} tries to identify some places inside applications that can introduce the performance problems. These problems can be solved by changing the behavior of memory allocations, without using the new memory allocator. 
+These problems are rarely investigated in the past. The most closest work related to this is to simply record the placement with excessive allocations. However, excessive allocations is a total class of the problems that are investigated in this paper, but the existing work fails to present any detailed idea on the following problems: whether all these excessive memory allocations can be reduced? whether they can improve the performance? how to reduce that? These questions requires highly expertise and large amount of manual effort. Instead, \HeapPerf{} presents more useful idea on these questions, and hope to guide programmers, even non-experts, to solve these problems easily. 
+
+We observe three different patterns that can cause performance problems, or called as anti-patterns~\cite{}. 
+
+The second type is shown as Figure~\ref{}. In this example, there are a number of memory allocations that will allocate small amount of bytes for each one. More particularly, these allocations are inside the same loop, and have the same size. Unfortunately, memory allocators will not precisely allocate the specified size of objects. For example, the \texttt{glibc} allocator will allocate 32 bytes as long as the required size is between 4 bytes and 24 bytes. Based on the explanation of Hoard~\cite{Hoard}, this method helps to manage small sizes of different objects, without introducing too many external fragmentation. However, this also introduces a significant problem on cache inefficiency, since only less than 13\% cache is actually utilized, which can introduce around $8\times$ performance slowdown comparing to the code listed in Figure~\ref{}. 
+
+
+The second type is shown as Figure~\ref{}, there are a number of unnecessary memory allocations and deallocations. By moving the placement of allocations to outside the loop, we can significantly improve the performance by reducing the overhead related to memory allocations and deallocations. 
+
+The third type is related to the uses of heap variables or stack variables. Some excessive heap objects, if they are turned into stack variables, will have large performance benefit. Comparing to heap objects, the overhead of memory allocations and deallocations can be largely reduced if using stack variables. Also, the stack is typically locate inside the cache, which will have lower access latency. Also, stack variables will have exact size, without the addition of metadata and huge alignment. 
+\todo{Whether those variables have been touched only very few times, typically should be putted into the heap objects since they may cause the in-efficient cache utilization as well}.  
+ 
+
+
 Heap memory related performance bugs can be from the following categories, if only think about applications. 
 
 \begin{itemize}
-\item: Too many allocations and deallocations. Based on ~\cite{Lee:2000:DMM:786772.787150}, the total run time spending in memory allocation and liberation may take up to 30\% execution time. 
+\item: Too many allocations and deallocations. The total run time spending in memory allocation and liberation may take up to 30\% execution time\cite{1190248}. 
 
-\item: Too many memory usages: this can actually affect the performance when there are too much memory that has been allocated but not used.  
+\item: Too many memory uses: this can actually affect the performance when there are too much memory that has been allocated but not used. This can be caused by memory leaks or too late de-allocation. \todo{Most existing tools focus on the memory leak, but whether there are some tools that can uncover delayed-deallocation?}  
 
 \item: 
 \end{itemize}
@@ -13,13 +32,12 @@ Heap memory related performance bugs can be from the following categories, if on
 
 What we can do for heap memory management?
 
-First, we can point out the unnecessary memory allocations and deallocations. For example, we can malloc a large object, and then assign to different small projects. Some of them may be called inside the internal level of loop functions, we can move up. 
+First, we can point out the unnecessary memory allocations and deallocations. For example, we can malloc a large object, and then assign to different small projects. Some of them may be called inside the internal level of loop functions, we can move up to external loop level. 
 By reducing unnecessary memory allocations, we expect to improve the performance. 
 
-Second, we can give a statistics on the life-span of objects. Whether we can find out some problems inside? For example, we can use stack variables instead of heap. 
+Second, we can give a statistics on the life-span of objects. Whether we can find out some problems inside? For example, we can use stack variables instead of heap if some objects are too short-lived, or mostly inside a function call. 
 
-Third, we can actually give the statistics on each callsite. Some callsites may have larger number of allocations. Check whether we can use . 
-
+Third, we can actually give the statistics on each callsite. Some callsites may have larger number of allocations. 
 
 Can we evaluate the performance related to heap allocations? For example, how much time is spending on memory allocation. 
 We can approximate the time of spending on each allocation. Then we can distribute the time to different statements, just similar to gprof. Then maybe it is obvious that we can reduce the overhead by reducing the memory allocations. Then it is possible that a separate paper by using the 
@@ -39,4 +57,8 @@ It will be a perfect paper for ICSE or SC.
 %% Should we just use a two-phase solution? That is, we can use a hash-table to identify different allocation site with their memory uses: how many times for memory allocations? How many times for related free operations? If there are a lot of memory allocations that are not freed, then it is possible a memory leak. We could also identify whether those memory are actually touched or not by using the watchpoint mechanisms? Also, we may try to check whether memory allocation are in the same sequence, for example, alloc-free-alloc-free, and with the same size. If yes, then it is possible that is unnecessary memory operations. 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%
-Typically, I think that mtrace utilizes  
+Typically, I think that mtrace utilizes 
+
+Can we check the example of malloc-free situations?
+Can we base on a ``anomaly detection'' but.  
+I guess that the memory will be freed before the next allocation. If not, then there is high probability of leaking. If memory allocated is on the same site,  
