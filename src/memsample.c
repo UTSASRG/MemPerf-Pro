@@ -17,7 +17,6 @@ long perf_event_open(struct perf_event_attr *hw_event, pid_t pid, int cpu, int g
 	return syscall(__NR_perf_event_open, hw_event, pid, cpu, group_fd, flags);
 }
 
-extern void * program_break;
 extern "C" {
 	pid_t gettid() {
 		return syscall(__NR_gettid);
@@ -27,11 +26,10 @@ extern "C" {
 }
 __thread extern bool isMainThread;
 __thread extern char * shadow_mem;
-__thread extern void * stackStart;
-__thread extern void * stackEnd;
-__thread extern void * watchStartByte;
-__thread extern void * watchEndByte;
-__thread extern void * highestObjAddr;
+__thread extern char * stackStart;
+__thread extern char * stackEnd;
+__thread extern char * watchStartByte;
+__thread extern char * watchEndByte;
 __thread extern FILE * output;
 
 int numSamples;
@@ -95,7 +93,7 @@ void stopSampling() {
 void doSampleRead() {
 	prev_head = perf_mmap_read(prev_head, 0, NULL);
 
-	processFreeQueue();
+	//processFreeQueue();
 }
 
 long long perf_mmap_read(long long prev_head, long long reg_mask,
@@ -106,7 +104,7 @@ long long perf_mmap_read(long long prev_head, long long reg_mask,
 	long long head, offset;
 	long long copy_amt, prev_head_wrap;
 	void *data_mmap = (void *)((size_t)our_mmap + getpagesize());
-	const bool debug = false;
+	bool const debug = false;
 	int i, size;
 
 	if(control_page == NULL) {
@@ -183,7 +181,7 @@ long long perf_mmap_read(long long prev_head, long long reg_mask,
 				uint64_t addr;
 				memcpy(&addr, &data[offset], sizeof(uint64_t));
 				offset += sizeof(uint64_t);
-				void * paddr = (void *)addr;
+				const char * paddr = (const char *)addr;
 
 				// If we have sampled an address in our watch range, and it does
 				// not belong to the stack, then proceed...
@@ -193,8 +191,7 @@ long long perf_mmap_read(long long prev_head, long long reg_mask,
 
 					// Calculate the offset of this
 					// byte from the start of the heap.
-					long long access_byte_offset =
-						(char *)paddr - (char *)watchStartByte;
+					long long access_byte_offset = paddr - watchStartByte;
 
 					if(debug) {
 						printf("access_offset=%lld, watchStartByte=%p, "

@@ -18,7 +18,6 @@
 
 typedef HashMap<uint64_t, Tuple *, spinlock> HashMapX;
 
-bool shadowMemZeroedOut = false;
 __thread bool isMainThread = false;
 __thread char * shadow_mem;
 __thread char * stackStart;
@@ -29,7 +28,7 @@ __thread void * maxObjAddr = (void *)0x0;
 __thread FILE * output = NULL;
 __thread FreeQueue * freeQueue1, * freeQueue2;
 
-// This map will go from the callsite id key to a tuple containing:
+// This map will go from the callsite ID key to a structure containing:
 //	(1) the first callsite
 //	(2) the second callsite
 //	(3) the total number of allocations originating from this callsite pair
@@ -40,8 +39,6 @@ __thread FreeQueue * freeQueue1, * freeQueue2;
 //	(6) the total number of accesses on objects spawned from this callsite id
 HashMapX mapCallsiteStats;
 
-void * program_break;
-extern void * __libc_stack_end;
 extern char * program_invocation_name;
 extern char __executable_start;
 extern int numSamples;
@@ -50,15 +47,20 @@ extern int numSignals;
 typedef int (*main_fn_t)(int, char **, char **);
 main_fn_t real_main;
 
+bool const debug = false;
+bool mallocInitialized = false;
+bool shadowMemZeroedOut = false;
+char * tmpbuf;
+unsigned int numTempAllocs = 0;
+unsigned int tmppos = 0;
+uint64_t min_pos_callsite_id;
+
+struct stack_frame {
+	struct stack_frame * prev;	// pointing to previous stack_frame
+	void * caller_address;		// the address of caller
+};
+
 extern "C" {
-	uint64_t min_pos_callsite_id;
-
-	struct addr2line_info {
-		char exename[256];
-		unsigned int lineNum;
-		bool error = false;
-	};
-
 	// Function prototypes
     void processFreeQueue();
 	void FreeEnqueue(FreeQueue * queue, QueueItem item);
@@ -67,11 +69,11 @@ extern "C" {
 	FreeQueue * newFreeQueue();
 	bool isWordMallocHeader(long *word);
 	size_t getTotalAllocSize(size_t sz);
-	struct addr2line_info addr2line(void * ddr);
+	addrinfo addr2line(void * ddr);
 	void countUnfreedObjAccesses();
 	void exitHandler();
-	void freeShadowMem(void * ptr);
-	void initShadowMem(void * objAlloc, size_t sz);
+	void freeShadowMem(const void * ptr);
+	void initShadowMem(const void * objAlloc, size_t sz);
 	void writeHashMap();
 	inline void getCallsites(void **callsite1, void **callsite2);
 
@@ -87,19 +89,14 @@ extern "C" {
 	void * pvalloc(size_t) __attribute__ ((weak, alias("xxpvalloc")));
 	void * alloca(size_t) __attribute__ ((weak, alias("xxalloca")));
 }
-bool mallocInitialized = false;
-char * tmpbuf;
-unsigned int tmppos = 0;
-unsigned int numTempAllocs = 0;
-const bool debug = false;
 
 __attribute__((constructor)) void initializer() {
 	// Ensure we are operating on a system using 64-bit pointers.
-	// We need to do this because we will later be taking the low 8-byte word
+	// This is necessary, as later we'll be taking the low 8-byte word
 	// of callsites. This could obviously be expanded to support 32-bit systems
 	// as well, in the future.
 	size_t ptrSize = sizeof(void *);
-	if(ptrSize != 8) {
+	if(ptrSize != EIGHT_BYTES) {
 		fprintf(stderr, "error: unsupported pointer size: %zu\n", ptrSize);
 		abort();
 	}
@@ -117,11 +114,11 @@ __attribute__((constructor)) void initializer() {
 	Real::initializer();
 	mallocInitialized = true;
 	isMainThread = true;
-	program_break = sbrk(0);
+	void * program_break = sbrk(0);
 	stackStart = (char *)__builtin_frame_address(0);
 	stackEnd = stackStart + FIVE_MB;
 	watchStartByte = (char *)program_break;
-	watchEndByte = watchStartByte + SHADOW_MEM_SIZE;
+	watchEndByte = watchStartByte + SHADOW_MEM_SIZE - 1;
 
 	// Initialize hashmap
 	mapCallsiteStats.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
@@ -167,8 +164,8 @@ __attribute__((destructor)) void finalizer() {
 void exitHandler() {
 	stopSampling();
 
-	processFreeQueue();
-	processFreeQueue();
+	//processFreeQueue();
+	//processFreeQueue();
 
 	long access_byte_offset = (char *)maxObjAddr - watchStartByte;
 	char * shadow_mem_end = shadow_mem + SHADOW_MEM_SIZE;
@@ -205,16 +202,11 @@ extern "C" int libmemperf_libc_start_main(main_fn_t main_fn, int argc, char ** a
 
 // Memory management functions
 extern "C" {
-	struct stack_frame {
-		struct stack_frame * prev;	// pointing to previous stack_frame
-		void * caller_address;		// the address of caller
-	};
-
 	void processFreeQueue() {
         // Process all items in queue1 first.
         while(!isFreeQueueEmpty(freeQueue1)) {
             void * free_req = FreeDequeue(freeQueue1);
-            freeShadowMem(free_req);
+            freeShadowMem((const void *)free_req);
             Real::free(free_req);
         }
 
@@ -259,16 +251,18 @@ extern "C" {
 	}
 
 	void * xxmalloc(size_t sz) {
-		// Small allocation routine designed to service malloc requests made by the
-		// dlsym() function. Due to our linkage aliasing which redirects calls to
-		// malloc to xxmalloc in this file, when dlsym calls malloc, xxmalloc is
-		// called instead. xxmalloc then relies on Real::malloc to fulfill the
-		// request, however, Real::malloc has not yet been assigned until the dlsym
-		// call returns. This results in a segmentation fault. To remedy the problem,
-		// we detect whether Real has finished initializing; if it has not, we
-		// fulfill malloc requests using mmap regions. Once dlsym finishes,
-		// all future malloc requests will be fulfilled by Real::malloc, which
-		// contains a reference to the real libc malloc routine.
+		// Small allocation routine designed to service malloc requests made by
+		// the dlsym() function, as well as code running prior to dlsym(). Due
+		// to our linkage alias which redirects malloc calls to xxmalloc
+		// located in this file; when dlsym calls malloc, xxmalloc is called
+		// instead. Without this routine, xxmalloc would simply rely on
+		// Real::malloc to fulfill the request, however, Real::malloc would not
+		// yet be assigned until the dlsym call returns. This results in a
+		// segmentation fault. To remedy the problem, we detect whether the Real
+		// has finished initializing; if it has not, we fulfill malloc requests
+		// using a memory mapped region. Once dlsym finishes, all future malloc
+		// requests will be fulfilled by Real::malloc, which itself is a
+		// reference to the real glibc malloc routine.
 		if(!mallocInitialized) {
 			if((tmppos + sz) < TEMP_BUF_SIZE) {
 				void * retptr = (void *)(tmpbuf + tmppos);
@@ -286,7 +280,7 @@ extern "C" {
 		void * objAlloc = Real::malloc(sz);
 
 		if(!shadowMemZeroedOut) {
-			initShadowMem(objAlloc, sz);
+			initShadowMem((const void *)objAlloc, sz);
 		}
 
 		return objAlloc;
@@ -311,7 +305,7 @@ extern "C" {
 	* allocation is recorded in the global stats hash map.
 	* Callers include xxmalloc and xxrealloc.
 	*/
-	void initShadowMem(void * objAlloc, size_t sz) {
+	void initShadowMem(const void * objAlloc, size_t sz) {
 		void * callsite1;
 		void * callsite2;
 		getCallsites(&callsite1, &callsite2);
@@ -328,14 +322,6 @@ extern "C" {
 		if(callsite2 == (void *)NO_CALLSITE)
 			callsite2 = (void *)0x0;
 
-		if(((char *)objAlloc + totalObjSz) > maxObjAddr) {
-			long access_byte_offset = (char *)objAlloc - (char *)watchStartByte;
-			// Only update the maxObjAddr variable if this object could be
-			// tracked given the limited size of shadow memory.
-			if(access_byte_offset >= 0 && access_byte_offset < SHADOW_MEM_SIZE)
-				maxObjAddr = (void *)((char *)objAlloc + totalObjSz);
-		}
-
 		// Store the callsite_id in the shadow memory location that
 		// corresponds to the object's malloc header.
 		long object_offset = (char *)objAlloc - (char *)watchStartByte;
@@ -345,12 +331,11 @@ extern "C" {
 		// fulfill certain requests, and the heap may have possibly outgrown
 		// the size of shadow memory. We only want to keep track of objects
 		// that mappable to shadow memory.
-		if(object_offset >= 0 && object_offset < SHADOW_MEM_SIZE) {
+		if(object_offset >= 0 && (object_offset + totalObjSz) < SHADOW_MEM_SIZE) {
 			if(objAlloc > maxObjAddr) {
 				// Only update the max pointer if this object could be
 				// tracked, given the limited size of our shadow memory.
-				if(object_offset >= 0 && object_offset < SHADOW_MEM_SIZE)
-					maxObjAddr = (void *)((char *)objAlloc + totalObjSz);
+				maxObjAddr = (void *)((char *)objAlloc + totalObjSz);
 			}
 
 			// Record the callsite_id to the shadow memory word
@@ -383,12 +368,13 @@ extern "C" {
 	* objects' shadow memory is zeroed out in preparation for later reuse.
 	* Callers include xxfree and xxrealloc.
 	*/
-	void freeShadowMem(void * ptr) {
+	void freeShadowMem(const void * ptr) {
 		if(ptr == NULL)
 			return;
 
-		long shadow_mem_offset = (char *)ptr - (char *)watchStartByte;
-		long *callsiteHeader = (long *)(shadow_mem + shadow_mem_offset - MALLOC_HEADER_SIZE);
+		long object_byte_offset = (char *)ptr - watchStartByte;
+		long *callsiteHeader = (long *)(shadow_mem +
+				object_byte_offset - MALLOC_HEADER_SIZE);
 
 		// This check is necessary because we cannot trust that we are in
 		// control of dynamic memory, as we do not support calls to all
@@ -396,14 +382,15 @@ extern "C" {
 		// valloc).
 		if(isWordMallocHeader(callsiteHeader)) {
 			// Fetch object's size from its malloc header
-			long *objHeader = (long *)ptr - 1;
+			const long *objHeader = (long *)ptr - 1;
 			unsigned int objSize = *objHeader - 1;
 			unsigned int objSizeInWords = objSize / 8;
 
-			long callsite_id = *callsiteHeader;
+			unsigned long callsite_id = (unsigned long) *callsiteHeader;
 			if(debug) {
-				fprintf(output, ">>> found malloc header @ %p, callsite_id=0x%lx, object size=%u\n",
-						objHeader, callsite_id, objSize);
+				fprintf(output, ">>> found malloc header @ %p, "
+						"callsite_id=0x%lx, object size=%u\n", objHeader,
+						callsite_id, objSize);
 			}
 
 			// Zero-out the malloc header area of the object's shadow memory.
@@ -412,19 +399,25 @@ extern "C" {
 			int i = 0;
 			long access_count = 0;
 			long *next_word = callsiteHeader;
-			for(i = 0; i < objSizeInWords - 1; i++) {
+			long numWordsToVisit = objSizeInWords - 1;
+			if(object_byte_offset >= SHADOW_MEM_SIZE) {
+				numWordsToVisit = (SHADOW_MEM_SIZE - object_byte_offset) / 8;
+			}
+			for(i = 0; i < numWordsToVisit; i++) {
 				next_word++;
-				if(debug)
-					fprintf(output, "\t shadow mem value @ %p = 0x%lx\n", next_word, *next_word);
+				if(debug) {
+					fprintf(output, "\t freeShadowMem: shadow mem value @ %p "
+							"= 0x%lx\n", next_word, *next_word);
+				}
 				access_count += *next_word;
 				*next_word = 0;		// zero out the word after counting it
 			}
 			if(debug) {
-				fprintf(output, "\t finished with object count = %ld of ptr @ %p\n",
-						access_count, ptr);
+				fprintf(output, "\t freeShadowMem: finished with object @ %p, "
+						"count = %ld\n", ptr, access_count);
 			}
 
-			if(((unsigned long)callsite_id > (unsigned long)min_pos_callsite_id) &&
+			if((callsite_id > (unsigned long)min_pos_callsite_id) &&
 					(access_count > 0)) {
 				Tuple * map_value;
 				mapCallsiteStats.find(callsite_id, &map_value);
@@ -453,8 +446,6 @@ extern "C" {
 					((ptr >= (void *)watchStartByte) &&
 					(ptr <= (void *)watchEndByte))) {
 				FreeEnqueue(freeQueue2, ptr);
-				//freeShadowMem(ptr);
-				//Real::free(ptr);
 			} else {
 				Real::free(ptr);
 			}
@@ -496,7 +487,8 @@ extern "C" {
 
 		if(ptr != NULL) {
 			if(!shadowMemZeroedOut &&
-					(ptr >= (void *)watchStartByte && ptr <= (void *)watchEndByte)) {
+					((ptr >= (void *)watchStartByte) &&
+					(ptr <= (void *)watchEndByte))) {
 				freeShadowMem(ptr);
 			}
 		}
@@ -560,7 +552,7 @@ extern "C" {
 			void * callsite1 = value->callsite1;
 			void * callsite2 = value->callsite2;
 
-			struct addr2line_info addrInfo1, addrInfo2;
+			addrinfo addrInfo1, addrInfo2;
 			addrInfo1 = addr2line(callsite1);
 			addrInfo2 = addr2line(callsite2);
 
@@ -585,11 +577,11 @@ extern "C" {
 		}
 	}
 
-	struct addr2line_info addr2line(void * addr) {
+	addrinfo addr2line(void * addr) {
 		int fd[2];
 		char strCallsite[16];
 		char strInfo[512];
-		struct addr2line_info info;
+		addrinfo info;
 
 		if(pipe(fd) == -1) {
 			fprintf(stderr, "error: unable to create pipe\n");
@@ -633,27 +625,14 @@ extern "C" {
 	}
 
 	bool isWordMallocHeader(long *word) {
-		long access_byte_offset = (char *)word - shadow_mem;
-		long access_word_offset = access_byte_offset / WORD_SIZE;
-
-		/*
-		// DEBUG BLOCK
-		bool bGreater = ((unsigned long)*word > (unsigned long)min_pos_callsite_id);
-		bool isMod = (access_word_offset % 2 == 1);
-		int iCount = mapCallsiteStats.count(*word);
-		if(!(bGreater && isMod && (iCount > 0))) {
-			fprintf(output, " >> %p=0x%lx not a malloc header: bGreater=%d, isMod=%d, iCount=%d\n",
-				word, *word, bGreater, isMod, iCount);
-		}
-		*/
-
 		Tuple * found_item;
 		return (((unsigned long)*word > (unsigned long)min_pos_callsite_id) &&
-				(access_word_offset % 2 == 1) &&
 				(mapCallsiteStats.find(*word, &found_item)));
 	}
 
 	void countUnfreedObjAccesses() {
+		// Flipping this flag ensures that any further calls to malloc and free
+		// are not tracked and will not touch shadow memory in any way.
 		shadowMemZeroedOut = true;
 
 		char *shadow_mem_end = shadow_mem + SHADOW_MEM_SIZE;
@@ -662,8 +641,10 @@ extern "C" {
 		long *sweepEnd = (long *)(shadow_mem + max_byte_offset);
 		long *sweepCurrent;
 
-		if(debug)
-			fprintf(output, ">>> sweepStart = %p, sweepEnd = %p\n", sweepStart, sweepEnd);
+		if(debug) {
+			fprintf(output, "\n>>> sweepStart = %p, sweepEnd = %p\n",
+				sweepStart, sweepEnd);
+		}
 
 		for(sweepCurrent = sweepStart; sweepCurrent <= sweepEnd; sweepCurrent++) {
 			// If the current word corresponds to an object's malloc header then check
@@ -671,17 +652,19 @@ extern "C" {
 			// use this size to sum over the corresponding number of words in shadow
 			// memory.
 			if(isWordMallocHeader(sweepCurrent)) {
-				long current_byte_offset = (char *)sweepCurrent - (char *)sweepStart;
+				long current_byte_offset =
+					(char *)sweepCurrent - (char *)sweepStart;
 				long callsite_id = *sweepCurrent;
-				long *realObjHeader = (long *)(watchStartByte + current_byte_offset);
+				const long * realObjHeader =
+					(long *)(watchStartByte + current_byte_offset);
 				long objSizeInBytes = *realObjHeader - 1;
 				long objSizeInWords = objSizeInBytes / 8;
 				long access_count = 0;
 				int i;
 
 				if(debug) {
-					fprintf(output, ">>> found malloc header @ %p, "
-						"callsite_id=0x%lx, object size=%ld (%ld words)\n",
+					fprintf(output, ">>> countUnfreed: found malloc header @ %p"
+						", callsite_id=0x%lx, object size=%ld (%ld words)\n",
 						sweepCurrent, callsite_id, objSizeInBytes,
 						objSizeInWords);
 				}
@@ -690,12 +673,13 @@ extern "C" {
 					sweepCurrent++;
 					if(debug) {
 						if((sweepCurrent >= (long *)shadow_mem_end) &&
-								((long *)(shadow_mem_end + 8) > sweepCurrent)) { 
-							fprintf(output,
-									"-------------- END OF SHADOW MEMORY REGION --------------\n");
+								((long *)(shadow_mem_end + sizeof(long)) >
+								 sweepCurrent)) {
+							fprintf(output, "-------------- END OF "
+									"SHADOW MEMORY REGION --------------\n");
 						}
-						fprintf(output, "\t shadow mem value @ %p = 0x%lx\n",
-							sweepCurrent, *sweepCurrent);
+						fprintf(output, "\t countUnfreed: shadow mem value @ %p "
+								"= 0x%lx\n", sweepCurrent, *sweepCurrent);
 					}
 					access_count += *sweepCurrent;
 				}

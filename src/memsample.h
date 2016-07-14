@@ -15,7 +15,7 @@
 #define MAPSIZE (MMAP_PAGES * getpagesize())
 #define DATA_MAPSIZE (DATA_MMAP_PAGES * getpagesize())
 #define OVERFLOW_INTERVAL 100
-#define SHADOW_MEM_SIZE ONE_GB
+#define SHADOW_MEM_SIZE (80 * ONE_GB)
 #define WORD_SIZE (sizeof(long))
 
 // This value is chosen to ensure that all callsite ID's generated are
@@ -25,6 +25,7 @@
 #define LOAD_ACCESS 0x1cd
 #define STORE_ACCESS 0x2cd
 #define MALLOC_HEADER_SIZE (sizeof(size_t))
+#define EIGHT_BYTES 8
 #define FIVE_MB 5242880
 #define ONE_HUNDRED_MB 104857600l
 #define FIVE_HUNDRED_MB 524288000l
@@ -52,6 +53,12 @@ typedef struct {
 	QueueNode * head;
 	QueueNode * tail;
 } FreeQueue;
+
+typedef struct addr2line_info {
+    char exename[256];
+    unsigned int lineNum;
+    bool error = false;
+} addrinfo;
 
 int initSampling(void);
 void setupSampling(void);
