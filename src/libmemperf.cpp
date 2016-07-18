@@ -8,6 +8,7 @@
 #include <dlfcn.h>
 #include <malloc.h>
 #include <alloca.h>
+#include <sys/wait.h>
 
 #include "memsample.h"
 #include "real.hh"
@@ -39,7 +40,10 @@ __thread FreeQueue * freeQueue1, * freeQueue2;
 //	(6) the total number of accesses on objects spawned from this callsite id
 HashMapX mapCallsiteStats;
 
+extern char data_start;
+extern char _etext;
 extern char * program_invocation_name;
+extern void * __libc_stack_end;
 extern char __executable_start;
 extern int numSamples;
 extern int numSignals;
@@ -62,20 +66,20 @@ struct stack_frame {
 
 extern "C" {
 	// Function prototypes
-    void processFreeQueue();
-	void FreeEnqueue(FreeQueue * queue, QueueItem item);
+	addrinfo addr2line(void * ddr);
+	FreeQueue * newFreeQueue();
 	QueueItem FreeDequeue(FreeQueue * queue);
 	bool isFreeQueueEmpty(FreeQueue * queue);
-	FreeQueue * newFreeQueue();
 	bool isWordMallocHeader(long *word);
 	size_t getTotalAllocSize(size_t sz);
-	addrinfo addr2line(void * ddr);
 	void countUnfreedObjAccesses();
 	void exitHandler();
+	void FreeEnqueue(FreeQueue * queue, QueueItem item);
 	void freeShadowMem(const void * ptr);
 	void initShadowMem(const void * objAlloc, size_t sz);
+    void processFreeQueue();
 	void writeHashMap();
-	inline void getCallsites(void **callsite1, void **callsite2);
+	inline void getCallsites(void **callsites);
 
 	// Function aliases
 	void free(void *) __attribute__ ((weak, alias("xxfree")));
@@ -83,11 +87,11 @@ extern "C" {
 	void * malloc(size_t) __attribute__ ((weak, alias("xxmalloc")));
 	void * realloc(void *, size_t) __attribute__ ((weak, alias("xxrealloc")));
 	void * valloc(size_t) __attribute__ ((weak, alias("xxvalloc")));
-	int posix_memalign(void **, size_t, size_t) __attribute__ ((weak, alias("xxposix_memalign")));
 	void * aligned_alloc(size_t, size_t) __attribute__ ((weak, alias("xxaligned_alloc")));
 	void * memalign(size_t, size_t) __attribute__ ((weak, alias("xxmemalign")));
 	void * pvalloc(size_t) __attribute__ ((weak, alias("xxpvalloc")));
 	void * alloca(size_t) __attribute__ ((weak, alias("xxalloca")));
+	int posix_memalign(void **, size_t, size_t) __attribute__ ((weak, alias("xxposix_memalign")));
 }
 
 __attribute__((constructor)) void initializer() {
@@ -116,7 +120,7 @@ __attribute__((constructor)) void initializer() {
 	isMainThread = true;
 	void * program_break = sbrk(0);
 	stackStart = (char *)__builtin_frame_address(0);
-	stackEnd = stackStart + FIVE_MB;
+	stackEnd = (char *)__libc_stack_end;
 	watchStartByte = (char *)program_break;
 	watchEndByte = watchStartByte + SHADOW_MEM_SIZE - 1;
 
@@ -287,11 +291,14 @@ extern "C" {
 	}
 
 	Tuple * newTuple(void * callsite1, void * callsite2, int numAllocs,
-			long szTotal, long szUsed, long numAccesses) {
+			int numFrees, long szFreed, long szTotal, long szUsed,
+			long numAccesses) {
 		Tuple * new_tuple = (Tuple *)Real::malloc(sizeof(Tuple));
 		new_tuple->callsite1 = callsite1;
 		new_tuple->callsite2 = callsite2;
 		new_tuple->numAllocs = numAllocs;
+		new_tuple->numFrees = numFrees;
+		new_tuple->szFreed = szFreed;
 		new_tuple->szTotal = szTotal;
 		new_tuple->szUsed = szUsed;
 		new_tuple->numAccesses = numAccesses;
@@ -306,9 +313,10 @@ extern "C" {
 	* Callers include xxmalloc and xxrealloc.
 	*/
 	void initShadowMem(const void * objAlloc, size_t sz) {
-		void * callsite1;
-		void * callsite2;
-		getCallsites(&callsite1, &callsite2);
+		void * callsites[2];
+		getCallsites(callsites);
+		void * callsite1 = callsites[0];
+		void * callsite2 = callsites[1];
 
 		size_t totalObjSz = getTotalAllocSize(sz);
 		uint64_t lowWord1 = (uint64_t) callsite1 & 0xFFFFFFFF;
@@ -349,7 +357,8 @@ extern "C" {
 				found_value->szUsed += sz;
 				found_value->szTotal += totalObjSz;
 			} else {
-				Tuple * new_tuple = newTuple(callsite1, callsite2, 1, totalObjSz, sz, 0);
+				Tuple * new_tuple =
+					newTuple(callsite1, callsite2, 1, 0, 0, totalObjSz, sz, 0);
 				mapCallsiteStats.insertIfAbsent(callsite_id, new_tuple);
 			}
 		}
@@ -417,11 +426,13 @@ extern "C" {
 						"count = %ld\n", ptr, access_count);
 			}
 
-			if((callsite_id > (unsigned long)min_pos_callsite_id) &&
-					(access_count > 0)) {
+			if(callsite_id > (unsigned long)min_pos_callsite_id) {
 				Tuple * map_value;
 				mapCallsiteStats.find(callsite_id, &map_value);
 				map_value->numAccesses += access_count;
+				map_value->numFrees++;
+				// Subtract eight bytes representing the malloc header
+				map_value->szFreed += (objSize - 8);
 			}
 		}
 	}
@@ -445,10 +456,9 @@ extern "C" {
 			if(!shadowMemZeroedOut &&
 					((ptr >= (void *)watchStartByte) &&
 					(ptr <= (void *)watchEndByte))) {
-				FreeEnqueue(freeQueue2, ptr);
-			} else {
-				Real::free(ptr);
+				freeShadowMem(ptr);
 			}
+			Real::free(ptr);
 		}
 	}
 
@@ -502,20 +512,26 @@ extern "C" {
 		return reptr;
 	}
 
-	inline void getCallsites(void **callsite1, void **callsite2) {
+	inline void getCallsites(void **callsites) {
+		void * btext = &__executable_start;
+		void * etext = &data_start;
+
 		struct stack_frame * current_frame =
-			(struct stack_frame *)(__builtin_frame_address(1));
-		*callsite1 = current_frame->caller_address;
-		struct stack_frame * prev_frame = current_frame->prev;
-		// We cannot assume that a previous stack frame exists; doing so, and then
-		// attempting to dereference its address will result in a segfault.
-		// Therefore, we first determine whether its address is a valid stack
-		// address. If so, then we proceed by deferencing it. If it is NOT a
-		// stack address, then we will use NO_CALLSITE as a placeholder value.
-		*callsite2 = (void *)NO_CALLSITE;
-		if(((void *)prev_frame <= (void *)stackStart) &&
+			(struct stack_frame *)(__builtin_frame_address(0));
+		struct stack_frame * prev_frame = current_frame;
+
+		// Initialize the array elements.
+		callsites[0] = (void *)NULL;
+		callsites[1] = (void *)NULL;
+
+		int i = 0;
+		while((i < 2) && ((void *)prev_frame <= (void *)stackStart) &&
 				(prev_frame >= current_frame)) {
-			*callsite2 = prev_frame->caller_address;
+			void * caller_addr = prev_frame->caller_address;
+			if((caller_addr >= btext) && (caller_addr <= etext)) {
+				callsites[i++] = caller_addr;
+			}
+			prev_frame = prev_frame->prev;
 		}
 	}
 
@@ -541,9 +557,9 @@ extern "C" {
 	void writeHashMap() {
 		fprintf(output, "Hash map contents\n");
 		fprintf(output, "------------------------------------------\n");
-		fprintf(output, "%-18s %-18s %-20s %-20s %6s %8s %8s %8s %8s\n",
-				"callsite1", "callsite2", "src1", "src2",
-				"allocs", "used sz", "total sz", "avg sz", "accesses");
+		fprintf(output, "%-18s %-18s %-20s %-20s %6s %6s %8s %8s %8s %8s %8s\n",
+				"callsite1", "callsite2", "src1", "src2", "allocs", "frees",
+				"freed sz", "used sz", "total sz", "avg sz", "accesses");
 
 
 		HashMapX::iterator iterator;
@@ -557,6 +573,8 @@ extern "C" {
 			addrInfo2 = addr2line(callsite2);
 
 			int count = value->numAllocs;
+			int numFreed = value->numFrees;
+			long szFreed = value->szFreed;
 			long usedSize = value->szUsed;
 			long totalSize = value->szTotal;
 			float avgSize = usedSize / (float) count;
@@ -567,6 +585,8 @@ extern "C" {
 			fprintf(output, "%-14s:%-5d ", addrInfo1.exename, addrInfo1.lineNum);
 			fprintf(output, "%-14s:%-5d ", addrInfo2.exename, addrInfo2.lineNum);
 			fprintf(output, "%6d ", count);
+			fprintf(output, "%6d ", numFreed);
+			fprintf(output, "%8ld ", szFreed);
 			fprintf(output, "%8ld ", usedSize);
 			fprintf(output, "%8ld ", totalSize);
 			fprintf(output, "%8.1f ", avgSize);
@@ -591,7 +611,8 @@ extern "C" {
 			return info;
 		}
 
-		switch(fork()) {
+		pid_t parent;
+		switch(parent = fork()) {
 			case -1:
 				fprintf(stderr, "error: unable to fork child process\n");
 				break;
@@ -612,6 +633,8 @@ extern "C" {
 					info.error = true;
 					return info;
 				}
+				close(fd[0]);
+				waitpid(parent, NULL, 0);
 
 				// Tokenize the return string, breaking apart by ':'
 				// Take the second token, which will be the line number.

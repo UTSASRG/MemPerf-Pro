@@ -26,19 +26,21 @@
 #define STORE_ACCESS 0x2cd
 #define MALLOC_HEADER_SIZE (sizeof(size_t))
 #define EIGHT_BYTES 8
-#define FIVE_MB 5242880
+#define EIGHT_MB 8388608
 #define ONE_HUNDRED_MB 104857600l
 #define FIVE_HUNDRED_MB 524288000l
 #define EIGHT_HUNDRED_MB 838860800l
 #define ONE_GB 1073741824l
 #define TEN_GB 10737418240
 #define MAX_FILENAME_LEN 128
-#define TEMP_BUF_SIZE FIVE_MB
+#define TEMP_BUF_SIZE EIGHT_MB
 
 typedef struct {
     void * callsite1;
     void * callsite2;
     int numAllocs;
+    int numFrees;
+    long szFreed;
     long szTotal;
     long szUsed;
     long numAccesses;

@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 int main() {
 	int i, j;
@@ -9,10 +10,9 @@ int main() {
 
 	for(i  = 0; i < 100; i++) {
 		ptr = (int *) malloc(sizeof(int));
-		*ptr = 0;
 		for(j = 0; j < 100000; j++) {
-			(void)*ptr;
-			*ptr = 7;
+			*ptr = i * j;
+			//usleep(10000);
 		}
 		free(ptr);
 	}
