@@ -556,14 +556,15 @@ extern "C" {
 
 	void writeHashMap() {
 		fprintf(output, "Hash map contents\n");
-		fprintf(output, "------------------------------------------\n");
-		fprintf(output, "%-18s %-18s %-20s %-20s %6s %6s %8s %8s %8s %8s %8s\n",
+		fprintf(output, "--------------------------------------------------\n");
+		fprintf(output,
+				"%-18s %-18s %-20s %-20s %6s %6s %8s %8s %8s %10s %8s\n",
 				"callsite1", "callsite2", "src1", "src2", "allocs", "frees",
 				"freed sz", "used sz", "total sz", "avg sz", "accesses");
 
-
 		HashMapX::iterator iterator;
-		for(iterator = mapCallsiteStats.begin(); iterator != mapCallsiteStats.end(); iterator++) {
+		for(iterator = mapCallsiteStats.begin();
+				iterator != mapCallsiteStats.end(); iterator++) {
 			Tuple * value = iterator.getData();
 			void * callsite1 = value->callsite1;
 			void * callsite2 = value->callsite2;
@@ -589,7 +590,7 @@ extern "C" {
 			fprintf(output, "%8ld ", szFreed);
 			fprintf(output, "%8ld ", usedSize);
 			fprintf(output, "%8ld ", totalSize);
-			fprintf(output, "%8.1f ", avgSize);
+			fprintf(output, "%10.1f ", avgSize);
 			fprintf(output, "%8ld", totalAccesses);
 			fprintf(output, "\n");
 
