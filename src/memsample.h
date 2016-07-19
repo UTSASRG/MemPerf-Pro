@@ -57,9 +57,8 @@ typedef struct {
 } FreeQueue;
 
 typedef struct addr2line_info {
-    char exename[256];
-    unsigned int lineNum;
-    bool error = false;
+    char exename[15];
+    int lineNum;
 } addrinfo;
 
 int initSampling(void);

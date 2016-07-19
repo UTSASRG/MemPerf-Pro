@@ -599,15 +599,16 @@ extern "C" {
 	}
 
 	addrinfo addr2line(void * addr) {
-		static bool primed = false;
+		static bool initialized = false;
 		static int fd[2][2];
-		char strCallsite[16];
+		char strCallsite[20];
 		char strInfo[512];
 		addrinfo info;
 
-		if(!primed) {
+		if(!initialized) {
 			if((pipe(fd[0]) == -1) || (pipe(fd[1]) == -1)) {
-				fprintf(stderr, "error: unable to create pipe for addr2line\n");
+				perror("error: unable to create pipe for addr2line\n");
+				fprintf(output, "error: unable to create pipe for addr2line\n");
 				strcpy(info.exename, "error");
 				info.lineNum = -1;
 				return info;
@@ -616,7 +617,7 @@ extern "C" {
 			pid_t parent;
 			switch(parent = fork()) {
 				case -1:
-					fprintf(stderr, "error: unable to fork addr2line process\n");
+					perror("error: unable to fork addr2line process\n");
 					fprintf(output, "error: unable to fork addr2line process\n");
 					strcpy(info.exename, "error");
 					info.lineNum = -1;
@@ -624,6 +625,7 @@ extern "C" {
 				case 0:		// child
 					dup2(fd[1][0], STDIN_FILENO);
 					dup2(fd[0][1], STDOUT_FILENO);
+					// Close unneeded pipe ends for the child
 					close(fd[0][0]);
 					close(fd[1][1]);
 					execlp("addr2line", "addr2line", "-s", "-e",
@@ -631,9 +633,10 @@ extern "C" {
 					exit(EXIT_FAILURE);	// if we're still here then exec failed
 					break;
 				default:	// parent
+					// Close unneeded pipe ends for the parent
 					close(fd[0][1]);
 					close(fd[1][0]);
-					primed = true;
+					initialized = true;
 			}
 		}
 
@@ -652,7 +655,6 @@ extern "C" {
 					"error: unable to read from pipe facing addr2line\n");
 			strcpy(info.exename, "error");
 			info.lineNum = 0;
-			info.error = true;
 			return info;
 		}
 
@@ -662,7 +664,7 @@ extern "C" {
 		// prevent misalignment in the program output.
 		char * token = strtok(strInfo, ":");
 		strncpy(info.exename, token, 14);
-		info.exename[15] = '\0';	// null terminate the exename field
+		info.exename[14] = '\0';	// null terminate the exename field
 		token = strtok(NULL, ":");
 		info.lineNum = atoi(token);
 
