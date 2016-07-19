@@ -15,7 +15,7 @@
 #define MAPSIZE (MMAP_PAGES * getpagesize())
 #define DATA_MAPSIZE (DATA_MMAP_PAGES * getpagesize())
 #define OVERFLOW_INTERVAL 100
-#define SHADOW_MEM_SIZE (80 * ONE_GB)
+#define SHADOW_MEM_SIZE (16 * ONE_GB)
 #define WORD_SIZE (sizeof(long))
 
 // This value is chosen to ensure that all callsite ID's generated are
@@ -58,7 +58,7 @@ typedef struct {
 
 typedef struct addr2line_info {
     char exename[15];
-    int lineNum;
+    unsigned int lineNum;
 } addrinfo;
 
 int initSampling(void);

@@ -8,7 +8,6 @@
 #include <dlfcn.h>
 #include <malloc.h>
 #include <alloca.h>
-#include <sys/wait.h>
 
 #include "memsample.h"
 #include "real.hh"
@@ -513,38 +512,58 @@ extern "C" {
 	}
 
 	inline void getCallsites(void **callsites) {
+		int i = 0;
 		void * btext = &__executable_start;
 		void * etext = &data_start;
 
+		// Fetch the frame address of the topmost stack frame
 		struct stack_frame * current_frame =
 			(struct stack_frame *)(__builtin_frame_address(0));
+
+		// Initialize the prev_frame pointer to equal the current_frame. This
+		// simply ensures that the while loop below will be entered and
+		// executed and least once
 		struct stack_frame * prev_frame = current_frame;
 
-		// Initialize the array elements.
+		// Initialize the array elements
 		callsites[0] = (void *)NULL;
 		callsites[1] = (void *)NULL;
 
-		int i = 0;
+		// Loop condition tests the validity of the frame address given for the
+		// previous frame by ensuring it actually points to a location located on
+		// the stack
 		while((i < 2) && ((void *)prev_frame <= (void *)stackStart) &&
 				(prev_frame >= current_frame)) {
+			// Inspect the return address belonging to the previous stack frame;
+			// if it's located in the program text, record it as the next
+			// callsite
 			void * caller_addr = prev_frame->caller_address;
 			if((caller_addr >= btext) && (caller_addr <= etext)) {
 				callsites[i++] = caller_addr;
 			}
+			// Walk the prev_frame pointer backward in preparation for the
+			// next iteration of the loop
 			prev_frame = prev_frame->prev;
 		}
 	}
 
+	/*
+	 * This function returns the total usable size of an object allocated
+	 * using glibc malloc (and therefore it does not include the space occupied
+	 * by its 8 byte header).
+ 	 */
 	size_t getTotalAllocSize(size_t sz) {
 		size_t totalSize, usableSize;
 
-		// Smallest possible total object size is 32 bytes, thus total usable
-		// object size is 32 - 8 = 24 bytes.
-		if(sz <= 16)
+		// Smallest possible total object size (including header) is 32 bytes,
+		// thus making the total usable object size equal to 32-8=24 bytes.
+		if(sz <= 24) {
 			return 24;
+		}
 
 		// Calculate a total object size that is double-word aligned.
-		if((sz + 8) % 16 != 0) {
+		totalSize = sz + 8;
+		if(totalSize % 16 != 0) {
 			totalSize = 16 * (((sz + 8) / 16) + 1);
 			usableSize = totalSize - 8;
 		} else {
@@ -565,21 +584,21 @@ extern "C" {
 		HashMapX::iterator iterator;
 		for(iterator = mapCallsiteStats.begin();
 				iterator != mapCallsiteStats.end(); iterator++) {
-			Tuple * value = iterator.getData();
-			void * callsite1 = value->callsite1;
-			void * callsite2 = value->callsite2;
+			Tuple * tuple = iterator.getData();
+			void * callsite1 = tuple->callsite1;
+			void * callsite2 = tuple->callsite2;
 
 			addrinfo addrInfo1, addrInfo2;
 			addrInfo1 = addr2line(callsite1);
 			addrInfo2 = addr2line(callsite2);
 
-			int count = value->numAllocs;
-			int numFreed = value->numFrees;
-			long szFreed = value->szFreed;
-			long usedSize = value->szUsed;
-			long totalSize = value->szTotal;
+			int count = tuple->numAllocs;
+			int numFreed = tuple->numFrees;
+			long szFreed = tuple->szFreed;
+			long usedSize = tuple->szUsed;
+			long totalSize = tuple->szTotal;
 			float avgSize = usedSize / (float) count;
-			long totalAccesses = value->numAccesses;
+			long totalAccesses = tuple->numAccesses;
 
 			fprintf(output, "%-18p ", callsite1);
 			fprintf(output, "%-18p ", callsite2);
@@ -594,7 +613,7 @@ extern "C" {
 			fprintf(output, "%8ld", totalAccesses);
 			fprintf(output, "\n");
 
-			free(value);
+			free(tuple);
 		}
 	}
 
@@ -610,7 +629,7 @@ extern "C" {
 				perror("error: unable to create pipe for addr2line\n");
 				fprintf(output, "error: unable to create pipe for addr2line\n");
 				strcpy(info.exename, "error");
-				info.lineNum = -1;
+				info.lineNum = 0;
 				return info;
 			}
 
@@ -620,7 +639,7 @@ extern "C" {
 					perror("error: unable to fork addr2line process\n");
 					fprintf(output, "error: unable to fork addr2line process\n");
 					strcpy(info.exename, "error");
-					info.lineNum = -1;
+					info.lineNum = 0;
 					return info;
 				case 0:		// child
 					dup2(fd[1][0], STDIN_FILENO);
