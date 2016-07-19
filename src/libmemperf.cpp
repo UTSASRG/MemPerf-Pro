@@ -66,7 +66,7 @@ struct stack_frame {
 
 extern "C" {
 	// Function prototypes
-	addrinfo addr2line(void * ddr);
+	addrinfo addr2line(void * addr);
 	FreeQueue * newFreeQueue();
 	QueueItem FreeDequeue(FreeQueue * queue);
 	bool isFreeQueueEmpty(FreeQueue * queue);
@@ -558,7 +558,7 @@ extern "C" {
 		fprintf(output, "Hash map contents\n");
 		fprintf(output, "--------------------------------------------------\n");
 		fprintf(output,
-				"%-18s %-18s %-20s %-20s %6s %6s %8s %8s %8s %10s %8s\n",
+				"%-18s %-18s %-20s %-20s %6s %6s %11s %11s %11s %10s %8s\n",
 				"callsite1", "callsite2", "src1", "src2", "allocs", "frees",
 				"freed sz", "used sz", "total sz", "avg sz", "accesses");
 
@@ -587,9 +587,9 @@ extern "C" {
 			fprintf(output, "%-14s:%-5d ", addrInfo2.exename, addrInfo2.lineNum);
 			fprintf(output, "%6d ", count);
 			fprintf(output, "%6d ", numFreed);
-			fprintf(output, "%8ld ", szFreed);
-			fprintf(output, "%8ld ", usedSize);
-			fprintf(output, "%8ld ", totalSize);
+			fprintf(output, "%11ld ", szFreed);
+			fprintf(output, "%11ld ", usedSize);
+			fprintf(output, "%11ld ", totalSize);
 			fprintf(output, "%10.1f ", avgSize);
 			fprintf(output, "%8ld", totalAccesses);
 			fprintf(output, "\n");
@@ -599,51 +599,72 @@ extern "C" {
 	}
 
 	addrinfo addr2line(void * addr) {
-		int fd[2];
+		static bool primed = false;
+		static int fd[2][2];
 		char strCallsite[16];
 		char strInfo[512];
 		addrinfo info;
 
-		if(pipe(fd) == -1) {
-			fprintf(stderr, "error: unable to create pipe\n");
+		if(!primed) {
+			if((pipe(fd[0]) == -1) || (pipe(fd[1]) == -1)) {
+				fprintf(stderr, "error: unable to create pipe for addr2line\n");
+				strcpy(info.exename, "error");
+				info.lineNum = -1;
+				return info;
+			}
+
+			pid_t parent;
+			switch(parent = fork()) {
+				case -1:
+					fprintf(stderr, "error: unable to fork addr2line process\n");
+					fprintf(output, "error: unable to fork addr2line process\n");
+					strcpy(info.exename, "error");
+					info.lineNum = -1;
+					return info;
+				case 0:		// child
+					dup2(fd[1][0], STDIN_FILENO);
+					dup2(fd[0][1], STDOUT_FILENO);
+					close(fd[0][0]);
+					close(fd[1][1]);
+					execlp("addr2line", "addr2line", "-s", "-e",
+							program_invocation_name, "--", (char *)NULL);
+					exit(EXIT_FAILURE);	// if we're still here then exec failed
+					break;
+				default:	// parent
+					close(fd[0][1]);
+					close(fd[1][0]);
+					primed = true;
+			}
+		}
+
+		sprintf(strCallsite, "%p\n", addr);
+		int szToWrite = strlen(strCallsite);
+		if(write(fd[1][1], strCallsite, szToWrite) < szToWrite) {
+			fprintf(stderr,
+					"error: incomplete write to pipe facing addr2line\n");
+			fprintf(output,
+					"error: incomplete write to pipe facing addr2line\n");
+		}
+
+		if(read(fd[0][0], strInfo, 512) == -1) {
+			perror("error: unable to read from pipe facing addr2line\n");
+			fprintf(output,
+					"error: unable to read from pipe facing addr2line\n");
 			strcpy(info.exename, "error");
 			info.lineNum = 0;
 			info.error = true;
 			return info;
 		}
 
-		pid_t parent;
-		switch(parent = fork()) {
-			case -1:
-				fprintf(stderr, "error: unable to fork child process\n");
-				break;
-			case 0:		// child
-				close(fd[0]);
-				dup2(fd[1], STDOUT_FILENO);
-				sprintf(strCallsite, "%p", addr);
-				execlp("addr2line", "addr2line", "-s", "-e", program_invocation_name,
-					strCallsite, (char *)NULL);
-				exit(EXIT_FAILURE);		// if we're still here, then exec failed
-				break;
-			default:	// parent
-				close(fd[1]);
-				if(read(fd[0], strInfo, 512) == -1) {
-					fprintf(stderr, "error: unable to read from pipe\n");
-					strcpy(info.exename, "error");
-					info.lineNum = 0;
-					info.error = true;
-					return info;
-				}
-				close(fd[0]);
-				waitpid(parent, NULL, 0);
-
-				// Tokenize the return string, breaking apart by ':'
-				// Take the second token, which will be the line number.
-				char * token = strtok(strInfo, ":");
-				strncpy(info.exename, token, 256);
-				token = strtok(NULL, ":");
-				info.lineNum = atoi(token);
-		}
+		// Tokenize the return string, breaking apart by ':'.
+		// Take the second token, which will be the line number.
+		// Only copies the first 14 characters of the file name in order to
+		// prevent misalignment in the program output.
+		char * token = strtok(strInfo, ":");
+		strncpy(info.exename, token, 14);
+		info.exename[15] = '\0';	// null terminate the exename field
+		token = strtok(NULL, ":");
+		info.lineNum = atoi(token);
 
 		return info;
 	}
