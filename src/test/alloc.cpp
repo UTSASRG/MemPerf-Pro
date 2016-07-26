@@ -8,9 +8,9 @@ int main() {
 
 	printf("alloc.cpp: in the beginning of main\n");
 
-	for(i  = 0; i < 100; i++) {
+	for(i  = 0; i < 100000; i++) {
 		ptr = (int *) malloc(sizeof(int));
-		for(j = 0; j < 100000; j++) {
+		for(j = 0; j < 10000; j++) {
 			*ptr = i * j;
 			//usleep(10000);
 		}

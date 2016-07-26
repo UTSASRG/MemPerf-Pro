@@ -30,6 +30,7 @@ int numSampleReads;
 int numSignals;
 long numHits;
 long numSamples;
+long numSamplesLost;
 
 thread_local perf_info perfInfo;
 
@@ -91,6 +92,8 @@ void stopSampling() {
 	fprintf(thrData.output, ">>> sample counts obtained via read = %lld, %lld\n", count1, count2);
 	fprintf(thrData.output, ">>> effective sampling rate = %.2f%%\n", effectiveSampleRate);
 
+	if(numSamplesLost)
+		fprintf(thrData.output, ">!! numSamplesLost = %ld\n", numSamplesLost);
 	fprintf(thrData.output, ">>> numSampleReads = %d\n", numSampleReads);
 	fprintf(thrData.output, ">>> numHits = %ld\n", numHits);
 }
@@ -118,9 +121,6 @@ long long perf_mmap_read(long long prev_head) {
 
 	head = control_page->data_head;
 	size = head - perfInfo.prev_head;
-
-	if(head < perfInfo.prev_head)
-		perfInfo.prev_head = 0;
 
 	// If we're within one page of exhausting the data buffer then emit a
 	// warning
@@ -262,6 +262,16 @@ long long perf_mmap_read(long long prev_head) {
 					//	thrData.watchStartByte, paddr, thrData.watchEndByte);
 				}
 			}
+			break;
+		} // end case block
+		case PERF_RECORD_LOST: {
+			uint64_t id, lost;
+			memcpy(&id, &perfInfo.data[offset], sizeof(uint64_t));
+			memcpy(&lost, &perfInfo.data[(offset + sizeof(uint64_t))], sizeof(uint64_t));
+			offset += 2 * sizeof(uint64_t);
+			if(numSamplesLost == 0)
+				fprintf(stderr, "WARNING: perf sample data has been lost!\n");
+			numSamplesLost += lost;
 			break;
 		} // end case block
 		} // end switch statement
