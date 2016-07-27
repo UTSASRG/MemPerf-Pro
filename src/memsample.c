@@ -85,17 +85,18 @@ void stopSampling() {
 	// process any sample data still remaining in the ring buffer
 	doSampleRead();
 
-	long long count1, count2;
-	read(perfInfo.perf_fd, &count1, sizeof(long long));
-	read(perfInfo.perf_fd2, &count2, sizeof(long long));
-	double effectiveSampleRate = 100.0 * numSamples / (count1 + count2);
-	fprintf(thrData.output, ">>> sample counts obtained via read = %lld, %lld\n", count1, count2);
-	fprintf(thrData.output, ">>> effective sampling rate = %.2f%%\n", effectiveSampleRate);
+    long long count1, count2;
+    read(perfInfo.perf_fd, &count1, sizeof(long long));
+    read(perfInfo.perf_fd2, &count2, sizeof(long long));
+    double effectiveSampleRate = (double) numSamples / (count1 + count2);
+    fprintf(thrData.output, ">>> sample counts obtained via read = %lld, %lld\n", count1, count2);
+    fprintf(thrData.output, ">>> effective sampling period = %.0f (%.2f%%)\n",
+            1 / effectiveSampleRate, 100 * effectiveSampleRate);
 
-	if(numSamplesLost)
-		fprintf(thrData.output, ">!! numSamplesLost = %ld\n", numSamplesLost);
-	fprintf(thrData.output, ">>> numSampleReads = %d\n", numSampleReads);
-	fprintf(thrData.output, ">>> numHits = %ld\n", numHits);
+    if(numSamplesLost)
+        fprintf(thrData.output, ">!! numSamplesLost = %ld\n", numSamplesLost);
+    fprintf(thrData.output, ">>> numSampleReads = %d\n", numSampleReads);
+    fprintf(thrData.output, ">>> numHits = %ld\n", numHits);
 }
 
 void doSampleRead() {
@@ -159,10 +160,8 @@ long long perf_mmap_read(long long prev_head) {
 		// move position past the header we just read above
 		offset += sizeof(struct perf_event_header); 
 
-		switch(event->type) {
-
 		// Sample data
-		case PERF_RECORD_SAMPLE: {
+		if(event->type == PERF_RECORD_SAMPLE) {
 			uint64_t ip;
 			if(sample_type & PERF_SAMPLE_IP) {
 				memcpy(&ip, &perfInfo.data[offset], sizeof(uint64_t));
@@ -262,9 +261,7 @@ long long perf_mmap_read(long long prev_head) {
 					//	thrData.watchStartByte, paddr, thrData.watchEndByte);
 				}
 			}
-			break;
-		} // end case block
-		case PERF_RECORD_LOST: {
+		} else if(event->type == PERF_RECORD_LOST) {
 			uint64_t id, lost;
 			memcpy(&id, &perfInfo.data[offset], sizeof(uint64_t));
 			memcpy(&lost, &perfInfo.data[(offset + sizeof(uint64_t))], sizeof(uint64_t));
@@ -272,9 +269,7 @@ long long perf_mmap_read(long long prev_head) {
 			if(numSamplesLost == 0)
 				fprintf(stderr, "WARNING: perf sample data has been lost!\n");
 			numSamplesLost += lost;
-			break;
-		} // end case block
-		} // end switch statement
+		}
 		// Move the offset counter ahead by the size given in the event header.
 		offset = starting_offset + event->size;
 
@@ -466,7 +461,7 @@ void setupSampling(void) {
 	// Second parameter (target thread): 0=self, -1=cpu-wide mode
 	// Third parameter: cpu: -1 == any
 	// Fourth parameter: group id (-1 for group leader)
-	perfInfo.perf_fd = perf_event_open(&pe_store, 0, -1, -1, 0);
+	perfInfo.perf_fd = perf_event_open(&pe_load, 0, -1, -1, 0);
 	if(perfInfo.perf_fd == -1) {
 		perror("Failed to open perf event for pe_load");
 		abort();
