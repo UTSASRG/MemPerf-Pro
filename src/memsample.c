@@ -45,7 +45,7 @@ int sample_type = PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_TIME |
 int read_format = PERF_FORMAT_GROUP;
 
 void doSampleRead();
-long long perf_mmap_read(long long prev_head);
+long long perf_mmap_read();
 
 void startSampling() {
 	if(ioctl(perfInfo.perf_fd, PERF_EVENT_IOC_REFRESH, OVERFLOW_INTERVAL) == -1) {
@@ -101,10 +101,10 @@ void stopSampling() {
 
 void doSampleRead() {
 	numSampleReads++;
-	perfInfo.prev_head = perf_mmap_read(perfInfo.prev_head);
+	perfInfo.prev_head = perf_mmap_read();
 }
 
-long long perf_mmap_read(long long prev_head) {
+long long perf_mmap_read() {
 	struct perf_event_header *event;
 	struct perf_event_mmap_page *control_page =
 		(struct perf_event_mmap_page *)perfInfo.our_mmap;

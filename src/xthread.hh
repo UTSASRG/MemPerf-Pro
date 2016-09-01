@@ -79,14 +79,14 @@ class xthread {
 			fprintf(stderr, "error: unable to get thread attributes: %s\n", strerror(errno));
 			abort();
 		}
-		if(pthread_attr_getstack(&attrs, (void **)&thrData.stackStart, &stackSize) != 0) {
+		if(pthread_attr_getstack(&attrs, (void **)&thrData.stackEnd, &stackSize) != 0) {
 			fprintf(stderr, "error: unable to get stack values: %s\n", strerror(errno));
 			abort();
 		}
 		char * firstHeapObj = (char *)malloc(sizeof(char));
 		thrData.watchStartByte = firstHeapObj - MALLOC_HEADER_SIZE;
 		thrData.watchEndByte = thrData.watchStartByte + SHADOW_MEM_SIZE;
-		thrData.stackEnd = thrData.stackStart + stackSize;
+		thrData.stackStart = thrData.stackEnd + stackSize;
 		free(firstHeapObj);
 
 		fprintf(thrData.output, ">>> thread %d stack start @ %p, stack end @ %p\n", tid,
