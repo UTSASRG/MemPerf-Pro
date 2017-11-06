@@ -61,7 +61,8 @@ or not? Also, we could mention whether we could improve the memory utilization o
 
 It is possible that we could actually work on two different types of memory allocators, such as Freelist-allocator, and BIBOP-style allocator. 
 Maybe we could also measure the lock contention of memory allocators. 
-We could also measure the system call's overhead by combining with the strace? 
+We could also measure the system call's overhead by combining with the strace, or we just install some hooks
+on system call table inside the allocator.? 
 Don't know whether we could integrate the tool with memory allocator.
 
 Whether we should use madvise instead, in order to reduce the memory consumption. 
@@ -75,5 +76,13 @@ Also, we could evaluate the cache utilization of different allocators, which may
 Overall, the plan could be focuses on different memory allocators at first, and point out why a memory allocator 
 will perform bad, while the other allocator will perform good on some applications. 
 
+
 In the end, we hope to discover some basic idea of allocator design.
-  
+
+Existing malloc profiler has to integrate with the implementation of allocator design at first. 
+We are proposing a general profiler for different memory allocators.
+
+Also, existing profiler may simply collect information of different size classes, but we will point 
+out the performance issues caused by memory allocators.
+
+We can provide insights to the design of memory allocators.    
