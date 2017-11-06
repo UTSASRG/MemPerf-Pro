@@ -1,14 +1,11 @@
-SRCS =  libmemperf.cpp	\
+SRCS =  libtestperf.cpp	\
 		real.cpp		\
-		memsample.c
+		test-bestcase.c	\
+		test-worstcase.c
 
 INCS =  xthread.hh		\
-		memsample.h		\
-		real.hh			\
-		hashmap.hh		\
-		list.hh			\
-		hashfuncs.hh	\
-		spinlock.hh
+		libtestperf.h	\
+		real.hh
 
 DEPS = $(SRCS) $(INCS)
 
@@ -21,7 +18,6 @@ CXX = clang++
 #-DEVALUATING_PERF
 
 CFLAGS += -O2 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-frame-pointer -DDETECT_OVERFLOW -DDETECT_USAGE_AFTER_FREE -DDEBUG_LEVEL=1
-CFLAGS2 += -O0 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-frame-pointer -DDETECT_OVERFLOW -DDETECT_USAGE_AFTER_FREE -DDEBUG_LEVEL=1
 #-DDETECT_MEMORY_LEAKAGE -DDETECT_USAGE_AFTER_FREE
 # CFLAGS += -DDETECT_OVERFLOW -DDETECT_MEMORY_LEAKAGE -DDETECT_USAGE_AFTER_FREE
 # -DEVALUATING_PERF
@@ -46,18 +42,18 @@ CFLAGS2 += -O0 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-f
 INCLUDE_DIRS = -I. -I/usr/include/x86_64-linux-gnu/c++/4.8/
 LIBS     := dl pthread
 
-TARGETS = libmemperf.so test/test test/test-clean
+TARGETS = libtestperf.so test
 
 all: $(TARGETS)
 
-libmemperf.so: $(DEPS)
-	$(CXX) $(CFLAGS) $(INCLUDE_DIRS) -shared -fPIC $(SRCS) -o libmemperf.so -ldl -lpthread
+libtestperf.so: $(DEPS)
+	$(CXX) $(CFLAGS) $(INCLUDE_DIRS) -shared -fPIC $(SRCS) -o libtestperf.so -ldl -lpthread
 
-test/test: libmemperf.so test/alloc.cpp
-	$(CXX) $(CFLAGS2) -rdynamic ./libmemperf.so -o test/test test/alloc.cpp
-
-test/test-clean: test/alloc.cpp
-	$(CXX) $(CFLAGS2) -o test/test-clean test/alloc.cpp
+test: libtestperf.so test-worstcase.c test-bestcase.c
+	$(CXX) $(CFLAGS) -rdynamic ./libtestperf.so -o test-worstcase test-worstcase.c
+	$(CXX) $(CFLAGS) -rdynamic ./libtestperf.so -o test-bestcase test-bestcase.c
+	$(CXX) $(CFLAGS) -o test-worstcase-clean test-worstcase.c
+	$(CXX) $(CFLAGS) -o test-bestcase-clean test-bestcase.c
 
 clean:
 	rm -f $(TARGETS)

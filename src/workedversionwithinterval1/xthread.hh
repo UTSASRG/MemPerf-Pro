@@ -3,7 +3,13 @@
 #include "memsample.h"
 #include "real.hh"
 
-__thread extern thread_data thrData;
+__thread extern char * shadow_mem;
+__thread extern char * stackStart;
+__thread extern char * stackEnd;
+__thread extern char * watchStartByte;
+__thread extern char * watchEndByte;
+__thread extern void * maxObjAddr;
+__thread extern FILE * output;
 
 extern "C" void printHashMap();
 extern "C" pid_t gettid();
@@ -26,24 +32,13 @@ class xthread {
 		children->startRoutine = fn;
 
 		int result = Real::pthread_create(tid, attr, xthread::startThread, (void *)children);
-		if(result) {
-			perror("ERROR: pthread_create failed");
+		if(result != 0) {
+			fprintf(stderr, "ERROR: pthread_create failed with errno=%d: %s\n", errno, strerror(errno));
 			abort();
 		}
 
 		return result;
 	}
-
-	/*
-    static void * startThread(void * arg) {
-        thread_t * current = (thread_t *) arg;
-        pid_t tid = syscall(__NR_gettid);
-        current->tid = tid;
-        void * result = current->startRoutine(current->startArg);
-        current->result = result;
-        return result;
-    }
-	*/
 
 	static void * startThread(void * arg) {
 		void * result = NULL;
@@ -58,20 +53,20 @@ class xthread {
 				program_invocation_name, pid, tid);
 
 		// Presently set to overwrite file; change fopen flag to "a" for append.
-		thrData.output = fopen(outputFile, "w");
-		if(thrData.output == NULL) {
+		output = fopen(outputFile, "w");
+		if(output == NULL) {
 			fprintf(stderr, "error: unable to open output file for writing hash map\n");
 			abort();
 		}
 
-		if((thrData.shadow_mem = (char *)mmap(NULL, SHADOW_MEM_SIZE, PROT_READ | PROT_WRITE,
+		if((shadow_mem = (char *)mmap(NULL, SHADOW_MEM_SIZE, PROT_READ | PROT_WRITE,
 						MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
 			fprintf(stderr, "error: unable to allocate shadow memory: %s\n", strerror(errno));
 			abort();
 		}
 
-		fprintf(thrData.output, ">>> shadow memory allocated for child thread %d @ %p ~ %p "
-				"(size=%ld bytes)\n", tid, thrData.shadow_mem, thrData.shadow_mem + SHADOW_MEM_SIZE,
+		fprintf(output, ">>> shadow memory allocated for child thread %d @ %p ~ %p "
+				"(size=%ld bytes)\n", tid, shadow_mem, shadow_mem + SHADOW_MEM_SIZE,
 				SHADOW_MEM_SIZE);
 
 		pthread_attr_t attrs;
@@ -79,30 +74,30 @@ class xthread {
 			fprintf(stderr, "error: unable to get thread attributes: %s\n", strerror(errno));
 			abort();
 		}
-		if(pthread_attr_getstack(&attrs, (void **)&thrData.stackEnd, &stackSize) != 0) {
+		if(pthread_attr_getstack(&attrs, (void **)&stackStart, &stackSize) != 0) {
 			fprintf(stderr, "error: unable to get stack values: %s\n", strerror(errno));
 			abort();
 		}
 		char * firstHeapObj = (char *)malloc(sizeof(char));
-		thrData.watchStartByte = firstHeapObj - MALLOC_HEADER_SIZE;
-		thrData.watchEndByte = thrData.watchStartByte + SHADOW_MEM_SIZE;
-		thrData.stackStart = thrData.stackEnd + stackSize;
+		watchStartByte = firstHeapObj - MALLOC_HEADER_SIZE;
+		watchEndByte = watchStartByte + SHADOW_MEM_SIZE;
+		stackEnd = stackStart + stackSize;
 		free(firstHeapObj);
 
-		fprintf(thrData.output, ">>> thread %d stack start @ %p, stack end @ %p\n", tid,
-				thrData.stackStart, thrData.stackEnd);
-		fprintf(thrData.output, ">>> watch start @ %p, watch end @ %p\n",
-				thrData.watchStartByte, thrData.watchEndByte);
+		fprintf(output, ">>> thread %d stack start @ %p, stack end @ %p\n", tid,
+				stackStart, stackEnd);
+		fprintf(output, ">>> watch start @ %p, watch end @ %p\n",
+				watchStartByte, watchEndByte);
 
 		initSampling();
 		result = current->startRoutine(current->startArg);
 		stopSampling();
 
-		long access_byte_offset = (char *)thrData.maxObjAddr - (char *)thrData.watchStartByte;
-		char * maxShadowObjAddr = (char *)thrData.shadow_mem + access_byte_offset;
-		fprintf(thrData.output, ">>> maxObjAddr = %p/%p\n", thrData.maxObjAddr, maxShadowObjAddr);
+		long access_byte_offset = (char *)maxObjAddr - (char *)watchStartByte;
+		char * maxShadowObjAddr = (char *)shadow_mem + access_byte_offset;
+		fprintf(output, ">>> maxObjAddr = %p/%p\n", maxObjAddr, maxShadowObjAddr);
 
-		fclose(thrData.output);
+		fclose(output);
 		return result;
 	}
 };

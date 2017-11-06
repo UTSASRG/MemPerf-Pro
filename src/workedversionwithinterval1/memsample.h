@@ -1,21 +1,23 @@
 #ifndef __MEMSAMPLE_H
 #define __MEMSAMPLE_H
 
-#include <errno.h>
-#include <poll.h>
-#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
+#include <string.h>
+#include <pthread.h>
+#include <errno.h>
 #include <syscall.h>
 #include <sys/mman.h>
 
-#define MMAP_PAGES 33	// must be in the form of 2^N + 1
+#define MMAP_PAGES 4097	// must be in the form of 2^N + 1
 #define DATA_MMAP_PAGES (MMAP_PAGES - 1)
 #define MAPSIZE (MMAP_PAGES * getpagesize())
 #define DATA_MAPSIZE (DATA_MMAP_PAGES * getpagesize())
-#define OVERFLOW_INTERVAL 100
+
+#define OVERFLOW_INTERVAL 1
+//0000
+//#define OVERFLOW_INTERVAL 0x10000000
 #define SHADOW_MEM_SIZE (16 * ONE_GB)
 #define WORD_SIZE (sizeof(long))
 
@@ -47,30 +49,20 @@ typedef struct {
     long numAccesses;
 } Tuple;
 
+typedef void * QueueItem;
+typedef struct structQueueNode {
+	structQueueNode * next;
+	QueueItem item;
+} QueueNode;
+typedef struct {
+	QueueNode * head;
+	QueueNode * tail;
+} FreeQueue;
+
 typedef struct addr2line_info {
     char exename[15];
     unsigned int lineNum;
 } addrinfo;
-
-typedef struct {
-	char * shadow_mem = NULL;
-	char * stackStart = NULL;
-	char * stackEnd = NULL;
-	char * watchStartByte = NULL;
-	char * watchEndByte = NULL;
-	void * maxObjAddr = (void *)0x0;
-	FILE * output = NULL;
-} thread_data;
-
-typedef struct {
-	int perf_fd;
-	int perf_fd2;
-	int perf_fdT;
-	long long prev_head;
-	pid_t tid;
-	unsigned char * data = NULL;
-	void * our_mmap = NULL;
-} perf_info;
 
 int initSampling(void);
 void setupSampling(void);
