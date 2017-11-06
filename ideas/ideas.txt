@@ -60,7 +60,7 @@ I remembered that we have done this for Guarder and FreeGuard, we will check whe
 or not? Also, we could mention whether we could improve the memory utilization or not.
 
 It is possible that we could actually work on two different types of memory allocators, such as Freelist-allocator, and BIBOP-style allocator. 
-Maybe we could also measure the lock contention of memory allocators. 
+Maybe we could also measure the lock contention of memory allocators, which we will intercept the synchronization commands of different memory allocators. . 
 We could also measure the system call's overhead by combining with the strace, or we just install some hooks
 on system call table inside the allocator.? 
 Don't know whether we could integrate the tool with memory allocator.
@@ -85,4 +85,7 @@ We are proposing a general profiler for different memory allocators.
 Also, existing profiler may simply collect information of different size classes, but we will point 
 out the performance issues caused by memory allocators.
 
-We can provide insights to the design of memory allocators.    
+We can provide insights to the design of memory allocators.
+Since the design is specially designed for experts, such as designers of memory allocators, convenience will
+be a lower priority. That is the reason why we will use kernel module or other mechanisms. 
+
