@@ -49,4 +49,31 @@ http://dl.acm.org/citation.cfm?id=2854053
 
 Possibly, we can provide a memory allocator that combines the one embedded with metadata and the one without metadata, although that also means the overhead of allocation. 
 
-Possibly, we will have new discoveries on NUMA systems.  
+Possibly, we will have new discoveries on NUMA systems.
+
+We could utilize to evaluate the performance of memory allocator as well. Such as DieHarder may take 
+a lot of time during the allocations and deallocations. 
+Also, how is the memory blowup of allocator? Can he improve it implementation by reducing the memory 
+blowup. 
+
+I remembered that we have done this for Guarder and FreeGuard, we will check whether how much memory are utilize 
+or not? Also, we could mention whether we could improve the memory utilization or not.
+
+It is possible that we could actually work on two different types of memory allocators, such as Freelist-allocator, and BIBOP-style allocator. 
+Maybe we could also measure the lock contention of memory allocators. 
+We could also measure the system call's overhead by combining with the strace? 
+Don't know whether we could integrate the tool with memory allocator.
+
+Whether we should use madvise instead, in order to reduce the memory consumption. 
+We could check the memory usage of different size classes, and then may cooperate with other factors. 
+
+In the end, we could evaluate the performance factors of different allocators, which may provide some insights
+on the performance of allocator. 
+
+Also, we could evaluate the cache utilization of different allocators, which may point out some potential problems. 
+
+Overall, the plan could be focuses on different memory allocators at first, and point out why a memory allocator 
+will perform bad, while the other allocator will perform good on some applications. 
+
+In the end, we hope to discover some basic idea of allocator design.
+  
