@@ -1,5 +1,22 @@
 \section{Introduction}
 
+
+MallocProfiler will serve two purposes. 
+(1) This will be utilized to get the allocator related parameters. 
+
+(2) We will be able to identify whether the performance problem is caused by the memory allocator. We could actually divide the overhead to the overhead of allocator or the overhead of applications. 
+Therefore, we could identify the root causes and not always blame for the application writer. 
+
+
+\todo{We may use dedup or freqmine or swaptions (maybe this one) to show the performance difference caused by memory allocator. Then we could say that the performance memory allocator will impose significant difference on the performance of applications.}
+However, the memory allocator itself has not got sufficient attention that it should reserve to. 
+For instance, there is no an dedicate the allocator profiler that can be utilized for identify the allocator's performance. 
+
+Although TCMalloc have one profiler, but it tends to provide the statistics about the applications, that we can track the memory uses of different functions. However, it doesn't give the statistics of allocators itself. 
+
+Then we have utilized this profiler to identify the root cause of performance difference in existing allocators, such as Linux, OpenBSD, DieHarder, or Hoard, or TCMalloc. Then shows the internal reason of why some are slower than others. 
+
+
 Dynamic memory management plays an important role in the performance of applications, especially on multithreaded programs. 
 For performance related to memory uses, some work focuses on improving existing memory allocators. Some focuses on a better memory layout among different elements of the same data structure. 
 But there is little work that focuses on the improving the performance by changing the behavior of memory allocations and deallocations. 
