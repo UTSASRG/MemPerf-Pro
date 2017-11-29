@@ -14,7 +14,9 @@ For instance, there is no an dedicate the allocator profiler that can be utilize
 
 Although TCMalloc have one profiler, but it tends to provide the statistics about the applications, that we can track the memory uses of different functions. However, it doesn't give the statistics of allocators itself. 
 
-Then we have utilized this profiler to identify the root cause of performance difference in existing allocators, such as Linux, OpenBSD, DieHarder, or Hoard, or TCMalloc. Then shows the internal reason of why some are slower than others. 
+Then we have utilized this profiler to identify the root cause of performance difference in existing allocators, such as Linux, OpenBSD, DieHarder, or TCMalloc. Then shows the internal reason of why some are slower than others. 
+
+We may choose two general-purpose allocators and two secure allocators. Then we know why secure allocators are slower, currently. 
 
 
 Dynamic memory management plays an important role in the performance of applications, especially on multithreaded programs. 
