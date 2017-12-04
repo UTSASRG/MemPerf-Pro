@@ -59,6 +59,9 @@ blowup.
 I remembered that we have done this for Guarder and FreeGuard, we will check whether how much memory are utilize 
 or not? Also, we could mention whether we could improve the memory utilization or not.
 
+Also, we will evaluate the memory usage for every memory allocator? Then we can possibly find out whether the memory overhead of an allocator is big. 
+We will also check the memory usage for the applications that how many are allocated and how many are wasted in total. 
+
 It is possible that we could actually work on two different types of memory allocators, such as Freelist-allocator, and BIBOP-style allocator. 
 Maybe we could also measure the lock contention of memory allocators, which we will intercept the synchronization commands of different memory allocators. . 
 We could also measure the system call's overhead by combining with the strace, or we just install some hooks
@@ -88,4 +91,5 @@ out the performance issues caused by memory allocators.
 We can provide insights to the design of memory allocators.
 Since the design is specially designed for experts, such as designers of memory allocators, convenience will
 be a lower priority. That is the reason why we will use kernel module or other mechanisms. 
+
 
