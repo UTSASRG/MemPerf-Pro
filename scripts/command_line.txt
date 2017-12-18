@@ -1,0 +1,7 @@
+For parsec default.mk:
+strace -f -c ./$(TEST_NAME)-pthread $(TEST_ARGS) 2>&1 | tee $(TEST_NAME)-pthread-syscalls.txt
+strace -f -c ./$(TEST_NAME)-$(MYLIB) $(TEST_ARGS) 2>&1 | tee $(TEST_NAME)-$(MYLIB)-syscalls.txt
+
+
+get_syscalls.awk: totals syscall counts across multiple files
+run: awk -f get_syscalls.awk <file1> <file2> ...
