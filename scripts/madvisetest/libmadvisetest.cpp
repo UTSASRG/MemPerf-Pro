@@ -7,7 +7,7 @@
 #include "real.hh"
 #include "xthread.hh"
 #include "mm.hh"
-#include "libsyscall_intercept_hook_point.h"
+#include <libsyscall_intercept_hook_point.h>
 
 
 #ifdef RDTSC
@@ -149,7 +149,7 @@ extern "C" int madvisetest_libc_start_main(main_fn_t main_fn, int argc, char** a
 		// real run
 		atexit(print_madvise_data);
 
-		#ifdef RUN_TIMER
+		#ifdef USE_TIMER
 		install_timer();
 		#endif
 
