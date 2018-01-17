@@ -5,15 +5,13 @@ The required header file libsyscall_intercept_hook_point.h is located in /usr/in
 on both SRG1 and SRG2 machines. If missing or running on an external machine you must download
 and install the library, which can be obtained from https://github.com/pmem/syscall_intercept
 
-If built with the USE_TIMER option, libmadvisetest will install a timer which will result in
-the contents of glibc's malloc_save_state structure, which is obtained via a call to
-malloc_get_state(). This is useful for tracking the internal state of the allocator across
-time.
-Ex: $ make USE_TIMER=1
-
 Lastly, libmadvisetest uses the rdtscp instruction by default to perform timekeeping, but
 if built with the RDTSC option, will use the non-serialized rdtsc instruction instead.
 Ex: $ make RDTSC=1
 
+The included test program (test.c) allocates memory via MMAP system call, uses this memory,
+then calls madvise with the MADV_DONTNEED flag. This test utility can be used to verify the
+proper functioning of the libmadvisetest library.
+
 Sam Silvestro
-10 Jan 2018
+17 Jan 2018

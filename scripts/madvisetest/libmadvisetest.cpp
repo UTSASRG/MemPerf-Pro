@@ -2,7 +2,6 @@
 #include <sys/mman.h>
 #include <sys/syscall.h>   /* For SYS_xxx definitions */
 #include <unistd.h>
-#include <malloc.h>
 #include <string.h>
 #include "real.hh"
 #include "xthread.hh"
@@ -19,41 +18,13 @@
 #define SEPERATOR "------------------------------------------------------\n"
 #define CPU_CLOCK_FREQ 2000000000
 
-#define NBINS 128
-struct malloc_save_state
-{
-  long magic;
-  long version;
-  void * av[NBINS * 2 + 2];
-  char *sbrk_base;
-  int sbrked_mem_bytes;
-  unsigned long trim_threshold;
-  unsigned long top_pad;
-  unsigned int n_mmaps_max;
-  unsigned long mmap_threshold;
-  int check_action;
-  unsigned long max_sbrked_mem;
-  unsigned long max_total_mem;  /* Always 0, for backwards compatibility.  */
-  unsigned int n_mmaps;
-  unsigned int max_n_mmaps;
-  unsigned long mmapped_mem;
-  unsigned long max_mmapped_mem;
-  int using_malloc_checking;
-  unsigned long max_fast;
-  unsigned long arena_test;
-  unsigned long arena_max;
-  unsigned long narenas;
-};
-
 int xxintercept_hook_point(long syscall_number,
         long arg0, long arg1,
         long arg2, long arg3,
         long arg4, long arg5,
         long *result);
-void install_timer();
-void print_madvise_data();
-void print_malloc_state(int sig = 0);
 
+void print_madvise_data();
 unsigned long long start_time;
 madv_t _madvise_data[MAX_ALIVE_THREADS];
 intptr_t globalStackAddr;
@@ -65,18 +36,6 @@ extern "C" int __libc_start_main(main_fn_t, int, char**, void (*)(), void (*)(),
 extern "C" int madvisetest_libc_start_main(main_fn_t main_fn, int argc, char** argv, void (*init)(), void (*fini)(), void (*rtld_fini)(), void* stack_end) {
 		intercept_hook_point = xxintercept_hook_point;
 
-		/*
-    struct malloc_save_state * malloc_state = (struct malloc_save_state *)malloc_get_state();
-    struct malloc_save_state new_malloc_state;
-		memcpy(&new_malloc_state, malloc_state, sizeof(struct malloc_save_state));
-		new_malloc_state.sbrked_mem_bytes = 123;
-		new_malloc_state.max_sbrked_mem = 123;
-		if(malloc_set_state(&new_malloc_state)) {
-				fprintf(stderr, "malloc_set_state failed\n");
-		}
-		free(malloc_state);
-		*/
-
 		memset(&_madvise_data, 0, sizeof(_madvise_data));
     for(int i = 0; i < MAX_ALIVE_THREADS; i++) {
       _madvise_data[i].tindex = i;
@@ -87,7 +46,8 @@ extern "C" int madvisetest_libc_start_main(main_fn_t main_fn, int argc, char** a
 		if((globalStackAddr = (intptr_t)MM::mmapAllocatePrivate(stackSize)) == 0) {
 				FATAL("Failed to initialize stack area\n");
 		}
-		madvise((void *)globalStackAddr, stackSize, MADV_NOHUGEPAGE);
+		syscall_no_intercept(SYS_madvise, (long)globalStackAddr, (long)stackSize, (long)MADV_NOHUGEPAGE);
+		//madvise((void *)globalStackAddr, stackSize, MADV_NOHUGEPAGE);
 
 		#warning turned off use of guard pages between thread stacks
 		/*
@@ -149,52 +109,9 @@ extern "C" int madvisetest_libc_start_main(main_fn_t main_fn, int argc, char** a
 		// real run
 		atexit(print_madvise_data);
 
-		#ifdef USE_TIMER
-		install_timer();
-		#endif
-
 		start_time = rdtscp();
-		print_malloc_state();
 		auto real_libc_start_main = (decltype(__libc_start_main)*)dlsym(RTLD_NEXT, "__libc_start_main");
 		return real_libc_start_main(main_fn, argc, argv, init, fini, rtld_fini, stack_end);
-}
-
-void install_timer() {
-		struct sigevent sev;
-		struct itimerspec its;
-		struct sigaction sa;
-		static timer_t state_timer;
-
-		/* Establish handler for timer signal */
-		sa.sa_handler = print_malloc_state;
-		sigemptyset(&sa.sa_mask);
-		if(sigaction(SIGRTMIN, &sa, NULL) == -1) {
-				perror("sigaction failed");
-				abort();
-		}
-
-		// How to setup the signal for a specific thread.
-		sev.sigev_notify = SIGEV_THREAD_ID;
-		sev._sigev_un._tid = syscall(__NR_gettid);
-		sev.sigev_signo = SIGRTMIN;
-		sev.sigev_value.sival_ptr = &state_timer;
-		if(timer_create(CLOCK_MONOTONIC, &sev, &state_timer) == -1) {
-				perror("timer_create failed");
-				abort();
-		}
-
-		/* Start the timer */
-		its.it_value.tv_sec = 1;
-		its.it_value.tv_nsec = 0;
-		// generates time value of 1 ~ 2 seconds
-		//its.it_interval.tv_sec = 1 + (rand() % 2);
-		its.it_interval.tv_sec = 1;
-		its.it_interval.tv_nsec = 0;
-
-		if(timer_settime(state_timer, 0, &its, NULL) == -1) {
-				perror("timer_settime failed");
-				abort();
-		}
 }
 
 // Variables used by our pre-init private allocator
@@ -277,8 +194,6 @@ int xxintercept_hook_point(long syscall_number,
 }
 
 void print_madvise_data() {
-		print_malloc_state(0);
-
 		for(int i = 0; i < MAX_ALIVE_THREADS; i++) {
 				madv_t * data = &_madvise_data[i];
 				if(data->numCalls > 0) {
@@ -286,24 +201,4 @@ void print_madvise_data() {
 										i, data->numCalls, data->timeSum, data->sizeSum);
 				}
 		}
-}
-
-void print_malloc_state(int sig) {
-    struct malloc_save_state * malloc_state = (struct malloc_save_state *)malloc_get_state();
-		printf(SEPERATOR);
-		double time_offset = (double)(rdtscp() - start_time) / CPU_CLOCK_FREQ;
-    printf("t + %10.9fs:\n", time_offset);
-    printf("malloc top pad          == %lu\n", malloc_state->top_pad);
-    printf("malloc trim threshold   == %lu\n", malloc_state->trim_threshold);
-    printf("malloc mmap threshold   == %lu\n", malloc_state->mmap_threshold);
-    printf("malloc num mmaps        == %u\n", malloc_state->n_mmaps);
-    printf("malloc max num mmaps    == %u\n", malloc_state->max_n_mmaps);
-    printf("malloc mmap'd mem       == %lu\n", malloc_state->mmapped_mem);
-    printf("malloc max mmap'd mem   == %lu\n", malloc_state->max_mmapped_mem);
-    printf("malloc num arenas       == %lu\n", malloc_state->narenas);
-    printf("malloc max sbrk mem     == %lu\n", malloc_state->max_sbrked_mem);
-    printf("malloc sbrk base        == %p\n", malloc_state->sbrk_base);
-    printf("malloc sbrk'd mem       == %d\n", malloc_state->sbrked_mem_bytes);
-		printf(SEPERATOR);
-		free(malloc_state);
 }

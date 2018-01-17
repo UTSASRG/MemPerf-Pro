@@ -6,7 +6,6 @@ INCS = log.hh				\
 		list.hh								\
 		mm.hh									\
 		real.hh								\
-		slist.h               \
 		hashfuncs.hh					\
 		hashheapallocator.hh	\
 		hashmap.hh						\
@@ -29,12 +28,15 @@ endif
 INCLUDE_DIRS = -I. -I/usr/include/x86_64-linux-gnu/c++/4.8/
 LIBS     := dl pthread
 
-TARGETS = libmadvisetest.so
+TARGETS = libmadvisetest.so test
 
 all: $(TARGETS)
 
 libmadvisetest.so: $(DEPS)
 	$(CXX) $(CFLAGS) $(INCLUDE_DIRS) -shared -fPIC $(SRCS) -o libmadvisetest.so -lsyscall_intercept -ldl -lpthread -lrt
+
+test: test.c libmadvisetest.so
+	$(CXX) $(CFLAGS) $(INCLUDE_DIRS) test.c -o test -rdynamic ./libmadvisetest.so
 
 clean:
 	rm -f $(TARGETS)

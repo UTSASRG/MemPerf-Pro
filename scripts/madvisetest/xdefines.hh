@@ -6,8 +6,6 @@
 #include <ucontext.h>
 #include <assert.h>
 
-#include "slist.h"
-
 extern char * getThreadBuffer();
 
 inline unsigned long long rdtscp() {
