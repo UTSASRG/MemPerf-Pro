@@ -1,0 +1,17 @@
+This library utilizes the syscall_intercept library to intercept madvise system calls
+performed by glibc.
+
+The required header file libsyscall_intercept_hook_point.h is located in /usr/include
+on both SRG1 and SRG2 machines. If missing or running on an external machine you must download
+and install the library, which can be obtained from https://github.com/pmem/syscall_intercept
+
+Lastly, libmadvisetest uses the rdtscp instruction by default to perform timekeeping, but
+if built with the RDTSC option, will use the non-serialized rdtsc instruction instead.
+Ex: $ make RDTSC=1
+
+The included test program (test.c) allocates memory via MMAP system call, uses this memory,
+then calls madvise with the MADV_DONTNEED flag. This test utility can be used to verify the
+proper functioning of the libmadvisetest library.
+
+Sam Silvestro
+17 Jan 2018
