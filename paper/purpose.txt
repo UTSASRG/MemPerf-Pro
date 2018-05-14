@@ -1,0 +1,9 @@
+We will work on the allocator profiling to understanding the system call overhead. We may not need to intercept system calls, but intercepting those system calls. How long it spent on the memory allocation and deallocation, using rtdsc, which can be caused by long memory allocation time? How much of objects has been re-utilized? How is the memory blowup, what is the memory consumption and how much has been allocated? Can we know lock contention of memory allocation, maybe we could monitor the lock usage, just as SyncPerf, and identify that lock acquisitions are  waiting during allocation? Can we identify is there inter-objects cache contention on these objects? If yes, that is the possible example of these allocators.  
+
+Overall, it will three categories. Also, we would like to know some internals of inside. 
+
+Performance overhead? Why it is slow, due to memory management itself, lock contention, or too much effort on system calls. Can we use the flame figure or block figure? 
+
+Memory overhead? Whether this allocator will utilize a large amount of memory? How much it spent on the management itself, how much it can not fully utilized?  
+
+Maybe we should add the PMU sampling to this project, so that we can know about whether the project are helpful on the performance? Whether they introduce the false sharing issue? whether they are good in NUMA situation? 
