@@ -63,17 +63,13 @@ typedef struct {
 } thread_data;
 
 typedef struct {
-	int perf_fd;
-	int perf_fd2;
-	int perf_fdT;
-	long long prev_head;
+	int perf_fd_fault;
+	int perf_fd_tlb;
+	int perf_fd_cache;
 	pid_t tid;
-	unsigned char * data = NULL;
-	void * our_mmap = NULL;
 } perf_info;
 
 int initSampling(void);
 void setupSampling(void);
-void startSampling(void);
-void stopSampling(void);
+void doPerfRead(void);
 #endif

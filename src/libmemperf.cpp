@@ -40,8 +40,6 @@ extern char _etext;
 extern char * program_invocation_name;
 extern void * __libc_stack_end;
 extern char __executable_start;
-extern int numSamples;
-extern int numSignals;
 
 bool const debug = false;
 bool mallocInitialized = false;
@@ -160,14 +158,12 @@ __attribute__((destructor)) void finalizer() {
 }
 
 void exitHandler() {
-	stopSampling();
+	doPerfRead();
 
 	long access_byte_offset =
 		(char *)thrData.maxObjAddr - thrData.watchStartByte;
 	char * shadow_mem_end = thrData.shadow_mem + SHADOW_MEM_SIZE;
 	char * maxShadowObjAddr = thrData.shadow_mem + access_byte_offset;
-	fprintf(thrData.output, ">>> numSamples = %d, numSignals = %d\n",
-			numSamples, numSignals);
 	fprintf(thrData.output, ">>> heap memory used = %ld bytes\n",
 			access_byte_offset);
 	if(maxShadowObjAddr >= shadow_mem_end) {

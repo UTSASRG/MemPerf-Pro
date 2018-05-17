@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/mman.h>
 
 int main() {
 	int i, j;
@@ -15,6 +16,14 @@ int main() {
 			//usleep(10000);
 		}
 		free(ptr);
+	}
+
+
+
+	char * blah = (char *)mmap(NULL, 20000000, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+	for(i = 0; i < 4882; i++) {
+			char * ptr = blah + i * 4096;
+			*ptr = 'a';
 	}
 
 	printf("exiting...\n");

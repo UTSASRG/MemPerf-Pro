@@ -34,17 +34,6 @@ class xthread {
 		return result;
 	}
 
-	/*
-    static void * startThread(void * arg) {
-        thread_t * current = (thread_t *) arg;
-        pid_t tid = syscall(__NR_gettid);
-        current->tid = tid;
-        void * result = current->startRoutine(current->startArg);
-        current->result = result;
-        return result;
-    }
-	*/
-
 	static void * startThread(void * arg) {
 		void * result = NULL;
 		size_t stackSize;
@@ -96,7 +85,7 @@ class xthread {
 
 		initSampling();
 		result = current->startRoutine(current->startArg);
-		stopSampling();
+		doPerfRead();
 
 		long access_byte_offset = (char *)thrData.maxObjAddr - (char *)thrData.watchStartByte;
 		char * maxShadowObjAddr = (char *)thrData.shadow_mem + access_byte_offset;
