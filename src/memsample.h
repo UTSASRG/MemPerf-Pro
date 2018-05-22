@@ -36,6 +36,17 @@
 #define MAX_FILENAME_LEN 128
 #define TEMP_BUF_SIZE EIGHT_MB
 
+inline unsigned long long rdtscp() {
+		unsigned int lo, hi;
+		asm volatile (
+						"rdtscp"
+						: "=a"(lo), "=d"(hi) /* outputs */
+						: "a"(0)             /* inputs */
+						: "%ebx", "%ecx");     /* clobbers*/
+		unsigned long long retval = ((unsigned long long)lo) | (((unsigned long long)hi) << 32);
+		return retval;
+}
+
 typedef struct {
     void * callsite1;
     void * callsite2;
@@ -46,6 +57,11 @@ typedef struct {
     long szUsed;
     long numAccesses;
 } Tuple;
+
+typedef struct {
+	int numAllocs;
+	size_t size;
+} ObjectTuple;
 
 typedef struct addr2line_info {
     char exename[15];
