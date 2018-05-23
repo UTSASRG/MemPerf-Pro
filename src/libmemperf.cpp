@@ -5,10 +5,15 @@
  */
 
 #pragma GCC diagnostic ignored "-Wreturn-type-c-linkage"
+#define _GNU_SOURCE         /* See feature_test_macros(7) */
 
 #include <dlfcn.h>
 #include <malloc.h>
 #include <alloca.h>
+
+#include <sys/mman.h>
+#include <sys/syscall.h>   /* For SYS_xxx definitions */
+#include <unistd.h>
 
 #include <map>
 #include <cstdlib>
@@ -19,23 +24,23 @@
 #include "hashmap.hh"
 #include "hashfuncs.hh"
 #include "spinlock.hh"
+#include "selfmap.hh"
+#include <libsyscall_intercept_hook_point.h>
+
+#define CALLSITE_MAXIMUM_LENGTH 10
 
 typedef HashMap<uint64_t, ObjectTuple*, spinlock> HashMapX;
+spinlock mmap_lock;
+int numMmaps;
+size_t mmapSize;
+extern int (*intercept_hook_point)(long syscall_number,
+      long arg0, long arg1,
+      long arg2, long arg3,
+      long arg4, long arg5,
+      long *result);
 
 __thread thread_data thrData;
 
-// This map will go from the callsite ID key to a structure containing:
-//	(1) the first callsite
-//	(2) the second callsite
-//	(3) the total number of allocations originating from this callsite pair
-//	(4) the total number of frees originating from this callsite pair
-//	(5) the total size of these freed objects (i.e., when using glibc malloc,
-//		total usable size (no header))
-//	(6) the total size of these allocations (i.e., when using glibc malloc,
-//		total usable size (no header))
-//	(7) the requested/used size of these allocations (i.e., the sum of sz taken
-//		from each malloc(sz) call)
-//	(8) the total number of accesses on objects spawned from this callsite id
 HashMapX mapCallsiteStats;
 
 extern char data_start;
@@ -46,7 +51,6 @@ extern char __executable_start;
 
 bool const debug = false;
 bool mallocInitialized = false;
-bool shadowMemZeroedOut = false;
 uint64_t min_pos_callsite_id;
 
 // Rich
@@ -63,7 +67,7 @@ void getInfo ();
 ObjectTuple* newObjectTuple (int numAllocs, size_t objectSize);
 
 // Variables used by our pre-init private allocator
-char * tmpbuf;
+char tmpbuf[TEMP_BUF_SIZE];
 unsigned int numTempAllocs = 0;
 unsigned int tmppos = 0;
 
@@ -88,6 +92,8 @@ extern "C" {
 	void * malloc(size_t) __attribute__ ((weak, alias("yymalloc")));
 	void * realloc(void *, size_t) __attribute__ ((weak, alias("yyrealloc")));
 	void * valloc(size_t) __attribute__ ((weak, alias("yyvalloc")));
+	void * mmap(void *addr, size_t length, int prot, int flags,
+                  int fd, off_t offset) __attribute__ ((weak, alias("yymmap")));
 	void * aligned_alloc(size_t, size_t) __attribute__ ((weak,
 				alias("yyaligned_alloc")));
 	void * memalign(size_t, size_t) __attribute__ ((weak, alias("yymemalign")));
@@ -97,7 +103,16 @@ extern "C" {
 				alias("yyposix_memalign")));
 }
 
+int xxintercept_hook_point(long syscall_number,
+        long arg0, long arg1,
+        long arg2, long arg3,
+        long arg4, long arg5,
+        long *result);
+
 __attribute__((constructor)) void initializer() {
+	if(mallocInitialized) { return; }
+	intercept_hook_point = xxintercept_hook_point;
+
 	// Ensure we are operating on a system using 64-bit pointers.
 	// This is necessary, as later we'll be taking the low 8-byte word
 	// of callsites. This could obviously be expanded to support 32-bit systems
@@ -108,38 +123,33 @@ __attribute__((constructor)) void initializer() {
 		abort();
 	}
 
+	mmap_lock.init();
+
 	// Calculate the minimum possible callsite ID by taking the low four bytes
 	// of the start of the program text and repeating them twice, back-to-back,
 	// resulting in eight bytes which resemble: 0x<lowWord><lowWord>
 	uint64_t btext = (uint64_t)&__executable_start & 0xFFFFFFFF;
 	min_pos_callsite_id = (btext << 32) | btext;
 
+	/*
 	// Allocate memory for our pre-init temporary allocator
 	if((tmpbuf = (char *)mmap(NULL, TEMP_BUF_SIZE, PROT_READ | PROT_WRITE,
 					MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
         perror("error: unable to allocate temporary memory");
 		abort();
-    }
+  }
+	*/
 
 	Real::initializer();
+	selfmap::getInstance().getTextRegions();
 	mallocInitialized = true;
 	void * program_break = sbrk(0);
 	thrData.stackStart = (char *)__builtin_frame_address(0);
 	thrData.stackEnd = (char *)__libc_stack_end;
-	thrData.watchStartByte = (char *)program_break;
-	thrData.watchEndByte = thrData.watchStartByte + SHADOW_MEM_SIZE - 1;
 
 	// Initialize hashmap
 	mapCallsiteStats.initialize(HashFuncs::hashCallsiteId,
 			HashFuncs::compareCallsiteId, 4096);
-
-	// Allocate shadow memory
-	if((thrData.shadow_mem = (char *)mmap(NULL, SHADOW_MEM_SIZE,
-					PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS,
-					-1, 0)) == MAP_FAILED) {
-		perror("error: unable to allocate shadow memory");
-		abort();
-	}
 
 	// Generate the name of our output file, then open it for writing.
 	char outputFile[MAX_FILENAME_LEN];
@@ -153,13 +163,8 @@ __attribute__((constructor)) void initializer() {
 		return;
 	}
 
-	fprintf(thrData.output, ">>> shadow memory allocated for main thread @ "
-			"%p ~ %p (size=%ld bytes)\n", thrData.shadow_mem,
-			thrData.shadow_mem + SHADOW_MEM_SIZE, SHADOW_MEM_SIZE);
 	fprintf(thrData.output, ">>> stack start @ %p, stack end @ %p\n",
 			thrData.stackStart, thrData.stackEnd);
-	fprintf(thrData.output, ">>> watch start @ %p, watch end @ %p\n",
-			thrData.watchStartByte, thrData.watchEndByte);
 	fprintf(thrData.output, ">>> program break @ %p\n", program_break);
 	fflush(thrData.output);
 
@@ -184,6 +189,9 @@ void writeHashMap (void) {
 
 void writeAllocData () {
 
+	fprintf (thrData.output, ">>> Number of mmap calls: %d\n", numMmaps);
+	fprintf (thrData.output, ">>> Total size of mmap calls: %zu\n", mmapSize);
+
 	fprintf (thrData.output, ">>> Number of new allocations: %d\n", numNewAlloc);
 	fprintf (thrData.output, ">>> Number of re allocations:  %d\n", numReuseAlloc);
 	fprintf (thrData.output, ">>> Number of frees:           %d\n", numFrees);
@@ -198,17 +206,6 @@ void writeAllocData () {
 void exitHandler() {
 	doPerfRead();
 
-	long access_byte_offset =
-		(char *)thrData.maxObjAddr - thrData.watchStartByte;
-	char * shadow_mem_end = thrData.shadow_mem + SHADOW_MEM_SIZE;
-	char * maxShadowObjAddr = thrData.shadow_mem + access_byte_offset;
-	fprintf(thrData.output, ">>> heap memory used = %ld bytes\n",
-			access_byte_offset);
-	if(maxShadowObjAddr >= shadow_mem_end) {
-		fprintf(thrData.output, ">>> WARNING: shadow memory was exceeded! "
-				"maxObjAddr = %p (shadow: %p)\n\n", thrData.maxObjAddr,
-				maxShadowObjAddr);
-	}
 	fflush(thrData.output);
 	writeAllocData ();
 //	writeHashmap ();
@@ -231,6 +228,7 @@ extern "C" int __libc_start_main(main_fn_t, int, char **, void (*)(),
 extern "C" int libmemperf_libc_start_main(main_fn_t main_fn, int argc,
 		char ** argv, void (*init)(), void (*fini)(), void (*rtld_fini)(),
 		void * stack_end) {
+	intercept_hook_point = xxintercept_hook_point;
 	auto real_libc_start_main =
 		(decltype(__libc_start_main) *)dlsym(RTLD_NEXT, "__libc_start_main");
 	real_main = main_fn;
@@ -312,18 +310,9 @@ extern "C" {
 				(ptr <= (void *)(tmpbuf + TEMP_BUF_SIZE))) {
 			numTempAllocs--;
 			if(numTempAllocs == 0) {
-				if(mallocInitialized)
-					munmap(tmpbuf, TEMP_BUF_SIZE);
-				else
 					tmppos = 0;
 			}
 		} else {
-			if(!shadowMemZeroedOut &&
-					((ptr >= (void *)thrData.watchStartByte) &&
-					(ptr <= (void *)thrData.watchEndByte))) {
-				//freeShadowMem(ptr);
-			}
-
 			uint64_t before = rdtscp ();
 
 			Real::free(ptr);
@@ -373,19 +362,7 @@ extern "C" {
 			return yymalloc(sz);
 		}
 
-		if(ptr != NULL) {
-			if(!shadowMemZeroedOut &&
-					((ptr >= (void *)thrData.watchStartByte) &&
-					(ptr <= (void *)thrData.watchEndByte))) {
-				//freeShadowMem(ptr);
-			}
-		}
-
 		void * reptr = Real::realloc(ptr, sz);
-
-		if(!shadowMemZeroedOut) {
-			//initShadowMem(reptr, sz);
-		}
 
 		return reptr;
 	}
@@ -567,4 +544,90 @@ void getInfo () {
 		bumpPointer = true;
 		fprintf (thrData.output, ">>> Allocator: bump pointer\n");
 	}
+}
+
+inline bool isAllocatorInCallStack() {
+        // Fetch the frame address of the topmost stack frame
+        struct stack_frame * current_frame =
+            (struct stack_frame *)(__builtin_frame_address(0));
+
+        // Initialize the prev_frame pointer to equal the current_frame. This
+        // simply ensures that the while loop below will be entered and
+        // executed and least once
+        struct stack_frame * prev_frame = current_frame;
+
+        void * stackEnd = thrData.stackEnd;
+
+				int allocatorLevel = -1;
+
+				void * lastSeenAddress = NULL;
+
+        int cur_depth = 0;
+        while(((void *)prev_frame <= stackEnd) &&
+                (prev_frame >= current_frame) && (cur_depth < CALLSITE_MAXIMUM_LENGTH)) {
+						void * caller_address = prev_frame->caller_address;
+						lastSeenAddress = caller_address;
+
+						if(selfmap::getInstance().isAllocator(caller_address)) {
+								printf("current caller is allocator: caller = %p, frame = %p\n", caller_address, prev_frame);
+								//return true;
+								//hasSeenAllocator = true;
+								allocatorLevel = cur_depth;
+						} else {
+								printf("current caller is NOT the allocator: caller = %p, frame = %p\n", caller_address, prev_frame);
+						}
+
+            //in some case, "prev" address is the same as current address
+            //or there is recursion 
+            if(prev_frame == prev_frame->prev) {
+								cur_depth++;
+                break;
+            }
+
+            // Walk the prev_frame pointer backward in preparation for the
+            // next iteration of the loop
+            prev_frame = prev_frame->prev;
+
+            cur_depth++;
+				}
+
+				printf("allocatorLevel = %d, cur_depth = %d\n", allocatorLevel, cur_depth);
+				if((allocatorLevel > -1) && (allocatorLevel < cur_depth - 1)) {
+				//if(hasSeenAllocator && !selfmap::getInstance().isAllocator(lastSeenAddress)) {
+						return true;
+				}	
+
+				return false;
+}
+
+extern "C" void * yymmap(void *addr, size_t length, int prot, int flags,
+				int fd, off_t offset) {
+		initializer();
+	
+		if(isAllocatorInCallStack()) {
+				mmap_lock.lock();
+				numMmaps++;
+				mmapSize += length;
+				void * retval = Real::mmap(addr, length, prot, flags, fd, offset);
+				mmap_lock.unlock();
+				return retval;
+		} else {
+				return Real::mmap(addr, length, prot, flags, fd, offset);
+		}
+}
+
+int xxintercept_hook_point(long syscall_number,
+				long arg0, long arg1,
+				long arg2, long arg3,
+				long arg4, long arg5,
+				long *result) {
+		if(syscall_number == SYS_mmap) {
+				if(isAllocatorInCallStack()) {
+						mmap_lock.lock();
+						numMmaps++;
+						mmapSize += arg1;
+						mmap_lock.unlock();
+				}
+		}
+		return 1;
 }

@@ -53,16 +53,6 @@ class xthread {
 			abort();
 		}
 
-		if((thrData.shadow_mem = (char *)mmap(NULL, SHADOW_MEM_SIZE, PROT_READ | PROT_WRITE,
-						MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
-			fprintf(stderr, "error: unable to allocate shadow memory: %s\n", strerror(errno));
-			abort();
-		}
-
-		fprintf(thrData.output, ">>> shadow memory allocated for child thread %d @ %p ~ %p "
-				"(size=%ld bytes)\n", tid, thrData.shadow_mem, thrData.shadow_mem + SHADOW_MEM_SIZE,
-				SHADOW_MEM_SIZE);
-
 		pthread_attr_t attrs;
 		if(pthread_getattr_np(pthread_self(), &attrs) != 0) {
 			fprintf(stderr, "error: unable to get thread attributes: %s\n", strerror(errno));
@@ -73,23 +63,15 @@ class xthread {
 			abort();
 		}
 		char * firstHeapObj = (char *)malloc(sizeof(char));
-		thrData.watchStartByte = firstHeapObj - MALLOC_HEADER_SIZE;
-		thrData.watchEndByte = thrData.watchStartByte + SHADOW_MEM_SIZE;
 		thrData.stackStart = thrData.stackEnd + stackSize;
 		free(firstHeapObj);
 
 		fprintf(thrData.output, ">>> thread %d stack start @ %p, stack end @ %p\n", tid,
 				thrData.stackStart, thrData.stackEnd);
-		fprintf(thrData.output, ">>> watch start @ %p, watch end @ %p\n",
-				thrData.watchStartByte, thrData.watchEndByte);
 
 		initSampling();
 		result = current->startRoutine(current->startArg);
 		doPerfRead();
-
-		long access_byte_offset = (char *)thrData.maxObjAddr - (char *)thrData.watchStartByte;
-		char * maxShadowObjAddr = (char *)thrData.shadow_mem + access_byte_offset;
-		fprintf(thrData.output, ">>> maxObjAddr = %p/%p\n", thrData.maxObjAddr, maxShadowObjAddr);
 
 		fclose(thrData.output);
 		return result;

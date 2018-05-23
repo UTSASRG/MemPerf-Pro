@@ -69,11 +69,8 @@ typedef struct addr2line_info {
 } addrinfo;
 
 typedef struct {
-	char * shadow_mem = NULL;
 	char * stackStart = NULL;
 	char * stackEnd = NULL;
-	char * watchStartByte = NULL;
-	char * watchEndByte = NULL;
 	void * maxObjAddr = (void *)0x0;
 	FILE * output = NULL;
 } thread_data;

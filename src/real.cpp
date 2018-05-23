@@ -14,6 +14,7 @@ namespace Real {
 	DEFINE_WRAPPER(malloc);
 	DEFINE_WRAPPER(realloc);
 	DEFINE_WRAPPER(pthread_create);
+	DEFINE_WRAPPER(mmap);
 
 	void initializer() {
 		INIT_WRAPPER(brk, RTLD_NEXT);
@@ -22,6 +23,7 @@ namespace Real {
 		INIT_WRAPPER(calloc, RTLD_NEXT);
 		INIT_WRAPPER(malloc, RTLD_NEXT);
 		INIT_WRAPPER(realloc, RTLD_NEXT);
+		INIT_WRAPPER(mmap, RTLD_NEXT);
 
 		void *pthread_handle = dlopen("libpthread.so.0", RTLD_NOW | RTLD_GLOBAL | RTLD_NOLOAD);
 		INIT_WRAPPER(pthread_create, pthread_handle);

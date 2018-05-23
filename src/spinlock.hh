@@ -21,7 +21,9 @@ public:
     }
   }
 
-  void unlock() { __atomic_store_n(&_lock, 0, __ATOMIC_SEQ_CST); }
+	void unlock() {
+			__atomic_store_n(&_lock, 0, __ATOMIC_SEQ_CST);
+	}
 
 private:
   int _lock;
