@@ -14,6 +14,7 @@
 #include <sys/mman.h>
 #include <sys/syscall.h>   /* For SYS_xxx definitions */
 #include <unistd.h>
+#include <execinfo.h>
 
 #include <map>
 #include <cstdlib>
@@ -547,6 +548,33 @@ void getInfo () {
 }
 
 inline bool isAllocatorInCallStack() {
+		void * array[256];
+		int frames = backtrace(array, 256);
+		int allocatorLevel = -2;
+
+		char buf[256];
+
+		if(frames >= 256) {
+				fprintf(stderr, "WARNING: callstack may have been truncated\n");
+		} else if(frames == 0) {
+				fprintf(stderr, "WARNING: callstack depth was detected as zero\n");
+		}
+
+		printf("backtrace, frames = %d:\n", frames);
+		for(int i = 0; i < frames; i++) {
+				void * addr = array[i];
+				printf("   level %3d: addr = %p\n", i, addr);
+
+				if(selfmap::getInstance().isAllocator(addr)) {
+						allocatorLevel = i;
+				}
+		}
+
+		return((allocatorLevel != -2) && (allocatorLevel != frames - 1));
+}
+
+/*
+inline bool isAllocatorInCallStack() {
         // Fetch the frame address of the topmost stack frame
         struct stack_frame * current_frame =
             (struct stack_frame *)(__builtin_frame_address(0));
@@ -599,12 +627,14 @@ inline bool isAllocatorInCallStack() {
 
 				return false;
 }
+*/
 
 extern "C" void * yymmap(void *addr, size_t length, int prot, int flags,
 				int fd, off_t offset) {
 		initializer();
 	
 		if(isAllocatorInCallStack()) {
+				printf("*** yymmap call came from the allocator\n");
 				mmap_lock.lock();
 				numMmaps++;
 				mmapSize += length;
@@ -623,6 +653,7 @@ int xxintercept_hook_point(long syscall_number,
 				long *result) {
 		if(syscall_number == SYS_mmap) {
 				if(isAllocatorInCallStack()) {
+						printf("*** xxintercept_hook_point call came from the allocator\n");
 						mmap_lock.lock();
 						numMmaps++;
 						mmapSize += arg1;
