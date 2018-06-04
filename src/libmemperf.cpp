@@ -18,6 +18,7 @@
 
 #include <map>
 #include <cstdlib>
+#include <vector>
 
 #include "memsample.h"
 #include "real.hh"
@@ -26,7 +27,6 @@
 #include "hashfuncs.hh"
 #include "spinlock.hh"
 #include "selfmap.hh"
-#include <libsyscall_intercept_hook_point.h>
 
 #define CALLSITE_MAXIMUM_LENGTH 10
 
@@ -34,11 +34,6 @@ typedef HashMap<uint64_t, ObjectTuple*, spinlock> HashMapX;
 spinlock mmap_lock;
 int numMmaps;
 size_t mmapSize;
-extern int (*intercept_hook_point)(long syscall_number,
-      long arg0, long arg1,
-      long arg2, long arg3,
-      long arg4, long arg5,
-      long *result);
 
 __thread thread_data thrData;
 
@@ -65,6 +60,7 @@ bool bumpPointer = false;
 bool bibop = false;
 
 void getInfo ();
+void getClassSizes ();
 ObjectTuple* newObjectTuple (int numAllocs, size_t objectSize);
 
 // Variables used by our pre-init private allocator
@@ -104,15 +100,8 @@ extern "C" {
 				alias("yyposix_memalign")));
 }
 
-int xxintercept_hook_point(long syscall_number,
-        long arg0, long arg1,
-        long arg2, long arg3,
-        long arg4, long arg5,
-        long *result);
-
 __attribute__((constructor)) void initializer() {
 	if(mallocInitialized) { return; }
-	intercept_hook_point = xxintercept_hook_point;
 
 	// Ensure we are operating on a system using 64-bit pointers.
 	// This is necessary, as later we'll be taking the low 8-byte word
@@ -142,7 +131,7 @@ __attribute__((constructor)) void initializer() {
 	*/
 
 	Real::initializer();
-	selfmap::getInstance().getTextRegions();
+	//selfmap::getInstance().getTextRegions();
 	mallocInitialized = true;
 	void * program_break = sbrk(0);
 	thrData.stackStart = (char *)__builtin_frame_address(0);
@@ -170,6 +159,8 @@ __attribute__((constructor)) void initializer() {
 	fflush(thrData.output);
 
 	getInfo ();
+	printf ("got info\n");
+	if (bibop) getClassSizes ();
 }
 
 __attribute__((destructor)) void finalizer() {
@@ -183,7 +174,7 @@ void writeHashMap (void) {
 			  iterator != mapCallsiteStats.end();
 			  iterator++) {
 			
-			ObjectTuple* tuple = iterator.getData();	
+			//ObjectTuple* tuple = iterator.getData();	
 
 		}
 }
@@ -209,7 +200,6 @@ void exitHandler() {
 
 	fflush(thrData.output);
 	writeAllocData ();
-//	writeHashmap ();
 }
 
 // MemPerf's main function
@@ -229,7 +219,6 @@ extern "C" int __libc_start_main(main_fn_t, int, char **, void (*)(),
 extern "C" int libmemperf_libc_start_main(main_fn_t main_fn, int argc,
 		char ** argv, void (*init)(), void (*fini)(), void (*rtld_fini)(),
 		void * stack_end) {
-	intercept_hook_point = xxintercept_hook_point;
 	auto real_libc_start_main =
 		(decltype(__libc_start_main) *)dlsym(RTLD_NEXT, "__libc_start_main");
 	real_main = main_fn;
@@ -531,7 +520,7 @@ void getInfo () {
 
 	long address1 = reinterpret_cast<long> (add1);
 	long address2 = reinterpret_cast<long> (add2);
-	long spaceBetween = std::abs((address2 - address1));
+	long spaceBetween = std::abs(address2 - address1);
 
 	fprintf (thrData.output, ">>> Space between objects: %ld bytes\n", spaceBetween);
 
@@ -544,6 +533,29 @@ void getInfo () {
 
 		bumpPointer = true;
 		fprintf (thrData.output, ">>> Allocator: bump pointer\n");
+	}
+}
+
+void getClassSizes () {
+
+	std::vector <uint64_t> classSizes;
+	int size = 8;
+	void* malloc1;
+	void* malloc2;
+	long address1;
+	long address2;
+	long spaceBetween;
+
+	for (int i = 0; i < 25; i++) {
+
+		malloc1 = Real::malloc (size);
+		malloc2 = Real::malloc (size*2);
+
+		address1 = reinterpret_cast <long> (malloc1);
+		address2 = reinterpret_cast <long> (malloc2);
+		spaceBetween = std::abs (address2 - address1);
+		printf ("spaceBetween = %lu\n", spaceBetween);
+		break;
 	}
 }
 
@@ -572,7 +584,6 @@ inline bool isAllocatorInCallStack() {
 
 		return((allocatorLevel != -2) && (allocatorLevel != frames - 1));
 }
-
 /*
 inline bool isAllocatorInCallStack() {
         // Fetch the frame address of the topmost stack frame
@@ -633,6 +644,15 @@ extern "C" void * yymmap(void *addr, size_t length, int prot, int flags,
 				int fd, off_t offset) {
 		initializer();
 	
+		mmap_lock.lock();
+		void * retval = Real::mmap(addr, length, prot, flags, fd, offset);
+		numMmaps++;
+		mmapSize += length;
+		mmap_lock.unlock();
+		return retval;
+
+		
+/*
 		if(isAllocatorInCallStack()) {
 				printf("*** yymmap call came from the allocator\n");
 				mmap_lock.lock();
@@ -644,21 +664,6 @@ extern "C" void * yymmap(void *addr, size_t length, int prot, int flags,
 		} else {
 				return Real::mmap(addr, length, prot, flags, fd, offset);
 		}
-}
 
-int xxintercept_hook_point(long syscall_number,
-				long arg0, long arg1,
-				long arg2, long arg3,
-				long arg4, long arg5,
-				long *result) {
-		if(syscall_number == SYS_mmap) {
-				if(isAllocatorInCallStack()) {
-						printf("*** xxintercept_hook_point call came from the allocator\n");
-						mmap_lock.lock();
-						numMmaps++;
-						mmapSize += arg1;
-						mmap_lock.unlock();
-				}
-		}
-		return 1;
+*/
 }

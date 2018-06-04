@@ -20,10 +20,10 @@ int main() {
 	}
 */
 
-//	ptr = (int *) malloc(15);
-//	printf("malloc(15) = %p\n", ptr);
+	ptr = (int *) malloc(15);
+	printf("malloc(15) = %p\n", ptr);
 
-	ptr = (int *) malloc(15000000);
+	ptr = (int *) malloc(1500000);
 	printf("malloc(a bunch) = %p\n", ptr);
 
 /*
