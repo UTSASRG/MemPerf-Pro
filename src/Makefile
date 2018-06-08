@@ -37,11 +37,8 @@ test/test: libmemperf.so test/alloc.cpp
 test/test-obsd: libmemperf.so test/alloc.cpp
 	$(CXX) $(CFLAGS2) -rdynamic ./libmemperf.so -rdynamic /home/sam/Memoryallocators/OpenBSD-6.0/libomalloc.so -o test/test-obsd test/alloc.cpp
 
-#test/test-xlibc: libmemperf.so test/alloc.cpp
-#	$(CXX) $(CFLAGS2) -rdynamic ./libmemperf.so -rdynamic /home/richard/malloc/libmalloc.so -o test/test-xlibc test/alloc.cpp
-
-test/test-xlibc: test/alloc.cpp
-	$(CXX) $(CFLAGS2) -rdynamic /home/richard/malloc/libmalloc.so -o test/test-xlibc test/alloc.cpp
+test/test-xlibc: libmemperf.so test/alloc.cpp
+	$(CXX) $(CFLAGS2) -rdynamic ./libmemperf.so -rdynamic /home/richard/Memoryallocators/libc-2.24/libmalloc.so -o test/test-xlibc test/alloc.cpp
 
 test/test-clean: test/alloc.cpp
 	$(CXX) $(CFLAGS2) -o test/test-clean test/alloc.cpp

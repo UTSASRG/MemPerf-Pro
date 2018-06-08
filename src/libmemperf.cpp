@@ -53,14 +53,26 @@ uint64_t min_pos_callsite_id;
 int numNewAlloc = 0;
 int numReuseAlloc = 0;
 int numFrees = 0;
+int numMallocs = 0;
 unsigned long cyclesNewAlloc = 0;
 unsigned long cyclesReuseAlloc = 0;
 unsigned long cyclesFree = 0;
+unsigned long mmapThreshold;
 bool bumpPointer = false;
 bool bibop = false;
+static volatile bool inMalloc = false;
+static volatile bool inRealloc = false;
+static volatile bool inRealMain = false;
+FILE* objectStats;
+FILE* classInfo;
+FILE* pageInfo;
+FILE* testInfo;
+spinlock mallocLock;
+spinlock reallocLock;
 
-void getInfo ();
+void getAllocStyle ();
 void getClassSizes ();
+void test1 ();
 ObjectTuple* newObjectTuple (int numAllocs, size_t objectSize);
 
 // Variables used by our pre-init private allocator
@@ -114,6 +126,8 @@ __attribute__((constructor)) void initializer() {
 	}
 
 	mmap_lock.init();
+	mallocLock.init ();
+	reallocLock.init ();
 
 	// Calculate the minimum possible callsite ID by taking the low four bytes
 	// of the start of the program text and repeating them twice, back-to-back,
@@ -158,9 +172,12 @@ __attribute__((constructor)) void initializer() {
 	fprintf(thrData.output, ">>> program break @ %p\n", program_break);
 	fflush(thrData.output);
 
-	getInfo ();
-	printf ("got info\n");
-	if (bibop) getClassSizes ();
+	// Determines allocator style: bump pointer or bibop
+	getAllocStyle ();
+	
+	// Determine class size of 
+	//if (bibop) getClassSizes ();
+	if (bibop) test1 ();
 }
 
 __attribute__((destructor)) void finalizer() {
@@ -183,21 +200,41 @@ void writeAllocData () {
 
 	fprintf (thrData.output, ">>> Number of mmap calls: %d\n", numMmaps);
 	fprintf (thrData.output, ">>> Total size of mmap calls: %zu\n", mmapSize);
-
+	fprintf (thrData.output, ">>> Detected mmap threshold: %zu\n", mmapThreshold);
+	fprintf (thrData.output, ">>> Number of malloc calls: %d\n", numMallocs);
 	fprintf (thrData.output, ">>> Number of new allocations: %d\n", numNewAlloc);
 	fprintf (thrData.output, ">>> Number of re allocations:  %d\n", numReuseAlloc);
 	fprintf (thrData.output, ">>> Number of frees:           %d\n", numFrees);
-	fprintf (thrData.output, ">>> Avg cycles of new alloc:    %lu clock cycles\n",
-				(cyclesNewAlloc / (long)numNewAlloc));
-	fprintf (thrData.output, ">>> Avg cycles of reuse alloc:  %lu clock cycles\n",
-				(cyclesReuseAlloc / (long)numReuseAlloc));
-	fprintf (thrData.output, ">>> Avg cycles for free:        %lu clock cycles \n",
-				(cyclesFree / (long)numFrees));
+
+	if (numNewAlloc > 0)
+		fprintf (thrData.output, ">>> Avg cycles of new alloc:      %lu clock cycles\n",
+					(cyclesNewAlloc / (long)numNewAlloc));
+
+	else
+		fprintf (thrData.output, ">>> Avg cycles of new alloc:      N/A\n");
+
+	if (numReuseAlloc > 0) 
+		fprintf (thrData.output, ">>> Avg cycles of reuse alloc:    %lu clock cycles\n",
+					(cyclesReuseAlloc / (long)numReuseAlloc));
+
+	else 
+		fprintf (thrData.output, ">>> Avg cycles of reuse alloc:    N/A\n");
+
+	if (numFrees > 0)
+		fprintf (thrData.output, ">>> Avg cycles for free:          %lu clock cycles \n",
+					(cyclesFree / (long)numFrees));
+
+	else
+		fprintf (thrData.output, ">>> Avg cycles for free:          N/A\n");
+
+	fflush (thrData.output);
 }
 
 void exitHandler() {
-	doPerfRead();
 
+	inRealMain = false;
+
+	doPerfRead();
 	fflush(thrData.output);
 	writeAllocData ();
 }
@@ -208,7 +245,8 @@ int libmemperf_main(int argc, char ** argv, char ** envp) {
 	atexit(exitHandler);
 
 	initSampling();
-
+	
+	inRealMain = true;
 	return real_main(argc, argv, envp);
 }
 
@@ -255,37 +293,49 @@ extern "C" {
 			}
 		}
 
-		uint64_t before = rdtscp ();
+		void* objAlloc;
 
-		void* objAlloc = Real::malloc(sz);
+		if (inRealMain) {
 
-		uint64_t after = rdtscp ();
+			inMalloc = true;
+			uint64_t before = rdtscp ();
+			objAlloc = Real::malloc(sz);
+			uint64_t after = rdtscp ();
+			uint64_t cyclesForMalloc = after - before;
+			uint64_t address = reinterpret_cast <uint64_t> (objAlloc);
 
-		uint64_t cyclesForMalloc = after - before;
+			ObjectTuple* found_value;
 
-		uint64_t address = reinterpret_cast <uint64_t> (objAlloc);
+			mallocLock.lock ();
 
-		ObjectTuple* found_value;
+			if(mapCallsiteStats.find(address, &found_value)) {
+				found_value->numAllocs++;
+				found_value->size = sz;
+				numReuseAlloc ++;
+				cyclesReuseAlloc += cyclesForMalloc;
+			}
+			else {
+				ObjectTuple* tuple = newObjectTuple (1, sz);
+				mapCallsiteStats.insertIfAbsent(address, tuple);
+				numNewAlloc ++;
+				cyclesNewAlloc += cyclesForMalloc;
+			}
 
-		if(mapCallsiteStats.find(address, &found_value)) {
-			found_value->numAllocs++;
-			found_value->size = sz;
-			numReuseAlloc ++;
-			cyclesReuseAlloc += cyclesForMalloc;
+			numMallocs++;
+			inMalloc = false;
+			mallocLock.unlock ();
 		}
-		else {
-			ObjectTuple* tuple = newObjectTuple (1, sz);
-			mapCallsiteStats.insertIfAbsent(address, tuple);
-			numNewAlloc ++;
-			cyclesNewAlloc += cyclesForMalloc;
-		}
+		
+		else objAlloc = Real::malloc (sz);
 
 		return objAlloc;
 	}
 
 	void * yycalloc(size_t nelem, size_t elsize) {
+		
 		void * ptr = NULL;
-		if((ptr = malloc(nelem * elsize)))
+		ptr = malloc (nelem * elsize);
+		if(ptr)
 			memset(ptr, 0, nelem * elsize);
 		return ptr;
 	}
@@ -303,14 +353,17 @@ extern "C" {
 					tmppos = 0;
 			}
 		} else {
-			uint64_t before = rdtscp ();
-
-			Real::free(ptr);
-
-			uint64_t after = rdtscp ();
-
-			numFrees ++;
-			cyclesFree += (after - before);
+			
+			if (inRealMain) {
+				uint64_t before = rdtscp ();
+				Real::free(ptr);
+				uint64_t after = rdtscp ();
+				numFrees ++;
+				cyclesFree += (after - before);
+			}
+			else {
+				Real::free (ptr);
+			}
 		}
 	}
 
@@ -352,7 +405,11 @@ extern "C" {
 			return yymalloc(sz);
 		}
 
+		reallocLock.lock ();
+		inRealloc = true;
 		void * reptr = Real::realloc(ptr, sz);
+		inRealloc = false;
+		reallocLock.unlock ();
 
 		return reptr;
 	}
@@ -511,52 +568,142 @@ ObjectTuple* newObjectTuple (int numAllocs, size_t objectSize) {
 }
 
 // Try to figure out which allocator is being used
-void getInfo () {
+void getAllocStyle () {
 
 	void* add1 = Real::malloc (8);
 	void* add2 = Real::malloc (2048);
 
-	fprintf (thrData.output, ">>> add1: %p\n>>> add2: %p\n", add1, add2);
+	fprintf (thrData.output, ">>> Object1 (8B): %p\n>>> Object2 (2KB): %p\n", add1, add2);
 
 	long address1 = reinterpret_cast<long> (add1);
 	long address2 = reinterpret_cast<long> (add2);
-	long spaceBetween = std::abs(address2 - address1);
 
-	fprintf (thrData.output, ">>> Space between objects: %ld bytes\n", spaceBetween);
+	long address1Page = address1 / 4096;
+	long address2Page = address2 / 4096;
 
-	if (spaceBetween >= 4096) {
+	fprintf (thrData.output, ">>> Object1 page: %ld, Object2 page: %ld\n", address1Page, address2Page);
+
+	if ((address1Page - address2Page) != 0) {
 
 		bibop = true;
-		fprintf (thrData.output, ">>> Allocator: bibop\n");
+		
+		fprintf (thrData.output, ">>> Objects are not on same page\n");
+		fprintf (thrData.output, ">>> Allocator Style: BIBOP\n");
 	}
+
 	else {
 
 		bumpPointer = true;
-		fprintf (thrData.output, ">>> Allocator: bump pointer\n");
+		fprintf (thrData.output, ">>> Objects are on same page.\n");
+		fprintf (thrData.output, ">>> Allocator Style: bump-pointer\n");
 	}
 }
 
 void getClassSizes () {
 
+	objectStats = fopen ("test/files/objectStats.txt", "w");
+	pageInfo = fopen ("test/files/pageInfo.txt", "w");
+	classInfo = fopen ("test/files/classInfo.txt", "w");
+
 	std::vector <uint64_t> classSizes;
 	int size = 8;
+	
 	void* malloc1;
-	void* malloc2;
-	long address1;
-	long address2;
-	long spaceBetween;
 
-	for (int i = 0; i < 25; i++) {
+	long currentAddress = 0;
+	long currentPage = 0;
+
+	std::map <long, int> pages;
+	
+	for (int i = 1; i <= 1000; i++) {
 
 		malloc1 = Real::malloc (size);
-		malloc2 = Real::malloc (size*2);
 
-		address1 = reinterpret_cast <long> (malloc1);
-		address2 = reinterpret_cast <long> (malloc2);
-		spaceBetween = std::abs (address2 - address1);
-		printf ("spaceBetween = %lu\n", spaceBetween);
-		break;
+		currentAddress = reinterpret_cast <long> (malloc1);
+		currentPage = currentAddress / 4096;
+		
+		auto found = pages.find (currentPage);		
+
+		if (found == pages.end ()) 
+			pages.emplace (currentPage, 1);
+
+		else
+			pages[currentPage] = (found->second) + 1;
+
+		fprintf (objectStats, "obj %4d >>> address: %lx  page: %lu\n",
+					i, currentAddress, currentPage);
 	}
+
+	for (auto page = pages.begin(); page != pages.end(); ++page) {
+
+		fprintf (pageInfo, "page %lu has %d objects\n", page->first, page->second);
+	}
+
+	fclose (objectStats);
+	fclose (pageInfo);
+	fclose (classInfo);	
+}
+
+void test1 () {
+
+	void* oldAddress;
+	void* newAddress;
+	long oldAddr = 0, newAddr = 0;
+	size_t oldSize = 8, newSize = 8;
+	char fileName [32];
+	double exactPage = 0;
+	double kiloB = 0;
+	std::vector <uint64_t> classSizes;
+
+	pid_t pid = getpid ();
+
+	snprintf (fileName, 32, "test/files/testInfo_%d.txt", pid);
+
+	testInfo = fopen (fileName, "w");
+
+	oldAddress = Real::malloc (oldSize);
+	oldAddr = reinterpret_cast <long> (oldAddress);
+
+	for (int i = 0; i < 20000; i++) {
+
+		newSize += 8;
+		newAddress = Real::realloc (oldAddress, newSize);
+		newAddr = reinterpret_cast <long> (newAddress);
+
+		exactPage = newAddr / 4096.0;
+		
+		if ((newAddr != oldAddr)) {
+
+			if (classSizes.empty ()) 
+				classSizes.push_back (oldSize);
+
+			else {
+
+				classSizes.push_back (oldSize);
+				kiloB = oldSize / 1024.0;
+				fprintf (testInfo, "oldSize: %lu - %.2f KB | old=%p, new=%p, realloc "
+										 "%zu B returned new address. Page %.2f\n",
+							oldSize, kiloB, oldAddress, newAddress, newSize, exactPage);
+			}
+		}
+
+		oldAddr = newAddr;
+		oldAddress = newAddress;
+		oldSize = newSize;
+	}
+
+	classInfo = fopen ("test/files/classInfo.txt", "a");
+	fprintf (classInfo, "Possible Class Sizes: ");
+
+	if (!classSizes.empty ()) {
+
+		for (auto cSize = classSizes.begin (); cSize != classSizes.end (); cSize++) 
+			fprintf (classInfo, "%zu ", *cSize);
+	}
+
+	fprintf (classInfo, "\n\n");
+	fclose (classInfo);
+	fclose (testInfo);
 }
 
 inline bool isAllocatorInCallStack() {
@@ -646,8 +793,16 @@ extern "C" void * yymmap(void *addr, size_t length, int prot, int flags,
 	
 		mmap_lock.lock();
 		void * retval = Real::mmap(addr, length, prot, flags, fd, offset);
-		numMmaps++;
-		mmapSize += length;
+
+		// if call came from the allocator
+		if (inMalloc || inRealloc) {
+
+			numMmaps++;
+			mmapSize += length;
+			if (numMmaps == 1)
+				mmapThreshold = length;
+		}
+
 		mmap_lock.unlock();
 		return retval;
 
