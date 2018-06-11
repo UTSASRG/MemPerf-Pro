@@ -92,7 +92,7 @@ template <class KeyType,                    // What is the key? A long or string
 				 _keycmp = kcmp;
 
 				 // Allocated predefined size.
-				 _entries = (struct HashEntry*)Real::malloc(size * sizeof(struct HashEntry));
+				 _entries = (struct HashEntry*)RealX::malloc(size * sizeof(struct HashEntry));
 				 // getThreadIndex());
 
 				 // Initialize all of these _entries.
@@ -191,7 +191,7 @@ template <class KeyType,                    // What is the key? A long or string
 					 // Remove this entry if existing.
 					 entry->erase();
 
-					 Real::free(entry);
+					 RealX::free(entry);
 				 }
 
 				 first->count--;
@@ -207,7 +207,7 @@ template <class KeyType,                    // What is the key? A long or string
 			 private:
 			 // Create a new Entry with specified key and value.
 			 struct Entry* createNewEntry(const KeyType& key, size_t keylen, ValueType value) {
-				 struct Entry* entry = (struct Entry*)Real::malloc(sizeof(struct Entry));
+				 struct Entry* entry = (struct Entry*)RealX::malloc(sizeof(struct Entry));
 
 				 // Initialize this new entry.
 				 entry->initialize(key, keylen, value);

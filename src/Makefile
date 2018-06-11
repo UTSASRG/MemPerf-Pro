@@ -24,12 +24,12 @@ CFLAGS2 += -O0 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-f
 INCLUDE_DIRS = -I. -I/usr/include/x86_64-linux-gnu/c++/4.8/
 LIBS     := dl pthread
 
-TARGETS = libmemperf.so test/test test/test-clean test/test-obsd test/test-xlibc
+TARGETS = libmemperf.so test/test test/test-clean test/test-obsd test/test-xlibc test/test-freeguard
 
 all: $(TARGETS)
 
 libmemperf.so: $(DEPS)
-	$(CXX) $(CFLAGS) $(INCLUDE_DIRS) -shared -fPIC $(SRCS) -o libmemperf.so -lsyscall_intercept -ldl -lpthread
+	$(CXX) $(CFLAGS) $(INCLUDE_DIRS) -shared -fPIC $(SRCS) -o libmemperf.so -ldl -lpthread
 
 test/test: libmemperf.so test/alloc.cpp
 	$(CXX) $(CFLAGS2) -rdynamic ./libmemperf.so -o test/test test/alloc.cpp
@@ -39,6 +39,9 @@ test/test-obsd: libmemperf.so test/alloc.cpp
 
 test/test-xlibc: libmemperf.so test/alloc.cpp
 	$(CXX) $(CFLAGS2) -rdynamic ./libmemperf.so -rdynamic /home/richard/Memoryallocators/libc-2.24/libmalloc.so -o test/test-xlibc test/alloc.cpp
+
+test/test-freeguard: libmemperf.so test/alloc.cpp
+	$(CXX) $(CFLAGS2) -rdynamic ./libmemperf.so -rdynamic /home/richard/FreeGuard/libfreeguard.so -o test/test-freeguard test/alloc.cpp
 
 test/test-clean: test/alloc.cpp
 	$(CXX) $(CFLAGS2) -o test/test-clean test/alloc.cpp

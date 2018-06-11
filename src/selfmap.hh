@@ -173,7 +173,7 @@ class selfmap {
             _appTextEnd = (void*)m.getLimit();
 						printf("application @ %p ~ %p\n", _appTextStart, _appTextEnd);
           } else {
-							uintptr_t mallocSymbol = (uintptr_t)Real::malloc;
+							uintptr_t mallocSymbol = (uintptr_t)RealX::malloc;
 							uintptr_t libTextStart = (uintptr_t)m.getBase();
 							uintptr_t libTextEnd = (uintptr_t)m.getLimit();
 							_allocLibrary = std::string(m.getFile());
@@ -194,7 +194,7 @@ class selfmap {
     selfmap() {
       // Read the name of the main executable
       // char buffer[PATH_MAX];
-      //Real::readlink("/proc/self/exe", buffer, PATH_MAX);
+      //RealX::readlink("/proc/self/exe", buffer, PATH_MAX);
       //_main_exe = std::string(buffer);
       bool gotMainExe = false;
       // Build the mappings data structure

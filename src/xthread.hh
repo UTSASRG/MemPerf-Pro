@@ -25,7 +25,7 @@ class xthread {
 		children->startArg = arg;
 		children->startRoutine = fn;
 
-		int result = Real::pthread_create(tid, attr, xthread::startThread, (void *)children);
+		int result = RealX::pthread_create(tid, attr, xthread::startThread, (void *)children);
 		if(result) {
 			perror("ERROR: pthread_create failed");
 			abort();

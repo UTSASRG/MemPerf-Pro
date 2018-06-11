@@ -7,7 +7,7 @@
 
 #define DECLARE_WRAPPER(name) extern decltype(::name) * name;
 
-namespace Real {
+namespace RealX {
 	void initializer();
 	DECLARE_WRAPPER(brk);
 	DECLARE_WRAPPER(sbrk);
