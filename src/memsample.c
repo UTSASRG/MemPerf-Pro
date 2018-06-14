@@ -35,9 +35,9 @@ void doPerfRead() {
 		read(perfInfo.perf_fd_tlb, &count_tlb, sizeof(int64_t));
 		read(perfInfo.perf_fd_cache, &count_cache, sizeof(int64_t));
 
-		fprintf(thrData.output, ">>> num page faults  = %ld\n", count_fault);
-		fprintf(thrData.output, ">>> num TLB misses   = %ld\n", count_tlb);
-		fprintf(thrData.output, ">>> num cache misses = %ld\n", count_cache);
+		fprintf(thrData.output, ">>> num page faults    %ld\n", count_fault);
+		fprintf(thrData.output, ">>> num TLB misses     %ld\n", count_tlb);
+		fprintf(thrData.output, ">>> num cache misses   %ld\n", count_cache);
 }
 
 void setupSampling(void) {

@@ -17,6 +17,8 @@ namespace RealX {
 	DECLARE_WRAPPER(realloc);
 	DECLARE_WRAPPER(pthread_create);
 	DECLARE_WRAPPER(mmap);
+	DECLARE_WRAPPER(pthread_mutex_lock);
+	DECLARE_WRAPPER(pthread_mutex_unlock);
 };
 
 #endif
