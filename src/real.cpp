@@ -17,6 +17,7 @@ namespace RealX {
 	DEFINE_WRAPPER(mmap);
 	DEFINE_WRAPPER(pthread_mutex_lock);
 	DEFINE_WRAPPER(pthread_mutex_unlock);
+	DEFINE_WRAPPER(pthread_mutex_trylock);
 
 	void initializer() {
 		INIT_WRAPPER(brk, RTLD_NEXT);
@@ -31,5 +32,6 @@ namespace RealX {
 		INIT_WRAPPER(pthread_create, pthread_handle);
 		INIT_WRAPPER(pthread_mutex_lock, pthread_handle);
 		INIT_WRAPPER(pthread_mutex_unlock, pthread_handle);
+		INIT_WRAPPER(pthread_mutex_trylock, pthread_handle);
 	}
 }

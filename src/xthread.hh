@@ -20,7 +20,7 @@ class xthread {
 
 	public:
 	static int thread_create(pthread_t * tid, const pthread_attr_t * attr, threadFunction * fn, void * arg) {
-		thread_t * children = (thread_t *) malloc(sizeof(thread_t));
+		thread_t * children = (thread_t *) RealX::malloc(sizeof(thread_t));
 		children->thread = tid;
 		children->startArg = arg;
 		children->startRoutine = fn;
@@ -38,11 +38,14 @@ class xthread {
 		void * result = NULL;
 		size_t stackSize;
 		thread_t * current = (thread_t *) arg;
-		pid_t pid = getpid();
+		
+		pid_t pid = getpid(); 
 		pid_t tid = gettid();
 		current->tid = tid;
 
+
 		char outputFile[MAX_FILENAME_LEN];
+
 		snprintf(outputFile, MAX_FILENAME_LEN, "%s_libmemperf_pid_%d_tid_%d.txt",
 				program_invocation_name, pid, tid);
 
@@ -50,8 +53,10 @@ class xthread {
 		thrData.output = fopen(outputFile, "w");
 		if(thrData.output == NULL) {
 			fprintf(stderr, "error: unable to open output file for writing hash map\n");
+			fprintf(stderr, "error: %s\n", strerror (errno));
 			abort();
 		}
+
 
 		pthread_attr_t attrs;
 		if(pthread_getattr_np(pthread_self(), &attrs) != 0) {
@@ -62,9 +67,10 @@ class xthread {
 			fprintf(stderr, "error: unable to get stack values: %s\n", strerror(errno));
 			abort();
 		}
-		char * firstHeapObj = (char *)malloc(sizeof(char));
+		char * firstHeapObj = (char *)RealX::malloc(sizeof(char));
 		thrData.stackStart = thrData.stackEnd + stackSize;
 		free(firstHeapObj);
+
 
 		fprintf(thrData.output, ">>> thread %d stack start @ %p, stack end @ %p\n", tid,
 				thrData.stackStart, thrData.stackEnd);

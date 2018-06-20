@@ -15,6 +15,10 @@
 #include <unistd.h>
 
 #include "list.hh"
+#include "spinlock.hh"
+
+void* myMalloc (size_t size);
+void myFree (void* ptr);
 
 template <class KeyType,                    // What is the key? A long or string
 		 class ValueType,                  // What is the value there?
@@ -92,7 +96,7 @@ template <class KeyType,                    // What is the key? A long or string
 				 _keycmp = kcmp;
 
 				 // Allocated predefined size.
-				 _entries = (struct HashEntry*)RealX::malloc(size * sizeof(struct HashEntry));
+				 _entries = (struct HashEntry*) myMalloc (size * sizeof(struct HashEntry));
 				 // getThreadIndex());
 
 				 // Initialize all of these _entries.
@@ -191,7 +195,7 @@ template <class KeyType,                    // What is the key? A long or string
 					 // Remove this entry if existing.
 					 entry->erase();
 
-					 RealX::free(entry);
+					 myFree (entry);
 				 }
 
 				 first->count--;
@@ -207,8 +211,17 @@ template <class KeyType,                    // What is the key? A long or string
 			 private:
 			 // Create a new Entry with specified key and value.
 			 struct Entry* createNewEntry(const KeyType& key, size_t keylen, ValueType value) {
-				 struct Entry* entry = (struct Entry*)RealX::malloc(sizeof(struct Entry));
+				
+				if (callFromActiveThread) {
+				 struct Entry* entry = (struct Entry*)	threadAlloc (sizeof(struct Entry));
+		
+				 // Initialize this new entry.
+				 entry->initialize(key, keylen, value);
+				 return entry;
 
+				}
+				 struct Entry* entry = (struct Entry*)	myMalloc (sizeof(struct Entry));
+		
 				 // Initialize this new entry.
 				 entry->initialize(key, keylen, value);
 				 return entry;
