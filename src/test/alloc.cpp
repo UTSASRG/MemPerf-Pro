@@ -8,21 +8,13 @@ int main() {
 	int i, j;
 	int* ptr;
 
-	for(i  = 0; i < 100000; i++) {
+	for(i  = 0; i < 10000; i++) {
 		ptr = (int *) malloc(sizeof(int));
 		for(j = 0; j < 10000; j++) {
 			*ptr = i * j;
 		}
 		free(ptr);
 	}
-
-/*
-	char * blah = (char *)mmap(NULL, 20000000, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
-	for(i = 0; i < 4882; i++) {
-			char * ptr = blah + i * 4096;
-			*ptr = 'a';
-	}
-*/
 
 	return EXIT_SUCCESS;
 }

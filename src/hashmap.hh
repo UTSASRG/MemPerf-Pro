@@ -212,14 +212,6 @@ template <class KeyType,                    // What is the key? A long or string
 			 // Create a new Entry with specified key and value.
 			 struct Entry* createNewEntry(const KeyType& key, size_t keylen, ValueType value) {
 				
-				if (callFromActiveThread) {
-				 struct Entry* entry = (struct Entry*)	threadAlloc (sizeof(struct Entry));
-		
-				 // Initialize this new entry.
-				 entry->initialize(key, keylen, value);
-				 return entry;
-
-				}
 				 struct Entry* entry = (struct Entry*)	myMalloc (sizeof(struct Entry));
 		
 				 // Initialize this new entry.

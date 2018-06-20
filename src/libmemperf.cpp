@@ -326,7 +326,7 @@ extern "C" {
 		if (activeThreads.find (tid, &t)) return RealX::malloc (sz);
 
 		//Add thread id to list of active threads
-		activeThreads.insertToActiveThreads (tid, true);
+		activeThreads.insertIfAbesnt (tid, true);
 
 		//Collect allocation data
 		void* objAlloc;
@@ -357,7 +357,7 @@ extern "C" {
 		mallocLock.unlock ();
 
 		//Remove thread id from active threads
-		activeThreads.eraseThread (tid);
+		activeThreads.erase (tid);
 		return objAlloc;
 	}
 
