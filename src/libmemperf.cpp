@@ -56,8 +56,7 @@ initStatus mallocInitialized = NOT_INITIALIZED;
 uint64_t min_pos_callsite_id;
 
 #define MAX_CLASS_SIZE 65536
-#define TEMP_MEM_SIZE 2048000 // 8MB
-#define THREAD_BUF_SIZE 8000000 
+#define TEMP_MEM_SIZE 8192000
 
 bool bumpPointer = false;
 bool bibop = false;
@@ -83,9 +82,6 @@ spinlock freeLock;
 void* myMalloc (size_t size);
 void myFree (void* ptr);
 
-void* threadAlloc (size_t size);
-void threadFree (void* p);
-
 typedef struct LockContention {
 	int contention;
 	int maxContention;
@@ -98,7 +94,6 @@ LC* newLC () {
 	return lc;
 }
 
-HashMap <pid_t, bool, spinlock> activeThreads;
 HashMap <uint64_t, bool, spinlock> addressUsage;
 HashMap <uint64_t, LC*, spinlock> lockUsage;
 
@@ -122,10 +117,56 @@ unsigned int tmppos = 0;
 
 unsigned int numMaps = 0;
 
-// Buffer for activeThreads hashmap only
-char threadBuf[THREAD_BUF_SIZE];
-unsigned int threadPos = 0;
-unsigned int numActiveThreads = 0;
+// Array for active threads
+pid_t activeThreads [300];
+int activeThreadCount = 0;
+
+bool isActiveThread (pid_t id) {
+
+	for (int i = 0; i < activeThreadCount; i++) 
+		if (activeThreads[i] == id) return true;
+
+	return false;
+}
+
+void addThread (pid_t id) {
+
+	activeThreads[activeThreadCount] = id;
+	activeThreadCount++;
+}
+
+void removeThread (pid_t id) {
+
+	if (isActiveThread(id)) {
+
+		// Only one active thread
+		if (activeThreadCount == 1) {
+			activeThreadCount = 0;
+			return;
+		}
+
+		// Get index
+		int index = -1;
+		for (int i = 0; i < activeThreadCount; i++) {
+			if (activeThreads[i] == id) {
+				index = i;
+				break;
+			}
+		}
+
+		// Last thread in the array
+		if ((index + 1) == activeThreadCount) {
+			activeThreadCount--;
+			return;
+		}
+
+		// Middle somewhere. Shift elements
+		for (int j = index; j < (activeThreadCount - 1); j++) {
+			activeThreads[j] = activeThreads [j+1];
+			activeThreadCount--;
+		}		
+	}
+}
 
 struct stack_frame {
 	struct stack_frame * prev;	// pointing to previous stack_frame
@@ -229,9 +270,6 @@ __attribute__((constructor)) initStatus initializer() {
 	fprintf(thrData.output, ">>> program break @ %p\n", program_break);
 	fflush(thrData.output);
 
-	activeThreads.initialize(HashFuncs::hashInt,
-			HashFuncs::compareInt, 4096);
-
 	addressUsage.initialize(HashFuncs::hashCallsiteId,
 			HashFuncs::compareCallsiteId, 4096);
 
@@ -322,11 +360,10 @@ extern "C" {
 		pid_t tid = gettid ();
 
 		//If already there, then just pass the malloc to RealX
-		bool t;
-		if (activeThreads.find (tid, &t)) return RealX::malloc (sz);
+		if (isActiveThread(tid)) return RealX::malloc (sz);
 
 		//Add thread id to list of active threads
-		activeThreads.insertIfAbsent (tid, true);
+		addThread (tid);
 
 		//Collect allocation data
 		void* objAlloc;
@@ -336,7 +373,8 @@ extern "C" {
 		uint64_t cyclesForMalloc = after - before;
 		uint64_t address = reinterpret_cast <uint64_t> (objAlloc);
 
-		//Has this address been used before
+		//Has this address been used beforea
+		bool t;
 		if (addressUsage.find (address, &t)) {
 			mallocLock.lock ();
 			reused_address++;
@@ -357,7 +395,7 @@ extern "C" {
 		mallocLock.unlock ();
 
 		//Remove thread id from active threads
-		activeThreads.erase (tid);
+		removeThread (tid);
 		return objAlloc;
 	}
 
@@ -595,8 +633,7 @@ extern "C" {
 		pid_t tid = gettid ();
 
 		//Is this thread doing allocation
-		bool t;
-		if (activeThreads.find (tid, &t)) {
+		if (isActiveThread(tid)) {
 
 			//Have we encountered this lock before?
 			LC* thisLock;
@@ -629,8 +666,7 @@ extern "C" {
 		pid_t tid = gettid ();
 
 		//Is this thread doing allocation
-		bool t;
-		if (activeThreads.find (tid, &t)) {
+		if (isActiveThread(tid)) {
 
 			//Have we encountered this lock before?
 			LC* thisLock;
@@ -684,9 +720,9 @@ void* myMalloc (size_t size) {
 
 	myMallocLock.lock ();
 	void* retptr;
-	if((tmppos + size) < (TEMP_MEM_SIZE * 4)) {
+	if((tmppos + size) < TEMP_MEM_SIZE) {
 		retptr = (void *)(tmpbuf + tmppos);
-		tmppos += ((size/4) + 1);
+		tmppos += size;
 		numTempAllocs++;
 	} else {
 		fprintf(stderr, "error: global allocator out of memory\n");
@@ -710,38 +746,6 @@ void myFree (void* ptr) {
 	}
 	myMallocLock.unlock();
 }
-
-void* threadAlloc (size_t size) {
-	
-	threadAllocLock.lock ();
-	void* retptr;
-	if((threadPos + size) < THREAD_BUF_SIZE) {
-		retptr = (void *)(threadBuf + threadPos);
-		threadPos += size;
-		numActiveThreads++;
-	} else {
-		fprintf(stderr, "error: thread allocator out of memory\n");
-		fprintf(stderr, "\t requested size = %zu, total size = %d, "
-							 "total allocs = %u\n", size, TEMP_MEM_SIZE * 4, numTempAllocs);
-		abort();
-	}
-	threadAllocLock.unlock ();
-	return retptr;
-}
-
-void threadFree (void* p) {
-
-	if (p == NULL) return;	
-
-	threadAllocLock.lock();
-	if ((p >= threadBuf) &&
-		(p <= (threadBuf + THREAD_BUF_SIZE))) {
-		numActiveThreads--;
-		if(numActiveThreads == 0) threadPos = 0;
-	}
-	threadAllocLock.unlock();
-}
-
 
 // Try to figure out which allocator is being used
 void getAllocStyle () {
@@ -1023,7 +1027,6 @@ extern "C" void * yymmap(void *addr, size_t length, int prot, int flags,
 		if (!mapsInitialized) 
 			return RealX::mmap (addr, length, prot, flags, fd, offset);
 	
-		mmap_lock.lock();
 		void* retval = RealX::mmap(addr, length, prot, flags, fd, offset);
 
 		//Is the profiler getting mmap threshold?
@@ -1035,11 +1038,14 @@ extern "C" void * yymmap(void *addr, size_t length, int prot, int flags,
 				malloc_mmapThreshold = length;
 		}
 
-		//Is this thread currently doing an allocation?
-		pid_t tid = gettid ();
-		bool t = true;
-		if (activeThreads.find (tid, &t)) 
-			num_mmaps++;
-			
+		else {
+			//Is this thread currently doing an allocation?
+			pid_t tid = gettid ();
+			if (isActiveThread(tid)) 
+				mmap_lock.lock();
+				num_mmaps++;
+				mmap_lock.unlock();
+		}
+
 		return retval;
 }
