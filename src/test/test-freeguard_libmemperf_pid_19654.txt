@@ -1,0 +1,4 @@
+>>> stack start @ 0x7ffe61642820, stack end @ 0x7ffe616428a0
+>>> program break @ 0x9c8000
+>>> allocator     bibop
+>>> classSizes    8 24 56 120 248 504 1016 2040 4088 8184 16376 32760 65528 
