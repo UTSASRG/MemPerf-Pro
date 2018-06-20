@@ -20,6 +20,7 @@
 #include <cstdlib>
 #include <vector>
 #include <algorithm>
+#include <cstring>
 
 #include "memsample.h"
 #include "real.hh"
@@ -45,8 +46,19 @@ extern char * program_invocation_name;
 extern void * __libc_stack_end;
 extern char __executable_start;
 
+const char *CLASS_SIZE_FILE_NAME = "class_sizes.txt";
+FILE *classSizeFile;
+
 bool const debug = false;
-bool mallocInitialized = false;
+
+enum initStatus{
+    INIT_ERROR = -1,
+    NOT_INITIALIZED = 0, 
+    IN_PROGRESS = 1, 
+    INITIALIZED = 2
+};
+initStatus mallocInitialized = NOT_INITIALIZED;
+
 uint64_t min_pos_callsite_id;
 
 // Richard
@@ -138,8 +150,12 @@ extern "C" {
 				alias("yyposix_memalign")));
 }
 
-__attribute__((constructor)) void initializer() {
-	if(mallocInitialized) { return; }
+__attribute__((constructor)) initStatus initializer() {
+    
+	if(mallocInitialized == INITIALIZED || mallocInitialized == IN_PROGRESS){
+                return mallocInitialized;
+        }
+        mallocInitialized = IN_PROGRESS;
 
 	// Ensure we are operating on a system using 64-bit pointers.
 	// This is necessary, as later we'll be taking the low 8-byte word
@@ -176,9 +192,9 @@ __attribute__((constructor)) void initializer() {
 	RealX::initializer();
 
 	//This deadlocks
-	//selfmap::getInstance().getTextRegions();
+	selfmap::getInstance().getTextRegions();
 
-	mallocInitialized = true;
+	mallocInitialized = INITIALIZED;
 	void * program_break = sbrk(0);
 	thrData.stackStart = (char *)__builtin_frame_address(0);
 	thrData.stackEnd = (char *)__libc_stack_end;
@@ -198,7 +214,7 @@ __attribute__((constructor)) void initializer() {
 	thrData.output = fopen(outputFile, "w");
 	if(thrData.output == NULL) {
 		perror("error: unable to open output file to write");
-		return;
+		return INIT_ERROR;
 	}
 
 	fprintf(thrData.output, ">>> stack start @ %p, stack end @ %p\n",
@@ -214,6 +230,8 @@ __attribute__((constructor)) void initializer() {
 
 	//get mmap threshold
 	getMmapThreshold ();
+        
+        return mallocInitialized;
 }
 
 __attribute__((destructor)) void finalizer_memperf() {
@@ -268,7 +286,7 @@ extern "C" {
 		// using a memory mapped region. Once dlsym finishes, all future malloc
 		// requests will be fulfilled by RealX::malloc, which itself is a
 		// reference to the real glibc malloc routine.
-		if(!mallocInitialized) {
+		if(mallocInitialized != INITIALIZED) {
 			if((tmppos + sz) < TEMP_BUF_SIZE) {
 				void * retptr = (void *)(tmpbuf + tmppos);
 				tmppos += sz;
@@ -383,7 +401,7 @@ extern "C" {
 	}
 
 	void * yyrealloc(void * ptr, size_t sz) {
-		if(!mallocInitialized) {
+		if(mallocInitialized != INITIALIZED) {
 			if(ptr == NULL)
 				return yymalloc(sz);
 			yyfree(ptr);
@@ -637,28 +655,75 @@ void getAllocStyle () {
 
 void getClassSizes () {
 
-	void* oldAddress;
-	void* newAddress;
-	long oldAddr = 0, newAddr = 0;
-	size_t oldSize = 8, newSize = 8;
 	std::vector <uint64_t> classSizes;
+        size_t bytesToRead = 0;
+        bool matchFound = false;        
+        char *line;
+        char *token;
+        
+        char *name_without_path = strrchr(program_invocation_name, '/') + 1;        
+        
+        classSizeFile = fopen(CLASS_SIZE_FILE_NAME, "a+");        
+        
+        while(getline(&line, &bytesToRead, classSizeFile) != -1){
+            
+                line[strcspn(line, "\n")] = 0;
+                
+                if(strcmp(line, name_without_path) == 0){
+                    
+                        matchFound = true;
+                }
+                
+                if(matchFound) break;
+        }
+        
+        if(matchFound){
+                getline(&line, &bytesToRead, classSizeFile);
+                line[strcspn(line, "\n")] = 0;
+                
+                while( (token = strsep(&line, " ")) ){
+                    
+                        if(atoi(token) != 0){
+                        
+                               classSizes.push_back( (uint64_t) atoi(token));
+                        }
+                }
+        }
+        
+        if(!matchFound){
+            
+                void* oldAddress;
+                void* newAddress;
+                long oldAddr = 0, newAddr = 0;
+                size_t oldSize = 8, newSize = 8;
 
-	oldAddress = RealX::malloc (oldSize);
-	oldAddr = reinterpret_cast <long> (oldAddress);
+                oldAddress = RealX::malloc (oldSize);
+                oldAddr = reinterpret_cast <long> (oldAddress);
 
-	while (oldSize <= MAX_CLASS_SIZE) {
+                while (oldSize <= MAX_CLASS_SIZE) {
 
-		newSize += 8;
-		newAddress = RealX::realloc (oldAddress, newSize);
-		newAddr = reinterpret_cast <long> (newAddress);
+                        newSize += 8;
+                        newAddress = RealX::realloc (oldAddress, newSize);
+                        newAddr = reinterpret_cast <long> (newAddress);
 
-		if ((newAddr != oldAddr))
-			classSizes.push_back (oldSize);
+                        if ((newAddr != oldAddr))
+                                classSizes.push_back (oldSize);
 
-		oldAddr = newAddr;
-		oldAddress = newAddress;
-		oldSize = newSize;
-	}
+                        oldAddr = newAddr;
+                        oldAddress = newAddress;
+                        oldSize = newSize;
+                }
+
+                fprintf(classSizeFile, "%s\n", name_without_path);
+
+                for (auto cSize = classSizes.begin (); cSize != classSizes.end (); cSize++) {
+                        fprintf (classSizeFile, "%zu ", *cSize);
+                }
+
+                fprintf(classSizeFile, "\n");
+                fclose(classSizeFile);
+        }
+
 
 	fprintf (thrData.output, ">>> classSizes    ");
 
@@ -849,7 +914,10 @@ inline bool isAllocatorInCallStack() {
 
 extern "C" void * yymmap(void *addr, size_t length, int prot, int flags,
 				int fd, off_t offset) {
-		initializer();
+	
+                if(initializer() == IN_PROGRESS){
+                        return RealX::mmap(addr, length, prot, flags, fd, offset);
+                }
 	
 		mmap_lock.lock();
 		void * retval = RealX::mmap(addr, length, prot, flags, fd, offset);
