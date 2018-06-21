@@ -1,5 +1,7 @@
 #include <sys/syscall.h>
 
+#include <stdio.h>
+
 #include "memsample.h"
 #include "real.hh"
 
@@ -56,7 +58,6 @@ class xthread {
 			fprintf(stderr, "error: %s\n", strerror (errno));
 			abort();
 		}
-
 
 		pthread_attr_t attrs;
 		if(pthread_getattr_np(pthread_self(), &attrs) != 0) {

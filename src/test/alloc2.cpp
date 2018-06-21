@@ -8,11 +8,10 @@ int main() {
 		  size_t size = 8;
 		  void* pointer;
 
-		  for (int i = 0; i < 200000; i++) {
+		  for (int i = 0; i < 10000; i++) {
 
 					 pointer = malloc (size);
 					 free (pointer);
-					 size += 8;
 		  }
 
 		  return EXIT_SUCCESS;

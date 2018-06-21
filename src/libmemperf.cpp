@@ -56,7 +56,8 @@ initStatus mallocInitialized = NOT_INITIALIZED;
 uint64_t min_pos_callsite_id;
 
 #define MAX_CLASS_SIZE 65536
-#define TEMP_MEM_SIZE 8192000
+#define TEMP_MEM_SIZE 2048000  // 8MB
+#define THREAD_BUF_SIZE 2048000	// 8 MB
 
 bool bumpPointer = false;
 bool bibop = false;
@@ -76,7 +77,7 @@ int trylockAttempts = 0;
 spinlock mallocLock;
 spinlock reallocLock;
 spinlock myMallocLock;
-spinlock threadAllocLock;
+spinlock activeThreadLock;
 spinlock freeLock;
 
 void* myMalloc (size_t size);
@@ -94,14 +95,15 @@ LC* newLC () {
 	return lc;
 }
 
+HashMap <pid_t, bool, spinlock> activeThreads;
 HashMap <uint64_t, bool, spinlock> addressUsage;
 HashMap <uint64_t, LC*, spinlock> lockUsage;
 
 unsigned long cyclesFree = 0;
 unsigned long cyclesNewAlloc = 0;
 unsigned long cyclesReuseAlloc = 0;
-unsigned long malloc_mmapThreshold = 0;
-unsigned long realloc_mmapThreshold = 0;
+unsigned long malloc_mmap_threshold = 0;
+unsigned long realloc_mmap_threshold = 0;
 
 void getAllocStyle ();
 void getClassSizes ();
@@ -115,57 +117,40 @@ char tmpbuf[TEMP_MEM_SIZE];
 unsigned int numTempAllocs = 0;
 unsigned int tmppos = 0;
 
-unsigned int numMaps = 0;
+// Variables for activeThreads hashmap only
+char threadBuf [THREAD_BUF_SIZE];
+unsigned int numActiveThreads = 0;
+unsigned int threadBufPos = 0;
 
-// Array for active threads
-pid_t activeThreads [300];
-int activeThreadCount = 0;
+void* allocNewThread (size_t size) {
 
-bool isActiveThread (pid_t id) {
-
-	for (int i = 0; i < activeThreadCount; i++) 
-		if (activeThreads[i] == id) return true;
-
-	return false;
-}
-
-void addThread (pid_t id) {
-
-	activeThreads[activeThreadCount] = id;
-	activeThreadCount++;
-}
-
-void removeThread (pid_t id) {
-
-	if (isActiveThread(id)) {
-
-		// Only one active thread
-		if (activeThreadCount == 1) {
-			activeThreadCount = 0;
-			return;
-		}
-
-		// Get index
-		int index = -1;
-		for (int i = 0; i < activeThreadCount; i++) {
-			if (activeThreads[i] == id) {
-				index = i;
-				break;
-			}
-		}
-
-		// Last thread in the array
-		if ((index + 1) == activeThreadCount) {
-			activeThreadCount--;
-			return;
-		}
-
-		// Middle somewhere. Shift elements
-		for (int j = index; j < (activeThreadCount - 1); j++) {
-			activeThreads[j] = activeThreads [j+1];
-			activeThreadCount--;
-		}		
+	activeThreadLock.lock ();
+	void* retptr;
+	if((threadBufPos + size) < THREAD_BUF_SIZE) {
+		retptr = (void *)(threadBuf + threadBufPos);
+		threadBufPos += size;
+		numActiveThreads++;
+	} else {
+		fprintf(stderr, "error: activeThreads allocator out of memory\n");
+		fprintf(stderr, "\t requested size = %zu, total size = %d, "
+							 "total allocs = %u\n", size, THREAD_BUF_SIZE*4, numTempAllocs);
+		abort();
 	}
+	activeThreadLock.unlock ();
+	return retptr;
+}
+
+void freeThread (void* ptr) {
+
+	if (ptr == NULL) return;	
+
+	activeThreadLock.lock();
+	if ((ptr >= threadBuf) &&
+		(ptr <= (threadBuf + THREAD_BUF_SIZE))) {
+		numActiveThreads--;
+		if(numActiveThreads == 0) threadBufPos = 0;
+	}
+	activeThreadLock.unlock();
 }
 
 struct stack_frame {
@@ -221,7 +206,7 @@ __attribute__((constructor)) initStatus initializer() {
 	mallocLock.init ();
 	reallocLock.init ();
 	myMallocLock.init ();
-	threadAllocLock.init ();
+	activeThreadLock.init ();
 	freeLock.init ();
 
 	// Calculate the minimum possible callsite ID by taking the low four bytes
@@ -256,7 +241,7 @@ __attribute__((constructor)) initStatus initializer() {
 	pid_t pid = getpid();
 //	snprintf(outputFile, MAX_FILENAME_LEN, "%s_libmemperf_pid_%d_tid_%d.txt",
 //		program_invocation_name, pid, pid);
-	snprintf(outputFile, MAX_FILENAME_LEN, "%s_libmemperf_pid_%d.txt",
+	snprintf(outputFile, MAX_FILENAME_LEN, "%s_libmemperf_pid_%d_main_thread.txt",
 		program_invocation_name, pid);
 	// Will overwrite current file; change the fopen flag to "a" for append.
 	thrData.output = fopen(outputFile, "w");
@@ -273,6 +258,9 @@ __attribute__((constructor)) initStatus initializer() {
 	addressUsage.initialize(HashFuncs::hashCallsiteId,
 			HashFuncs::compareCallsiteId, 4096);
 
+	activeThreads.initialize(HashFuncs::hashInt,
+			HashFuncs::compareInt, 4096);
+
 	lockUsage.initialize(HashFuncs::hashCallsiteId,
 						 HashFuncs::compareCallsiteId, 4096);
 
@@ -287,7 +275,7 @@ __attribute__((constructor)) initStatus initializer() {
 	//get mmap threshold
 	getMmapThreshold ();
         
-        return mallocInitialized;
+   return mallocInitialized;
 }
 
 __attribute__((destructor)) void finalizer_memperf() {
@@ -349,8 +337,8 @@ extern "C" {
 				return retptr;
 			} else {
 				fprintf(stderr, "error: temp allocator out of memory\n");
-				fprintf(stderr, "\t requested size = %zu, total size = %zu, "
-					"total allocs = %u\n", sz, sizeof (tmpbuf), numTempAllocs);
+				fprintf(stderr, "\t requested size = %zu, total size = %d, "
+					"total allocs = %u\n", sz, TEMP_MEM_SIZE, numTempAllocs);
 				abort();
 			}
 		}
@@ -360,10 +348,11 @@ extern "C" {
 		pid_t tid = gettid ();
 
 		//If already there, then just pass the malloc to RealX
-		if (isActiveThread(tid)) return RealX::malloc (sz);
+		bool find;
+		if (activeThreads.find (tid, &find)) return RealX::malloc (sz);
 
 		//Add thread id to list of active threads
-		addThread (tid);
+		activeThreads.insertThread (tid, true);
 
 		//Collect allocation data
 		void* objAlloc;
@@ -373,9 +362,8 @@ extern "C" {
 		uint64_t cyclesForMalloc = after - before;
 		uint64_t address = reinterpret_cast <uint64_t> (objAlloc);
 
-		//Has this address been used beforea
-		bool t;
-		if (addressUsage.find (address, &t)) {
+		//Has this address been used before
+		if (addressUsage.find (address, &find)) {
 			mallocLock.lock ();
 			reused_address++;
 			cyclesReuseAlloc += cyclesForMalloc;
@@ -395,7 +383,7 @@ extern "C" {
 		mallocLock.unlock ();
 
 		//Remove thread id from active threads
-		removeThread (tid);
+		activeThreads.eraseThread (tid);
 		return objAlloc;
 	}
 
@@ -615,25 +603,25 @@ extern "C" {
 		return info;
 	}
 
+	/*
 	// Intercept thread creation
 	int pthread_create(pthread_t * tid, const pthread_attr_t * attr,
 			void *(*start_routine)(void *), void * arg) {
 		return xthread::thread_create(tid, attr, start_routine, arg);
 	}
+	*/
 	
 	int pthread_mutex_lock(pthread_mutex_t *mutex) {
 
 		if (!mapsInitialized) 
 			return RealX::pthread_mutex_lock (mutex);
 
-		//Aquire the lock
-		int result = RealX::pthread_mutex_lock (mutex);
-
 		uint64_t lockAddr = reinterpret_cast <uint64_t> (mutex);
 		pid_t tid = gettid ();
 
 		//Is this thread doing allocation
-		if (isActiveThread(tid)) {
+		bool find;
+		if (activeThreads.find(tid, &find)) {
 
 			//Have we encountered this lock before?
 			LC* thisLock;
@@ -651,6 +639,8 @@ extern "C" {
 			}	
 		}
 
+		//Aquire the lock
+		int result = RealX::pthread_mutex_lock (mutex);
 		return result;
 	}
 
@@ -658,15 +648,13 @@ extern "C" {
 
 		if (!mapsInitialized)
 			return RealX::pthread_mutex_trylock (mutex);
-
-		//Try to aquire the lock
-		int result = RealX::pthread_mutex_trylock (mutex);
 	
 		uint64_t lockAddr = reinterpret_cast <uint64_t> (mutex);
 		pid_t tid = gettid ();
 
 		//Is this thread doing allocation
-		if (isActiveThread(tid)) {
+		bool find;
+		if (activeThreads.find(tid, &find)) {
 
 			//Have we encountered this lock before?
 			LC* thisLock;
@@ -684,6 +672,8 @@ extern "C" {
 			}	
 		}
 
+		//Try to aquire the lock
+		int result = RealX::pthread_mutex_trylock (mutex);
 		if (result != 0) trylockAttempts++;
 		return result;
 	}
@@ -727,7 +717,7 @@ void* myMalloc (size_t size) {
 	} else {
 		fprintf(stderr, "error: global allocator out of memory\n");
 		fprintf(stderr, "\t requested size = %zu, total size = %d, "
-							 "total allocs = %u\n", size, TEMP_MEM_SIZE * 4, numTempAllocs);
+							 "total allocs = %u\n", size, TEMP_MEM_SIZE*4, numTempAllocs);
 		abort();
 	}
 	myMallocLock.unlock ();
@@ -893,8 +883,8 @@ void writeAllocData () {
 	fprintf (thrData.output, ">>> reused_address     %d\n", reused_address);
 	fprintf (thrData.output, ">>> frees              %d\n", numFrees);
 	fprintf (thrData.output, ">>> num_mmaps          %d\n", num_mmaps);
-	fprintf (thrData.output, ">>> malloc_mmapThreshold   %zu\n", malloc_mmapThreshold);
-	fprintf (thrData.output, ">>> realloc_mmapThreshold  %zu\n", realloc_mmapThreshold);
+	fprintf (thrData.output, ">>> malloc_mmap_threshold   %zu\n", malloc_mmap_threshold);
+	fprintf (thrData.output, ">>> realloc_mmap_threshold  %zu\n", realloc_mmap_threshold);
 
 	if (new_address > 0)
 		fprintf (thrData.output, ">>> cyclesNewAlloc     %zu\n",
@@ -1032,16 +1022,17 @@ extern "C" void * yymmap(void *addr, size_t length, int prot, int flags,
 		//Is the profiler getting mmap threshold?
 		if (inGetMmapThreshold) {
 
-			if ((realloc_mmapThreshold == 0) && usingRealloc)
-				realloc_mmapThreshold = length;
-			else if ((malloc_mmapThreshold == 0) && usingMalloc)
-				malloc_mmapThreshold = length;
+			if ((realloc_mmap_threshold == 0) && usingRealloc)
+				realloc_mmap_threshold = length;
+			else if ((malloc_mmap_threshold == 0) && usingMalloc)
+				malloc_mmap_threshold = length;
 		}
 
 		else {
 			//Is this thread currently doing an allocation?
 			pid_t tid = gettid ();
-			if (isActiveThread(tid)) 
+			bool find;
+			if (activeThreads.find(tid, &find)) 
 				mmap_lock.lock();
 				num_mmaps++;
 				mmap_lock.unlock();
