@@ -42,6 +42,7 @@ extern char __executable_start;
 
 const char *CLASS_SIZE_FILE_NAME = "class_sizes.txt";
 FILE *classSizeFile;
+char *name_without_path;
 
 bool const debug = false;
 
@@ -65,6 +66,7 @@ bool usingMalloc = false;
 bool usingRealloc = false;
 bool inRealloc = false;
 bool mapsInitialized = false;
+bool gettingClassSizes = false;
 
 int numFrees = 0;
 int numMallocs = 0;
@@ -72,6 +74,7 @@ int new_address = 0;
 int reused_address = 0;
 int num_pthread_mutex_locks = 0;
 int trylockAttempts = 0;
+int dontneed_advice_count = 0;
 
 spinlock mallocLock;
 spinlock reallocLock;
@@ -304,12 +307,12 @@ void exitHandler() {
 
 // MemPerf's main function
 int libmemperf_main(int argc, char ** argv, char ** envp) {
-	// Register our cleanup routine as an on-exit handler.
+    // Register our cleanup routine as an on-exit handler.
 	atexit(exitHandler);
 
 	initSampling();
 	
-	return real_main_memperf(argc, argv, envp);
+    return real_main_memperf(argc, argv, envp);
 }
 
 extern "C" int __libc_start_main(main_fn_t, int, char **, void (*)(),
@@ -361,6 +364,9 @@ extern "C" {
 
 		//If already there, then just pass the malloc to RealX
 		if (isActiveThread(tid)) return RealX::malloc (sz);
+
+        //If in our getClassSizes function, use RealX
+        if(gettingClassSizes) return RealX::malloc(sz);
 
 		//Add thread id to list of active threads
 		addThread (tid);
@@ -704,6 +710,14 @@ extern "C" {
 
 		return RealX::pthread_mutex_unlock (mutex);
 	}
+
+    int madvise(void *addr, size_t length, int advice){
+
+        if(advice == MADV_DONTNEED) dontneed_advice_count++;
+        
+        return RealX::madvise(addr, length, advice);
+
+    }
 }
 
 // Richard
@@ -773,17 +787,18 @@ void getAllocStyle () {
 }
 
 void getClassSizes () {
-
-	std::vector <uint64_t> classSizes;
+        
+        gettingClassSizes = true;
+        
+	    std::vector <uint64_t> classSizes;
         size_t bytesToRead = 0;
         bool matchFound = false;        
         char *line;
         char *token;
         
-        char *name_without_path = strrchr(program_invocation_name, '/') + 1;        
-        
+        name_without_path = strrchr(program_invocation_name, '/') + 1;        
         classSizeFile = fopen(CLASS_SIZE_FILE_NAME, "a+");        
-        
+       
         while(getline(&line, &bytesToRead, classSizeFile) != -1){
             
                 line[strcspn(line, "\n")] = 0;
@@ -840,19 +855,22 @@ void getClassSizes () {
                 }
 
                 fprintf(classSizeFile, "\n");
-                fclose(classSizeFile);
         }
 
 
-	fprintf (thrData.output, ">>> classSizes    ");
+    	fprintf (thrData.output, ">>> classSizes    ");
 
-	if (!classSizes.empty ()) {
+        if (!classSizes.empty ()) {
 
-		for (auto cSize = classSizes.begin (); cSize != classSizes.end (); cSize++) 
-			fprintf (thrData.output, "%zu ", *cSize);
-	}
+            for (auto cSize = classSizes.begin (); cSize != classSizes.end (); cSize++) 
+                fprintf (thrData.output, "%zu ", *cSize);
+        }
 
-	fprintf (thrData.output, "\n");
+        fclose(classSizeFile);
+
+        fprintf (thrData.output, "\n");
+
+        gettingClassSizes = false;
 }
 
 void getMmapThreshold () {
