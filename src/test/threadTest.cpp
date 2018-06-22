@@ -3,16 +3,20 @@
 #include <unistd.h>
 #include <sys/mman.h>
 #include <pthread.h>
+#include <malloc.h>
 
-#define NUM_THREADS 50
+#define NUM_THREADS 5
 
 void* thread_start (void*);
+pthread_barrier_t barrier;
 
 int main() {
 
 	pthread_t threads[NUM_THREADS];
 	int create, join;
 	void* result;
+
+	pthread_barrier_init (&barrier, NULL, (unsigned int) NUM_THREADS);
 
 	for (int i = 0; i < NUM_THREADS; i++) {
 
@@ -36,19 +40,19 @@ int main() {
 		}
 	}
 
+//	malloc_stats ();
+
 	return EXIT_SUCCESS;
 }
 
 void* thread_start (void* arg) {
 
-	int i, j;
-	int* ptr;
-	for (i = 0; i < 1000; i++) {
+	int i;
+	void* ptr;
+	for (i = 0; i < 10000; i++) {
 
-		ptr = (int *) malloc(sizeof(int));
-		for(j = 0; j < 1000; j++) {
-			*ptr = i * j;
-		}
+		//pthread_barrier_wait (&barrier);
+		ptr = malloc (16);
 		free(ptr);
 	}
 
