@@ -56,16 +56,16 @@ initStatus mallocInitialized = NOT_INITIALIZED;
 uint64_t min_pos_callsite_id;
 
 #define MAX_CLASS_SIZE 65536
-#define TEMP_MEM_SIZE 2048000  // 8MB
-#define THREAD_BUF_SIZE 2048000	// 8 MB
+#define TEMP_MEM_SIZE 2048000  // This * sizeof char = 8MB
+#define THREAD_BUF_SIZE 2048000	// This * sizeof char = 8MB
 
 bool bumpPointer = false;
 bool bibop = false;
 bool inGetMmapThreshold = false;
 bool usingMalloc = false;
 bool usingRealloc = false;
-bool inRealloc = false;
 bool mapsInitialized = false;
+bool mmap_found = false;
 
 int numFrees = 0;
 int numMallocs = 0;
@@ -73,12 +73,22 @@ int new_address = 0;
 int reused_address = 0;
 int num_pthread_mutex_locks = 0;
 int trylockAttempts = 0;
+int numThreadsWaiting = 0;
+int totalWaits = 0;
+
+thread_local uint64_t timeAttempted;
+thread_local uint64_t timeWaiting;
+thread_local int numWaits;
+thread_local bool waiting;
+
+uint64_t totalTimeWaiting = 0;
 
 spinlock mallocLock;
 spinlock reallocLock;
 spinlock myMallocLock;
 spinlock activeThreadLock;
 spinlock freeLock;
+spinlock trylockLock;
 
 void* myMalloc (size_t size);
 void myFree (void* ptr);
@@ -86,12 +96,14 @@ void myFree (void* ptr);
 typedef struct LockContention {
 	int contention;
 	int maxContention;
+	uint64_t waitingTime;
 } LC;
 
 LC* newLC () {
 	LC* lc = (LC*) myMalloc (sizeof(LC));
 	lc->contention = 1;
 	lc->maxContention = 1;
+	lc->waitingTime = 0;
 	return lc;
 }
 
@@ -208,6 +220,7 @@ __attribute__((constructor)) initStatus initializer() {
 	myMallocLock.init ();
 	activeThreadLock.init ();
 	freeLock.init ();
+	trylockLock.init ();
 
 	// Calculate the minimum possible callsite ID by taking the low four bytes
 	// of the start of the program text and repeating them twice, back-to-back,
@@ -458,11 +471,7 @@ extern "C" {
 			return yymalloc(sz);
 		}
 
-		reallocLock.lock ();
-		inRealloc = true;
 		void * reptr = RealX::realloc(ptr, sz);
-		inRealloc = false;
-		reallocLock.unlock ();
 
 		return reptr;
 	}
@@ -603,16 +612,18 @@ extern "C" {
 		return info;
 	}
 
-	/*
+/*
 	// Intercept thread creation
 	int pthread_create(pthread_t * tid, const pthread_attr_t * attr,
 			void *(*start_routine)(void *), void * arg) {
-		return xthread::thread_create(tid, attr, start_routine, arg);
+		int result = xthread::thread_create(tid, attr, start_routine, arg);
+		
+		return result;
 	}
-	*/
+*/
 	
 	int pthread_mutex_lock(pthread_mutex_t *mutex) {
-
+	
 		if (!mapsInitialized) 
 			return RealX::pthread_mutex_lock (mutex);
 
@@ -627,20 +638,32 @@ extern "C" {
 			LC* thisLock;
 			if (lockUsage.find (lockAddr, &thisLock)) {
 				thisLock->contention++;
-				if (thisLock->contention > thisLock->maxContention) 
+
+				if (thisLock->contention > thisLock->maxContention)
 					thisLock->maxContention = thisLock->contention;
+
+				if (thisLock->contention > 1) {
+				   timeAttempted = rdtscp();
+					numWaits++;
+					totalWaits++;
+					waiting = true;
+				}
 			}	
 
 			//Add lock to lockUsage hashmap
 			else {
 				num_pthread_mutex_locks++;
-				LC* lc = newLC();
-				lockUsage.insertIfAbsent (lockAddr, lc);
+				lockUsage.insertIfAbsent (lockAddr, newLC());
 			}	
 		}
 
 		//Aquire the lock
 		int result = RealX::pthread_mutex_lock (mutex);
+		if (waiting) {
+			 timeWaiting += ((rdtscp()) - timeAttempted);
+			waiting = false;
+			totalTimeWaiting += timeWaiting;
+		}
 		return result;
 	}
 
@@ -674,7 +697,11 @@ extern "C" {
 
 		//Try to aquire the lock
 		int result = RealX::pthread_mutex_trylock (mutex);
-		if (result != 0) trylockAttempts++;
+		if (result != 0) {
+			trylockLock.lock();
+			trylockAttempts++;
+			trylockLock.unlock();
+		}
 		return result;
 	}
 
@@ -684,7 +711,7 @@ extern "C" {
 			return RealX::pthread_mutex_unlock (mutex);
 
 		uint64_t lockAddr = reinterpret_cast <uint64_t> (mutex);
-			
+
 		//Decrement contention on this LC if this lock is
 		//in our map
 		LC* thisLock;
@@ -855,24 +882,27 @@ void getMmapThreshold () {
 	// Find realloc mmap threshold
 	usingRealloc = true;
 	reallocPtr = RealX::malloc (size);
-	for (int i = 0; i < 150000; i++) {
+	while (!mmap_found) {
 
 		reallocPtr = RealX::realloc (reallocPtr, size);
 		size += 8;
 	}
-	usingRealloc = false;
 
+	usingRealloc = false;
+	mmap_found = false;
+
+	// Find malloc mmap threshold
 	size = 3000;
 	usingMalloc = true;
-	// Find malloc mmap threshold
-	for (int i = 0; i < 150000; i++) {
+	while (!mmap_found) {
 
 		mallocPtr = RealX::malloc (size);
 		RealX::free (mallocPtr);
 		size += 8;
 	}
-	usingMalloc = false;
 
+	usingMalloc = false;
+	mmap_found = false;
 	inGetMmapThreshold = false;
 }
 
@@ -908,6 +938,11 @@ void writeAllocData () {
 		fprintf (thrData.output, ">>> cyclesFree         N/A\n");
 
 	fprintf (thrData.output, ">>> pthread_mutex_lock %d\n", num_pthread_mutex_locks);
+
+	if (totalWaits > 0) {
+		fprintf (thrData.output, ">>> avg lock wait      %zu\n", (totalTimeWaiting/(uint64_t)totalWaits));
+	}
+	
 	fflush (thrData.output);
 }
 
@@ -1022,10 +1057,14 @@ extern "C" void * yymmap(void *addr, size_t length, int prot, int flags,
 		//Is the profiler getting mmap threshold?
 		if (inGetMmapThreshold) {
 
-			if ((realloc_mmap_threshold == 0) && usingRealloc)
+			if ((realloc_mmap_threshold == 0) && usingRealloc) {
 				realloc_mmap_threshold = length;
-			else if ((malloc_mmap_threshold == 0) && usingMalloc)
+				mmap_found = true;
+			}
+			else if ((malloc_mmap_threshold == 0) && usingMalloc) {
 				malloc_mmap_threshold = length;
+				mmap_found = true;
+			}
 		}
 
 		else {
