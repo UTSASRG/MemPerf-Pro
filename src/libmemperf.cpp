@@ -65,7 +65,6 @@ bool bibop = false;
 bool inGetMmapThreshold = false;
 bool usingMalloc = false;
 bool usingRealloc = false;
-bool inRealloc = false;
 bool mapsInitialized = false;
 bool gettingClassSizes = false;
 
@@ -82,6 +81,7 @@ spinlock reallocLock;
 spinlock myMallocLock;
 spinlock activeThreadLock;
 spinlock freeLock;
+spinlock madviseLock;
 
 void* myMalloc (size_t size);
 void myFree (void* ptr);
@@ -211,6 +211,7 @@ __attribute__((constructor)) initStatus initializer() {
 	myMallocLock.init ();
 	activeThreadLock.init ();
 	freeLock.init ();
+    madviseLock.init ();
 
 	// Calculate the minimum possible callsite ID by taking the low four bytes
 	// of the start of the program text and repeating them twice, back-to-back,
@@ -395,6 +396,14 @@ extern "C" {
 
 	void * yycalloc(size_t nelem, size_t elsize) {
 		
+//		if (!mapsInitialized) return RealX::calloc (nelem, elsize);
+
+//		pid_t tid = gettid ();
+
+		//If already there, then just pass the malloc to RealX
+//		bool find;
+//		if (activeThreads.find (tid, &find)) return RealX::calloc (nelem, elsize);
+
 		void * ptr = NULL;
 		ptr = malloc (nelem * elsize);
 		if(ptr)
@@ -457,20 +466,25 @@ extern "C" {
 	}
 
 	void * yyrealloc(void * ptr, size_t sz) {
-		if(mallocInitialized != INITIALIZED) {
+
+	//	if (!mapsInitialized) return RealX::realloc (ptr, sz);
+
+	//	pid_t tid = gettid ();
+
+		//If already there, then just pass the realloc to RealX
+	//	bool find;
+	//	if (activeThreads.find (tid, &find)) return RealX::realloc (ptr, sz);
+
+        if(mallocInitialized != INITIALIZED) {
 			if(ptr == NULL)
 				return yymalloc(sz);
 			yyfree(ptr);
 			return yymalloc(sz);
 		}
 
-		reallocLock.lock ();
-		inRealloc = true;
 		void * reptr = RealX::realloc(ptr, sz);
-		inRealloc = false;
-		reallocLock.unlock ();
-
-		return reptr;
+		
+        return reptr;
 	}
 
 	inline void getCallsites(void **callsites) {
@@ -703,10 +717,16 @@ extern "C" {
 
     int madvise(void *addr, size_t length, int advice){
 
-        if(advice == MADV_DONTNEED) dontneed_advice_count++;
-        
-        return RealX::madvise(addr, length, advice);
+        if (advice == MADV_DONTNEED){
 
+            madviseLock.lock();
+            dontneed_advice_count++;
+            madviseLock.unlock();
+            fprintf(stderr, "dontneed count: %d", dontneed_advice_count);
+
+        }
+
+        return RealX::madvise(addr, length, advice);
     }
 }
 
@@ -938,7 +958,7 @@ void writeContention () {
 
 	auto mapEnd = lockUsage.end();
 	for (auto lock = lockUsage.begin(); lock != mapEnd; lock++) 
-		fprintf (file, "lockAddr= %zu  maxContention= %d\n", lock.getkey(), lock.getData()->maxContention);
+		fprintf (file, "lockAddr= %zX  maxContention= %d\n", lock.getkey(), lock.getData()->maxContention);
 
 	fflush (file);
 	fclose (file);

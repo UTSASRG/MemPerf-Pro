@@ -26,7 +26,8 @@ LIBS     := dl pthread
 
 TARGETS = libmemperf.so test/test-clean test/test-obsd test/test-xlibc test/test-freeguard \
 			 test/test-dieharder test/test-obsd-thread test/test-freeguard-thread \
-			 test/test-dieharder-thread test/test-xlibc-thread
+			 test/test-dieharder-thread test/test-xlibc-thread test/bs-obsd test/bs-libc \
+			 test/bs-freeguard test/bs-dieharder
 
 all: $(TARGETS)
 
@@ -61,6 +62,19 @@ test/test-xlibc: libmemperf.so test/alloc2.cpp
 
 test/test-xlibc-thread: libmemperf.so test/threadTest.cpp
 	$(CXX) $(CFLAGS2) -rdynamic ./libmemperf.so -rdynamic /home/richard/Memoryallocators/libc-2.24/libmalloc.so -o test/test-xlibc-thread test/threadTest.cpp -pthread
+
+#Parsec Black-Scholes
+test/bs-libc: libmemperf.so test/blackscholes.c
+	$(CXX) $(CFLAGS2) -rdynamic ./libmemperf.so -rdynamic /home/richard/Memoryallocators/libc-2.24/libmalloc.so -o test/bs-libc test/blackscholes.c -pthread -fopenmp
+
+test/bs-obsd: libmemperf.so test/blackscholes.c
+	$(CXX) $(CFLAGS2) -rdynamic ./libmemperf.so -rdynamic /home/sam/Memoryallocators/OpenBSD-6.0/libomalloc.so -o test/bs-libc test/blackscholes.c -pthread -fopenmp
+
+test/bs-dieharder: libmemperf.so test/blackscholes.c
+	$(CXX) $(CFLAGS2) -rdynamic ./libmemperf.so -rdynamic /home/sam/Memoryallocators/DieHard/src/libdieharder.so -o test/bs-dieharder test/blackscholes.c -pthread -fopenmp
+
+test/bs-freeguard: libmemperf.so test/blackscholes.c
+	$(CXX) $(CFLAGS2) -rdynamic ./libmemperf.so -rdynamic /home/richard/FreeGuard/libfreeguard.so -o test/bs-freeguard test/blackscholes.c -pthread -fopenmp
 
 # Clean
 test/test-clean: test/alloc.cpp
