@@ -13,6 +13,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <atomic>
 
 #include "list.hh"
 #include "spinlock.hh"
@@ -21,7 +22,7 @@ void* myMalloc (size_t size);
 void myFree (void* ptr);
 void* allocNewThread (size_t size);
 void freeThread (void* ptr);
-bool threadMap = false;
+bool DEBUG = false;
 
 template <class KeyType,                    // What is the key? A long or string
 		 class ValueType,                  // What is the value there?
@@ -132,13 +133,18 @@ template <class KeyType,                    // What is the key? A long or string
 				 assert(_initialized == true);
 				 size_t hindex = hashIndex(key, keylen);
 				 struct HashEntry* first = getHashEntry(hindex);
-				 struct Entry* entry = getEntry(first, key, keylen);
+				 if (DEBUG) printf (" IN FIND\n");
+
 				 bool isFound = false;
+					first->Lock();
+				 struct Entry* entry = getEntry(first, key, keylen);
 
 				 if(entry) {
 					 *value = entry->value;
 					 isFound = true;
 				 }
+
+					first->Unlock();
 
 				 return isFound;
 			 }
@@ -178,64 +184,6 @@ template <class KeyType,                    // What is the key? A long or string
 				 return isFound;
 			 }
 
-				// Specific to activeThreads HashMap
-			 // Insert a hash table entry if it is not existing.
-			 // If the entry is already existing, return true
-			 bool insertThread (const KeyType& key, ValueType value) {
-				 assert(_initialized == true);
-				 size_t keylen = sizeof(key);
-				 size_t hindex = hashIndex(key, keylen);
-				 struct HashEntry* first = getHashEntry(hindex);
-				 struct Entry* entry;
-				 bool isFound = true;
-
-				 first->Lock();
-
-				 // Check all _entries with the same hindex.
-				 entry = getEntry(first, key, keylen);
-				 if(!entry) {
-					 isFound = false;
-					 threadMap = true;
-					 insertEntry(first, key, keylen, value);
-					 threadMap = false;
-				 }
-
-				 first->Unlock();
-
-				 return isFound;
-			 }
-
-				// Specific to activeThreads HashMap
-			 // Free an entry with specified
-			 bool eraseThread(const KeyType& key) {
-				 assert(_initialized == true);
-				 size_t keylen = sizeof(key);
-				 size_t hindex = hashIndex(key, keylen);
-				 struct HashEntry* first = getHashEntry(hindex);
-				 struct Entry* entry;
-				 bool isFound = false;
-
-				 first->Lock();
-
-				 entry = getEntry(first, key, keylen);
-
-				 if(entry) {
-					 isFound = true;
-
-					 // Check whether this entry is the first entry.
-					 // Remove this entry if existing.
-					 entry->erase();
-
-					 freeThread (entry);
-				 }
-
-				 first->count--;
-
-				 first->Unlock();
-
-				 return isFound;
-			 }
-
 			 // Free an entry with specified
 			 bool erase(const KeyType& key) {
 				 assert(_initialized == true);
@@ -255,11 +203,81 @@ template <class KeyType,                    // What is the key? A long or string
 					 // Check whether this entry is the first entry.
 					 // Remove this entry if existing.
 					 entry->erase();
-
+					 first->count--;
 					 myFree (entry);
 				 }
 
-				 first->count--;
+				 first->Unlock();
+
+				 return isFound;
+			 }
+
+
+				// Specific to activeThreads HashMap
+			 // Insert a hash table entry if it is not existing.
+			 // If the entry is already existing, return true
+			 bool insertThread (const KeyType& key, ValueType value) {
+				 assert(_initialized == true);
+				 size_t keylen = sizeof(key);
+				 size_t hindex = hashIndex(key, keylen);
+				 struct HashEntry* first = getHashEntry(hindex);
+				 struct Entry* entry;
+				 bool isFound = true;
+
+				 first->Lock();
+				
+				 if (DEBUG) printf ("               TRYING TO INSERT %zu to hindex= %zu\n", (unsigned long)key, hindex);
+				 // Check all _entries with the same hindex.
+				 entry = getEntry(first, key, keylen);
+				 if(!entry) {
+					 isFound = false;
+					 insertEntryT(first, key, keylen, value);
+				 }
+
+				 if (DEBUG) {
+					printf ("after insert, calling getEntry\n");
+					getEntry(first, key, keylen);
+				 }
+
+				 first->Unlock();
+
+				 return isFound;
+			 }
+
+				// Specific to activeThreads HashMap
+			 // Free an entry with specified
+			 bool eraseThread(const KeyType& key) {
+				 assert(_initialized == true);
+				 size_t keylen = sizeof(key);
+				 size_t hindex = hashIndex(key, keylen);
+				 struct HashEntry* first = getHashEntry(hindex);
+				 struct Entry* entry;
+				 bool isFound = false;
+
+				 first->Lock();
+					
+				 if (DEBUG) {
+					printf ("\n     TRYING TO ERASE %zu in hindex %zu\n\n", (unsigned long)key, hindex);
+				 }
+
+				 entry = getEntry(first, key, keylen);
+
+				 if(entry) {
+					 isFound = true;
+
+					 // Check whether this entry is the first entry.
+					 // Remove this entry if existing.
+					 entry->erase();
+					 first->count--;
+					 freeThread (entry);
+				 }
+
+				 else {printf ("entry wasn't found\n");}
+
+				 if (DEBUG) {
+					printf ("after erase, calling getEntry\n");
+					getEntry (first, key, keylen);
+				 }
 
 				 first->Unlock();
 
@@ -272,14 +290,6 @@ template <class KeyType,                    // What is the key? A long or string
 			 private:
 			 // Create a new Entry with specified key and value.
 			 struct Entry* createNewEntry(const KeyType& key, size_t keylen, ValueType value) {
-				if (threadMap) {
-					struct Entry* entry = (struct Entry*)	allocNewThread (sizeof(struct Entry));
-		
-					// Initialize this new entry.
-					entry->initialize(key, keylen, value);
-					return entry;
-				}
-
 				 struct Entry* entry = (struct Entry*)	myMalloc (sizeof(struct Entry));
 		
 				 // Initialize this new entry.
@@ -287,10 +297,27 @@ template <class KeyType,                    // What is the key? A long or string
 				 return entry;
 			 }
 
+			 // Create a new Entry with specified key and value.
+			 struct Entry* createNewEntryT(const KeyType& key, size_t keylen, ValueType value) {
+					struct Entry* entry = (struct Entry*) allocNewThread (sizeof(struct Entry));
+		
+					// Initialize this new entry.
+					entry->initialize(key, keylen, value);
+					return entry;
+			 }
+
 			 void insertEntry(struct HashEntry* head, const KeyType& key, size_t keylen, ValueType value) {
 				 // Check whether the first entry is empty or not.
 				 // Create an entry
 				 struct Entry* entry = createNewEntry(key, keylen, value);
+				 listInsertTail(&entry->list, &head->list);
+				 head->count++;
+			 }
+
+			 void insertEntryT(struct HashEntry* head, const KeyType& key, size_t keylen, ValueType value) {
+				 // Check whether the first entry is empty or not.
+				 // Create an entry
+				 struct Entry* entry = createNewEntryT(key, keylen, value);
 				 listInsertTail(&entry->list, &head->list);
 				 head->count++;
 			 }
@@ -302,16 +329,20 @@ template <class KeyType,                    // What is the key? A long or string
 
 				 // Check all _entries with the same hindex.
 				 int count = first->count;
+				 if (DEBUG) printf ("getEntry called, count= %d\n", count);
 				 while(count > 0) {
+
+					 if (DEBUG) printf ("entry:key= %zu\n ", (unsigned long) entry->getKey());
+
 					 if(entry->keylen == keylen && _keycmp(entry->key, key, keylen)) {
 						 result = entry;
+						 if (DEBUG) printf ("key found\n");
 						 break;
 					 }
 
 					 entry = entry->nextEntry();
 					 count--;
 				 }
-
 				 return result;
 			 }
 
