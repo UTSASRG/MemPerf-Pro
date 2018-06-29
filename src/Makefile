@@ -63,18 +63,18 @@ test/test-xlibc: libmemperf.so test/alloc2.cpp
 test/test-xlibc-thread: libmemperf.so test/threadTest.cpp
 	$(CXX) $(CFLAGS2) -rdynamic ./libmemperf.so -rdynamic /home/richard/Memoryallocators/libc-2.24/libmalloc.so -o test/test-xlibc-thread test/threadTest.cpp -pthread
 
-#Parsec Black-Scholes
-test/bs-libc: libmemperf.so test/blackscholes.c
-	$(CXX) $(CFLAGS2) -rdynamic ./libmemperf.so -rdynamic /home/richard/Memoryallocators/libc-2.24/libmalloc.so -o test/bs-libc test/blackscholes.c -pthread 
+#Parsec Black-Scholes multithreaded
+test/bs-libc: libmemperf.so test/blackscholes-pthread.cpp
+	$(CXX) $(CFLAGS2) -rdynamic ./libmemperf.so -rdynamic /home/richard/Memoryallocators/libc-2.24/libmalloc.so -o test/bs-libc test/blackscholes-pthread.cpp -lpthread -DENABLE_THREADS
 
-test/bs-obsd: libmemperf.so test/blackscholes.c
-	$(CXX) $(CFLAGS2) -rdynamic ./libmemperf.so -rdynamic /home/sam/Memoryallocators/OpenBSD-6.0/libomalloc.so -o test/bs-libc test/blackscholes.c -pthread 
+test/bs-obsd: libmemperf.so test/blackscholes-pthread.cpp
+	$(CXX) $(CFLAGS2) -rdynamic ./libmemperf.so -rdynamic /home/sam/Memoryallocators/OpenBSD-6.0/libomalloc.so -o test/bs-obsd test/blackscholes-pthread.cpp -lpthread -DENABLE_THREADS
 
-test/bs-dieharder: libmemperf.so test/blackscholes.c
-	$(CXX) $(CFLAGS2) -rdynamic ./libmemperf.so -rdynamic /home/sam/Memoryallocators/DieHard/src/libdieharder.so -o test/bs-dieharder test/blackscholes.c -pthread 
+test/bs-dieharder: libmemperf.so test/blackscholes-pthread.cpp
+	$(CXX) $(CFLAGS2) -rdynamic ./libmemperf.so -rdynamic /home/sam/Memoryallocators/DieHard/src/libdieharder.so -o test/bs-dieharder test//blackscholes-pthread.cpp -lpthread -DENABLE_THREADS  
 
-test/bs-freeguard: libmemperf.so test/blackscholes.c
-	$(CXX) $(CFLAGS2) -rdynamic ./libmemperf.so -rdynamic /home/richard/FreeGuard/libfreeguard.so -o test/bs-freeguard test/blackscholes.c -pthread
+test/bs-freeguard: libmemperf.so test/blackscholes-pthread.cpp
+	$(CXX) $(CFLAGS2) -rdynamic ./libmemperf.so -rdynamic /home/richard/FreeGuard/libfreeguard.so -o test/bs-freeguard test/blackscholes-pthread.cpp -lpthread -DENABLE_THREADS
 
 # Clean
 test/test-clean: test/alloc.cpp
