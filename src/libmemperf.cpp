@@ -71,21 +71,26 @@ bool gettingClassSizes = false;
 
 int numFrees = 0;
 int numMallocs = 0;
+int numCallocs = 0;
+int numReallocs = 0;
 int new_address = 0;
 int reused_address = 0;
 int num_pthread_mutex_locks = 0;
 int trylockAttempts = 0;
+
 uint64_t totalWaits = 0;
 uint64_t totalTimeWaiting = 0;
+
+int dontneed_advice_count = 0;
+int madvise_calls = 0;
 
 thread_local uint64_t timeAttempted;
 thread_local uint64_t timeWaiting;
 thread_local uint64_t numWaits;
 thread_local bool waiting;
 
-int dontneed_advice_count = 0;
-
 spinlock mallocLock;
+spinlock callocLock;
 spinlock reallocLock;
 spinlock myMallocLock;
 spinlock threadAllocLock;
@@ -238,8 +243,8 @@ extern "C" {
 __attribute__((constructor)) initStatus initializer() {
     
 	if(mallocInitialized == INITIALIZED || mallocInitialized == IN_PROGRESS){
-                return mallocInitialized;
-        }
+            return mallocInitialized;
+    }
         mallocInitialized = IN_PROGRESS;
 
 	// Ensure we are operating on a system using 64-bit pointers.
@@ -254,6 +259,7 @@ __attribute__((constructor)) initStatus initializer() {
 
 	mmap_lock.init();
 	mallocLock.init ();
+    callocLock.init();
 	reallocLock.init ();
 	myMallocLock.init ();
 	threadAllocLock.init ();
@@ -446,20 +452,50 @@ extern "C" {
 	}
 
 	void * yycalloc(size_t nelem, size_t elsize) {
-		
-//		if (!mapsInitialized) return RealX::calloc (nelem, elsize);
 
-//		pid_t tid = gettid ();
+        bool find;
+        int tid = (int) gettid();
 
-		//If already there, then just pass the malloc to RealX
-//		bool find;
-//		if (activeThreads.find (tid, &find)) return RealX::calloc (nelem, elsize);
+        if(!mapsInitialized || activeThreads.find(tid, &find)){
 
-		void * ptr = NULL;
-		ptr = malloc (nelem * elsize);
-		if(ptr)
-			memset(ptr, 0, nelem * elsize);
-		return ptr;
+            void * ptr = NULL;
+            ptr = malloc (nelem * elsize);
+            if(ptr)
+                memset(ptr, 0, nelem * elsize);
+            return ptr;
+        }
+        
+        activeThreads.insertThread(tid, true);
+
+        void *objAlloc;
+        uint64_t before = rdtscp();
+        objAlloc = RealX::calloc(nelem, elsize);
+        uint64_t after = rdtscp();
+        uint64_t cyclesForCalloc = after - before;
+        uint64_t address = reinterpret_cast <uint64_t> (objAlloc);
+
+        if ( addressUsage.find(address, &find) ){
+            mallocLock.lock();
+            reused_address++;
+            cyclesReuseAlloc += cyclesForCalloc;
+            mallocLock.unlock();
+        }
+        else{
+            mallocLock.lock();
+            new_address++;
+            cyclesNewAlloc += cyclesForCalloc;
+            mallocLock.unlock();
+            addressUsage.insertIfAbsent(address, 1);
+        }
+
+        callocLock.lock();
+        numCallocs++;
+        callocLock.unlock();
+
+        activeThreads.eraseThread(tid);
+
+        return objAlloc;
+
 	}
 
 	void yyfree(void * ptr) {
@@ -534,9 +570,36 @@ extern "C" {
 			return yymalloc(sz);
 		}
 
-		void * reptr = RealX::realloc(ptr, sz);
+        activeThreads.insert(tid, true);
 
-		return reptr;
+        void *objAlloc;
+        uint64_t before = rdtscp();
+        objAlloc = RealX::realloc(ptr, sz);
+        uint64_t after = rdtscp();
+        uint64_t cyclesForRealloc = after - before;
+        uint64_t address = reinterpret_cast <uint64_t> (objAlloc);
+
+        if ( addressUsage.find(address, &find) ){
+            mallocLock.lock();
+            reused_address++;
+            cyclesReuseAlloc += cyclesForRealloc;
+            mallocLock.unlock();
+        }
+        else{
+            mallocLock.lock();
+            new_address++;
+            cyclesNewAlloc += cyclesForRealloc;
+            mallocLock.unlock();
+            addressUsage.insertIfAbsent(address, 1);
+        }
+
+        reallocLock.lock();
+        numReallocs++;
+        reallocLock.unlock();
+
+        activeThreads.eraseThread(tid);
+
+		return objAlloc;
 	}
 
 	inline void getCallsites(void **callsites) {
@@ -798,10 +861,11 @@ extern "C" {
             madviseLock.lock();
             dontneed_advice_count++;
             madviseLock.unlock();
-            fprintf(stderr, "dontneed count: %d", dontneed_advice_count);
 
         }
-
+        madviseLock.lock();
+        madvise_calls++;
+        madviseLock.unlock();
         return RealX::madvise(addr, length, advice);
     }
 }
@@ -953,7 +1017,9 @@ void getMmapThreshold () {
 void writeAllocData () {
 
 	fprintf (thrData.output, ">>> mallocs            %d\n", numMallocs);
-	fprintf (thrData.output, ">>> new_address        %d\n", new_address);
+	fprintf (thrData.output, ">>> callocs            %d\n", numCallocs);
+    fprintf (thrData.output, ">>> reallocs           %d\n", numReallocs);
+    fprintf (thrData.output, ">>> new_address        %d\n", new_address);
 	fprintf (thrData.output, ">>> reused_address     %d\n", reused_address);
 	fprintf (thrData.output, ">>> frees              %d\n", numFrees);
 	fprintf (thrData.output, ">>> num_mmaps          %d\n", num_mmaps);
@@ -980,7 +1046,10 @@ void writeAllocData () {
 
 	if (totalWaits > 0) 
 		fprintf (thrData.output, ">>> avgWaitTime        %zu\n", (totalTimeWaiting/totalWaits));
-	
+
+    fprintf(thrData.output, ">>> madvise calls       %d\n", madvise_calls);
+    fprintf(thrData.output, ">>> w/ MADV_DONTNEED    %d\n", dontneed_advice_count );
+
 	fflush (thrData.output);
 }
 
