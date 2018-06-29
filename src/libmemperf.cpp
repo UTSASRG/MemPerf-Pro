@@ -59,12 +59,11 @@ uint64_t min_pos_callsite_id;
 
 #define MAX_CLASS_SIZE 65536
 #define TEMP_MEM_SIZE 8192000
-#define THREAD_BUF_SIZE 8192000
+#define THREAD_BUF_SIZE 8192000*4
 
 bool bumpPointer = false;
 bool bibop = false;
 bool inGetMmapThreshold = false;
-bool usingMalloc = false;
 bool usingRealloc = false;
 bool mapsInitialized = false;
 bool mmap_found = false;
@@ -76,15 +75,14 @@ int new_address = 0;
 int reused_address = 0;
 int num_pthread_mutex_locks = 0;
 int trylockAttempts = 0;
-int numThreadsWaiting = 0;
-int totalWaits = 0;
+uint64_t totalWaits = 0;
+uint64_t totalTimeWaiting = 0;
 
 thread_local uint64_t timeAttempted;
 thread_local uint64_t timeWaiting;
-thread_local int numWaits;
+thread_local uint64_t numWaits;
 thread_local bool waiting;
 
-uint64_t totalTimeWaiting = 0;
 int dontneed_advice_count = 0;
 
 spinlock mallocLock;
@@ -94,6 +92,7 @@ spinlock threadAllocLock;
 spinlock freeLock;
 spinlock madviseLock;
 spinlock trylockLock;
+spinlock globalLock;
 
 void* myMalloc (size_t size);
 void myFree (void* ptr);
@@ -101,14 +100,12 @@ void myFree (void* ptr);
 typedef struct LockContention {
 	int contention;
 	int maxContention;
-	uint64_t waitingTime;
 } LC;
 
 LC* newLC () {
 	LC* lc = (LC*) myMalloc (sizeof(LC));
 	lc->contention = 1;
 	lc->maxContention = 1;
-	lc->waitingTime = 0;
 	return lc;
 }
 
@@ -120,7 +117,6 @@ unsigned long cyclesFree = 0;
 unsigned long cyclesNewAlloc = 0;
 unsigned long cyclesReuseAlloc = 0;
 unsigned long malloc_mmap_threshold = 0;
-unsigned long realloc_mmap_threshold = 0;
 
 void getAllocStyle ();
 void getClassSizes ();
@@ -198,7 +194,7 @@ void freeThread (void* ptr) {
 		numActiveThreads.fetch_sub (1, std::memory_order_release);
 		uint64_t n = (uint64_t) numActiveThreads.load (std::memory_order_acquire);
 		if (n == 0) threadBufPos = 0;
-		if (debug) printf ("freeThreadCalled numActiveThreads= %zu\n", (uint64_t)numActiveThreads);
+//		if (debug) printf ("freeThreadCalled numActiveThreads= %zu\n", (uint64_t)numActiveThreads);
 	}
 	else {
 		printf ("attempting to free bad ptr\nthreadBuf= %p-%p, ptr= %p\n",
@@ -262,8 +258,9 @@ __attribute__((constructor)) initStatus initializer() {
 	myMallocLock.init ();
 	threadAllocLock.init ();
 	freeLock.init ();
-    madviseLock.init ();
+   madviseLock.init ();
 	trylockLock.init ();
+	globalLock.init ();
 
 	// Calculate the minimum possible callsite ID by taking the low four bytes
 	// of the start of the program text and repeating them twice, back-to-back,
@@ -326,11 +323,10 @@ __attribute__((constructor)) initStatus initializer() {
 	getAllocStyle ();
 	
 	// Determine class size for bibop allocator
+	// If the class sizes are in the class_sizes.txt file
+	// it will read from that. Else if will get the info
 	if (bibop) getClassSizes ();
 
-	//get mmap threshold
-	getMmapThreshold ();
-        
    return mallocInitialized;
 }
 
@@ -344,7 +340,6 @@ void exitHandler() {
 	fflush(thrData.output);
 	writeAllocData ();
 	writeContention ();
-	printf ("final numThreadsActive= %zu\n", (uint64_t)numActiveThreads);
 }
 
 // MemPerf's main function
@@ -409,6 +404,8 @@ extern "C" {
 		if (activeThreads.find (threadID, &find)) return RealX::malloc (sz);
 
       //If in our getClassSizes function, use RealX
+		//We need this because the vector uses push_back
+		//which calls malloc
       if(gettingClassSizes) return RealX::malloc(sz);
 
 		//Add thread id to list of active threads
@@ -521,17 +518,18 @@ extern "C" {
 
 	void * yyrealloc(void * ptr, size_t sz) {
 
-	//	if (!mapsInitialized) return RealX::realloc (ptr, sz);
+		if (!mapsInitialized) return RealX::realloc (ptr, sz);
 
-	//	pid_t tid = gettid ();
+		pid_t tid = gettid ();
 
 		//If already there, then just pass the realloc to RealX
-	//	bool find;
-	//	if (activeThreads.find (tid, &find)) return RealX::realloc (ptr, sz);
+		bool find;
+		if (activeThreads.find (tid, &find)) return RealX::realloc (ptr, sz);
 
-        if(mallocInitialized != INITIALIZED) {
+      if(mallocInitialized != INITIALIZED) {
 			if(ptr == NULL)
 				return yymalloc(sz);
+
 			yyfree(ptr);
 			return yymalloc(sz);
 		}
@@ -680,13 +678,13 @@ extern "C" {
 /*
 	// Intercept thread creation
 	int pthread_create(pthread_t * tid, const pthread_attr_t * attr,
-			void *(*start_routine)(void *), void * arg) {
+							 void *(*start_routine)(void *), void * arg) {
+
 		int result = xthread::thread_create(tid, attr, start_routine, arg);
-		
 		return result;
 	}
 */
-	
+
 	int pthread_mutex_lock(pthread_mutex_t *mutex) {
 	
 		if (!mapsInitialized) 
@@ -711,7 +709,9 @@ extern "C" {
 				if (thisLock->contention > 1) {
 				   timeAttempted = rdtscp();
 					numWaits++;
+					globalLock.lock();
 					totalWaits++;
+					globalLock.unlock();
 					waiting = true;
 				}
 			}	
@@ -726,9 +726,11 @@ extern "C" {
 		//Aquire the lock
 		int result = RealX::pthread_mutex_lock (mutex);
 		if (waiting) {
-			 timeWaiting += ((rdtscp()) - timeAttempted);
+			timeWaiting += ((rdtscp()) - timeAttempted);
 			waiting = false;
+			globalLock.lock();
 			totalTimeWaiting += timeWaiting;
+			globalLock.unlock();
 		}
 		return result;
 	}
@@ -842,88 +844,92 @@ void getAllocStyle () {
 
 void getClassSizes () {
         
-        gettingClassSizes = true;
-        
-	    std::vector <uint64_t> classSizes;
-        size_t bytesToRead = 0;
-        bool matchFound = false;        
-        char *line;
-        char *token;
-        
-        name_without_path = strrchr(program_invocation_name, '/') + 1;        
-        classSizeFile = fopen(CLASS_SIZE_FILE_NAME, "a+");        
-       
-        while(getline(&line, &bytesToRead, classSizeFile) != -1){
-            
-                line[strcspn(line, "\n")] = 0;
+	std::vector <uint64_t> classSizes;
+	size_t bytesToRead = 0;
+	bool matchFound = false;        
+	char *line;
+	char *token;
+
+	name_without_path = strrchr(program_invocation_name, '/') + 1;        
+	classSizeFile = fopen(CLASS_SIZE_FILE_NAME, "a+");        
+
+	while(getline(&line, &bytesToRead, classSizeFile) != -1){
+
+		line[strcspn(line, "\n")] = 0;
+
+		if(strcmp(line, name_without_path) == 0){
+
+         matchFound = true;
+      }
                 
-                if(strcmp(line, name_without_path) == 0){
+      if(matchFound) break;
+   }
+        
+   if(matchFound){
+		if (debug) printf ("match found\n");
+		getline(&line, &bytesToRead, classSizeFile);
+      line[strcspn(line, "\n")] = 0;
+                
+      while( (token = strsep(&line, " ")) ){
                     
-                        matchFound = true;
-                }
-                
-                if(matchFound) break;
-        }
-        
-        if(matchFound){
-                getline(&line, &bytesToRead, classSizeFile);
-                line[strcspn(line, "\n")] = 0;
-                
-                while( (token = strsep(&line, " ")) ){
-                    
-                        if(atoi(token) != 0){
+         if(atoi(token) != 0){
                         
-                               classSizes.push_back( (uint64_t) atoi(token));
-                        }
-                }
-        }
+            classSizes.push_back( (uint64_t) atoi(token));
+         }
+      }
+
+		auto cSize = classSizes.end();
+		cSize--;
+		malloc_mmap_threshold = *cSize;
+   }
         
-        if(!matchFound){
+   if(!matchFound){
             
-                void* oldAddress;
-                void* newAddress;
-                long oldAddr = 0, newAddr = 0;
-                size_t oldSize = 8, newSize = 8;
+		if (debug) printf ("match not found\n");
+		getMmapThreshold();
+      void* oldAddress;
+		void* newAddress;
+		uint64_t oldAddr = 0, newAddr = 0;
+		size_t oldSize = 8, newSize = 8;
 
-                oldAddress = RealX::malloc (oldSize);
-                oldAddr = reinterpret_cast <long> (oldAddress);
+		oldAddress = RealX::malloc (oldSize);
+		oldAddr = reinterpret_cast <uint64_t> (oldAddress);
 
-                while (oldSize <= MAX_CLASS_SIZE) {
+		gettingClassSizes = true;
+		while (newSize <= malloc_mmap_threshold) {
 
-                        newSize += 8;
-                        newAddress = RealX::realloc (oldAddress, newSize);
-                        newAddr = reinterpret_cast <long> (newAddress);
-                         if ((newAddr != oldAddr))
-                                classSizes.push_back (oldSize);
+			newSize += 8;
+			newAddress = RealX::realloc (oldAddress, newSize);
+			newAddr = reinterpret_cast <uint64_t> (newAddress);
+			if (newAddr != oldAddr)
+				classSizes.push_back (oldSize);
 
-                        oldAddr = newAddr;
-                        oldAddress = newAddress;
-                        oldSize = newSize;
-                }
+			oldAddr = newAddr;
+			oldAddress = newAddress;
+			oldSize = newSize;
+		}
 
-                fprintf(classSizeFile, "%s\n", name_without_path);
+      fprintf(classSizeFile, "%s\n", name_without_path);
 
-                for (auto cSize = classSizes.begin (); cSize != classSizes.end (); cSize++) {
-                        fprintf (classSizeFile, "%zu ", *cSize);
-                }
+      for (auto cSize = classSizes.begin (); cSize != classSizes.end (); cSize++) 
+         fprintf (classSizeFile, "%zu ", *cSize);
 
-                fprintf(classSizeFile, "\n");
-        }
+      fprintf(classSizeFile, "\n");
+		fflush (classSizeFile);
+   }
 
+	fprintf (thrData.output, ">>> classSizes    ");
 
-    	fprintf (thrData.output, ">>> classSizes    ");
+	if (!classSizes.empty()) {
 
-        if (!classSizes.empty ()) {
+		for (auto cSize = classSizes.begin(); cSize != classSizes.end(); cSize++) 
+			fprintf (thrData.output, "%zu ", *cSize);
+	}
 
-            for (auto cSize = classSizes.begin (); cSize != classSizes.end (); cSize++) 
-                fprintf (thrData.output, "%zu ", *cSize);
-        }
-
-        fclose(classSizeFile);
-
-        fprintf (thrData.output, "\n");
-
-        gettingClassSizes = false;
+	fclose(classSizeFile);
+	fprintf (thrData.output, "\n");
+	fflush (thrData.output);
+	gettingClassSizes = false;
 }
 
 void getMmapThreshold () {
@@ -931,23 +937,9 @@ void getMmapThreshold () {
 	inGetMmapThreshold = true;
 	size_t size = 3000;
 	void* mallocPtr;
-	void* reallocPtr;
-
-	// Find realloc mmap threshold
-	usingRealloc = true;
-	reallocPtr = RealX::malloc (size);
-	while (!mmap_found) {
-
-		reallocPtr = RealX::realloc (reallocPtr, size);
-		size += 8;
-	}
-
-	usingRealloc = false;
-	mmap_found = false;
 
 	// Find malloc mmap threshold
 	size = 3000;
-	usingMalloc = true;
 	while (!mmap_found) {
 
 		mallocPtr = RealX::malloc (size);
@@ -955,8 +947,6 @@ void getMmapThreshold () {
 		size += 8;
 	}
 
-	usingMalloc = false;
-	mmap_found = false;
 	inGetMmapThreshold = false;
 }
 
@@ -968,34 +958,28 @@ void writeAllocData () {
 	fprintf (thrData.output, ">>> frees              %d\n", numFrees);
 	fprintf (thrData.output, ">>> num_mmaps          %d\n", num_mmaps);
 	fprintf (thrData.output, ">>> malloc_mmap_threshold   %zu\n", malloc_mmap_threshold);
-	fprintf (thrData.output, ">>> realloc_mmap_threshold  %zu\n", realloc_mmap_threshold);
 
 	if (new_address > 0)
-		fprintf (thrData.output, ">>> cyclesNewAlloc     %zu\n",
-					(cyclesNewAlloc / (long)new_address));
+		fprintf (thrData.output, ">>> cyclesNewAlloc     %zu\n", (cyclesNewAlloc / (long)new_address));
 
 	else
 		fprintf (thrData.output, ">>> cyclesNewAlloc     N/A\n");
 
 	if (reused_address > 0) 
-		fprintf (thrData.output, ">>> cyclesReuseAlloc   %zu\n",
-					(cyclesReuseAlloc / (long)reused_address));
+		fprintf (thrData.output, ">>> cyclesReuseAlloc   %zu\n", (cyclesReuseAlloc / (long)reused_address));
 
-	else 
-		fprintf (thrData.output, ">>> cyclesReuseAlloc   N/A\n");
+	else fprintf (thrData.output, ">>> cyclesReuseAlloc   N/A\n");
 
 	if (numFrees > 0)
-		fprintf (thrData.output, ">>> cyclesFree         %zu\n",
-					(cyclesFree / (long)numFrees));
+		fprintf (thrData.output, ">>> cyclesFree         %zu\n", (cyclesFree / (long)numFrees));
 
-	else
-		fprintf (thrData.output, ">>> cyclesFree         N/A\n");
+	else fprintf (thrData.output, ">>> cyclesFree         N/A\n");
 
 	fprintf (thrData.output, ">>> pthread_mutex_lock %d\n", num_pthread_mutex_locks);
+	fprintf (thrData.output, ">>> totalWaits         %zu\n", totalWaits);
 
-	if (totalWaits > 0) {
-		fprintf (thrData.output, ">>> avg lock wait      %zu\n", (totalTimeWaiting/(uint64_t)totalWaits));
-	}
+	if (totalWaits > 0) 
+		fprintf (thrData.output, ">>> avgWaitTime        %zu\n", (totalTimeWaiting/totalWaits));
 	
 	fflush (thrData.output);
 }
@@ -1009,7 +993,7 @@ void writeContention () {
 
 	auto mapEnd = lockUsage.end();
 	for (auto lock = lockUsage.begin(); lock != mapEnd; lock++) 
-		fprintf (file, "lockAddr= %zX  maxContention= %d\n", lock.getkey(), lock.getData()->maxContention);
+		fprintf (file, "lockAddr= %zx  maxContention= %d\n", lock.getkey(), lock.getData()->maxContention);
 
 	fflush (file);
 	fclose (file);
@@ -1108,14 +1092,10 @@ extern "C" void * yymmap(void *addr, size_t length, int prot, int flags,
 	
 		void* retval = RealX::mmap(addr, length, prot, flags, fd, offset);
 
-		//Is the profiler getting mmap threshold?
+		//Is the profiler getting class sizes
 		if (inGetMmapThreshold) {
 
-			if ((realloc_mmap_threshold == 0) && usingRealloc) {
-				realloc_mmap_threshold = length;
-				mmap_found = true;
-			}
-			else if ((malloc_mmap_threshold == 0) && usingMalloc) {
+			if (malloc_mmap_threshold == 0) {
 				malloc_mmap_threshold = length;
 				mmap_found = true;
 			}

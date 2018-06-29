@@ -70,7 +70,7 @@ class xthread {
 		}
 		char * firstHeapObj = (char *)RealX::malloc(sizeof(char));
 		thrData.stackStart = thrData.stackEnd + stackSize;
-		free(firstHeapObj);
+		RealX::free(firstHeapObj);
 
 
 		fprintf(thrData.output, ">>> thread %d stack start @ %p, stack end @ %p\n", tid,

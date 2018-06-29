@@ -6,6 +6,7 @@
 #include <malloc.h>
 
 #define NUM_THREADS 5
+#define NUM_MALLOCS 10000
 
 void* thread_start (void*);
 pthread_barrier_t barrier;
@@ -49,7 +50,7 @@ void* thread_start (void* arg) {
 
 	int i;
 	void* ptr;
-	for (i = 0; i < 10000; i++) {
+	for (i = 0; i < NUM_MALLOCS; i++) {
 
 		//pthread_barrier_wait (&barrier);
 		ptr = malloc (16);

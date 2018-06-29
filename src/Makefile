@@ -1,17 +1,17 @@
-SRCS =  libmemperf.cpp	\
-		real.cpp		\
-		selfmap.cpp		\
-		memsample.c
+SRCS =   libmemperf.cpp	\
+			real.cpp		\
+			selfmap.cpp		\
+			memsample.c
 
-INCS =  xthread.hh		\
-		memsample.h		\
-		real.hh			\
-		hashmap.hh		\
-		list.hh			\
-		hashfuncs.hh	\
-		interval.hh	\
-		selfmap.hh	\
-		spinlock.hh
+INCS =	xthread.hh		\
+			memsample.h		\
+			real.hh			\
+			hashmap.hh		\
+			list.hh			\
+			hashfuncs.hh	\
+			interval.hh	\
+			selfmap.hh	\
+			spinlock.hh
 
 DEPS = $(SRCS) $(INCS)
 
