@@ -4,8 +4,9 @@
 #include <sys/mman.h>
 #include <pthread.h>
 #include <malloc.h>
+#include <cstdint>
 
-#define NUM_THREADS 20
+#define NUM_THREADS 2
 #define NUM_MALLOCS 1000
 
 void* thread_start (void*);
@@ -48,23 +49,13 @@ int main() {
 
 void* thread_start (void* arg) {
 
-	int i;
-	int* j;
-	int a;
-	void* p[NUM_MALLOCS];
-	for (i = 0; i < NUM_MALLOCS; i++) 
-		p[i] = malloc (64);
-
-	for (i = 0; i < NUM_MALLOCS; i++) 
-		free (p[i]);
-
-	j = (int*) malloc (sizeof (int) * 1000);
+	void* pointer;
 	
-	for (i = 0; i < 1000; i++) 
-		j[i] = 50+i;
+	for (int i = 0; i < NUM_MALLOCS; i++) {
 
-	for (i = 0; i < 1000; i++)
-		a = j[i];
+		pointer = malloc (64);
+		free (pointer);
+	}
 
 	return nullptr;
 }

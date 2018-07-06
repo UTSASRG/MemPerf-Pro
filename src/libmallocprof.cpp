@@ -275,7 +275,7 @@ extern "C" {
 		// requests will be fulfilled by RealX::malloc, which itself is a
 		// reference to the real glibc malloc routine.
 		if(mallocInitialized != INITIALIZED) {
-			if((tmppos + sz) < TEMP_MEM_SIZE) 
+			if((tmppos.load () + sz) < TEMP_MEM_SIZE) 
 				return myMalloc (sz);
 			else {
 				fprintf(stderr, "error: temp allocator out of memory\n");
@@ -606,6 +606,12 @@ extern "C" {
 		return result;
 	}
 
+	int pthread_join(pthread_t thread, void **retval) {
+
+		int result = RealX::pthread_join (thread, retval);
+		return result;
+	}
+
 	int pthread_mutex_lock(pthread_mutex_t *mutex) {
 	
 		if (!mapsInitialized) 
@@ -744,8 +750,8 @@ void* myMalloc (size_t size) {
 
 	temp_mem_lock.lock ();
 	void* retptr;
-	if((tmppos + size) < TEMP_MEM_SIZE) {
-		retptr = (void *)(tmpbuf + tmppos);
+	if((tmppos.load() + size) < TEMP_MEM_SIZE) {
+		retptr = (void *)(tmpbuf + tmppos.load());
 		tmppos.fetch_add (size, std::memory_order_relaxed);
 		numTempAllocs++;
 	} else {
