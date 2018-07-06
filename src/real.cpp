@@ -14,6 +14,7 @@ namespace RealX {
 	DEFINE_WRAPPER(malloc);
 	DEFINE_WRAPPER(realloc);
 	DEFINE_WRAPPER(pthread_create);
+	DEFINE_WRAPPER(pthread_join);
 	DEFINE_WRAPPER(mmap);
 	DEFINE_WRAPPER(pthread_mutex_lock);
 	DEFINE_WRAPPER(pthread_mutex_unlock);
@@ -32,6 +33,7 @@ namespace RealX {
 
 		void *pthread_handle = dlopen("libpthread.so.0", RTLD_NOW | RTLD_GLOBAL | RTLD_NOLOAD);
 		INIT_WRAPPER(pthread_create, pthread_handle);
+		INIT_WRAPPER(pthread_join, pthread_handle);
 		INIT_WRAPPER(pthread_mutex_lock, pthread_handle);
 		INIT_WRAPPER(pthread_mutex_unlock, pthread_handle);
 		INIT_WRAPPER(pthread_mutex_trylock, pthread_handle);

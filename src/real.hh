@@ -16,11 +16,12 @@ namespace RealX {
 	DECLARE_WRAPPER(malloc);
 	DECLARE_WRAPPER(realloc);
 	DECLARE_WRAPPER(pthread_create);
+	DECLARE_WRAPPER(pthread_join);
 	DECLARE_WRAPPER(mmap);
 	DECLARE_WRAPPER(pthread_mutex_lock);
 	DECLARE_WRAPPER(pthread_mutex_unlock);
 	DECLARE_WRAPPER(pthread_mutex_trylock);
-    DECLARE_WRAPPER(madvise);
+   DECLARE_WRAPPER(madvise);
 };
 
 #endif

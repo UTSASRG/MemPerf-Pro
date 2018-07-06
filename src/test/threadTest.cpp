@@ -4,8 +4,10 @@
 #include <sys/mman.h>
 #include <pthread.h>
 #include <malloc.h>
+#include <cstdint>
 
-#define NUM_THREADS 5
+#define NUM_THREADS 2
+#define NUM_MALLOCS 1000
 
 void* thread_start (void*);
 pthread_barrier_t barrier;
@@ -47,13 +49,14 @@ int main() {
 
 void* thread_start (void* arg) {
 
-	int i;
-	void* ptr;
-	for (i = 0; i < 10000; i++) {
+	void* pointer;
+	size_t size = 64;
+	
+	for (int i = 0; i < NUM_MALLOCS; i++) {
 
-		//pthread_barrier_wait (&barrier);
-		ptr = malloc (16);
-		free(ptr);
+		pointer = malloc (size);
+		free (pointer);
+		size += 32;
 	}
 
 	return nullptr;

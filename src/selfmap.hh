@@ -140,7 +140,7 @@ class selfmap {
 
     /// Check whether an address is inside the Current library itself.
     bool isCurrentLibrary(void* pcaddr) {
-      return ((pcaddr >= _memperfTextStart) && (pcaddr <= _memperfTextEnd));
+      return ((pcaddr >= _mallocProfTextStart) && (pcaddr <= _mallocProfTextEnd));
     }
 
     bool isAllocator(void* pcaddr) {
@@ -163,11 +163,11 @@ class selfmap {
       for(const auto& entry : _mappings) {
         const mapping& m = entry.second;
         if(m.isText()) {
-          if(m.getFile().find("/libmemperf") != std::string::npos) {
-            _memperfTextStart = (void*)m.getBase();
-            _memperfTextEnd = (void*)m.getLimit();
+          if(m.getFile().find("/libmallocprof") != std::string::npos) {
+            _mallocProfTextStart = (void*)m.getBase();
+            _mallocProfTextEnd = (void*)m.getLimit();
             _currentLibrary = std::string(m.getFile());
-						printf("libmemperf @ %p ~ %p, file = %s\n", _memperfTextStart, _memperfTextEnd, _currentLibrary.c_str());
+						printf("libmallocprof @ %p ~ %p, file = %s\n", _mallocProfTextStart, _mallocProfTextEnd, _currentLibrary.c_str());
           } else if(m.getFile() == _main_exe) {
             _appTextStart = (void*)m.getBase();
             _appTextEnd = (void*)m.getLimit();
@@ -227,8 +227,8 @@ class selfmap {
     void* _appTextEnd;
     void * _allocTextStart;
     void * _allocTextEnd;
-    void* _memperfTextStart;
-    void* _memperfTextEnd;
+    void* _mallocProfTextStart;
+    void* _mallocProfTextEnd;
 };
 
 #endif
