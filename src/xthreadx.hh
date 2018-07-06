@@ -13,7 +13,7 @@ extern "C" pid_t gettid();
 thread_local extern uint64_t numWaits;
 thread_local extern uint64_t timeWaiting;
 
-class xthread {
+class xthreadx {
 	typedef void * threadFunction(void *);
 	typedef struct thread {
 		pthread_t * thread;
@@ -30,8 +30,8 @@ class xthread {
 		children->startArg = arg;
 		children->startRoutine = fn;
 
-//		int result = RealX::pthread_create(tid, attr, xthread::startThread, (void *)children);
-		int result = RealX::pthread_create(tid, attr, xthread::startThread_noFile, (void *)children);
+//		int result = RealX::pthread_create(tid, attr, xthreadx::startThread, (void *)children);
+		int result = RealX::pthread_create(tid, attr, xthreadx::startThread_noFile, (void *)children);
 		if(result) {
 			perror("ERROR: pthread_create failed");
 			abort();

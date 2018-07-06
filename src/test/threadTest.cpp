@@ -51,11 +51,12 @@ void* thread_start (void* arg) {
 	int i;
 	int* j;
 	int a;
-	void* p;
+	void* p[NUM_MALLOCS];
 	for (i = 0; i < NUM_MALLOCS; i++) 
-		p = malloc (64);
+		p[i] = malloc (64);
 
-	free (p);
+	for (i = 0; i < NUM_MALLOCS; i++) 
+		free (p[i]);
 
 	j = (int*) malloc (sizeof (int) * 1000);
 	

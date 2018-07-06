@@ -3,7 +3,7 @@ SRCS =   libmallocprof.cpp	\
 			selfmap.cpp		\
 			memsample.c
 
-INCS =	xthread.hh		\
+INCS =	xthreadx.hh		\
 			memsample.h		\
 			real.hh			\
 			hashmap.hh		\

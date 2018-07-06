@@ -23,7 +23,7 @@
 
 #include "memsample.h"
 #include "real.hh"
-#include "xthread.hh"
+#include "xthreadx.hh"
 #include "hashmap.hh"
 #include "hashfuncs.hh"
 #include "spinlock.hh"
@@ -600,7 +600,7 @@ extern "C" {
 	int pthread_create(pthread_t * tid, const pthread_attr_t * attr,
 							 void *(*start_routine)(void *), void * arg) {
 
-		int result = xthread::thread_create(tid, attr, start_routine, arg);
+		int result = xthreadx::thread_create(tid, attr, start_routine, arg);
 		return result;
 	}
 
