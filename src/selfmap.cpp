@@ -40,7 +40,7 @@ void selfmap::printCallStack(int frames, void** array) {
 
     // Print out lines if the callsite is from the application or libmemperf.so
     if(isCurrentLibrary((void *)addr)) {
-      addr = (void *)((intptr_t)addr - (intptr_t)_memperfTextStart);
+      addr = (void *)((intptr_t)addr - (intptr_t)_mallocProfTextStart);
       sprintf(buf, "addr2line -e %s %p", _currentLibrary.c_str(), addr); 
     }
     else if(isAllocator((void *)addr)) {

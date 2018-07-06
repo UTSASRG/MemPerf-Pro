@@ -50,11 +50,13 @@ int main() {
 void* thread_start (void* arg) {
 
 	void* pointer;
+	size_t size = 64;
 	
 	for (int i = 0; i < NUM_MALLOCS; i++) {
 
-		pointer = malloc (64);
+		pointer = malloc (size);
 		free (pointer);
+		size += 32;
 	}
 
 	return nullptr;

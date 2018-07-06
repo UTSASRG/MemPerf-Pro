@@ -85,6 +85,8 @@ std::atomic_uint cyclesFree (0);
 std::atomic_uint cyclesNewAlloc (0);
 std::atomic_uint cyclesReuseAlloc (0);
 
+std::vector <uint64_t> classSizes;
+
 #define relaxed std::memory_order_relaxed
 #define acquire std::memory_order_acquire
 #define release std::memory_order_release
@@ -106,7 +108,7 @@ struct stack_frame {
 	void * caller_address;		// the address of caller
 };
 
-HashMap <uint64_t, bool, spinlock> addressUsage;
+HashMap <uint64_t, ObjectTuple*, spinlock> addressUsage;
 HashMap <uint64_t, LC*, spinlock> lockUsage;
 
 spinlock temp_mem_lock;
@@ -119,7 +121,7 @@ void writeAllocData ();
 void writeContention ();
 void* myMalloc (size_t size);
 void myFree (void* ptr);
-ObjectTuple* newObjectTuple (int numAllocs, size_t objectSize);
+ObjectTuple* newObjectTuple (uint64_t address, size_t size);
 LC* newLC ();
 
 // pre-init private allocator memory
@@ -275,7 +277,7 @@ extern "C" {
 		// requests will be fulfilled by RealX::malloc, which itself is a
 		// reference to the real glibc malloc routine.
 		if(mallocInitialized != INITIALIZED) {
-			if((tmppos.load () + sz) < TEMP_MEM_SIZE) 
+			if((tmppos + sz) < TEMP_MEM_SIZE) 
 				return myMalloc (sz);
 			else {
 				fprintf(stderr, "error: temp allocator out of memory\n");
@@ -306,10 +308,14 @@ extern "C" {
 		uint64_t cyclesForMalloc = after - before;
 		uint64_t address = reinterpret_cast <uint64_t> (objAlloc);
 
-		bool find;
+		ObjectTuple* t;
 
 		//Has this address been used before
-		if (addressUsage.find (address, &find)) {
+		if (addressUsage.find (address, &t)) {
+			t->numAccesses++;
+			t->szTotal += sz;
+			t->numAllocs++;
+			t->szUsed = sz;
 			reused_address.fetch_add (1, std::memory_order_relaxed);
 			cyclesReuseAlloc.fetch_add (cyclesForMalloc, std::memory_order_relaxed);
 		}
@@ -317,7 +323,7 @@ extern "C" {
 		else {
 			new_address.fetch_add (1, std::memory_order_relaxed);
 			cyclesNewAlloc.fetch_add (cyclesForMalloc, std::memory_order_relaxed);
-			addressUsage.insertIfAbsent (address, 1);
+			addressUsage.insertIfAbsent (address, newObjectTuple(address, sz));
 		}
 		
 		numMallocs.fetch_add(1, std::memory_order_relaxed);
@@ -349,8 +355,12 @@ extern "C" {
 		uint64_t cyclesForCalloc = after - before;
 		uint64_t address = reinterpret_cast <uint64_t> (objAlloc);
 
-		bool find;
-		if ( addressUsage.find(address, &find) ){
+		ObjectTuple* t;
+		if ( addressUsage.find(address, &t) ){
+			t->numAccesses++;
+			t->szTotal += (nelem*elsize);
+			t->szUsed = (nelem*elsize);
+			t->numAllocs++;
 			reused_address.fetch_add(1, std::memory_order_relaxed);
 			cyclesReuseAlloc.fetch_add(cyclesForCalloc, std::memory_order_relaxed);
       }
@@ -358,7 +368,7 @@ extern "C" {
 		else{
 			new_address.fetch_add (1, std::memory_order_relaxed);
 			cyclesNewAlloc.fetch_add (cyclesForCalloc, std::memory_order_relaxed);
-			addressUsage.insertIfAbsent(address, 1);
+			addressUsage.insertIfAbsent(address, newObjectTuple(address, (nelem*elsize)));
       }
 
 		numCallocs.fetch_add (1, memory_order_relaxed);
@@ -379,6 +389,15 @@ extern "C" {
 				myFree (ptr);
 
 		else {
+
+			uint64_t address = reinterpret_cast <uint64_t> (ptr);
+			ObjectTuple* t;
+
+			if (addressUsage.find(address, &t)){
+				t->szFreed += t->szUsed;
+				t->numAccesses++;
+				t->numFrees++;
+			}
 
 			uint64_t before = rdtscp ();
 			RealX::free(ptr);
@@ -442,8 +461,12 @@ extern "C" {
 		uint64_t cyclesForRealloc = after - before;
 		uint64_t address = reinterpret_cast <uint64_t> (objAlloc);
 
-		bool find;
-      if ( addressUsage.find(address, &find) ){
+		ObjectTuple* t;
+      if ( addressUsage.find(address, &t) ){
+			t->numAccesses++;
+			t->szTotal += sz;
+			t->szUsed = sz;
+			t->numAllocs++;
 			reused_address.fetch_add(1, std::memory_order_relaxed);
 			cyclesReuseAlloc.fetch_add (cyclesForRealloc, std::memory_order_relaxed);
       }
@@ -451,7 +474,7 @@ extern "C" {
 		else{
 			new_address.fetch_add(1, std::memory_order_relaxed);
 			cyclesNewAlloc.fetch_add (cyclesForRealloc, std::memory_order_relaxed);
-			addressUsage.insertIfAbsent(address, 1);
+			addressUsage.insertIfAbsent(address, newObjectTuple(address, sz));
       }
 
 		numReallocs.fetch_add(1, std::memory_order_relaxed);
@@ -731,12 +754,19 @@ extern "C" {
 }
 
 // Create tuple for hashmap
-ObjectTuple* newObjectTuple (int numAllocs, size_t objectSize) {
+ObjectTuple* newObjectTuple (uint64_t address, size_t size) {
 
-	ObjectTuple* objectTuple = (ObjectTuple*) RealX::malloc (sizeof (ObjectTuple));	
-	objectTuple->numAllocs = numAllocs;
-	objectTuple->size = objectSize;
-	return objectTuple;
+	ObjectTuple* t = (ObjectTuple*) RealX::malloc (sizeof (ObjectTuple));	
+	
+	t->addr = address;
+	t->numAccesses = 1;
+	t->szTotal = size;
+	t->szUsed = size;
+	t->szFreed = 0;
+	t->numAllocs = 1;
+	t->numFrees = 0;
+
+	return t;
 }
 
 LC* newLC () {
@@ -750,8 +780,8 @@ void* myMalloc (size_t size) {
 
 	temp_mem_lock.lock ();
 	void* retptr;
-	if((tmppos.load() + size) < TEMP_MEM_SIZE) {
-		retptr = (void *)(tmpbuf + tmppos.load());
+	if((tmppos + size) < TEMP_MEM_SIZE) {
+		retptr = (void *)(tmpbuf + tmppos);
 		tmppos.fetch_add (size, std::memory_order_relaxed);
 		numTempAllocs++;
 	} else {
@@ -803,7 +833,6 @@ void getAllocStyle () {
 
 void getClassSizes () {
         
-	std::vector <uint64_t> classSizes;
 	size_t bytesToRead = 0;
 	bool matchFound = false;        
 	char *line;
@@ -913,8 +942,8 @@ void writeAllocData () {
 
 	fprintf (thrData.output, ">>> mallocs            %u\n", numMallocs.load(relaxed));
 	fprintf (thrData.output, ">>> callocs            %u\n", numCallocs.load(relaxed));
-    fprintf (thrData.output, ">>> reallocs           %u\n", numReallocs.load(relaxed));
-    fprintf (thrData.output, ">>> new_address        %u\n", new_address.load(relaxed));
+	fprintf (thrData.output, ">>> reallocs           %u\n", numReallocs.load(relaxed));
+	fprintf (thrData.output, ">>> new_address        %u\n", new_address.load(relaxed));
 	fprintf (thrData.output, ">>> reused_address     %u\n", reused_address.load(relaxed));
 	fprintf (thrData.output, ">>> frees              %u\n", numFrees.load(relaxed));
 	fprintf (thrData.output, ">>> num_mmaps          %u\n", num_mmaps.load(relaxed));
@@ -946,11 +975,17 @@ void writeAllocData () {
 		fprintf (thrData.output, ">>> avgWaitTime        %u\n",
 				  (totalTimeWaiting.load(relaxed)/totalWaits.load(relaxed)));
 
-    fprintf(thrData.output, ">>> madvise calls       %u\n", madvise_calls.load(relaxed));
-    fprintf(thrData.output, ">>> w/ MADV_DONTNEED    %u\n", dontneed_advice_count.load(relaxed));
-    fprintf(thrData.output, ">>> sbrk calls          %u\n", numSbrks.load(relaxed));
-    fprintf(thrData.output, ">>>program size added   %u\n", programBreakChange.load(relaxed));
+	fprintf(thrData.output, ">>> madvise calls        %u\n", madvise_calls.load(relaxed));
+   fprintf(thrData.output, ">>> w/ MADV_DONTNEED     %u\n", dontneed_advice_count.load(relaxed));
+	fprintf(thrData.output, ">>> sbrk calls           %u\n", numSbrks.load(relaxed));
+	fprintf(thrData.output, ">>> program size added   %u\n", programBreakChange.load(relaxed));
 
+	fprintf (thrData.output, "\n----------memory usage----------\n");
+
+	for (auto t = addressUsage.begin(); t != addressUsage.end(); t++)
+		fprintf (thrData.output, ">>> addr:0x%zx numAccesses:%zu szTotal:%zu szFreed:%zu numAllocs:%u numFrees:%u\n",
+					t.getData()->addr, t.getData()->numAccesses, t.getData()->szTotal,
+					t.getData()->szFreed, t.getData()->numAllocs, t.getData()->numFrees);
 
 	fflush (thrData.output);
 }
@@ -964,7 +999,7 @@ void writeContention () {
 
 	auto mapEnd = lockUsage.end();
 	for (auto lock = lockUsage.begin(); lock != mapEnd; lock++) 
-		fprintf (file, "lockAddr= %zx  maxContention= %d\n", lock.getkey(), lock.getData()->maxContention);
+		fprintf (file, "lockAddr= %zx  maxContention= %d\n", lock.getKey(), lock.getData()->maxContention);
 
 	fflush (file);
 	fclose (file);

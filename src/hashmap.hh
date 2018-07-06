@@ -315,7 +315,7 @@ template <class KeyType,                    // What is the key? A long or string
 
 				 ValueType getData() { return _entry->getValue(); }
 
-				 KeyType getkey() { return _entry->getKey(); }
+				 KeyType getKey() { return _entry->getKey(); }
 			 };
 
 			 // Acquire the first entry of the hash table

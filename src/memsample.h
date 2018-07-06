@@ -59,8 +59,13 @@ typedef struct {
 } Tuple;
 
 typedef struct {
-	int numAllocs;
-	size_t size;
+	uint64_t addr;
+	uint64_t numAccesses;
+	uint64_t szTotal;
+	uint64_t szFreed;
+	uint64_t szUsed;
+	uint32_t numAllocs;
+	uint32_t numFrees;
 } ObjectTuple;
 
 typedef struct addr2line_info {
