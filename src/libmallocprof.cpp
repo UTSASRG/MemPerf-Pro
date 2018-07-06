@@ -76,6 +76,8 @@ std::atomic_uint totalWaits (0);
 std::atomic_uint totalTimeWaiting (0);
 std::atomic_uint dontneed_advice_count (0);
 std::atomic_uint madvise_calls (0);
+std::atomic_uint numSbrks (0);
+std::atomic_uint programBreakChange (0);
 std::atomic_uint num_mmaps (0);
 std::atomic_uint numTempAllocs (0);
 std::atomic_uint tmppos (0);
@@ -706,6 +708,20 @@ extern "C" {
 		madvise_calls.fetch_add(1, std::memory_order_relaxed);
 		return RealX::madvise(addr, length, advice);
 	}
+
+    void *sbrk(intptr_t increment){
+        if(mallocInitialized != INITIALIZED) return RealX::sbrk(increment);
+
+        void *retptr = RealX::sbrk(increment);
+        uint64_t newProgramBreak = (uint64_t) RealX::sbrk(0);
+        uint64_t oldProgramBreak = (uint64_t) retptr;
+        uint64_t sizeChange = newProgramBreak - oldProgramBreak;
+
+        programBreakChange.fetch_add(sizeChange, relaxed);
+        numSbrks.fetch_add(1, relaxed);
+
+        return retptr;
+    }
 }
 
 // Create tuple for hashmap
@@ -891,8 +907,8 @@ void writeAllocData () {
 
 	fprintf (thrData.output, ">>> mallocs            %u\n", numMallocs.load(relaxed));
 	fprintf (thrData.output, ">>> callocs            %u\n", numCallocs.load(relaxed));
-   fprintf (thrData.output, ">>> reallocs           %u\n", numReallocs.load(relaxed));
-   fprintf (thrData.output, ">>> new_address        %u\n", new_address.load(relaxed));
+    fprintf (thrData.output, ">>> reallocs           %u\n", numReallocs.load(relaxed));
+    fprintf (thrData.output, ">>> new_address        %u\n", new_address.load(relaxed));
 	fprintf (thrData.output, ">>> reused_address     %u\n", reused_address.load(relaxed));
 	fprintf (thrData.output, ">>> frees              %u\n", numFrees.load(relaxed));
 	fprintf (thrData.output, ">>> num_mmaps          %u\n", num_mmaps.load(relaxed));
@@ -926,6 +942,9 @@ void writeAllocData () {
 
     fprintf(thrData.output, ">>> madvise calls       %u\n", madvise_calls.load(relaxed));
     fprintf(thrData.output, ">>> w/ MADV_DONTNEED    %u\n", dontneed_advice_count.load(relaxed));
+    fprintf(thrData.output, ">>> sbrk calls          %u\n", numSbrks.load(relaxed));
+    fprintf(thrData.output, ">>>program size added   %u\n", programBreakChange.load(relaxed));
+
 
 	fflush (thrData.output);
 }
