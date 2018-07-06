@@ -1,11 +1,12 @@
 /**
- * @file libmemperf.cpp
+ * @file libmallocprof.cpp
  * @author Tongping Liu <http://www.cs.utsa.edu/~tongpingliu>
  * @author Sam Silvestro <sam.silvestro@utsa.edu>
+ * @author Richard Salcedo <kbgagt@gmail.com>
  */
 
 #pragma GCC diagnostic ignored "-Wreturn-type-c-linkage"
-#define _GNU_SOURCE         /* See feature_test_macros(7) */
+//#define _GNU_SOURCE         /* See feature_test_macros(7) */
 
 #include <dlfcn.h>
 #include <malloc.h>
@@ -30,9 +31,6 @@
 
 #define CALLSITE_MAXIMUM_LENGTH 10
 
-spinlock mmap_lock;
-int num_mmaps;
-
 __thread thread_data thrData;
 
 extern char data_start;
@@ -45,21 +43,17 @@ const char *CLASS_SIZE_FILE_NAME = "class_sizes.txt";
 FILE *classSizeFile;
 char *name_without_path;
 
-bool const debug = false;
-
 enum initStatus{
     INIT_ERROR = -1,
     NOT_INITIALIZED = 0, 
     IN_PROGRESS = 1, 
     INITIALIZED = 2
 };
+
 initStatus mallocInitialized = NOT_INITIALIZED;
 
 uint64_t min_pos_callsite_id;
-
-#define MAX_CLASS_SIZE 65536
-#define TEMP_MEM_SIZE 8192000
-#define THREAD_BUF_SIZE 8192000*4
+uint64_t malloc_mmap_threshold = 0;
 
 bool bumpPointer = false;
 bool bibop = false;
@@ -68,153 +62,69 @@ bool usingRealloc = false;
 bool mapsInitialized = false;
 bool mmap_found = false;
 bool gettingClassSizes = false;
+bool const debug = false;
 
-int numFrees = 0;
-int numMallocs = 0;
-int numCallocs = 0;
-int numReallocs = 0;
-int new_address = 0;
-int reused_address = 0;
-int num_pthread_mutex_locks = 0;
-int trylockAttempts = 0;
+std::atomic_uint numFrees (0);
+std::atomic_uint numMallocs (0);
+std::atomic_uint numCallocs (0);
+std::atomic_uint numReallocs (0);
+std::atomic_uint new_address (0);
+std::atomic_uint reused_address (0);
+std::atomic_uint num_pthread_mutex_locks (0);
+std::atomic_uint trylockAttempts (0);
+std::atomic_uint totalWaits (0);
+std::atomic_uint totalTimeWaiting (0);
+std::atomic_uint dontneed_advice_count (0);
+std::atomic_uint madvise_calls (0);
+std::atomic_uint num_mmaps (0);
+std::atomic_uint numTempAllocs (0);
+std::atomic_uint tmppos (0);
+std::atomic_uint cyclesFree (0);
+std::atomic_uint cyclesNewAlloc (0);
+std::atomic_uint cyclesReuseAlloc (0);
 
-uint64_t totalWaits = 0;
-uint64_t totalTimeWaiting = 0;
-
-int dontneed_advice_count = 0;
-int madvise_calls = 0;
+#define relaxed std::memory_order_relaxed
+#define acquire std::memory_order_acquire
+#define release std::memory_order_release
+#define TEMP_MEM_SIZE 16384000
 
 thread_local uint64_t timeAttempted;
 thread_local uint64_t timeWaiting;
 thread_local uint64_t numWaits;
 thread_local bool waiting;
-
-spinlock mallocLock;
-spinlock callocLock;
-spinlock reallocLock;
-spinlock myMallocLock;
-spinlock threadAllocLock;
-spinlock freeLock;
-spinlock madviseLock;
-spinlock trylockLock;
-spinlock globalLock;
-
-void* myMalloc (size_t size);
-void myFree (void* ptr);
+thread_local bool inAllocation;
 
 typedef struct LockContention {
 	int contention;
 	int maxContention;
 } LC;
 
-LC* newLC () {
-	LC* lc = (LC*) myMalloc (sizeof(LC));
-	lc->contention = 1;
-	lc->maxContention = 1;
-	return lc;
-}
-
-HashMap <int, bool, spinlock> activeThreads;
-HashMap <uint64_t, bool, spinlock> addressUsage;
-HashMap <uint64_t, LC*, spinlock> lockUsage;
-
-unsigned long cyclesFree = 0;
-unsigned long cyclesNewAlloc = 0;
-unsigned long cyclesReuseAlloc = 0;
-unsigned long malloc_mmap_threshold = 0;
-
-void getAllocStyle ();
-void getClassSizes ();
-void getMmapThreshold ();
-void writeAllocData ();
-void writeContention ();
-ObjectTuple* newObjectTuple (int numAllocs, size_t objectSize);
-
-// Variables used by our pre-init private allocator
-char tmpbuf[TEMP_MEM_SIZE];
-unsigned int numTempAllocs = 0;
-unsigned int tmppos = 0;
-
-// Variables for activeThreads hashmap only
-char threadBuf [THREAD_BUF_SIZE];
-static std::atomic<unsigned int> numActiveThreads(0);
-unsigned int threadBufPos = 0;
-
-void* myMalloc (size_t size) {
-
-	myMallocLock.lock ();
-	void* retptr;
-	if((tmppos + size) < TEMP_MEM_SIZE) {
-		retptr = (void *)(tmpbuf + tmppos);
-		tmppos += size;
-		numTempAllocs++;
-	} else {
-		fprintf(stderr, "error: global allocator out of memory\n");
-		fprintf(stderr, "\t requested size = %zu, total size = %d, "
-							 "total allocs = %u\n", size, TEMP_MEM_SIZE, numTempAllocs);
-		abort();
-	}
-	myMallocLock.unlock ();
-	return retptr;
-}
-
-void myFree (void* ptr) {
-
-	if (ptr == NULL) return;	
-
-	myMallocLock.lock();
-	if ((ptr >= tmpbuf) &&
-		(ptr <= (tmpbuf + TEMP_MEM_SIZE))) {
-		numTempAllocs--;
-		if(numTempAllocs == 0) tmppos = 0;
-	}
-	myMallocLock.unlock();
-}
-
-void* allocNewThread (size_t size) {
-	threadAllocLock.lock();
-	void* retptr;
-	if((threadBufPos + size) <= THREAD_BUF_SIZE) {
-		retptr = (void *)(threadBuf + threadBufPos);
-		threadBufPos += size;
-		numActiveThreads.fetch_add(1, std::memory_order_release);
-	} 
-	else {
-		fprintf(stderr, "error: activeThreads allocator out of memory\n");
-		fprintf(stderr, "\t requested size = %zu, total size = %d, "
-							 "numActiveThreads = %zu, threadBufPos = %d\n",
-				  size, THREAD_BUF_SIZE, (uint64_t)numActiveThreads, threadBufPos);
-		abort();
-	}
-	threadAllocLock.unlock();
-	return retptr;
-}
-
-void freeThread (void* ptr) {
-
-	if (ptr == NULL) return;
-	
-	threadAllocLock.lock();
-	if ((ptr >= threadBuf) && (ptr <= (threadBuf + THREAD_BUF_SIZE))) {
-		numActiveThreads.fetch_sub (1, std::memory_order_release);
-		uint64_t n = (uint64_t) numActiveThreads.load (std::memory_order_acquire);
-		if (n == 0) threadBufPos = 0;
-//		if (debug) printf ("freeThreadCalled numActiveThreads= %zu\n", (uint64_t)numActiveThreads);
-	}
-	else {
-		printf ("attempting to free bad ptr\nthreadBuf= %p-%p, ptr= %p\n",
-				  &threadBuf, (void*) &threadBuf[THREAD_BUF_SIZE], ptr);
-	}
-	threadAllocLock.unlock();
-}
-
 struct stack_frame {
 	struct stack_frame * prev;	// pointing to previous stack_frame
 	void * caller_address;		// the address of caller
 };
 
+HashMap <uint64_t, bool, spinlock> addressUsage;
+HashMap <uint64_t, LC*, spinlock> lockUsage;
+
+spinlock temp_mem_lock;
+
+// Functions 
+void getAllocStyle ();
+void getClassSizes ();
+void getMmapThreshold ();
+void writeAllocData ();
+void writeContention ();
+void* myMalloc (size_t size);
+void myFree (void* ptr);
+ObjectTuple* newObjectTuple (int numAllocs, size_t objectSize);
+LC* newLC ();
+
+// pre-init private allocator memory
+char tmpbuf[TEMP_MEM_SIZE];
+
 typedef int (*main_fn_t)(int, char **, char **);
-main_fn_t real_main_memperf;
+main_fn_t real_main_mallocprof;
 
 extern "C" {
 	// Function prototypes
@@ -257,34 +167,13 @@ __attribute__((constructor)) initStatus initializer() {
 		abort();
 	}
 
-	mmap_lock.init();
-	mallocLock.init ();
-    callocLock.init();
-	reallocLock.init ();
-	myMallocLock.init ();
-	threadAllocLock.init ();
-	freeLock.init ();
-   madviseLock.init ();
-	trylockLock.init ();
-	globalLock.init ();
+	temp_mem_lock.init ();
 
 	// Calculate the minimum possible callsite ID by taking the low four bytes
 	// of the start of the program text and repeating them twice, back-to-back,
 	// resulting in eight bytes which resemble: 0x<lowWord><lowWord>
 	uint64_t btext = (uint64_t)&__executable_start & 0xFFFFFFFF;
 	min_pos_callsite_id = (btext << 32) | btext;
-
-
-	//tmpbuf is just declared as a char[TEMP_MEM_SIZE] right now
-
-/*
-	// Allocate memory for our pre-init temporary allocator
-	if((tmpbuf = mmap (NULL, TEMP_MEM_SIZE, PROT_READ | PROT_WRITE,
-					MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
-        perror("error: unable to allocate temporary memory");
-		abort();
-	}
-*/
 
 	RealX::initializer();
 
@@ -298,9 +187,7 @@ __attribute__((constructor)) initStatus initializer() {
 	// Generate the name of our output file, then open it for writing.
 	char outputFile[MAX_FILENAME_LEN];
 	pid_t pid = getpid();
-//	snprintf(outputFile, MAX_FILENAME_LEN, "%s_libmemperf_pid_%d_tid_%d.txt",
-//		program_invocation_name, pid, pid);
-	snprintf(outputFile, MAX_FILENAME_LEN, "%s_libmemperf_pid_%d_main_thread.txt",
+	snprintf(outputFile, MAX_FILENAME_LEN, "%s_libmallocprof_%d_main_thread.txt",
 		program_invocation_name, pid);
 	// Will overwrite current file; change the fopen flag to "a" for append.
 	thrData.output = fopen(outputFile, "w");
@@ -317,9 +204,6 @@ __attribute__((constructor)) initStatus initializer() {
 	addressUsage.initialize(HashFuncs::hashCallsiteId,
 			HashFuncs::compareCallsiteId, 4096);
 
-	activeThreads.initialize(HashFuncs::hashInt,
-			HashFuncs::compareInt, 4096);
-
 	lockUsage.initialize(HashFuncs::hashCallsiteId,
 						 HashFuncs::compareCallsiteId, 4096);
 
@@ -332,11 +216,12 @@ __attribute__((constructor)) initStatus initializer() {
 	// If the class sizes are in the class_sizes.txt file
 	// it will read from that. Else if will get the info
 	if (bibop) getClassSizes ();
+	else getMmapThreshold();
 
    return mallocInitialized;
 }
 
-__attribute__((destructor)) void finalizer_memperf() {
+__attribute__((destructor)) void finalizer_mallocprof () {
 	fclose(thrData.output);
 }
 
@@ -348,27 +233,27 @@ void exitHandler() {
 	writeContention ();
 }
 
-// MemPerf's main function
-int libmemperf_main(int argc, char ** argv, char ** envp) {
-    // Register our cleanup routine as an on-exit handler.
-	atexit(exitHandler);
+// MallocProf's main function
+int libmallocprof_main(int argc, char ** argv, char ** envp) {
 
+   // Register our cleanup routine as an on-exit handler.
+	atexit(exitHandler);
 	initSampling();
 	
-    return real_main_memperf(argc, argv, envp);
+	return real_main_mallocprof (argc, argv, envp);
 }
 
 extern "C" int __libc_start_main(main_fn_t, int, char **, void (*)(),
 		void (*)(), void (*)(), void *) __attribute__((weak,
-			alias("libmemperf_libc_start_main")));
+			alias("libmallocprof_libc_start_main")));
 
-extern "C" int libmemperf_libc_start_main(main_fn_t main_fn, int argc,
+extern "C" int libmallocprof_libc_start_main(main_fn_t main_fn, int argc,
 		char ** argv, void (*init)(), void (*fini)(), void (*rtld_fini)(),
 		void * stack_end) {
 	auto real_libc_start_main =
 		(decltype(__libc_start_main) *)dlsym(RTLD_NEXT, "__libc_start_main");
-	real_main_memperf = main_fn;
-	return real_libc_start_main(libmemperf_main, argc, argv, init, fini,
+	real_main_mallocprof = main_fn;
+	return real_libc_start_main(libmallocprof_main, argc, argv, init, fini,
 			rtld_fini, stack_end);
 }
 
@@ -388,34 +273,28 @@ extern "C" {
 		// requests will be fulfilled by RealX::malloc, which itself is a
 		// reference to the real glibc malloc routine.
 		if(mallocInitialized != INITIALIZED) {
-			if((tmppos + sz) < TEMP_MEM_SIZE) {
-				void * retptr = (void *)(tmpbuf + tmppos);
-				tmppos += sz;
-				numTempAllocs++;
-				return retptr;
-			} else {
+			if((tmppos + sz) < TEMP_MEM_SIZE) 
+				return myMalloc (sz);
+			else {
 				fprintf(stderr, "error: temp allocator out of memory\n");
-				fprintf(stderr, "\t requested size = %zu, total size = %d, "
-					"total allocs = %u\n", sz, TEMP_MEM_SIZE, numTempAllocs);
+				fprintf(stderr, "\t requested size = %zu, total size = %d, total allocs = %u\n",
+						  sz, TEMP_MEM_SIZE, numTempAllocs.load(relaxed));
 				abort();
 			}
 		}
 	
 		if (!mapsInitialized) return RealX::malloc (sz);
 
-		pid_t tid = gettid ();
-		int threadID = (int) tid;
 		//If already there, then just pass the malloc to RealX
-		bool find;
-		if (activeThreads.find (threadID, &find)) return RealX::malloc (sz);
+		if (inAllocation) return RealX::malloc (sz);
 
-      //If in our getClassSizes function, use RealX
+		//If in our getClassSizes function, use RealX
 		//We need this because the vector uses push_back
 		//which calls malloc
-      if(gettingClassSizes) return RealX::malloc(sz);
+		if(gettingClassSizes) return RealX::malloc(sz);
 
-		//Add thread id to list of active threads
-		activeThreads.insertThread (threadID, true);
+		//thread_local
+		inAllocation = true;
 
 		//Collect allocation data
 		void* objAlloc;
@@ -425,77 +304,67 @@ extern "C" {
 		uint64_t cyclesForMalloc = after - before;
 		uint64_t address = reinterpret_cast <uint64_t> (objAlloc);
 
+		bool find;
+
 		//Has this address been used before
 		if (addressUsage.find (address, &find)) {
-			mallocLock.lock ();
-			reused_address++;
-			cyclesReuseAlloc += cyclesForMalloc;
-			mallocLock.unlock ();
+			reused_address.fetch_add (1, std::memory_order_relaxed);
+			cyclesReuseAlloc.fetch_add (cyclesForMalloc, std::memory_order_relaxed);
 		}
 
 		else {
-			mallocLock.lock ();
-			new_address ++;
-			cyclesNewAlloc += cyclesForMalloc;
-			mallocLock.unlock ();
+			new_address.fetch_add (1, std::memory_order_relaxed);
+			cyclesNewAlloc.fetch_add (cyclesForMalloc, std::memory_order_relaxed);
 			addressUsage.insertIfAbsent (address, 1);
 		}
 		
-		mallocLock.lock ();
-		numMallocs++;
-		mallocLock.unlock ();
+		numMallocs.fetch_add(1, std::memory_order_relaxed);
 
-		//Remove thread id from active threads
-		activeThreads.eraseThread (threadID);
+		//thread_local
+		inAllocation = false;
 
 		return objAlloc;
 	}
 
 	void * yycalloc(size_t nelem, size_t elsize) {
 
-        bool find;
-        int tid = (int) gettid();
+		if(!mapsInitialized || inAllocation){
 
-        if(!mapsInitialized || activeThreads.find(tid, &find)){
+			void * ptr = NULL;
+			ptr = malloc (nelem * elsize);
+			if(ptr)
+				memset(ptr, 0, nelem * elsize);
+			return ptr;
+		}
 
-            void * ptr = NULL;
-            ptr = malloc (nelem * elsize);
-            if(ptr)
-                memset(ptr, 0, nelem * elsize);
-            return ptr;
-        }
-        
-        activeThreads.insertThread(tid, true);
+		//thread_local
+		inAllocation = true;
 
-        void *objAlloc;
-        uint64_t before = rdtscp();
-        objAlloc = RealX::calloc(nelem, elsize);
-        uint64_t after = rdtscp();
-        uint64_t cyclesForCalloc = after - before;
-        uint64_t address = reinterpret_cast <uint64_t> (objAlloc);
+		void *objAlloc;
+		uint64_t before = rdtscp();
+		objAlloc = RealX::calloc(nelem, elsize);
+		uint64_t after = rdtscp();
+		uint64_t cyclesForCalloc = after - before;
+		uint64_t address = reinterpret_cast <uint64_t> (objAlloc);
 
-        if ( addressUsage.find(address, &find) ){
-            mallocLock.lock();
-            reused_address++;
-            cyclesReuseAlloc += cyclesForCalloc;
-            mallocLock.unlock();
-        }
-        else{
-            mallocLock.lock();
-            new_address++;
-            cyclesNewAlloc += cyclesForCalloc;
-            mallocLock.unlock();
-            addressUsage.insertIfAbsent(address, 1);
-        }
+		bool find;
+		if ( addressUsage.find(address, &find) ){
+			reused_address.fetch_add(1, std::memory_order_relaxed);
+			cyclesReuseAlloc.fetch_add(cyclesForCalloc, std::memory_order_relaxed);
+      }
+      
+		else{
+			new_address.fetch_add (1, std::memory_order_relaxed);
+			cyclesNewAlloc.fetch_add (cyclesForCalloc, std::memory_order_relaxed);
+			addressUsage.insertIfAbsent(address, 1);
+      }
 
-        callocLock.lock();
-        numCallocs++;
-        callocLock.unlock();
+		numCallocs.fetch_add (1, memory_order_relaxed);
 
-        activeThreads.eraseThread(tid);
+		//thread_local
+		inAllocation = false;
 
-        return objAlloc;
-
+		return objAlloc;
 	}
 
 	void yyfree(void * ptr) {
@@ -504,21 +373,16 @@ extern "C" {
 
 		// Determine whether the specified object came from our global buffer;
 		// only call RealX::free() if the object did not come from here.
-		if((ptr >= (void *) tmpbuf) &&
-			(ptr <= (void *)(tmpbuf + TEMP_MEM_SIZE))) {
-			numTempAllocs--;
-			if(numTempAllocs == 0) {
-					tmppos = 0;
-			}
-		} else {
+		if((ptr >= (void *) tmpbuf) && (ptr <= (void *)(tmpbuf + TEMP_MEM_SIZE))) 
+				myFree (ptr);
+
+		else {
 
 			uint64_t before = rdtscp ();
 			RealX::free(ptr);
 			uint64_t after = rdtscp ();
-			freeLock.lock ();
-			numFrees ++;
-			freeLock.unlock ();
-			cyclesFree += (after - before);
+			numFrees.fetch_add(1, std::memory_order_relaxed);
+			cyclesFree.fetch_add ((after - before), memory_order_relaxed);
 		}
 	}
 
@@ -556,11 +420,7 @@ extern "C" {
 
 		if (!mapsInitialized) return RealX::realloc (ptr, sz);
 
-		pid_t tid = gettid ();
-
-		//If already there, then just pass the realloc to RealX
-		bool find;
-		if (activeThreads.find (tid, &find)) return RealX::realloc (ptr, sz);
+		if (inAllocation) return RealX::realloc (ptr, sz);
 
       if(mallocInitialized != INITIALIZED) {
 			if(ptr == NULL)
@@ -570,34 +430,32 @@ extern "C" {
 			return yymalloc(sz);
 		}
 
-        activeThreads.insert(tid, true);
+		//thread_local
+		inAllocation = true;
 
-        void *objAlloc;
-        uint64_t before = rdtscp();
-        objAlloc = RealX::realloc(ptr, sz);
-        uint64_t after = rdtscp();
-        uint64_t cyclesForRealloc = after - before;
-        uint64_t address = reinterpret_cast <uint64_t> (objAlloc);
+		void *objAlloc;
+		uint64_t before = rdtscp();
+		objAlloc = RealX::realloc(ptr, sz);
+		uint64_t after = rdtscp();
+		uint64_t cyclesForRealloc = after - before;
+		uint64_t address = reinterpret_cast <uint64_t> (objAlloc);
 
-        if ( addressUsage.find(address, &find) ){
-            mallocLock.lock();
-            reused_address++;
-            cyclesReuseAlloc += cyclesForRealloc;
-            mallocLock.unlock();
-        }
-        else{
-            mallocLock.lock();
-            new_address++;
-            cyclesNewAlloc += cyclesForRealloc;
-            mallocLock.unlock();
-            addressUsage.insertIfAbsent(address, 1);
-        }
+		bool find;
+      if ( addressUsage.find(address, &find) ){
+			reused_address.fetch_add(1, std::memory_order_relaxed);
+			cyclesReuseAlloc.fetch_add (cyclesForRealloc, std::memory_order_relaxed);
+      }
+		
+		else{
+			new_address.fetch_add(1, std::memory_order_relaxed);
+			cyclesNewAlloc.fetch_add (cyclesForRealloc, std::memory_order_relaxed);
+			addressUsage.insertIfAbsent(address, 1);
+      }
 
-        reallocLock.lock();
-        numReallocs++;
-        reallocLock.unlock();
+		numReallocs.fetch_add(1, std::memory_order_relaxed);
 
-        activeThreads.eraseThread(tid);
+		//thread_local
+		inAllocation = false;
 
 		return objAlloc;
 	}
@@ -738,7 +596,6 @@ extern "C" {
 		return info;
 	}
 
-/*
 	// Intercept thread creation
 	int pthread_create(pthread_t * tid, const pthread_attr_t * attr,
 							 void *(*start_routine)(void *), void * arg) {
@@ -746,7 +603,6 @@ extern "C" {
 		int result = xthread::thread_create(tid, attr, start_routine, arg);
 		return result;
 	}
-*/
 
 	int pthread_mutex_lock(pthread_mutex_t *mutex) {
 	
@@ -754,12 +610,9 @@ extern "C" {
 			return RealX::pthread_mutex_lock (mutex);
 
 		uint64_t lockAddr = reinterpret_cast <uint64_t> (mutex);
-		pid_t tid = gettid ();
-		int threadID = (int) tid;
 
 		//Is this thread doing allocation
-		bool find;
-		if (activeThreads.find(threadID, &find)) {
+		if (inAllocation) {
 
 			//Have we encountered this lock before?
 			LC* thisLock;
@@ -772,16 +625,14 @@ extern "C" {
 				if (thisLock->contention > 1) {
 				   timeAttempted = rdtscp();
 					numWaits++;
-					globalLock.lock();
-					totalWaits++;
-					globalLock.unlock();
+					totalWaits.fetch_add(1, std::memory_order_relaxed);
 					waiting = true;
 				}
 			}	
 
 			//Add lock to lockUsage hashmap
 			else {
-				num_pthread_mutex_locks++;
+				num_pthread_mutex_locks.fetch_add(1, std::memory_order_relaxed);
 				lockUsage.insertIfAbsent (lockAddr, newLC());
 			}	
 		}
@@ -791,9 +642,7 @@ extern "C" {
 		if (waiting) {
 			timeWaiting += ((rdtscp()) - timeAttempted);
 			waiting = false;
-			globalLock.lock();
-			totalTimeWaiting += timeWaiting;
-			globalLock.unlock();
+			totalTimeWaiting.fetch_add (timeWaiting, std::memory_order_relaxed);
 		}
 		return result;
 	}
@@ -804,12 +653,9 @@ extern "C" {
 			return RealX::pthread_mutex_trylock (mutex);
 	
 		uint64_t lockAddr = reinterpret_cast <uint64_t> (mutex);
-		pid_t tid = gettid ();
-		int threadID = (int) tid;
 
 		//Is this thread doing allocation
-		bool find;
-		if (activeThreads.find(threadID, &find)) {
+		if (inAllocation) {
 
 			//Have we encountered this lock before?
 			LC* thisLock;
@@ -821,7 +667,7 @@ extern "C" {
 
 			//Add lock to lockUsage hashmap
 			else {
-				num_pthread_mutex_locks++;
+				num_pthread_mutex_locks.fetch_add(1, std::memory_order_relaxed);
 				LC* lc = newLC();
 				lockUsage.insertIfAbsent (lockAddr, lc);
 			}	
@@ -830,9 +676,7 @@ extern "C" {
 		//Try to aquire the lock
 		int result = RealX::pthread_mutex_trylock (mutex);
 		if (result != 0) {
-			trylockLock.lock();
-			trylockAttempts++;
-			trylockLock.unlock();
+			trylockAttempts.fetch_add(1, std::memory_order_relaxed);
 		}
 		return result;
 	}
@@ -854,23 +698,16 @@ extern "C" {
 		return RealX::pthread_mutex_unlock (mutex);
 	}
 
-    int madvise(void *addr, size_t length, int advice){
+	int madvise(void *addr, size_t length, int advice){
 
-        if (advice == MADV_DONTNEED){
+		if (advice == MADV_DONTNEED)
+			dontneed_advice_count.fetch_add(1, std::memory_order_relaxed);
 
-            madviseLock.lock();
-            dontneed_advice_count++;
-            madviseLock.unlock();
-
-        }
-        madviseLock.lock();
-        madvise_calls++;
-        madviseLock.unlock();
-        return RealX::madvise(addr, length, advice);
-    }
+		madvise_calls.fetch_add(1, std::memory_order_relaxed);
+		return RealX::madvise(addr, length, advice);
+	}
 }
 
-// Richard
 // Create tuple for hashmap
 ObjectTuple* newObjectTuple (int numAllocs, size_t objectSize) {
 
@@ -880,6 +717,42 @@ ObjectTuple* newObjectTuple (int numAllocs, size_t objectSize) {
 	return objectTuple;
 }
 
+LC* newLC () {
+	LC* lc = (LC*) myMalloc (sizeof(LC));
+	lc->contention = 1;
+	lc->maxContention = 1;
+	return lc;
+}
+
+void* myMalloc (size_t size) {
+
+	temp_mem_lock.lock ();
+	void* retptr;
+	if((tmppos + size) < TEMP_MEM_SIZE) {
+		retptr = (void *)(tmpbuf + tmppos);
+		tmppos.fetch_add (size, std::memory_order_relaxed);
+		numTempAllocs++;
+	} else {
+		fprintf(stderr, "error: global allocator out of memory\n");
+		fprintf(stderr, "\t requested size = %zu, total size = %d, "
+							 "total allocs = %u\n", size, TEMP_MEM_SIZE, numTempAllocs.load(relaxed));
+		abort();
+	}
+	temp_mem_lock.unlock ();
+	return retptr;
+}
+
+void myFree (void* ptr) {
+
+	if (ptr == NULL) return;	
+
+	temp_mem_lock.lock();
+	if ((ptr >= tmpbuf) && (ptr <= (tmpbuf + TEMP_MEM_SIZE))) {
+		numTempAllocs--;
+		if(numTempAllocs == 0) tmppos = 0;
+	}
+	temp_mem_lock.unlock();
+}
 
 // Try to figure out which allocator is being used
 void getAllocStyle () {
@@ -1016,39 +889,43 @@ void getMmapThreshold () {
 
 void writeAllocData () {
 
-	fprintf (thrData.output, ">>> mallocs            %d\n", numMallocs);
-	fprintf (thrData.output, ">>> callocs            %d\n", numCallocs);
-    fprintf (thrData.output, ">>> reallocs           %d\n", numReallocs);
-    fprintf (thrData.output, ">>> new_address        %d\n", new_address);
-	fprintf (thrData.output, ">>> reused_address     %d\n", reused_address);
-	fprintf (thrData.output, ">>> frees              %d\n", numFrees);
-	fprintf (thrData.output, ">>> num_mmaps          %d\n", num_mmaps);
+	fprintf (thrData.output, ">>> mallocs            %u\n", numMallocs.load(relaxed));
+	fprintf (thrData.output, ">>> callocs            %u\n", numCallocs.load(relaxed));
+   fprintf (thrData.output, ">>> reallocs           %u\n", numReallocs.load(relaxed));
+   fprintf (thrData.output, ">>> new_address        %u\n", new_address.load(relaxed));
+	fprintf (thrData.output, ">>> reused_address     %u\n", reused_address.load(relaxed));
+	fprintf (thrData.output, ">>> frees              %u\n", numFrees.load(relaxed));
+	fprintf (thrData.output, ">>> num_mmaps          %u\n", num_mmaps.load(relaxed));
 	fprintf (thrData.output, ">>> malloc_mmap_threshold   %zu\n", malloc_mmap_threshold);
 
-	if (new_address > 0)
-		fprintf (thrData.output, ">>> cyclesNewAlloc     %zu\n", (cyclesNewAlloc / (long)new_address));
+	if (new_address.load(relaxed) > 0)
+		fprintf (thrData.output, ">>> cyclesNewAlloc     %u\n",
+				  (cyclesNewAlloc.load(relaxed) / new_address.load(relaxed)));
 
 	else
 		fprintf (thrData.output, ">>> cyclesNewAlloc     N/A\n");
 
-	if (reused_address > 0) 
-		fprintf (thrData.output, ">>> cyclesReuseAlloc   %zu\n", (cyclesReuseAlloc / (long)reused_address));
+	if (reused_address.load(relaxed) > 0) 
+		fprintf (thrData.output, ">>> cyclesReuseAlloc   %u\n",
+				  (cyclesReuseAlloc.load(relaxed) / reused_address.load(relaxed)));
 
 	else fprintf (thrData.output, ">>> cyclesReuseAlloc   N/A\n");
 
-	if (numFrees > 0)
-		fprintf (thrData.output, ">>> cyclesFree         %zu\n", (cyclesFree / (long)numFrees));
+	if (numFrees.load(relaxed) > 0)
+		fprintf (thrData.output, ">>> cyclesFree         %u\n",
+				  (cyclesFree.load(relaxed) / numFrees.load(relaxed)));
 
 	else fprintf (thrData.output, ">>> cyclesFree         N/A\n");
 
-	fprintf (thrData.output, ">>> pthread_mutex_lock %d\n", num_pthread_mutex_locks);
-	fprintf (thrData.output, ">>> totalWaits         %zu\n", totalWaits);
+	fprintf (thrData.output, ">>> pthread_mutex_lock %u\n", num_pthread_mutex_locks.load(relaxed));
+	fprintf (thrData.output, ">>> totalWaits         %u\n", totalWaits.load(relaxed));
 
-	if (totalWaits > 0) 
-		fprintf (thrData.output, ">>> avgWaitTime        %zu\n", (totalTimeWaiting/totalWaits));
+	if (totalWaits.load(relaxed) > 0) 
+		fprintf (thrData.output, ">>> avgWaitTime        %u\n",
+				  (totalTimeWaiting.load(relaxed)/totalWaits.load(relaxed)));
 
-    fprintf(thrData.output, ">>> madvise calls       %d\n", madvise_calls);
-    fprintf(thrData.output, ">>> w/ MADV_DONTNEED    %d\n", dontneed_advice_count );
+    fprintf(thrData.output, ">>> madvise calls       %u\n", madvise_calls.load(relaxed));
+    fprintf(thrData.output, ">>> w/ MADV_DONTNEED    %u\n", dontneed_advice_count.load(relaxed));
 
 	fflush (thrData.output);
 }
@@ -1164,21 +1041,14 @@ extern "C" void * yymmap(void *addr, size_t length, int prot, int flags,
 		//Is the profiler getting class sizes
 		if (inGetMmapThreshold) {
 
-			if (malloc_mmap_threshold == 0) {
-				malloc_mmap_threshold = length;
-				mmap_found = true;
-			}
+			malloc_mmap_threshold = length;
+			mmap_found = true;
 		}
 
 		else {
-			//Is this thread currently doing an allocation?
-			pid_t tid = gettid ();
-			int threadID = (int) tid;
-			bool find;
-			if (activeThreads.find(threadID, &find)) 
-				mmap_lock.lock();
-				num_mmaps++;
-				mmap_lock.unlock();
+			//If this thread currently doing an allocation
+			if (inAllocation) 
+				num_mmaps.fetch_add (1, std::memory_order_relaxed);
 		}
 
 		return retval;

@@ -10,6 +10,9 @@ __thread extern thread_data thrData;
 extern "C" void printHashMap();
 extern "C" pid_t gettid();
 
+thread_local extern uint64_t numWaits;
+thread_local extern uint64_t timeWaiting;
+
 class xthread {
 	typedef void * threadFunction(void *);
 	typedef struct thread {
@@ -27,7 +30,8 @@ class xthread {
 		children->startArg = arg;
 		children->startRoutine = fn;
 
-		int result = RealX::pthread_create(tid, attr, xthread::startThread, (void *)children);
+//		int result = RealX::pthread_create(tid, attr, xthread::startThread, (void *)children);
+		int result = RealX::pthread_create(tid, attr, xthread::startThread_noFile, (void *)children);
 		if(result) {
 			perror("ERROR: pthread_create failed");
 			abort();
@@ -45,10 +49,9 @@ class xthread {
 		pid_t tid = gettid();
 		current->tid = tid;
 
-
 		char outputFile[MAX_FILENAME_LEN];
 
-		snprintf(outputFile, MAX_FILENAME_LEN, "%s_libmemperf_pid_%d_tid_%d.txt",
+		snprintf(outputFile, MAX_FILENAME_LEN, "%s_libmallocprof_%d_tid_%d.txt",
 				program_invocation_name, pid, tid);
 
 		// Presently set to overwrite file; change fopen flag to "a" for append.
@@ -72,15 +75,46 @@ class xthread {
 		thrData.stackStart = thrData.stackEnd + stackSize;
 		RealX::free(firstHeapObj);
 
-
 		fprintf(thrData.output, ">>> thread %d stack start @ %p, stack end @ %p\n", tid,
-				thrData.stackStart, thrData.stackEnd);
+				  thrData.stackStart, thrData.stackEnd);
 
 		initSampling();
 		result = current->startRoutine(current->startArg);
 		doPerfRead();
 
+		fprintf (thrData.output, ">>> numWaits = %zu\n", numWaits);
+		fprintf (thrData.output, ">>> timeWaiting = %zu\n", timeWaiting);
+
 		fclose(thrData.output);
+		return result;
+	}
+
+	static void * startThread_noFile(void * arg) {
+		void * result = NULL;
+		size_t stackSize;
+		thread_t * current = (thread_t *) arg;
+		
+		pid_t tid = gettid();
+		current->tid = tid;
+
+		pthread_attr_t attrs;
+		if(pthread_getattr_np(pthread_self(), &attrs) != 0) {
+			fprintf(stderr, "error: unable to get thread attributes: %s\n", strerror(errno));
+			abort();
+		}
+		if(pthread_attr_getstack(&attrs, (void **)&thrData.stackEnd, &stackSize) != 0) {
+			fprintf(stderr, "error: unable to get stack values: %s\n", strerror(errno));
+			abort();
+		}
+
+		char * firstHeapObj = (char *)RealX::malloc(sizeof(char));
+		thrData.stackStart = thrData.stackEnd + stackSize;
+		RealX::free(firstHeapObj);
+
+		initSampling();
+		result = current->startRoutine(current->startArg);
+		doPerfRead_noFile();
+
 		return result;
 	}
 };

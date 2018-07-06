@@ -40,6 +40,17 @@ void doPerfRead() {
 		fprintf(thrData.output, ">>> num cache misses   %ld\n", count_cache);
 }
 
+void doPerfRead_noFile () {
+    int64_t count_fault, count_tlb, count_cache;
+		ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_DISABLE, 0);
+		ioctl(perfInfo.perf_fd_tlb, PERF_EVENT_IOC_DISABLE, 0);
+		ioctl(perfInfo.perf_fd_cache, PERF_EVENT_IOC_DISABLE, 0);
+
+		read(perfInfo.perf_fd_fault, &count_fault, sizeof(int64_t));
+		read(perfInfo.perf_fd_tlb, &count_tlb, sizeof(int64_t));
+		read(perfInfo.perf_fd_cache, &count_cache, sizeof(int64_t));
+}
+
 void setupSampling(void) {
 	struct perf_event_attr pe_fault, pe_tlb, pe_cache;
 	memset(&pe_fault, 0, sizeof(struct perf_event_attr));

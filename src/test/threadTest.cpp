@@ -5,8 +5,8 @@
 #include <pthread.h>
 #include <malloc.h>
 
-#define NUM_THREADS 5
-#define NUM_MALLOCS 10000
+#define NUM_THREADS 20
+#define NUM_MALLOCS 1000
 
 void* thread_start (void*);
 pthread_barrier_t barrier;
@@ -49,13 +49,21 @@ int main() {
 void* thread_start (void* arg) {
 
 	int i;
-	void* ptr;
-	for (i = 0; i < NUM_MALLOCS; i++) {
+	int* j;
+	int a;
+	void* p;
+	for (i = 0; i < NUM_MALLOCS; i++) 
+		p = malloc (64);
 
-		//pthread_barrier_wait (&barrier);
-		ptr = malloc (16);
-		free(ptr);
-	}
+	free (p);
+
+	j = (int*) malloc (sizeof (int) * 1000);
+	
+	for (i = 0; i < 1000; i++) 
+		j[i] = 50+i;
+
+	for (i = 0; i < 1000; i++)
+		a = j[i];
 
 	return nullptr;
 }

@@ -85,4 +85,5 @@ typedef struct {
 int initSampling(void);
 void setupSampling(void);
 void doPerfRead(void);
+void doPerfRead_noFile(void);
 #endif
