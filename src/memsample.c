@@ -25,34 +25,54 @@ __thread extern thread_data thrData;
 
 thread_local perf_info perfInfo;
 
+void getPerfInfo(int64_t *fault, int64_t *tlb, int64_t *cache_miss, int64_t *cache_ref, int64_t *instr){
+   
+		read(perfInfo.perf_fd_fault, fault, sizeof(int64_t));
+		read(perfInfo.perf_fd_tlb, tlb, sizeof(int64_t));
+		read(perfInfo.perf_fd_cache_miss, cache_miss, sizeof(int64_t));
+		read(perfInfo.perf_fd_cache_ref, cache_ref, sizeof(int64_t));
+		read(perfInfo.perf_fd_instr, instr, sizeof(int64_t));
+}
+
 void doPerfRead() {
-    int64_t count_fault, count_tlb, count_cache;
+    int64_t count_fault, count_tlb, count_cache_miss, count_cache_ref, count_instr;
 		ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_DISABLE, 0);
 		ioctl(perfInfo.perf_fd_tlb, PERF_EVENT_IOC_DISABLE, 0);
-		ioctl(perfInfo.perf_fd_cache, PERF_EVENT_IOC_DISABLE, 0);
+		ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_DISABLE, 0);
+		ioctl(perfInfo.perf_fd_cache_ref, PERF_EVENT_IOC_DISABLE, 0);
+		ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_DISABLE, 0);
 
 		read(perfInfo.perf_fd_fault, &count_fault, sizeof(int64_t));
 		read(perfInfo.perf_fd_tlb, &count_tlb, sizeof(int64_t));
-		read(perfInfo.perf_fd_cache, &count_cache, sizeof(int64_t));
+		read(perfInfo.perf_fd_cache_miss, &count_cache_miss, sizeof(int64_t));
+		read(perfInfo.perf_fd_cache_ref, &count_cache_ref, sizeof(int64_t));
+		read(perfInfo.perf_fd_instr, &count_instr, sizeof(int64_t));
 
-		fprintf(thrData.output, ">>> num page faults    %ld\n", count_fault);
-		fprintf(thrData.output, ">>> num TLB misses     %ld\n", count_tlb);
-		fprintf(thrData.output, ">>> num cache misses   %ld\n", count_cache);
+		//fprintf(thrData.output, "\n>>> tot page faults    %ld\n", count_fault);
+		//fprintf(thrData.output, ">>> tot TLB misses     %ld\n", count_tlb);
+		//fprintf(thrData.output, ">>> tot cache misses   %ld\n", count_cache_miss);
+		//fprintf(thrData.output, ">>> tot cache refs     %ld\n", count_cache_ref);
+        //fprintf(thrData.output, ">>> tot miss rate      %f%%\n", (float)count_cache_miss/(float)count_cache_ref * 100 );
+		//fprintf(thrData.output, ">>> tot instructions   %ld\n", count_instr);
 }
 
 void doPerfRead_noFile () {
-    int64_t count_fault, count_tlb, count_cache;
+    int64_t count_fault, count_tlb, count_cache_miss, count_instr;
 		ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_DISABLE, 0);
 		ioctl(perfInfo.perf_fd_tlb, PERF_EVENT_IOC_DISABLE, 0);
-		ioctl(perfInfo.perf_fd_cache, PERF_EVENT_IOC_DISABLE, 0);
+		ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_DISABLE, 0);
+		ioctl(perfInfo.perf_fd_cache_ref, PERF_EVENT_IOC_DISABLE, 0);
+		ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_DISABLE, 0);
 
 		read(perfInfo.perf_fd_fault, &count_fault, sizeof(int64_t));
 		read(perfInfo.perf_fd_tlb, &count_tlb, sizeof(int64_t));
-		read(perfInfo.perf_fd_cache, &count_cache, sizeof(int64_t));
+		read(perfInfo.perf_fd_cache_miss, &count_cache_miss, sizeof(int64_t));
+		read(perfInfo.perf_fd_cache_ref, &count_cache_miss, sizeof(int64_t));
+		read(perfInfo.perf_fd_instr, &count_instr, sizeof(int64_t));
 }
 
 void setupSampling(void) {
-	struct perf_event_attr pe_fault, pe_tlb, pe_cache;
+	struct perf_event_attr pe_fault, pe_tlb, pe_cache_miss, pe_cache_ref, pe_instr;
 	memset(&pe_fault, 0, sizeof(struct perf_event_attr));
 
 	pe_fault.type = PERF_TYPE_SOFTWARE;
@@ -106,11 +126,21 @@ void setupSampling(void) {
 	// Make an exact copy of the pe_fault attributes to be used for the
 	// corresponding store events' attributes.
 	memcpy(&pe_tlb, &pe_fault, sizeof(struct perf_event_attr));
-	memcpy(&pe_cache, &pe_fault, sizeof(struct perf_event_attr));
+	memcpy(&pe_cache_miss, &pe_fault, sizeof(struct perf_event_attr));
+	memcpy(&pe_cache_ref, &pe_fault, sizeof(struct perf_event_attr));
+    memcpy(&pe_instr, &pe_fault, sizeof(struct perf_event_attr));
+
 	pe_tlb.type = PERF_TYPE_HW_CACHE;
 	pe_tlb.config = PERF_COUNT_HW_CACHE_DTLB | (PERF_COUNT_HW_CACHE_OP_READ << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16);
-	pe_cache.type = PERF_TYPE_HARDWARE;
-	pe_cache.config = PERF_COUNT_HW_CACHE_MISSES;
+
+	pe_cache_miss.type = PERF_TYPE_HARDWARE;
+	pe_cache_miss.config = PERF_COUNT_HW_CACHE_MISSES;
+
+    pe_cache_ref.type = PERF_TYPE_HARDWARE;
+    pe_cache_ref.config = PERF_COUNT_HW_CACHE_REFERENCES;
+
+    pe_instr.type = PERF_TYPE_HARDWARE;
+    pe_instr.config = PERF_COUNT_HW_INSTRUCTIONS;
 
 	// Create the perf_event for this thread on all CPUs with no event group
 	// Second parameter (target thread): 0=self, -1=cpu-wide mode
@@ -129,19 +159,35 @@ void setupSampling(void) {
 		abort();
 	}
 
-	perfInfo.perf_fd_cache = perf_event_open(&pe_cache, 0, -1, -1, 0);
-	if(perfInfo.perf_fd_cache == -1) {
-		perror("Failed to open perf event for pe_cache");
+	perfInfo.perf_fd_cache_miss = perf_event_open(&pe_cache_miss, 0, -1, -1, 0);
+	if(perfInfo.perf_fd_cache_miss == -1) {
+		perror("Failed to open perf event for pe_cache_miss");
+		abort();
+	}
+	
+    perfInfo.perf_fd_cache_ref = perf_event_open(&pe_cache_ref, 0, -1, -1, 0);
+	if(perfInfo.perf_fd_cache_ref == -1) {
+		perror("Failed to open perf event for pe_cache_ref");
+		abort();
+	}
+
+    perfInfo.perf_fd_instr = perf_event_open(&pe_instr, 0, -1, -1, 0);
+	if(perfInfo.perf_fd_cache_miss == -1) {
+		perror("Failed to open perf event for pe_instr");
 		abort();
 	}
 
 	ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_RESET, 0);
 	ioctl(perfInfo.perf_fd_tlb, PERF_EVENT_IOC_RESET, 0);
-	ioctl(perfInfo.perf_fd_cache, PERF_EVENT_IOC_RESET, 0);
+	ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_RESET, 0);
+	ioctl(perfInfo.perf_fd_cache_ref, PERF_EVENT_IOC_RESET, 0);
+	ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_RESET, 0);
 
 	ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_ENABLE, 0);
 	ioctl(perfInfo.perf_fd_tlb, PERF_EVENT_IOC_ENABLE, 0);
-	ioctl(perfInfo.perf_fd_cache, PERF_EVENT_IOC_ENABLE, 0);
+	ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_ENABLE, 0);
+	ioctl(perfInfo.perf_fd_cache_ref, PERF_EVENT_IOC_ENABLE, 0);
+	ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_ENABLE, 0);
 
 
 	/*

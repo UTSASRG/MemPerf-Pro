@@ -31,11 +31,11 @@ namespace RealX {
 		INIT_WRAPPER(mmap, RTLD_NEXT);
         INIT_WRAPPER(madvise, RTLD_NEXT);
 
-		void *pthread_handle = dlopen("libpthread.so.0", RTLD_NOW | RTLD_GLOBAL | RTLD_NOLOAD);
-		INIT_WRAPPER(pthread_create, pthread_handle);
-		INIT_WRAPPER(pthread_join, pthread_handle);
-		INIT_WRAPPER(pthread_mutex_lock, pthread_handle);
-		INIT_WRAPPER(pthread_mutex_unlock, pthread_handle);
-		INIT_WRAPPER(pthread_mutex_trylock, pthread_handle);
+		//void *pthread_handle = dlopen("libpthread.so.0", RTLD_NOW | RTLD_GLOBAL | RTLD_NOLOAD);
+		INIT_WRAPPER(pthread_create, RTLD_NEXT);
+		INIT_WRAPPER(pthread_join, RTLD_NEXT);
+		INIT_WRAPPER(pthread_mutex_lock, RTLD_NEXT);
+		INIT_WRAPPER(pthread_mutex_unlock, RTLD_NEXT);
+		INIT_WRAPPER(pthread_mutex_trylock, RTLD_NEXT);
 	}
 }
