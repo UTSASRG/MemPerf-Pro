@@ -103,10 +103,13 @@ typedef struct {
 typedef struct {
 	int perf_fd_fault;
 	int perf_fd_tlb;
-	int perf_fd_cache;
+	int perf_fd_cache_miss;
+    int perf_fd_cache_ref;
+    int perf_fd_instr;
 	pid_t tid;
 } perf_info;
 
+void getPerfInfo(int64_t *, int64_t *, int64_t *, int64_t *, int64_t *);
 int initSampling(void);
 void setupSampling(void);
 void doPerfRead(void);

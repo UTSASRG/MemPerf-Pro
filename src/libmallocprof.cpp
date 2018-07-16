@@ -71,6 +71,11 @@ uint64_t totalSizeFree = 0;
 uint64_t totalSizeDiff = 0;
 
 //Atomic Globals
+std::atomic_uint numFaults (0);
+std::atomic_uint numTlbMisses (0);
+std::atomic_uint numCacheMisses (0);
+std::atomic_uint numCacheRefs (0);
+std::atomic_uint numInstrs (0);
 std::atomic_uint numFrees (0);
 std::atomic_uint numMallocs (0);
 std::atomic_uint numCallocs (0);
@@ -111,6 +116,7 @@ thread_local uint64_t numWaits;
 thread_local bool waiting;
 thread_local bool inAllocation;
 thread_local bool inMmap;
+thread_local bool samplingInit = false;
 
 //Stores info about locks
 typedef struct LockContention {
@@ -273,8 +279,11 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
 
    // Register our cleanup routine as an on-exit handler.
 	atexit(exitHandler);
-	initSampling();
-	
+    if(!samplingInit){
+	    initSampling();
+        samplingInit = true;
+    }
+
 	return real_main_mallocprof (argc, argv, envp);
 }
 
@@ -325,18 +334,31 @@ extern "C" {
 
 		//If in our getClassSizes function, use RealX
 		//We need this because the vector uses push_back
-		//which calls malloc
+		//which calls malloc, also fopen calls malloc
 		if(gettingClassSizes) return RealX::malloc(sz);
+
+        if(!samplingInit){
+            initSampling();
+            samplingInit = true;
+        }
+
+        int64_t before_faults, before_tlb_misses, before_cache_misses, before_cache_refs, before_instrs;
+        int64_t after_faults, after_tlb_misses, after_cache_misses, after_cache_refs, after_instrs;
 
 		//thread_local
 		inAllocation = true;
 
 		//Collect allocation data
 		void* objAlloc;
+
+        getPerfInfo(&before_faults, &before_tlb_misses, &before_cache_misses,
+                &before_cache_refs, &before_instrs);
 		uint64_t before = rdtscp ();
 		objAlloc = RealX::malloc(sz);
 		uint64_t after = rdtscp ();
-		uint64_t cyclesForMalloc = after - before;
+        getPerfInfo(&after_faults, &after_tlb_misses, &after_cache_misses, &after_cache_refs, &after_instrs);
+        
+        uint64_t cyclesForMalloc = after - before;
 		uint64_t address = reinterpret_cast <uint64_t> (objAlloc);
 
 		ObjectTuple* t;
@@ -372,6 +394,11 @@ extern "C" {
 				break;
 			}
 		}	
+        numFaults.fetch_add(after_faults - before_faults, relaxed);
+        numTlbMisses.fetch_add(after_tlb_misses - before_tlb_misses, relaxed);
+        numCacheMisses.fetch_add(after_cache_misses - before_cache_misses, relaxed);
+        numCacheRefs.fetch_add(after_cache_refs - before_cache_refs, relaxed);
+        numInstrs.fetch_add(after_instrs - before_instrs, relaxed); 
 
 		//thread_local
 		inAllocation = false;
@@ -390,14 +417,27 @@ extern "C" {
 			return ptr;
 		}
 
-		//thread_local
+        if(!samplingInit){
+            initSampling();
+            samplingInit = true;
+        }
+
+        int64_t before_faults, before_tlb_misses, before_cache_misses, before_cache_refs, before_instrs;
+        int64_t after_faults, after_tlb_misses, after_cache_misses, after_cache_refs, after_instrs;
+		
+        //thread_local
 		inAllocation = true;
 
 		void *objAlloc;
+
+        getPerfInfo(&before_faults, &before_tlb_misses, &before_cache_misses,
+                &before_cache_refs, &before_instrs);
 		uint64_t before = rdtscp();
 		objAlloc = RealX::calloc(nelem, elsize);
 		uint64_t after = rdtscp();
-		uint64_t cyclesForCalloc = after - before;
+        getPerfInfo(&after_faults, &after_tlb_misses, &after_cache_misses, &after_cache_refs, &after_instrs);
+	
+        uint64_t cyclesForCalloc = after - before;
 		uint64_t address = reinterpret_cast <uint64_t> (objAlloc);
 
 		ObjectTuple* t;
@@ -430,6 +470,12 @@ extern "C" {
 			}
 		}	
 
+        numFaults.fetch_add(after_faults - before_faults, relaxed);
+        numTlbMisses.fetch_add(after_tlb_misses - before_tlb_misses, relaxed);
+        numCacheMisses.fetch_add(after_cache_misses - before_cache_misses, relaxed);
+        numCacheRefs.fetch_add(after_cache_refs - before_cache_refs, relaxed);
+        numInstrs.fetch_add(after_instrs - before_instrs, relaxed); 
+
 		//thread_local
 		inAllocation = false;
 
@@ -439,6 +485,14 @@ extern "C" {
 	void yyfree(void * ptr) {
 		if(ptr == NULL)
 			return;
+
+        if(!samplingInit){
+            initSampling();
+            samplingInit = true;
+        }
+
+        int64_t before_faults, before_tlb_misses, before_cache_misses, before_cache_refs, before_instrs;
+        int64_t after_faults, after_tlb_misses, after_cache_misses, after_cache_refs, after_instrs;
 
 		// Determine whether the specified object came from our global buffer;
 		// only call RealX::free() if the object did not come from here.
@@ -456,11 +510,24 @@ extern "C" {
 				t->numFrees++;
 			}
 
+            getPerfInfo(&before_faults, &before_tlb_misses, &before_cache_misses,
+                    &before_cache_refs, &before_instrs);
 			uint64_t before = rdtscp ();
 			RealX::free(ptr);
 			uint64_t after = rdtscp ();
 			numFrees.fetch_add(1, relaxed);
 			cyclesFree.fetch_add ((after - before), memory_order_relaxed);
+            getPerfInfo(&after_faults, &after_tlb_misses, &after_cache_misses,
+                    &after_cache_refs, &after_instrs);
+
+			numFrees.fetch_add(1, relaxed);
+			cyclesFree.fetch_add ((after - before), relaxed);
+
+            numFaults.fetch_add(after_faults - before_faults, relaxed);
+            numTlbMisses.fetch_add(after_tlb_misses - before_tlb_misses, relaxed);
+            numCacheMisses.fetch_add(after_cache_misses - before_cache_misses, relaxed);
+            numCacheRefs.fetch_add(after_cache_refs - before_cache_refs, relaxed);
+            numInstrs.fetch_add(after_instrs - before_instrs, relaxed); 
 		}
 	}
 
@@ -508,14 +575,27 @@ extern "C" {
 			return yymalloc(sz);
 		}
 
+        if(!samplingInit){
+            initSampling();
+            samplingInit = true;
+        }
+
+        int64_t before_faults, before_tlb_misses, before_cache_misses, before_cache_refs, before_instrs;
+        int64_t after_faults, after_tlb_misses, after_cache_misses, after_cache_refs, after_instrs;
+
 		//thread_local
 		inAllocation = true;
 
 		void *objAlloc;
+
+        getPerfInfo(&before_faults, &before_tlb_misses, &before_cache_misses,
+                &before_cache_refs, &before_instrs);
 		uint64_t before = rdtscp();
 		objAlloc = RealX::realloc(ptr, sz);
 		uint64_t after = rdtscp();
-		uint64_t cyclesForRealloc = after - before;
+        getPerfInfo(&after_faults, &after_tlb_misses, &after_cache_misses, &after_cache_refs, &after_instrs);
+
+        uint64_t cyclesForRealloc = after - before;
 		uint64_t address = reinterpret_cast <uint64_t> (objAlloc);
 
 		ObjectTuple* t;
@@ -547,6 +627,11 @@ extern "C" {
 				break;
 			}
 		}	
+        numFaults.fetch_add(after_faults - before_faults, relaxed);
+        numTlbMisses.fetch_add(after_tlb_misses - before_tlb_misses, relaxed);
+        numCacheMisses.fetch_add(after_cache_misses - before_cache_misses, relaxed);
+        numCacheRefs.fetch_add(after_cache_refs - before_cache_refs, relaxed);
+        numInstrs.fetch_add(after_instrs - before_instrs, relaxed); 
 
 		//thread_local
 		inAllocation = false;
@@ -970,7 +1055,8 @@ void getAllocStyle () {
 void getClassSizes () {
         
 	size_t bytesToRead = 0;
-	bool matchFound = false;        
+	bool matchFound = false;
+	gettingClassSizes = true;
 	char *line;
 	char *token;
 
@@ -982,7 +1068,6 @@ void getClassSizes () {
 		line[strcspn(line, "\n")] = 0;
 
 		if(strcmp(line, name_without_path) == 0){
-
          matchFound = true;
       }
                 
@@ -996,8 +1081,7 @@ void getClassSizes () {
                 
       while( (token = strsep(&line, " ")) ){
                     
-         if(atoi(token) != 0){
-                        
+         if(atoi(token) != 0){                        
             classSizes.push_back( (uint64_t) atoi(token));
          }
       }
@@ -1011,7 +1095,7 @@ void getClassSizes () {
             
 		if (debug) printf ("match not found\n");
 		getMmapThreshold();
-      void* oldAddress;
+        void* oldAddress;
 		void* newAddress;
 		uint64_t oldAddr = 0, newAddr = 0;
 		size_t oldSize = 8, newSize = 8;
@@ -1019,7 +1103,6 @@ void getClassSizes () {
 		oldAddress = RealX::malloc (oldSize);
 		oldAddr = reinterpret_cast <uint64_t> (oldAddress);
 
-		gettingClassSizes = true;
 		while (newSize <= malloc_mmap_threshold) {
 
 			newSize += 8;
@@ -1079,6 +1162,16 @@ void getMmapThreshold () {
 
 void writeAllocData () {
 
+    fprintf (thrData.output, "\n>>> num page faults    %u\n", numFaults.load(relaxed));
+    fprintf (thrData.output, ">>> num TLB misses     %u\n", numTlbMisses.load(relaxed));
+    fprintf (thrData.output, ">>> num cache misses   %u\n", numCacheMisses.load(relaxed));
+    fprintf (thrData.output, ">>> num cache refs     %u\n", numCacheRefs.load(relaxed));
+    fprintf (thrData.output, ">>> cache miss rate    %.2lf%%\n",
+            (double)numCacheMisses.load(relaxed)/(double)numCacheRefs.load(relaxed) * 100 );
+    fprintf (thrData.output, ">>> num instructions   %u\n", numInstrs.load(relaxed));
+    fprintf (thrData.output, ">>> avg instr/alloc    %.2lf\n\n", (double)numInstrs.load(relaxed)/
+            (double)(numMallocs.load(relaxed) + numCallocs.load(relaxed)
+            + numReallocs.load(relaxed) + numFrees.load(relaxed)));
 	fprintf (thrData.output, ">>> mallocs            %u\n", numMallocs.load(relaxed));
 	fprintf (thrData.output, ">>> callocs            %u\n", numCallocs.load(relaxed));
 	fprintf (thrData.output, ">>> reallocs           %u\n", numReallocs.load(relaxed));
