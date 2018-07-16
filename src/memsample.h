@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <syscall.h>
 #include <sys/mman.h>
+#include <atomic>
 
 #define MMAP_PAGES 33	// must be in the form of 2^N + 1
 #define DATA_MMAP_PAGES (MMAP_PAGES - 1)
@@ -67,6 +68,25 @@ typedef struct {
 	uint32_t numAllocs;
 	uint32_t numFrees;
 } ObjectTuple;
+
+typedef struct {
+
+	uint64_t start;
+	uint64_t end;
+	size_t length;
+	std::atomic_bool used;
+} MmapTuple;
+
+typedef struct {
+
+	uint64_t VmSize_start;
+	uint64_t VmSize_end;
+	uint64_t VmPeak;
+	uint64_t VmRSS_start;
+	uint64_t VmRSS_end;
+	uint64_t VmHWM;
+	uint64_t VmLib;
+} VmInfo;
 
 typedef struct addr2line_info {
     char exename[15];
