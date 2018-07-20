@@ -98,6 +98,9 @@ std::atomic_uint cyclesNewAlloc (0);
 std::atomic_uint cyclesReuseAlloc (0);
 std::atomic_uint numThreads (0);
 
+int freeSizes[10000];
+int freeSizeCount = 0;
+
 //Vector of class sizes
 std::vector <uint64_t> classSizes;
 
@@ -141,6 +144,10 @@ HashMap <uint64_t, LC*, spinlock> lockUsage;
 //start, end, length, used
 HashMap <uint64_t, MmapTuple*, spinlock> mappings;
 
+//Hashmap of freelists, key 0 is bump pointer
+typedef HashMap <uint64_t, FreeObject*, spinlock> FreeList;
+HashMap <uint64_t, FreeList*, spinlock> freelistMap;
+
 //Spinlocks
 spinlock temp_mem_lock;
 
@@ -159,6 +166,9 @@ void getMemUsageStart ();
 void getMemUsageEnd ();
 void printMetadata ();
 void printAddressUsage ();
+void getMetadata ();
+void test ();
+FreeObject* newFreeObject (uint64_t addr, uint64_t size);
 
 // pre-init private allocator memory
 char tmpbuf[TEMP_MEM_SIZE];
@@ -244,6 +254,7 @@ __attribute__((constructor)) initStatus initializer() {
 	addressUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 	lockUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 	mappings.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
+	freelistMap.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 
 	mapsInitialized = true;
 
@@ -257,6 +268,9 @@ __attribute__((constructor)) initStatus initializer() {
 	else getMmapThreshold();
 
 	getMemUsageStart();
+
+//	getMetadata();
+//	test();
 
    return mallocInitialized;
 }
@@ -361,6 +375,19 @@ extern "C" {
         uint64_t cyclesForMalloc = after - before;
 		uint64_t address = reinterpret_cast <uint64_t> (objAlloc);
 
+		FreeObject* f;
+		if (freelist.find(address, &f)) {
+			freelist.erase(address);
+		}
+
+		else {
+
+			for (auto entry = freelist.begin(); entry != freelist.end(); entry++) {
+				auto data = entry.getData();
+				if (sz <= 
+			}
+		}
+
 		ObjectTuple* t;
 
 		//Has this address been used before
@@ -381,19 +408,6 @@ extern "C" {
 		
 		numMallocs.fetch_add(1, relaxed);
 
-		//Check all mmap mappings to know which mappings
-		//Are being used for allocations.
-		for (auto entry = mappings.begin(); entry != mappings.end(); entry++) {
-	
-			auto data = entry.getData();
-			if ((address >= data->start) && (address <= data->end)) {
-		
-				data->used.store (true, relaxed);
-				int one = 1;
-				write (STDOUT_FILENO, &one, sizeof (int));
-				break;
-			}
-		}	
         numFaults.fetch_add(after_faults - before_faults, relaxed);
         numTlbMisses.fetch_add(after_tlb_misses - before_tlb_misses, relaxed);
         numCacheMisses.fetch_add(after_cache_misses - before_cache_misses, relaxed);
@@ -503,24 +517,28 @@ extern "C" {
 
 			uint64_t address = reinterpret_cast <uint64_t> (ptr);
 			ObjectTuple* t;
+			FreeObject* f;
 
 			if (addressUsage.find(address, &t)){
 				t->szFreed += t->szUsed;
 				t->numAccesses++;
 				t->numFrees++;
+
+				freelist.insertIfAbsent(address, newFreeObject(address, t->szUsed));
 			}
 
             getPerfInfo(&before_faults, &before_tlb_misses, &before_cache_misses,
                     &before_cache_refs, &before_instrs);
+
 			uint64_t before = rdtscp ();
 			RealX::free(ptr);
 			uint64_t after = rdtscp ();
+
 			numFrees.fetch_add(1, relaxed);
-			cyclesFree.fetch_add ((after - before), memory_order_relaxed);
+
             getPerfInfo(&after_faults, &after_tlb_misses, &after_cache_misses,
                     &after_cache_refs, &after_instrs);
 
-			numFrees.fetch_add(1, relaxed);
 			cyclesFree.fetch_add ((after - before), relaxed);
 
             numFaults.fetch_add(after_faults - before_faults, relaxed);
@@ -616,17 +634,6 @@ extern "C" {
 
 		numReallocs.fetch_add(1, relaxed);
 
-		//Check all mmap mappings to know which mappings
-		//Are being used for allocations.
-		for (auto entry = mappings.begin(); entry != mappings.end(); entry++) {
-	
-			auto data = entry.getData();
-			if ((address >= data->start) && (address <= data->end)) {
-		
-				data->used.store (true, relaxed);
-				break;
-			}
-		}	
         numFaults.fetch_add(after_faults - before_faults, relaxed);
         numTlbMisses.fetch_add(after_tlb_misses - before_tlb_misses, relaxed);
         numCacheMisses.fetch_add(after_cache_misses - before_cache_misses, relaxed);
@@ -942,6 +949,16 @@ LC* newLC () {
 	return lc;
 }
 
+FreeObject* newFreeObject (uint64_t addr, uint64_t size) {
+
+	FreeObject* f = (FreeObject*) myMalloc (sizeof (FreeObject));
+
+	f->addr = addr;
+	f->size = size;
+	return f;
+}
+
+
 void* myMalloc (size_t size) {
 
 	temp_mem_lock.lock ();
@@ -1116,7 +1133,6 @@ void getClassSizes () {
 			oldSize = newSize;
 		}
 
-		RealX::free (oldAddress);
 		RealX::free (newAddress);
 
       fprintf(classSizeFile, "%s\n", name_without_path);
@@ -1140,6 +1156,10 @@ void getClassSizes () {
 	fprintf (thrData.output, "\n");
 	fflush (thrData.output);
 	gettingClassSizes = false;
+
+	for (auto size = classSizes.begin(); size != classSizes.end(); size++) {
+		freelistMap.insertIfAbsent(*size, newFreelist ());
+	}
 }
 
 void getMmapThreshold () {
@@ -1213,15 +1233,15 @@ void writeAllocData () {
    fprintf(thrData.output, ">>> w/ MADV_DONTNEED     %u\n", dontneed_advice_count.load(relaxed));
 	fprintf(thrData.output, ">>> sbrk calls           %u\n", numSbrks.load(relaxed));
 	fprintf(thrData.output, ">>> program size added   %u\n", programBreakChange.load(relaxed));
-	fprintf (thrData.output, ">>> VmSize_start(MB)       %.2f\n", vmInfo.VmSize_start / 1024.0);
-	fprintf (thrData.output, ">>> VmSize_end(MB)         %.2f\n", vmInfo.VmSize_end / 1024.0);
-	fprintf (thrData.output, ">>> VmPeak(MB)             %.2f\n", vmInfo.VmPeak / 1024.0);
-	fprintf (thrData.output, ">>> VmRSS_start(MB)        %.2f\n", vmInfo.VmRSS_start / 1024.0);
-	fprintf (thrData.output, ">>> VmRSS_end(MB)          %.2f\n", vmInfo.VmRSS_end / 1024.0);
-	fprintf (thrData.output, ">>> VmRSS_HWM(MB)          %.2f\n", vmInfo.VmHWM / 1024.0);
-	fprintf (thrData.output, ">>> VmRSS_Lib(MB)          %.2f\n", vmInfo.VmLib / 1024.0);
 
-	printMetadata();
+	fprintf (thrData.output, ">>> VmSize_start(kB)       %zu\n", vmInfo.VmSize_start);
+	fprintf (thrData.output, ">>> VmSize_end(kB)         %zu\n", vmInfo.VmSize_end);
+	fprintf (thrData.output, ">>> VmPeak(kB)             %zu\n", vmInfo.VmPeak);
+	fprintf (thrData.output, ">>> VmRSS_start(kB)        %zu\n", vmInfo.VmRSS_start);
+	fprintf (thrData.output, ">>> VmRSS_end(kB)          %zu\n", vmInfo.VmRSS_end);
+	fprintf (thrData.output, ">>> VmHWM(kB)          %zu\n", vmInfo.VmHWM);
+	fprintf (thrData.output, ">>> VmLib(kB)          %zu\n", vmInfo.VmLib);
+
 	printAddressUsage();
 
 	fflush (thrData.output);
@@ -1244,17 +1264,6 @@ void writeContention () {
 
 void printMetadata () {
 
-	uint64_t metadata = 0;
-	
-	for (auto entry = mappings.begin(); entry != mappings.end(); entry++) {
-
-		auto data = entry.getData();
-
-		if (data->used == true) continue;
-		else metadata += data->length;
-	}
-
-	printf ("metadata= %zu\n", metadata);
 }
 
 void printAddressUsage () {
@@ -1271,6 +1280,148 @@ void printAddressUsage () {
 		totalSizeAlloc += data->szTotal;
 		totalSizeFree += data->szFreed;
 		totalSizeDiff = totalSizeAlloc - totalSizeFree;
+	}
+}
+
+void getMetadata () {
+
+	pid_t id = ::getpid();
+	char fileName[30];
+
+	printf ("pid = %d\n", id);
+	//getchar();
+	std::snprintf (fileName, 30, "/proc/%d/status", id);
+
+	std::ifstream file (fileName);
+	std::string line;
+	
+	int start = 0, finish = 0;
+
+	const size_t size = 16;
+	const int numM = 1000;
+
+	int allocatedBytes = size * numM;
+
+	char* a[numM];
+	char touch;
+
+	for (int i = 0; i <= 41; i++) {
+
+		std::getline (file, line);
+		if (line.find("VmRSS") != std::string::npos) {
+			std::sscanf (line.data(), "%*s%d%*s", &start);
+			break;
+		}
+	}
+	file.close();
+
+	for (int i = 0; i < numM; i++) {
+
+		a[i] = (char*) RealX::malloc (size);
+		*a[i] = 'h';
+		*a[i] = 'i';
+		touch = *a[i];
+	}
+
+	//getchar();
+
+	file.open(fileName);
+
+	for (int i = 0; i <= 41; i++) {
+
+		std::getline (file, line);
+		if (line.find("VmRSS") != std::string::npos) {
+			std::sscanf (line.data(), "%*s%d%*s", &finish);
+			break;
+		}
+	}
+	file.close();
+
+	for (int i = 0; i < numM; i++) 
+		RealX::free (a[i]);
+
+	int result = finish*1024 - start*1024 - allocatedBytes;
+
+	printf ("start = %d\nfinish = %d\nallocatedBytes = %d\nresult = %d (%.2f kB)\n",
+			  start, finish, allocatedBytes, result, result/1024.0);
+}
+
+void test () {
+
+	pid_t id = ::getpid();
+	char fileName[30];
+
+	size_t size = 16;
+	int* p;
+
+	printf ("pid = %d\n", id);
+	std::snprintf (fileName, 30, "/proc/%d/status", id);
+
+	int startRSS = 0;
+	int finishRSS = 0;
+	int startVmSize = 0;
+	int finishVmSize = 0;
+	std::string line;
+
+	std::ifstream file (fileName);
+	for (int i = 0; i <= 41; i++) {
+
+		std::getline (file, line);
+		if (line.find("VmSize") != std::string::npos) {
+			std::sscanf (line.data(), "%*s%d%*s", &startVmSize);
+			continue;
+		}
+		else if (line.find("VmRSS") != std::string::npos) {
+			std::sscanf (line.data(), "%*s%d%*s", &startRSS);
+			break;;
+		}
+	}
+	file.close();
+
+	p = (int*) RealX::malloc (size);
+	*p = 15;
+
+	file.open(fileName);
+	for (int i = 0; i <= 41; i++) {
+
+		std::getline (file, line);
+		if (line.find("VmSize") != std::string::npos) {
+			std::sscanf (line.data(), "%*s%d%*s", &finishVmSize);
+			continue;
+		}
+		else if (line.find("VmRSS") != std::string::npos) {
+			std::sscanf (line.data(), "%*s%d%*s", &finishRSS);
+			break;;
+		}
+	}
+	file.close();
+
+	RealX::free (p);
+
+	printf ("startVmSize=    %d\n"
+			  "finishVmSize=   %d\n"
+			  "startVmRSS=     %d\n"
+			  "finishVmRSS=    %d\n",
+			  startVmSize, finishVmSize, startRSS, finishRSS);
+}
+
+Freelist* newFreelist () {
+	Freelist freelist;
+	freelist.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
+	return &freelist;
+}
+
+Freelist* getFreelist (uint64_t size) {
+
+	if (!bibop) {
+
+		Freelist* f;
+		if (freelistMap.find(0, &f)) return f;
+	}
+
+	else {
+
+		for (
 	}
 }
 
@@ -1378,16 +1529,6 @@ extern "C" void * yymmap(void *addr, size_t length, int prot, int flags,
 			mmap_found = true;
 			inMmap = false;
 			return retval;
-		}
-
-		//Add this mmap to a hashmap of mappings to
-		//determine if mapping is used to satisfy
-		//an allocation
-		if (length <= malloc_mmap_threshold) {
-
-			uint64_t address = reinterpret_cast <uint64_t> (retval);
-			MmapTuple* t = newMmapTuple (address, length);
-			mappings.insertIfAbsent (address, t);
 		}
 
 		//If this thread currently doing an allocation
