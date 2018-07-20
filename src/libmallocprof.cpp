@@ -145,8 +145,8 @@ HashMap <uint64_t, LC*, spinlock> lockUsage;
 HashMap <uint64_t, MmapTuple*, spinlock> mappings;
 
 //Hashmap of freelists, key 0 is bump pointer
-typedef HashMap <uint64_t, FreeObject*, spinlock> FreeList;
-HashMap <uint64_t, FreeList*, spinlock> freelistMap;
+typedef HashMap <uint64_t, FreeObject*, spinlock> Freelist;
+HashMap <uint64_t, Freelist*, spinlock> freelistMap;
 
 //Spinlocks
 spinlock temp_mem_lock;
@@ -375,21 +375,7 @@ extern "C" {
         uint64_t cyclesForMalloc = after - before;
 		uint64_t address = reinterpret_cast <uint64_t> (objAlloc);
 
-		FreeObject* f;
-		if (freelist.find(address, &f)) {
-			freelist.erase(address);
-		}
-
-		else {
-
-			for (auto entry = freelist.begin(); entry != freelist.end(); entry++) {
-				auto data = entry.getData();
-				if (sz <= 
-			}
-		}
-
 		ObjectTuple* t;
-
 		//Has this address been used before
 		if (addressUsage.find (address, &t)) {
 			t->numAccesses++;
@@ -472,18 +458,6 @@ extern "C" {
 
 		numCallocs.fetch_add (1, relaxed);
 
-		//Check all mmap mappings to know which mappings
-		//Are being used for allocations.
-		for (auto entry = mappings.begin(); entry != mappings.end(); entry++) {
-	
-			auto data = entry.getData();
-			if ((address >= data->start) && (address <= data->end)) {
-		
-				data->used.store (true, relaxed);
-				break;
-			}
-		}	
-
         numFaults.fetch_add(after_faults - before_faults, relaxed);
         numTlbMisses.fetch_add(after_tlb_misses - before_tlb_misses, relaxed);
         numCacheMisses.fetch_add(after_cache_misses - before_cache_misses, relaxed);
@@ -524,7 +498,6 @@ extern "C" {
 				t->numAccesses++;
 				t->numFrees++;
 
-				freelist.insertIfAbsent(address, newFreeObject(address, t->szUsed));
 			}
 
             getPerfInfo(&before_faults, &before_tlb_misses, &before_cache_misses,
@@ -1405,12 +1378,6 @@ void test () {
 			  startVmSize, finishVmSize, startRSS, finishRSS);
 }
 
-Freelist* newFreelist () {
-	Freelist freelist;
-	freelist.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
-	return &freelist;
-}
-
 Freelist* getFreelist (uint64_t size) {
 
 	if (!bibop) {
@@ -1421,7 +1388,6 @@ Freelist* getFreelist (uint64_t size) {
 
 	else {
 
-		for (
 	}
 }
 
