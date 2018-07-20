@@ -60,6 +60,12 @@ typedef struct {
 } Tuple;
 
 typedef struct {
+
+	uint64_t addr;
+	uint64_t size;
+} FreeObject;
+
+typedef struct {
 	uint64_t addr;
 	uint64_t numAccesses;
 	uint64_t szTotal;
