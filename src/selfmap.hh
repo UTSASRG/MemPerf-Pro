@@ -11,6 +11,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <fstream>
 #include <functional>
@@ -26,6 +27,8 @@
 //#include "wrappers/stlallocator.h"
 
 using namespace std;
+
+extern char *allocator_name;
 
 struct regioninfo {
   void* start;
@@ -181,6 +184,7 @@ class selfmap {
 							if((libTextStart <= mallocSymbol) && (mallocSymbol <= libTextEnd)) {
 									_allocTextStart = (void *)libTextStart;
 									_allocTextEnd = (void *)libTextEnd;
+                                    strcpy (allocator_name, _allocLibrary.c_str());
 									printf("allocator @ %p ~ %p, file = %s\n", _allocTextStart, _allocTextEnd, _allocLibrary.c_str());
 							} else {
 									printf("unknown library @ %p ~ %p, file = %s\n", _allocTextStart, _allocTextEnd, _allocLibrary.c_str());
