@@ -109,6 +109,14 @@ typedef struct {
 	pid_t tid;
 } perf_info;
 
+typedef struct {
+    int64_t numFaults;
+    int64_t numTlbMisses;
+    int64_t numCacheMisses;
+    int64_t numCacheRefs;
+    int64_t numInstrs;
+} thread_alloc_data;
+
 void getPerfInfo(int64_t *, int64_t *, int64_t *, int64_t *, int64_t *);
 int initSampling(void);
 void setupSampling(void);

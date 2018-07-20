@@ -6,7 +6,7 @@
 #include <malloc.h>
 #include <cstdint>
 
-#define NUM_THREADS 2
+#define NUM_THREADS 10
 #define NUM_MALLOCS 1000
 
 void* thread_start (void*);
