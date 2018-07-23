@@ -64,7 +64,8 @@ bool usingRealloc = false;
 bool mapsInitialized = false;
 bool mmap_found = false;
 bool gettingClassSizes = false;
-bool const debug = false;
+//const bool debug = true;
+const bool debug = false;
 
 uint64_t totalSizeAlloc = 0;
 uint64_t totalSizeFree = 0;
@@ -97,12 +98,13 @@ std::atomic_uint cyclesFree (0);
 std::atomic_uint cyclesNewAlloc (0);
 std::atomic_uint cyclesReuseAlloc (0);
 std::atomic_uint numThreads (0);
-
-int freeSizes[10000];
-int freeSizeCount = 0;
+std::atomic_uint blowup_bytes (0);
+std::atomic_uint blowup_allocations (0);
 
 //Vector of class sizes
 std::vector <uint64_t> classSizes;
+std::vector<uint64_t>::iterator csStart, csEnd;
+size_t largestClassSize;
 
 //Struct of virtual memory info
 VmInfo vmInfo;
@@ -157,6 +159,8 @@ HashMap <uint64_t, Freelist*, spinlock> freelistMap;
 
 //Spinlocks
 spinlock temp_mem_lock;
+spinlock getFreelistLock;
+spinlock freelistLock;
 
 // Functions 
 void getAllocStyle ();
@@ -176,8 +180,9 @@ void printMetadata ();
 void printAddressUsage ();
 void globalizeThreadAllocData();
 void getMetadata ();
-void test ();
+void test();
 FreeObject* newFreeObject (uint64_t addr, uint64_t size);
+Freelist* getFreelist (uint64_t size);
 
 // pre-init private allocator memory
 char tmpbuf[TEMP_MEM_SIZE];
@@ -227,6 +232,8 @@ __attribute__((constructor)) initStatus initializer() {
 	}
 
 	temp_mem_lock.init ();
+	getFreelistLock.init ();
+	freelistLock.init();
 
 	// Calculate the minimum possible callsite ID by taking the low four bytes
 	// of the start of the program text and repeating them twice, back-to-back,
@@ -235,6 +242,9 @@ __attribute__((constructor)) initStatus initializer() {
 	min_pos_callsite_id = (btext << 32) | btext;
 
 	RealX::initializer();
+
+	//Get metadata
+//	test();
 
     allocator_name = (char *) RealX::malloc(100 * sizeof(char));
 
@@ -277,12 +287,17 @@ __attribute__((constructor)) initStatus initializer() {
 	// If the class sizes are in the class_sizes.txt file
 	// it will read from that. Else if will get the info
 	if (bibop) getClassSizes ();
-	else getMmapThreshold();
+	else {
+		getMmapThreshold();
+		Freelist* f = (Freelist*) myMalloc (sizeof (Freelist));
+		f->initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
+		freelistMap.insert(0, f);
+		if (debug) printf ("Inserting freelistMap[0]\n");
+	}
 
 	getMemUsageStart();
 
 //	getMetadata();
-//	test();
 
    return mallocInitialized;
 }
@@ -389,6 +404,59 @@ extern "C" {
         uint64_t cyclesForMalloc = after - before;
 		uint64_t address = reinterpret_cast <uint64_t> (objAlloc);
 
+		//Check for Mem Blowup
+		if (sz <= malloc_mmap_threshold) {
+			freelistLock.lock();
+			Freelist* freelist;
+			bool reuseFreePossible = false;
+			bool reuseFreeObject = false;
+		
+			if (!bibop) {
+				if (freelistMap.find(0, &freelist)) {
+					if (debug) printf ("FreelistMap[0] found\n");
+					for (auto f = (*freelist).begin(); f != (*freelist).end(); f++) {
+						auto data = f.getData();
+						if (sz <= data->size) reuseFreePossible = true;
+						if (address == data->addr) {
+							reuseFreeObject = true;
+							(*freelist).erase(address);
+							break;
+						}
+					}
+				}
+				else {
+					printf ("Freelist[0] not found.\n");
+					abort();
+				}
+			}
+
+			else {
+				freelist = getFreelist (sz);
+				if ((*freelist).begin() != (*freelist).end()) {
+					reuseFreePossible = true;
+					for (auto f = (*freelist).begin(); f != (*freelist).end(); f++) {
+						auto data = f.getData();
+						if (address == data->addr) {
+							reuseFreeObject = true;
+							(*freelist).erase(address);
+							break;
+						}
+					}
+				}
+			}
+
+			freelistLock.unlock();
+
+			//If Reuse was possible, but didn't reuse
+			if (reuseFreePossible && !reuseFreeObject) {
+				//possible memory blowup has occurred
+				//get size of allocation
+				blowup_bytes.fetch_add(sz, relaxed);
+				//increment counter
+				blowup_allocations.fetch_add(1, relaxed);
+			}
+		}//End Check for Mem Blowup
+
 		ObjectTuple* t;
 		//Has this address been used before
 		if (addressUsage.find (address, &t)) {
@@ -462,6 +530,8 @@ extern "C" {
         uint64_t cyclesForCalloc = after - before;
 		uint64_t address = reinterpret_cast <uint64_t> (objAlloc);
 
+//		size_t sz = nelem*elsize;
+
 		ObjectTuple* t;
 		if ( addressUsage.find(address, &t) ){
 			t->numAccesses++;
@@ -479,12 +549,6 @@ extern "C" {
       }
 
 		numCallocs.fetch_add (1, relaxed);
-
-        numFaults.fetch_add(after_faults - before_faults, relaxed);
-        numTlbMisses.fetch_add(after_tlb_misses - before_tlb_misses, relaxed);
-        numCacheMisses.fetch_add(after_cache_misses - before_cache_misses, relaxed);
-        numCacheRefs.fetch_add(after_cache_refs - before_cache_refs, relaxed);
-        numInstrs.fetch_add(after_instrs - before_instrs, relaxed); 
 
         tadMap.insertIfAbsent(tid, newTad()); 
         thread_alloc_data *tad;
@@ -527,13 +591,34 @@ extern "C" {
 
 			uint64_t address = reinterpret_cast <uint64_t> (ptr);
 			ObjectTuple* t;
-			FreeObject* f;
 
 			if (addressUsage.find(address, &t)){
 				t->szFreed += t->szUsed;
 				t->numAccesses++;
 				t->numFrees++;
 
+				//Add this object to it's Freelist
+				//If bump pointer, add to freelistMap[0]
+				if (t->szUsed <= malloc_mmap_threshold) {
+					freelistLock.lock();
+					if (!bibop) {
+						Freelist* f;
+						if (freelistMap.find(0, &f)) {
+							(*f).insert(address, newFreeObject(address, t->szUsed));
+						}
+						else {
+							printf ("Freelist[0] not found.\n");
+							abort ();
+						}
+					}
+
+					//If bibop, add to freelistMap[t->szUsed]
+					else {
+						Freelist* f = getFreelist(t->szUsed);
+						(*f).insert(address, newFreeObject(address, t->szUsed));
+					}
+					freelistLock.unlock();
+				}
 			}
 
             getPerfInfo(&before_faults, &before_tlb_misses, &before_cache_misses,
@@ -630,6 +715,7 @@ extern "C" {
 
         uint64_t cyclesForRealloc = after - before;
 		uint64_t address = reinterpret_cast <uint64_t> (objAlloc);
+
 
 		ObjectTuple* t;
       if ( addressUsage.find(address, &t) ){
@@ -985,7 +1071,6 @@ thread_alloc_data* newTad(){
 FreeObject* newFreeObject (uint64_t addr, uint64_t size) {
 
 	FreeObject* f = (FreeObject*) myMalloc (sizeof (FreeObject));
-
 	f->addr = addr;
 	f->size = size;
 	return f;
@@ -1187,11 +1272,20 @@ void getClassSizes () {
 	fclose(classSizeFile);
 	fprintf (thrData.output, "\n");
 	fflush (thrData.output);
-	gettingClassSizes = false;
 
-	for (auto size = classSizes.begin(); size != classSizes.end(); size++) {
-		freelistMap.insertIfAbsent(*size, newFreelist ());
+	csStart = classSizes.begin();
+	csEnd = classSizes.end();
+	largestClassSize = *(csEnd--);
+	csEnd++;
+
+	for (auto cSize = csStart; cSize != csEnd; cSize++) {
+		auto classSize = *cSize;
+		Freelist* f = (Freelist*) myMalloc (sizeof (Freelist));
+		f->initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
+		freelistMap.insert(classSize, f);
 	}
+
+	gettingClassSizes = false;
 }
 
 void getMmapThreshold () {
@@ -1296,6 +1390,9 @@ void writeAllocData () {
 
 	printAddressUsage();
 
+	printf ("blowup_bytes = %u\nblowup_allocations = %u\n",
+			  blowup_bytes.load(relaxed), blowup_allocations.load(relaxed));
+
 	fflush (thrData.output);
 }
 
@@ -1350,7 +1447,7 @@ void getMetadata () {
 	int start = 0, finish = 0;
 
 	const size_t size = 16;
-	const int numM = 1000;
+	const int numM = 10000;
 
 	int allocatedBytes = size * numM;
 
@@ -1398,13 +1495,13 @@ void getMetadata () {
 			  start, finish, allocatedBytes, result, result/1024.0);
 }
 
-void test () {
+void test() {
 
 	pid_t id = ::getpid();
 	char fileName[30];
 
-	size_t size = 16;
-	int* p;
+	size_t size = 64;
+	char* p;
 
 	printf ("pid = %d\n", id);
 	std::snprintf (fileName, 30, "/proc/%d/status", id);
@@ -1430,8 +1527,9 @@ void test () {
 	}
 	file.close();
 
-	p = (int*) RealX::malloc (size);
-	*p = 15;
+	p = (char*) RealX::malloc (size);
+	for (int i = 0; i < size; i++)
+		p[i] = 'B';
 
 	file.open(fileName);
 	for (int i = 0; i <= 41; i++) {
@@ -1450,24 +1548,42 @@ void test () {
 
 	RealX::free (p);
 
-	printf ("startVmSize=    %d\n"
-			  "finishVmSize=   %d\n"
-			  "startVmRSS=     %d\n"
-			  "finishVmRSS=    %d\n",
+	printf ("startVmSize=    %d kB\n"
+			  "finishVmSize=   %d kB\n"
+			  "startVmRSS=     %d kB\n"
+			  "finishVmRSS=    %d kB\n",
 			  startVmSize, finishVmSize, startRSS, finishRSS);
 }
 
+//Get the freelist for this objects class size
 Freelist* getFreelist (uint64_t size) {
 
-	if (!bibop) {
+	getFreelistLock.lock();
+	Freelist* f = nullptr;
 
-		Freelist* f;
-		if (freelistMap.find(0, &f)) return f;
+	for (auto s = csStart; s != csEnd; s++) {
+		uint64_t classSize = *s;
+		if (size > classSize) {
+			if (debug) printf ("%zu > %zu\n", size, classSize);
+			continue;
+		}
+		else if (size <= classSize) {
+			if (freelistMap.find(classSize, &f)) {
+				if (debug) printf ("Freelist for size %zu found. Returning freelist[%zu]\n", size, classSize);
+				break;
+			}
+			else {
+				printf ("Didn't find Freelist for size %zu\n", size);
+			}
+		}
+	}
+	if (f == nullptr) {
+		printf ("Can't find freelist, aborting\n");
+		abort();
 	}
 
-	else {
-
-	}
+	getFreelistLock.unlock();
+	return f;
 }
 
 inline bool isAllocatorInCallStack() {

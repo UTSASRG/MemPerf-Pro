@@ -38,7 +38,7 @@ threads: libmallocprof.so \
 			test/test-freeguard-thread \
 			test/test-obsd-thread
 
-# Libmemperf
+# Libmallocprof
 libmallocprof.so: $(DEPS)
 	$(CXX) $(CFLAGS2) $(INCLUDE_DIRS) -shared -fPIC $(SRCS) -o libmallocprof.so -ldl -lpthread
 
