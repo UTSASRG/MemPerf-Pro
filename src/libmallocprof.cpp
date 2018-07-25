@@ -70,6 +70,7 @@ const bool debug = false;
 uint64_t totalSizeAlloc = 0;
 uint64_t totalSizeFree = 0;
 uint64_t totalSizeDiff = 0;
+uint64_t totalMemOverhead = 0;
 
 //Atomic Globals
 std::atomic_uint allThreadsNumFaults (0);
@@ -100,10 +101,11 @@ std::atomic_uint cyclesReuseAlloc (0);
 std::atomic_uint numThreads (0);
 std::atomic_uint blowup_bytes (0);
 std::atomic_uint blowup_allocations (0);
+std::atomic_uint fragmentation (0);
 
 //Vector of class sizes
 std::vector <uint64_t> classSizes;
-std::vector<uint64_t>::iterator csStart, csEnd;
+std::vector<uint64_t>::iterator csBegin, csEnd;
 size_t largestClassSize;
 
 //Struct of virtual memory info
@@ -112,7 +114,8 @@ VmInfo vmInfo;
 #define relaxed std::memory_order_relaxed
 #define acquire std::memory_order_acquire
 #define release std::memory_order_release
-#define TEMP_MEM_SIZE 16384000
+//#define TEMP_MEM_SIZE 16384000
+#define TEMP_MEM_SIZE 65536000
 
 //Thread local variables
 thread_local uint64_t numFaults;
@@ -183,6 +186,7 @@ void getMetadata ();
 void test();
 FreeObject* newFreeObject (uint64_t addr, uint64_t size);
 Freelist* getFreelist (uint64_t size);
+void calculateMemOverhead ();
 
 // pre-init private allocator memory
 char tmpbuf[TEMP_MEM_SIZE];
@@ -310,10 +314,11 @@ void exitHandler() {
 
 	doPerfRead();
 	getMemUsageEnd();
+	calculateMemOverhead();
 	fflush(thrData.output);
     globalizeThreadAllocData();
-	writeAllocData ();
-	writeContention ();
+	writeAllocData();
+	writeContention();
 }
 
 // MallocProf's main function
@@ -406,6 +411,23 @@ extern "C" {
 
 		//Check for Mem Blowup
 		if (sz <= malloc_mmap_threshold) {
+
+			//Check for internal fragmentation
+			if (bibop) {
+
+				for (auto s = csBegin; s != csEnd; s++) {
+
+					auto classSize = *s;
+					if (sz > classSize) continue;
+					else if (sz <= classSize) {
+						//Fragmentation = classSize - sz
+						int fragBytes = classSize - sz;
+						fragmentation.fetch_add (fragBytes, relaxed);
+						break;
+					}
+				}
+			}//End fragmentation check
+
 			freelistLock.lock();
 			Freelist* freelist;
 			bool reuseFreePossible = false;
@@ -445,8 +467,6 @@ extern "C" {
 				}
 			}
 
-			freelistLock.unlock();
-
 			//If Reuse was possible, but didn't reuse
 			if (reuseFreePossible && !reuseFreeObject) {
 				//possible memory blowup has occurred
@@ -455,6 +475,7 @@ extern "C" {
 				//increment counter
 				blowup_allocations.fetch_add(1, relaxed);
 			}
+			freelistLock.unlock();
 		}//End Check for Mem Blowup
 
 		ObjectTuple* t;
@@ -530,7 +551,60 @@ extern "C" {
         uint64_t cyclesForCalloc = after - before;
 		uint64_t address = reinterpret_cast <uint64_t> (objAlloc);
 
-//		size_t sz = nelem*elsize;
+		size_t sz = nelem*elsize;
+
+		//Check for Mem Blowup
+		if (sz <= malloc_mmap_threshold) {
+			freelistLock.lock();
+			Freelist* freelist;
+			bool reuseFreePossible = false;
+			bool reuseFreeObject = false;
+		
+			if (!bibop) {
+				if (freelistMap.find(0, &freelist)) {
+					if (debug) printf ("FreelistMap[0] found\n");
+					for (auto f = (*freelist).begin(); f != (*freelist).end(); f++) {
+						auto data = f.getData();
+						if (sz <= data->size) reuseFreePossible = true;
+						if (address == data->addr) {
+							reuseFreeObject = true;
+							(*freelist).erase(address);
+							break;
+						}
+					}
+				}
+				else {
+					printf ("Freelist[0] not found.\n");
+					abort();
+				}
+			}
+
+			else {
+				freelist = getFreelist (sz);
+				if ((*freelist).begin() != (*freelist).end()) {
+					reuseFreePossible = true;
+					for (auto f = (*freelist).begin(); f != (*freelist).end(); f++) {
+						auto data = f.getData();
+						if (address == data->addr) {
+							reuseFreeObject = true;
+							(*freelist).erase(address);
+							break;
+						}
+					}
+				}
+			}
+
+			freelistLock.unlock();
+
+			//If Reuse was possible, but didn't reuse
+			if (reuseFreePossible && !reuseFreeObject) {
+				//possible memory blowup has occurred
+				//get size of allocation
+				blowup_bytes.fetch_add(sz, relaxed);
+				//increment counter
+				blowup_allocations.fetch_add(1, relaxed);
+			}
+		}//End Check for Mem Blowup
 
 		ObjectTuple* t;
 		if ( addressUsage.find(address, &t) ){
@@ -716,6 +790,58 @@ extern "C" {
         uint64_t cyclesForRealloc = after - before;
 		uint64_t address = reinterpret_cast <uint64_t> (objAlloc);
 
+		//Check for Mem Blowup
+		if (sz <= malloc_mmap_threshold) {
+			freelistLock.lock();
+			Freelist* freelist;
+			bool reuseFreePossible = false;
+			bool reuseFreeObject = false;
+		
+			if (!bibop) {
+				if (freelistMap.find(0, &freelist)) {
+					if (debug) printf ("FreelistMap[0] found\n");
+					for (auto f = (*freelist).begin(); f != (*freelist).end(); f++) {
+						auto data = f.getData();
+						if (sz <= data->size) reuseFreePossible = true;
+						if (address == data->addr) {
+							reuseFreeObject = true;
+							(*freelist).erase(address);
+							break;
+						}
+					}
+				}
+				else {
+					printf ("Freelist[0] not found.\n");
+					abort();
+				}
+			}
+
+			else {
+				freelist = getFreelist (sz);
+				if ((*freelist).begin() != (*freelist).end()) {
+					reuseFreePossible = true;
+					for (auto f = (*freelist).begin(); f != (*freelist).end(); f++) {
+						auto data = f.getData();
+						if (address == data->addr) {
+							reuseFreeObject = true;
+							(*freelist).erase(address);
+							break;
+						}
+					}
+				}
+			}
+
+			freelistLock.unlock();
+
+			//If Reuse was possible, but didn't reuse
+			if (reuseFreePossible && !reuseFreeObject) {
+				//possible memory blowup has occurred
+				//get size of allocation
+				blowup_bytes.fetch_add(sz, relaxed);
+				//increment counter
+				blowup_allocations.fetch_add(1, relaxed);
+			}
+		}//End Check for Mem Blowup
 
 		ObjectTuple* t;
       if ( addressUsage.find(address, &t) ){
@@ -895,6 +1021,7 @@ extern "C" {
 							 void *(*start_routine)(void *), void * arg) {
 
 		int result = xthreadx::thread_create(tid, attr, start_routine, arg);
+		numThreads.fetch_add(1, relaxed);
 		return result;
 	}
 
@@ -1026,7 +1153,7 @@ extern "C" {
 // Create tuple for hashmap
 ObjectTuple* newObjectTuple (uint64_t address, size_t size) {
 
-	ObjectTuple* t = (ObjectTuple*) RealX::malloc (sizeof (ObjectTuple));	
+	ObjectTuple* t = (ObjectTuple*) myMalloc (sizeof (ObjectTuple));	
 	
 	t->addr = address;
 	t->numAccesses = 1;
@@ -1059,7 +1186,7 @@ LC* newLC () {
 }
 
 thread_alloc_data* newTad(){
-    thread_alloc_data* tad = (thread_alloc_data*) RealX::malloc(sizeof(thread_alloc_data));
+    thread_alloc_data* tad = (thread_alloc_data*) myMalloc (sizeof(thread_alloc_data));
     tad->numFaults = 0;
     tad->numTlbMisses = 0;
     tad->numCacheMisses = 0;
@@ -1273,12 +1400,12 @@ void getClassSizes () {
 	fprintf (thrData.output, "\n");
 	fflush (thrData.output);
 
-	csStart = classSizes.begin();
+	csBegin = classSizes.begin();
 	csEnd = classSizes.end();
 	largestClassSize = *(csEnd--);
 	csEnd++;
 
-	for (auto cSize = csStart; cSize != csEnd; cSize++) {
+	for (auto cSize = csBegin; cSize != csEnd; cSize++) {
 		auto classSize = *cSize;
 		Freelist* f = (Freelist*) myMalloc (sizeof (Freelist));
 		f->initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
@@ -1315,12 +1442,12 @@ void globalizeThreadAllocData(){
         allThreadsNumCacheRefs.fetch_add(it.getData()->numCacheRefs);
         allThreadsNumInstrs.fetch_add(it.getData()->numInstrs);
 
-        fprintf (thrData.output, "\n>>> Thread ID:     %lu\n", it.getKey());
-        fprintf (thrData.output, ">>> page faults    %ld\n", it.getData()->numFaults);
-        fprintf (thrData.output, ">>> TLB misses     %ld\n", it.getData()->numTlbMisses);
-        fprintf (thrData.output, ">>> cache misses   %ld\n", it.getData()->numCacheMisses);
-        fprintf (thrData.output, ">>> cache refs     %ld\n", it.getData()->numCacheRefs);
-        fprintf (thrData.output, ">>> num instr      %ld\n",it.getData()->numInstrs);
+//        fprintf (thrData.output, "\n>>> Thread ID:     %lu\n", it.getKey());
+//        fprintf (thrData.output, ">>> page faults    %ld\n", it.getData()->numFaults);
+//        fprintf (thrData.output, ">>> TLB misses     %ld\n", it.getData()->numTlbMisses);
+//        fprintf (thrData.output, ">>> cache misses   %ld\n", it.getData()->numCacheMisses);
+//        fprintf (thrData.output, ">>> cache refs     %ld\n", it.getData()->numCacheRefs);
+//        fprintf (thrData.output, ">>> num instr      %ld\n",it.getData()->numInstrs);
 
     }  
 }
@@ -1388,10 +1515,13 @@ void writeAllocData () {
 	fprintf (thrData.output, ">>> VmHWM(kB)          %zu\n", vmInfo.VmHWM);
 	fprintf (thrData.output, ">>> VmLib(kB)          %zu\n", vmInfo.VmLib);
 
-	printAddressUsage();
+	fprintf (thrData.output, "\n>>> blowup_bytes         %u\n", blowup_bytes.load(relaxed));
+	fprintf (thrData.output, ">>> blowup_allocations   %u\n", blowup_allocations.load(relaxed));
 
-	printf ("blowup_bytes = %u\nblowup_allocations = %u\n",
-			  blowup_bytes.load(relaxed), blowup_allocations.load(relaxed));
+	fprintf (thrData.output, ">>> fragmentation      %u\n", fragmentation.load(relaxed));
+	fprintf (thrData.output, ">>> totalMemOverhead   %zu\n", totalMemOverhead);
+
+	printAddressUsage();
 
 	fflush (thrData.output);
 }
@@ -1561,7 +1691,7 @@ Freelist* getFreelist (uint64_t size) {
 	getFreelistLock.lock();
 	Freelist* f = nullptr;
 
-	for (auto s = csStart; s != csEnd; s++) {
+	for (auto s = csBegin; s != csEnd; s++) {
 		uint64_t classSize = *s;
 		if (size > classSize) {
 			if (debug) printf ("%zu > %zu\n", size, classSize);
@@ -1584,6 +1714,12 @@ Freelist* getFreelist (uint64_t size) {
 
 	getFreelistLock.unlock();
 	return f;
+}
+
+void calculateMemOverhead () {
+
+	totalMemOverhead += fragmentation.load(relaxed);
+	totalMemOverhead += blowup_bytes.load(relaxed);
 }
 
 inline bool isAllocatorInCallStack() {
