@@ -80,7 +80,7 @@ typedef struct {
 	uint64_t start;
 	uint64_t end;
 	size_t length;
-	std::atomic_bool used;
+	bool used;
 } MmapTuple;
 
 typedef struct {
