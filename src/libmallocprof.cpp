@@ -250,7 +250,7 @@ __attribute__((constructor)) initStatus initializer() {
 	//Get metadata
 //	test();
 
-    allocator_name = (char *) RealX::malloc(100 * sizeof(char));
+    allocator_name = (char *) myMalloc::malloc(100 * sizeof(char));
 
 	selfmap::getInstance().getTextRegions();
 
@@ -506,11 +506,20 @@ extern "C" {
             tad->numTlbMisses += after_tlb_misses - before_tlb_misses;
             tad->numCacheMisses += after_cache_misses - before_cache_misses;
             tad->numCacheRefs += after_cache_refs - before_cache_refs;
-            tad->numInstrs += after_instrs - before_instrs; 
+            tad->numInstrs += after_instrs - before_instrs;
 
         }
 
-		//thread_local
+        if(after_instrs - before_instrs != 0){
+            fprintf(stderr, "Malloc from thread %lu\n", tid);
+            fprintf(stderr, "Num Faults:        %ld\n", after_faults - before_faults);
+            fprintf(stderr, "Num TLB Misses:    %ld\n", after_tlb_misses - before_tlb_misses);
+            fprintf(stderr, "Num Cache Misses:  %ld\n", after_cache_misses - before_cache_misses);
+            fprintf(stderr, "Num Cache Refs:    %ld\n", after_cache_refs - before_cache_refs);
+            fprintf(stderr, "Num Insructions:   %ld\n\n", after_instrs - before_instrs);
+        }
+
+        //thread_local
 		inAllocation = false;
 
 		return objAlloc;
@@ -637,6 +646,16 @@ extern "C" {
 
         }
 
+
+        if(after_instrs - before_instrs != 0){
+            fprintf(stderr, "Calloc from thread %lu\n", tid);
+            fprintf(stderr, "Num Faults:        %ld\n", after_faults - before_faults);
+            fprintf(stderr, "Num TLB Misses:    %ld\n", after_tlb_misses - before_tlb_misses);
+            fprintf(stderr, "Num Cache Misses:  %ld\n", after_cache_misses - before_cache_misses);
+            fprintf(stderr, "Num Cache Refs:    %ld\n", after_cache_refs - before_cache_refs);
+            fprintf(stderr, "Num Insructions:   %ld\n\n", after_instrs - before_instrs);
+        }
+
 		//thread_local
 		inAllocation = false;
 
@@ -719,6 +738,17 @@ extern "C" {
                 tad->numInstrs += after_instrs - before_instrs; 
 
             }
+
+
+            if(after_instrs - before_instrs != 0){
+                fprintf(stderr, "Free from thread %lu\n", tid);
+                fprintf(stderr, "Num Faults:        %ld\n", after_faults - before_faults);
+                fprintf(stderr, "Num TLB Misses:    %ld\n", after_tlb_misses - before_tlb_misses);
+                fprintf(stderr, "Num Cache Misses:  %ld\n", after_cache_misses - before_cache_misses);
+                fprintf(stderr, "Num Cache Refs:    %ld\n", after_cache_refs - before_cache_refs);
+                fprintf(stderr, "Num Insructions:   %ld\n\n", after_instrs - before_instrs);
+            }
+
 		}
 	}
 
@@ -872,6 +902,16 @@ extern "C" {
             tad->numCacheRefs += after_cache_refs - before_cache_refs;
             tad->numInstrs += after_instrs - before_instrs; 
 
+        }
+
+
+        if(after_instrs - before_instrs != 0){
+            fprintf(stderr, "Realloc from thread %lu\n", tid);
+            fprintf(stderr, "Num Faults:        %ld\n", after_faults - before_faults);
+            fprintf(stderr, "Num TLB Misses:    %ld\n", after_tlb_misses - before_tlb_misses);
+            fprintf(stderr, "Num Cache Misses:  %ld\n", after_cache_misses - before_cache_misses);
+            fprintf(stderr, "Num Cache Refs:    %ld\n", after_cache_refs - before_cache_refs);
+            fprintf(stderr, "Num Insructions:   %ld\n\n", after_instrs - before_instrs);
         }
 
 		//thread_local

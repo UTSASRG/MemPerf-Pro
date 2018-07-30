@@ -37,8 +37,9 @@ threads: libmallocprof.so \
 			test/test-dieharder-thread \
 			test/test-freeguard-thread \
 			test/test-obsd-thread
+pmu: test/pmu-libc-test test/pmu-obsd-test test/pmu-dieharder-test test/pmu-freeguard-test
 
-# Libmallocprof
+# Libmemperf
 libmallocprof.so: $(DEPS)
 	$(CXX) $(CFLAGS2) $(INCLUDE_DIRS) -shared -fPIC $(SRCS) -o libmallocprof.so -ldl -lpthread
 
@@ -51,10 +52,10 @@ test/test-obsd-thread: libmallocprof.so test/threadTest.cpp
 
 # FreeGuard
 test/test-freeguard: libmallocprof.so test/alloc.cpp
-	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/richard/FreeGuard/libfreeguard.so -o test/test-freeguard test/alloc.cpp
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/daniel/mem-alloc-project/FreeGuard/libfreeguard.so -o test/test-freeguard test/alloc.cpp
 
 test/test-freeguard-thread: libmallocprof.so test/threadTest.cpp
-	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/richard/FreeGuard/libfreeguard.so -o test/test-freeguard-thread test/threadTest.cpp -lpthread
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/daniel/mem-alloc-project/FreeGuard/libfreeguard.so -o test/test-freeguard-thread test/threadTest.cpp -lpthread
 
 # DieHarder
 test/test-dieharder: libmallocprof.so test/alloc.cpp
@@ -81,7 +82,7 @@ test/bs-dieharder: libmallocprof.so test/blackscholes-pthread.cpp
 	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/sam/Memoryallocators/DieHard/src/libdieharder.so -o test/bs-dieharder test/blackscholes-pthread.cpp -lpthread -DENABLE_THREADS  
 
 test/bs-freeguard: libmallocprof.so test/blackscholes-pthread.cpp
-	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/richard/FreeGuard/libfreeguard.so -o test/bs-freeguard test/blackscholes-pthread.cpp -lpthread -DENABLE_THREADS
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/daniel/mem-alloc-project/FreeGuard/libfreeguard.so -o test/bs-freeguard test/blackscholes-pthread.cpp -lpthread -DENABLE_THREADS
 
 #tests for pmu accuracy
 test/pmu-libc-test: libmallocprof.so test/pmu-test.cpp
@@ -91,7 +92,7 @@ test/pmu-obsd-test: libmallocprof.so test/pmu-test.cpp
 	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/sam/Memoryallocators/OpenBSD-6.0/libomalloc.so -o test/pmu-obsd-test test/pmu-test.cpp
 
 test/pmu-freeguard-test: libmallocprof.so test/pmu-test.cpp
-	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/richard/FreeGuard/libfreeguard.so -o test/pmu-freeguard-test test/pmu-test.cpp
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/daniel/mem-alloc-project/FreeGuard/libfreeguard.so -o test/pmu-freeguard-test test/pmu-test.cpp
 
 test/pmu-dieharder-test: libmallocprof.so test/pmu-test.cpp
 	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/sam/Memoryallocators/DieHard/src/libdieharder.so -o test/pmu-dieharder-test test/pmu-test.cpp

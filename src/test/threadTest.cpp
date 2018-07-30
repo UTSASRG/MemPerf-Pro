@@ -7,10 +7,10 @@
 #include <cstdint>
 
 #define NUM_THREADS 10
-#define NUM_MALLOCS 1000
+#define NUM_MALLOCS 100
 
 void* thread_start (void*);
-pthread_barrier_t barrier;
+//pthread_barrier_t barrier;
 
 int main() {
 
@@ -18,7 +18,7 @@ int main() {
 	int create, join;
 	void* result;
 
-	pthread_barrier_init (&barrier, NULL, (unsigned int) NUM_THREADS);
+	//pthread_barrier_init (&barrier, NULL, (unsigned int) NUM_THREADS);
 
 	for (int i = 0; i < NUM_THREADS; i++) {
 
