@@ -1,3 +1,11 @@
+Problem: how can we identify metadata mappings?
+Solution: maintain a hashmap of all mmap regions made by the allocator; on each malloc,
+	compare the returned object with these mappings in order to identify whether
+	the mapping is being used to serve objects to the application. On program end,
+	any mapping that was not used to serve objects from can be declared as metadata.
+
+Problem: How do we properly measure memory blowup?
+
 Can we identify the possible locality issues, instead of computation issue.
 Thus, we will only care about those allocations that are not alligned.
 Then for every callsite, we will have a corresponding rate of "efficiency and how many times 
