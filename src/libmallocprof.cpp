@@ -80,7 +80,9 @@ std::atomic_uint allThreadsNumFaults (0);
 std::atomic_uint allThreadsNumTlbMisses (0);
 std::atomic_uint allThreadsNumCacheMisses (0);
 std::atomic_uint allThreadsNumCacheRefs (0);
-std::atomic_uint allThreadsNumInstrs (0);
+std::atomic_uint allThreadsNumMallocInstrs (0);
+std::atomic_uint allThreadsNumReallocInstrs (0);
+std::atomic_uint allThreadsNumFreeInstrs (0);
 std::atomic_uint numFrees (0);
 std::atomic_uint numMallocs (0);
 std::atomic_uint numCallocs (0);
@@ -122,11 +124,11 @@ VmInfo vmInfo;
 #define TEMP_MEM_SIZE 65536000
 
 //Thread local variables
-thread_local uint64_t numFaults;
-thread_local uint64_t numTlbMisses;
-thread_local uint64_t numCacheMisses;
-thread_local uint64_t numCacheRefs;
-thread_local uint64_t numInstrs;
+//thread_local uint64_t numFaults;
+//thread_local uint64_t numTlbMisses;
+//thread_local uint64_t numCacheMisses;
+//thread_local uint64_t numCacheRefs;
+//thread_local uint64_t numInstrs;
 thread_local uint64_t timeAttempted;
 thread_local uint64_t timeWaiting;
 thread_local uint64_t numWaits;
@@ -401,7 +403,7 @@ extern "C" {
         int64_t before_faults, before_tlb_misses, before_cache_misses, before_cache_refs, before_instrs;
         int64_t after_faults, after_tlb_misses, after_cache_misses, after_cache_refs, after_instrs;
         uint64_t tid = gettid();
-
+		bool reuseFreeObject = false;
 		//thread_local
 		inAllocation = true;
 
@@ -440,7 +442,6 @@ extern "C" {
 			freelistLock.lock();
 			Freelist* freelist;
 			bool reuseFreePossible = false;
-			bool reuseFreeObject = false;
 		
 			if (!bibop) {
 				if (freelistMap.find(0, &freelist)) {
@@ -515,17 +516,23 @@ extern "C" {
             tad->numTlbMisses += after_tlb_misses - before_tlb_misses;
             tad->numCacheMisses += after_cache_misses - before_cache_misses;
             tad->numCacheRefs += after_cache_refs - before_cache_refs;
-            tad->numInstrs += after_instrs - before_instrs;
+            tad->numMallocInstrs += after_instrs - before_instrs;
 
         }
 
         if(after_instrs - before_instrs != 0){
-            fprintf(stderr, "Malloc from thread %lu\n", tid);
-            fprintf(stderr, "Num Faults:        %ld\n", after_faults - before_faults);
-            fprintf(stderr, "Num TLB Misses:    %ld\n", after_tlb_misses - before_tlb_misses);
-            fprintf(stderr, "Num Cache Misses:  %ld\n", after_cache_misses - before_cache_misses);
-            fprintf(stderr, "Num Cache Refs:    %ld\n", after_cache_refs - before_cache_refs);
-            fprintf(stderr, "Num Insructions:   %ld\n\n", after_instrs - before_instrs);
+
+            fprintf(stderr, "Malloc from thread %lu\n\
+                             From free list:    %s\n\
+                             Num faults:        %ld\n\
+                             Num TLB misses:    %ld\n\
+                             Num cache misses:  %ld\n\
+                             num cache refs:    %ld\n\
+                             Num instructions:  %ld\n\n", 
+                    tid, reuseFreeObject ? "true" : "false",
+                    after_faults - before_faults, after_tlb_misses - before_tlb_misses,
+                    after_cache_misses - before_cache_misses, after_cache_refs - before_cache_refs,
+                    after_instrs - before_instrs);
         }
 
         //thread_local
@@ -566,6 +573,7 @@ extern "C" {
         int64_t before_faults, before_tlb_misses, before_cache_misses, before_cache_refs, before_instrs;
         int64_t after_faults, after_tlb_misses, after_cache_misses, after_cache_refs, after_instrs;
         uint64_t tid = gettid();
+		bool reuseFreeObject = false;
 		
         //thread_local
 		inAllocation = true;
@@ -589,7 +597,6 @@ extern "C" {
 			freelistLock.lock();
 			Freelist* freelist;
 			bool reuseFreePossible = false;
-			bool reuseFreeObject = false;
 		
 			if (!bibop) {
 				if (freelistMap.find(0, &freelist)) {
@@ -664,19 +671,23 @@ extern "C" {
             tad->numTlbMisses += after_tlb_misses - before_tlb_misses;
             tad->numCacheMisses += after_cache_misses - before_cache_misses;
             tad->numCacheRefs += after_cache_refs - before_cache_refs;
-            tad->numInstrs += after_instrs - before_instrs; 
+            tad->numMallocInstrs += after_instrs - before_instrs; 
 
         }
-
-        if(after_instrs - before_instrs != 0){
-            fprintf(stderr, "Calloc from thread %lu\n", tid);
-            fprintf(stderr, "Num Faults:        %ld\n", after_faults - before_faults);
-            fprintf(stderr, "Num TLB Misses:    %ld\n", after_tlb_misses - before_tlb_misses);
-            fprintf(stderr, "Num Cache Misses:  %ld\n", after_cache_misses - before_cache_misses);
-            fprintf(stderr, "Num Cache Refs:    %ld\n", after_cache_refs - before_cache_refs);
-            fprintf(stderr, "Num Insructions:   %ld\n\n", after_instrs - before_instrs);
+        if (after_instrs - before_instrs != 0){
+            fprintf(stderr, "Calloc from thread %lu\n\
+                             From free list:    %s\n\
+                             Num faults:        %ld\n\
+                             Num TLB misses:    %ld\n\
+                             Num cache misses:  %ld\n\
+                             num cache refs:    %ld\n\
+                             Num instructions:  %ld\n\n", 
+                    tid, reuseFreeObject ? "true" : "false",
+                    after_faults - before_faults, after_tlb_misses - before_tlb_misses,
+                    after_cache_misses - before_cache_misses, after_cache_refs - before_cache_refs,
+                    after_instrs - before_instrs);
         }
-		
+
         mappingsLock.lock();
 		for (auto entry = mappings.begin(); entry != mappings.end(); entry++) {
 			auto data = entry.getData();
@@ -768,21 +779,22 @@ extern "C" {
                 tad->numTlbMisses += after_tlb_misses - before_tlb_misses;
                 tad->numCacheMisses += after_cache_misses - before_cache_misses;
                 tad->numCacheRefs += after_cache_refs - before_cache_refs;
-                tad->numInstrs += after_instrs - before_instrs; 
+                tad->numFreeInstrs += after_instrs - before_instrs; 
 
             }
 
-
-            if(after_instrs - before_instrs != 0){
-                fprintf(stderr, "Free from thread %lu\n", tid);
-                fprintf(stderr, "Num Faults:        %ld\n", after_faults - before_faults);
-                fprintf(stderr, "Num TLB Misses:    %ld\n", after_tlb_misses - before_tlb_misses);
-                fprintf(stderr, "Num Cache Misses:  %ld\n", after_cache_misses - before_cache_misses);
-                fprintf(stderr, "Num Cache Refs:    %ld\n", after_cache_refs - before_cache_refs);
-                fprintf(stderr, "Num Insructions:   %ld\n\n", after_instrs - before_instrs);
+            if (after_instrs - before_instrs != 0){
+                fprintf(stderr, "Free from thread %lu\n\
+                                 Num faults:        %ld\n\
+                                 Num TLB misses:    %ld\n\
+                                 Num cache misses:  %ld\n\
+                                 num cache refs:    %ld\n\
+                                 Num instructions:  %ld\n\n", 
+                        tid, after_faults - before_faults, after_tlb_misses - before_tlb_misses,
+                        after_cache_misses - before_cache_misses, after_cache_refs - before_cache_refs,
+                        after_instrs - before_instrs);
             }
-
-		}
+        }
 	}
 
 	inline void logUnsupportedOp() {
@@ -837,6 +849,7 @@ extern "C" {
         int64_t before_faults, before_tlb_misses, before_cache_misses, before_cache_refs, before_instrs;
         int64_t after_faults, after_tlb_misses, after_cache_misses, after_cache_refs, after_instrs;
         uint64_t tid = gettid();
+		bool reuseFreeObject = false;
 
 		//thread_local
 		inAllocation = true;
@@ -858,7 +871,6 @@ extern "C" {
 			freelistLock.lock();
 			Freelist* freelist;
 			bool reuseFreePossible = false;
-			bool reuseFreeObject = false;
 		
 			if (!bibop) {
 				if (freelistMap.find(0, &freelist)) {
@@ -933,19 +945,23 @@ extern "C" {
             tad->numTlbMisses += after_tlb_misses - before_tlb_misses;
             tad->numCacheMisses += after_cache_misses - before_cache_misses;
             tad->numCacheRefs += after_cache_refs - before_cache_refs;
-            tad->numInstrs += after_instrs - before_instrs; 
+            tad->numReallocInstrs += after_instrs - before_instrs; 
 
         }
-
-        if(after_instrs - before_instrs != 0){
-            fprintf(stderr, "Realloc from thread %lu\n", tid);
-            fprintf(stderr, "Num Faults:        %ld\n", after_faults - before_faults);
-            fprintf(stderr, "Num TLB Misses:    %ld\n", after_tlb_misses - before_tlb_misses);
-            fprintf(stderr, "Num Cache Misses:  %ld\n", after_cache_misses - before_cache_misses);
-            fprintf(stderr, "Num Cache Refs:    %ld\n", after_cache_refs - before_cache_refs);
-            fprintf(stderr, "Num Insructions:   %ld\n\n", after_instrs - before_instrs);
+        if (after_instrs - before_instrs != 0){
+            fprintf(stderr, "Realloc from thread %lu\n\
+                             From free list:    %s\n\
+                             Num faults:        %ld\n\
+                             Num TLB misses:    %ld\n\
+                             Num cache misses:  %ld\n\
+                             num cache refs:    %ld\n\
+                             Num instructions:  %ld\n\n", 
+                    tid, reuseFreeObject ? "true" : "false",
+                    after_faults - before_faults, after_tlb_misses - before_tlb_misses,
+                    after_cache_misses - before_cache_misses, after_cache_refs - before_cache_refs,
+                    after_instrs - before_instrs);
         }
-		
+
         mappingsLock.lock();
 		for (auto entry = mappings.begin(); entry != mappings.end(); entry++) {
 			auto data = entry.getData();
@@ -1275,7 +1291,9 @@ thread_alloc_data* newTad(){
     tad->numTlbMisses = 0;
     tad->numCacheMisses = 0;
     tad->numCacheRefs = 0;
-    tad->numInstrs = 0;
+    tad->numMallocInstrs = 0;
+    tad->numReallocInstrs = 0;
+    tad->numFreeInstrs = 0;
     return tad;
 }
 
@@ -1524,7 +1542,9 @@ void globalizeThreadAllocData(){
         allThreadsNumTlbMisses.fetch_add(it.getData()->numTlbMisses);
         allThreadsNumCacheMisses.fetch_add(it.getData()->numCacheMisses);
         allThreadsNumCacheRefs.fetch_add(it.getData()->numCacheRefs);
-        allThreadsNumInstrs.fetch_add(it.getData()->numInstrs);
+        allThreadsNumMallocInstrs.fetch_add(it.getData()->numMallocInstrs);
+        allThreadsNumReallocInstrs.fetch_add(it.getData()->numReallocInstrs);
+        allThreadsNumFreeInstrs.fetch_add(it.getData()->numFreeInstrs);
 
 //        fprintf (thrData.output, "\n>>> Thread ID:     %lu\n", it.getKey());
 //        fprintf (thrData.output, ">>> page faults    %ld\n", it.getData()->numFaults);
@@ -1545,10 +1565,15 @@ void writeAllocData () {
     fprintf (thrData.output, ">>> cache miss rate    %.2lf%%\n",
             (double)allThreadsNumCacheMisses.load(relaxed)
             /(double)allThreadsNumCacheRefs.load(relaxed) * 100 );
-    fprintf (thrData.output, ">>> num instructions   %u\n", allThreadsNumInstrs.load(relaxed));
-    fprintf (thrData.output, ">>> avg instr/alloc    %.2lf\n\n", (double)allThreadsNumInstrs.load(relaxed)
-            /(double)(numMallocs.load(relaxed) + numCallocs.load(relaxed)
-            + numReallocs.load(relaxed) + numFrees.load(relaxed)));
+    fprintf (thrData.output, ">>> num malloc instr   %u\n", allThreadsNumMallocInstrs.load(relaxed));
+    fprintf (thrData.output, ">>> num Realloc instr  %u\n", allThreadsNumReallocInstrs.load(relaxed));
+    fprintf (thrData.output, ">>> num free instr     %u\n", allThreadsNumFreeInstrs.load(relaxed));
+    fprintf (thrData.output, ">>> avg instr/alloc    %.2lf\n\n", 
+                (double)(allThreadsNumMallocInstrs.load(relaxed) 
+                + allThreadsNumReallocInstrs.load(relaxed) 
+                + allThreadsNumFreeInstrs.load(relaxed))
+                /(double)(numMallocs.load(relaxed) + numCallocs.load(relaxed)
+                + numReallocs.load(relaxed) + numFrees.load(relaxed)));
 	fprintf (thrData.output, ">>> mallocs            %u\n", numMallocs.load(relaxed));
 	fprintf (thrData.output, ">>> callocs            %u\n", numCallocs.load(relaxed));
 	fprintf (thrData.output, ">>> reallocs           %u\n", numReallocs.load(relaxed));

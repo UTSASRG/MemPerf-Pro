@@ -120,7 +120,9 @@ typedef struct {
     int64_t numTlbMisses;
     int64_t numCacheMisses;
     int64_t numCacheRefs;
-    int64_t numInstrs;
+    int64_t numMallocInstrs;
+    int64_t numReallocInstrs;
+    int64_t numFreeInstrs;
 } thread_alloc_data;
 
 void getPerfInfo(int64_t *, int64_t *, int64_t *, int64_t *, int64_t *);
