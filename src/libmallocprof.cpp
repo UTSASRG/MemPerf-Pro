@@ -211,6 +211,7 @@ Freelist* getFreelist (uint64_t size);
 void calculateMemOverhead ();
 void writeMappings();
 int num_used_pages(uintptr_t vstart, uintptr_t vend);
+int find_page(uintptr_t vstart, uintptr_t vend);
 void get_bp_metadata();
 void clearFreelists();
 void resetAtomics();
@@ -557,18 +558,6 @@ extern "C" {
 			cyclesNewAlloc.fetch_add (cyclesForMalloc, relaxed);
 			addressUsage.insertIfAbsent (address, newObjectTuple(address, sz));
 		}
-		
-		//fetch_add returns the value of numMallocs before adding.
-		//There are 10 mallocs before running code in main().
-		//So when this returns 9, the final "setup" malloc is done.
-		//Clear freelists? There is currently objects on freelists
-		//That didn't come from the application.
-		//All mallocs that don't reuse these objects are 
-		//Considered mem blowup
-		if ((numMallocs.fetch_add(1, relaxed)) == 9) {
-			clearFreelists();
-			resetAtomics();
-		}
 
         tadMap.insertIfAbsent(tid, newTad()); 
         thread_alloc_data *tad;
@@ -631,6 +620,8 @@ extern "C" {
             initSampling();
             samplingInit = true;
         }
+
+		if (!inRealMain) return RealX::calloc (nelem, elsize);
 
         int64_t before_faults, before_tlb_misses, before_cache_misses, before_cache_refs, before_instrs;
         int64_t after_faults, after_tlb_misses, after_cache_misses, after_cache_refs, after_instrs;
@@ -826,6 +817,9 @@ extern "C" {
 		if((ptr >= (void *) tmpbuf) && (ptr <= (void *)(tmpbuf + TEMP_MEM_SIZE))) 
 				myFree (ptr);
 
+		else if (!inRealMain) {
+			return RealX::free (ptr);
+		}
 		else {
 
 			uint64_t address = reinterpret_cast <uint64_t> (ptr);
@@ -939,9 +933,8 @@ extern "C" {
 
 		if (inAllocation) return RealX::realloc (ptr, sz);
 
-      if(mallocInitialized != INITIALIZED) {
-			if(ptr == NULL)
-				return yymalloc(sz);
+		if(mallocInitialized != INITIALIZED) {
+			if(ptr == NULL) return yymalloc(sz);
 
 			yyfree(ptr);
 			return yymalloc(sz);
@@ -951,6 +944,8 @@ extern "C" {
             initSampling();
             samplingInit = true;
         }
+		
+		if (!inRealMain) return RealX::realloc (ptr, sz);
 
         int64_t before_faults, before_tlb_misses, before_cache_misses, before_cache_refs, before_instrs;
         int64_t after_faults, after_tlb_misses, after_cache_misses, after_cache_refs, after_instrs;
@@ -1776,7 +1771,7 @@ void writeAllocData () {
 	fprintf (thrData.output, ">>> totalSizeAlloc           %zu\n", totalSizeAlloc);
 	fprintf (thrData.output, ">>> active_mem_HWM           %u\n", active_mem_HWM.load(relaxed));
 	fprintf (thrData.output, ">>> totalMemOverhead         %zu\n", totalMemOverhead);
-	fprintf (thrData.output, ">>> memEfficiency            %d%%\n", (int)memEfficiency);
+	fprintf (thrData.output, ">>> memEfficiency            %.2f%%\n", memEfficiency);
 
 	fprintf (thrData.output, "\n>>> summation_blowup_bytes         %u\n", summation_blowup_bytes.load(relaxed));
 	fprintf (thrData.output, ">>> summation_blowup_allocations   %u\n", summation_blowup_allocations.load(relaxed));
@@ -2067,6 +2062,51 @@ int num_used_pages(uintptr_t vstart, uintptr_t vend) {
 
 	close(fdmap);
 	return num_used_pages;
+}
+
+int find_page(uintptr_t vstart, uintptr_t vend) {
+	char pagemap_filename[50];
+	snprintf (pagemap_filename, 50, "/proc/%d/pagemap", pid);
+	int fdmap;
+	uint64_t bitmap;
+	unsigned long pagenum_start, pagenum_end;
+	unsigned num_pages_read = 0;
+	unsigned num_pages_to_read = 0;
+	unsigned num_used_pages = 0;
+	unsigned add_pages = 0;
+
+	if((fdmap = open(pagemap_filename, O_RDONLY)) == -1) {
+		return -1;
+	}
+
+	pagenum_start = vstart >> PAGE_BITS;
+	pagenum_end = vend >> PAGE_BITS;
+	num_pages_to_read = pagenum_end - pagenum_start + 1;
+	if(num_pages_to_read == 0) {
+		close(fdmap);
+		return -1;
+	}
+
+	if(lseek(fdmap, (pagenum_start * ENTRY_SIZE), SEEK_SET) == -1) {
+		close(fdmap);
+		return -1;
+	}
+
+	do {
+		if(read(fdmap, &bitmap, ENTRY_SIZE) != ENTRY_SIZE) {
+			close(fdmap);
+			return -1;
+		}
+
+		num_pages_read++;
+		if((bitmap >> 63) == 1) {
+			break;
+		}
+		add_pages++;
+	} while(num_pages_read < num_pages_to_read);
+
+	close(fdmap);
+	return add_pages;
 }
 
 /*
