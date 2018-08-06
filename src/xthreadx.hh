@@ -12,6 +12,7 @@ extern "C" pid_t gettid();
 
 thread_local extern uint64_t numWaits;
 thread_local extern uint64_t timeWaiting;
+thread_local extern uint64_t thread_stack_start;
 
 class xthreadx {
 	typedef void * threadFunction(void *);

@@ -1,16 +1,16 @@
-SRCS =   libmallocprof.cpp	\
-			real.cpp		\
-			selfmap.cpp		\
+SRCS =   	libmallocprof.cpp	\
+			real.cpp			\
+			selfmap.cpp			\
 			memsample.c
 
-INCS =	xthreadx.hh		\
+INCS =		xthreadx.hh		\
 			memsample.h		\
 			real.hh			\
 			hashmap.hh		\
 			list.hh			\
 			hashfuncs.hh	\
-			interval.hh	\
-			selfmap.hh	\
+			interval.hh		\
+			selfmap.hh		\
 			spinlock.hh
 
 DEPS = $(SRCS) $(INCS)
@@ -24,24 +24,24 @@ CFLAGS2 += -O0 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-f
 INCLUDE_DIRS = -I. -I/usr/include/x86_64-linux-gnu/c++/4.8/
 LIBS     := dl pthread
 
-TARGETS = libmallocprof.so \
-			 test/test-clean \
-			 test/test-xlibc \
-			 test/test-obsd \
-			 test/test-freeguard \
-			 test/test-dieharder \
-			 test/test-xlibc-thread \
-			 test/test-obsd-thread \
-			 test/test-freeguard-thread \
-			 test/test-dieharder-thread \
-			 test/bs-obsd \
-			 test/bs-libc \
-			 test/bs-freeguard \
-			 test/bs-dieharder \
-			 test/pmu-libc-test \
-			 test/pmu-obsd-test \
-			 test/pmu-dieharder-test \
-			 test/pmu-freeguard-test
+TARGETS =	libmallocprof.so 			\
+			test/test-clean 			\
+			test/test-xlibc 			\
+			test/test-obsd 				\
+			test/test-freeguard 		\
+			test/test-dieharder 		\
+			test/test-xlibc-thread 		\
+			test/test-obsd-thread 		\
+			test/test-freeguard-thread	\
+			test/test-dieharder-thread	\
+			test/bs-obsd				\
+			test/bs-libc				\
+			test/bs-freeguard			\
+			test/bs-dieharder			\
+			test/pmu-libc-test			\
+			test/pmu-obsd-test			\
+			test/pmu-dieharder-test		\
+			test/pmu-freeguard-test
 
 all: $(TARGETS)
 
@@ -57,8 +57,8 @@ threads: libmallocprof.so \
 			test/test-freeguard-thread \
 			test/test-obsd-thread
 
-TEST_FILE = alloc2.cpp
-THREADTEST_FILE = threadTest2.cpp
+TEST_FILE = pmu-test.cpp
+THREADTEST_FILE = threadTest.cpp
 
 # Libmallocprof
 libmallocprof.so: $(DEPS)
@@ -124,3 +124,4 @@ test/test-clean: test/$(TEST_FILE)
 
 clean:
 	rm -f $(TARGETS)
+	rm -f test/*.txt
