@@ -5,14 +5,15 @@
 
 int main() {
 
-		  size_t size = 8;
-		  void* pointer;
+	size_t size = 128;
+	void* pointer;
 
-		  for (int i = 0; i < 10000; i++) {
+	for (int i = 0; i < 10000; i++) {
+		pointer = malloc (size);
+//		printf ("pointer= %p\n", pointer);
+		free (pointer);
+		size += 64;
+	}
 
-					 pointer = malloc (size);
-					 free (pointer);
-		  }
-
-		  return EXIT_SUCCESS;
+	return EXIT_SUCCESS;
 }

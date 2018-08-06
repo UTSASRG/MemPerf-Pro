@@ -6,19 +6,18 @@
 #include <malloc.h>
 #include <cstdint>
 
-#define NUM_THREADS 10
-#define NUM_MALLOCS 100
+void* thread_start (void*);
+
+#define NUM_THREADS 1
+#define NUM_MALLOCS 10000
 
 void* thread_start (void*);
-//pthread_barrier_t barrier;
 
 int main() {
 
 	pthread_t threads[NUM_THREADS];
 	int create, join;
 	void* result;
-
-	//pthread_barrier_init (&barrier, NULL, (unsigned int) NUM_THREADS);
 
 	for (int i = 0; i < NUM_THREADS; i++) {
 
@@ -30,6 +29,7 @@ int main() {
 			abort ();
 		}
 	}
+
 
 	for (int i = 0; i < NUM_THREADS; i++) {
 
@@ -49,15 +49,20 @@ int main() {
 
 void* thread_start (void* arg) {
 
-	void* pointer;
-	size_t size = 64;
+	size_t size = 128;
+	void* pointer[NUM_MALLOCS];
+//	void* pointer;
 	
 	for (int i = 0; i < NUM_MALLOCS; i++) {
-
-		pointer = malloc (size);
-		free (pointer);
-		size += 32;
+		pointer[i] = malloc (size);
+//		pointer = malloc (size);
+//		free (pointer);
 	}
 
+	for (int i = 0; i < NUM_MALLOCS; i++) {
+		free (pointer[i]);
+	}
+
+//	getchar();
 	return nullptr;
 }
