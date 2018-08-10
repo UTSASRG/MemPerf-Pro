@@ -8,8 +8,8 @@
 
 void* thread_start (void*);
 
-#define NUM_THREADS 1
-#define NUM_MALLOCS 10000
+#define NUM_THREADS 32
+#define NUM_MALLOCS 100
 
 void* thread_start (void*);
 

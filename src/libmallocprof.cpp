@@ -71,7 +71,7 @@ bool mapsInitialized = false;
 bool mmap_found = false;
 bool gettingClassSizes = false;
 bool inRealMain = false;
-uint64_t totalSizeAlloc = 0;
+int64_t totalSizeAlloc = 0;
 uint64_t totalSizeFree = 0;
 uint64_t totalSizeDiff = 0;
 uint64_t totalMemOverhead = 0;
@@ -90,17 +90,49 @@ const bool d_mmap = false;
 const bool d_metadata = false;
 
 //Atomic Globals
-std::atomic_uint allThreadsNumFaults (0);
-std::atomic_uint allThreadsNumTlbMisses (0);
-std::atomic_uint allThreadsNumCacheMisses (0);
-std::atomic_uint allThreadsNumCacheRefs (0);
+/*
+std::atomic_uint allThreadsNumMallocFaults (0);
+std::atomic_uint allThreadsNumReallocFaults (0);
+std::atomic_uint allThreadsNumFreeFaults (0);
+
+std::atomic_uint allThreadsNumMallocTlbMisses (0);
+std::atomic_uint allThreadsNumReallocTlbMisses (0);
+std::atomic_uint allThreadsNumFreeTlbMisses (0);
+
+std::atomic_uint allThreadsNumMallocCacheMisses (0);
+std::atomic_uint allThreadsNumReallocCacheMisses (0);
+std::atomic_uint allThreadsNumFreeCacheMisses (0);
+
+std::atomic_uint allThreadsNumMallocCacheRefs (0);
+std::atomic_uint allThreadsNumReallocCacheRefs (0);
+std::atomic_uint allThreadsNumFreeCacheRefs (0);
+
 std::atomic_uint allThreadsNumMallocInstrs (0);
 std::atomic_uint allThreadsNumReallocInstrs (0);
 std::atomic_uint allThreadsNumFreeInstrs (0);
+
+std::atomic_uint allThreadsNumMallocFaultsFFL (0);
+std::atomic_uint allThreadsNumReallocFaultsFFL (0);
+
+std::atomic_uint allThreadsNumMallocTlbMissesFFL (0);
+std::atomic_uint allThreadsNumReallocTlbMissesFFL (0);
+
+std::atomic_uint allThreadsNumMallocCacheMissesFFL (0);
+std::atomic_uint allThreadsNumReallocCacheMissesFFL (0);
+
+std::atomic_uint allThreadsNumMallocCacheRefsFFL (0);
+std::atomic_uint allThreadsNumReallocCacheRefsFFL (0);
+
+std::atomic_uint allThreadsNumMallocInstrsFFL (0);
+std::atomic_uint allThreadsNumReallocInstrsFFL (0);
+*/
 std::atomic_uint numFrees (0);
 std::atomic_uint numMallocs (0);
 std::atomic_uint numCallocs (0);
 std::atomic_uint numReallocs (0);
+std::atomic_uint numMallocsFFL (0);
+std::atomic_uint numCallocsFFL (0);
+std::atomic_uint numReallocsFFL (0);
 std::atomic_uint new_address (0);
 std::atomic_uint reused_address (0);
 std::atomic_uint num_pthread_mutex_locks (0);
@@ -168,8 +200,13 @@ struct stack_frame {
 	void * caller_address;		// the address of caller
 };
 
-//Hashmap of thread IDs to their thread_alloc_data structs
-HashMap <uint64_t, thread_alloc_data*, spinlock> tadMap;
+//Hashmap of thread IDs to class sizes to their thread_alloc_data structs
+typedef HashMap <uint64_t, thread_alloc_data*, spinlock> classSizeMap;
+HashMap <uint64_t, classSizeMap*, spinlock> tadMap;
+
+//Hashmap of class size to tad struct, for all thread data summed up
+//HashMap <uint64_t, thread_alloc_data*, spinlock> allThreadsTadMap;
+std::map<uint64_t, thread_alloc_data*> allThreadsTadMap;
 
 //Hashmap of malloc'd addresses to a ObjectTuple
 HashMap <uint64_t, ObjectTuple*, spinlock> addressUsage;
@@ -193,6 +230,7 @@ spinlock mappingsLock;
 // Functions 
 void getAllocStyle ();
 void getClassSizes ();
+void refillClassSizes();
 void getMmapThreshold ();
 void writeAllocData ();
 void writeContention ();
@@ -213,6 +251,7 @@ Freelist* getFreelist (uint64_t size);
 void calculateMemOverhead ();
 void writeMappings();
 int num_used_pages(uintptr_t vstart, uintptr_t vend);
+int find_page(uintptr_t vstart, uintptr_t vend);
 void get_bp_metadata();
 void clearFreelists();
 void resetAtomics();
@@ -279,6 +318,7 @@ __attribute__((constructor)) initStatus initializer() {
 	RealX::initializer();
 
     tadMap.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
+    //allThreadsTadMap.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 	addressUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 	lockUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 	mappings.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
@@ -423,6 +463,8 @@ extern "C" {
 
 		if (!inRealMain) return RealX::malloc(sz);
 
+        numMallocs.fetch_add(1, relaxed);
+
         int64_t before_faults, before_tlb_misses, before_cache_misses, before_cache_refs, before_instrs;
         int64_t after_faults, after_tlb_misses, after_cache_misses, after_cache_refs, after_instrs;
         uint64_t tid = gettid();
@@ -558,29 +600,84 @@ extern "C" {
 			cyclesNewAlloc.fetch_add (cyclesForMalloc, relaxed);
 			addressUsage.insertIfAbsent (address, newObjectTuple(address, sz));
 		}
-		
-        tadMap.insertIfAbsent(tid, newTad()); 
+            
+        uint64_t currentClassSize = 0;
+        classSizeMap *csm;
         thread_alloc_data *tad;
         
-        if (tadMap.find(tid, &tad)){
+        if(bibop){   
+            if (classSizes.empty()) refillClassSizes(); //why does the classSizes vector get cleared? 
+            if (!tadMap.find(tid, &csm)){
+                csm = (classSizeMap*) myMalloc(sizeof(classSizeMap));
+                csm->initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
+                for (auto cSize = classSizes.begin (); cSize != classSizes.end (); cSize++){
+                    csm->insertIfAbsent(*cSize, newTad());
+                    //allThreadsTadMap.insertIfAbsent(*cSize, newTad());
+                    allThreadsTadMap[*cSize] = newTad();
+                }
+                csm->insertIfAbsent(0, newTad());
+                allThreadsTadMap[0] = newTad();
+                tadMap.insertIfAbsent(tid, csm);
+            }
             
-            tad->numFaults += after_faults - before_faults;
-            tad->numTlbMisses += after_tlb_misses - before_tlb_misses;
-            tad->numCacheMisses += after_cache_misses - before_cache_misses;
-            tad->numCacheRefs += after_cache_refs - before_cache_refs;
-            tad->numMallocInstrs += after_instrs - before_instrs;
+            for (auto cSize = classSizes.begin (); cSize != classSizes.end (); cSize++){
+                    if (sz <= *cSize && sz > *(cSize - 1)) 
+                        currentClassSize = *cSize;
+            }
 
+            if(sz > *(classSizes.end() - 1))
+                currentClassSize = 0; // uses 0 for larger than max class size
+            else if(currentClassSize < *classSizes.begin())
+                currentClassSize = *classSizes.begin();
+        }        
+        else{
+            if (!tadMap.find(tid, &csm)){
+                csm = (classSizeMap*) myMalloc(sizeof(classSizeMap));
+                csm->initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
+            }
+            csm->insertIfAbsent(0, newTad());
+            allThreadsTadMap[0] = newTad();
+            tadMap.insertIfAbsent(tid, csm);
         }
+        //fprintf(stderr, "max class size: %lu\n", *(classSizes.end() - 1));
+        //fprintf(stderr, "min class size: %lu\n", *classSizes.begin());
+            
+        csm = nullptr;
+        if(tadMap.find(tid, &csm)){
+            fprintf(stderr, "current class size: %lu\n", currentClassSize);
+            fprintf(stderr, "found tid -> csm\n");
+            
+            if(csm->find(currentClassSize, &tad)){
+                fprintf(stderr, "found csm -> tad\n");
+                
+                if (!reuseFreeObject){
+                    tad->numMallocFaults += after_faults - before_faults;
+                    tad->numMallocTlbMisses += after_tlb_misses - before_tlb_misses;
+                    tad->numMallocCacheMisses += after_cache_misses - before_cache_misses;
+                    tad->numMallocCacheRefs += after_cache_refs - before_cache_refs;
+                    tad->numMallocInstrs += after_instrs - before_instrs;
+                }
+                else{
+                    numMallocsFFL.fetch_add(1, relaxed);
+                    tad->numMallocFaultsFFL += after_faults - before_faults;
+                    tad->numMallocTlbMissesFFL += after_tlb_misses - before_tlb_misses;
+                    tad->numMallocCacheMissesFFL += after_cache_misses - before_cache_misses;
+                    tad->numMallocCacheRefsFFL += after_cache_refs - before_cache_refs;
+                    tad->numMallocInstrsFFL += after_instrs - before_instrs;
+                }
+            }
+        }
+        
 
         if(after_instrs - before_instrs != 0){
 
-            fprintf(stderr, "Malloc from thread %lu\n\
-                             From free list:    %s\n\
-                             Num faults:        %ld\n\
-                             Num TLB misses:    %ld\n\
-                             Num cache misses:  %ld\n\
-                             num cache refs:    %ld\n\
-                             Num instructions:  %ld\n\n", 
+            fprintf(stderr, "Malloc from thread %lu\n"
+                            "From free list:    %s\n"
+                            "Num faults:        %ld\n"
+                            "Num TLB misses:    %ld\n"
+                            "Num cache misses:  %ld\n"
+                            "num cache refs:    %ld\n"
+                            "Num instructions:  %ld\n\n", 
                     tid, reuseFreeObject ? "true" : "false",
                     after_faults - before_faults, after_tlb_misses - before_tlb_misses,
                     after_cache_misses - before_cache_misses, after_cache_refs - before_cache_refs,
@@ -636,6 +733,8 @@ extern "C" {
             initSampling();
             samplingInit = true;
         }
+
+		if (!inRealMain) return RealX::calloc (nelem, elsize);
 
         int64_t before_faults, before_tlb_misses, before_cache_misses, before_cache_refs, before_instrs;
         int64_t after_faults, after_tlb_misses, after_cache_misses, after_cache_refs, after_instrs;
@@ -776,27 +875,82 @@ extern "C" {
       }
 
 		numCallocs.fetch_add (1, relaxed);
-
-        tadMap.insertIfAbsent(tid, newTad()); 
+        
+        uint64_t currentClassSize = 0;
+        classSizeMap *csm;
         thread_alloc_data *tad;
         
-        if (tadMap.find(tid, &tad)){
+        if(bibop){   
+            if (classSizes.empty()) refillClassSizes(); //why does the classSizes vector get cleared? 
+            if (!tadMap.find(tid, &csm)){
+                csm = (classSizeMap*) myMalloc(sizeof(classSizeMap));
+                csm->initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
+                for (auto cSize = classSizes.begin (); cSize != classSizes.end (); cSize++){
+                    csm->insertIfAbsent(*cSize, newTad());
+                    //allThreadsTadMap.insertIfAbsent(*cSize, newTad());
+                    allThreadsTadMap[*cSize] = newTad();
+                }
+                csm->insertIfAbsent(0, newTad());
+                allThreadsTadMap[0] = newTad();
+                tadMap.insertIfAbsent(tid, csm);
+            }
             
-            tad->numFaults += after_faults - before_faults;
-            tad->numTlbMisses += after_tlb_misses - before_tlb_misses;
-            tad->numCacheMisses += after_cache_misses - before_cache_misses;
-            tad->numCacheRefs += after_cache_refs - before_cache_refs;
-            tad->numMallocInstrs += after_instrs - before_instrs; 
+            for (auto cSize = classSizes.begin (); cSize != classSizes.end (); cSize++){
+                    if (sz <= *cSize && sz > *(cSize - 1)) 
+                        currentClassSize = *cSize;
+            }
 
+            if(sz > *(classSizes.end() - 1))
+                currentClassSize = 0; // uses 0 for larger than max class size
+            else if(currentClassSize < *classSizes.begin())
+                currentClassSize = *classSizes.begin();
+        }        
+        else{
+            if (!tadMap.find(tid, &csm)){
+                csm = (classSizeMap*) myMalloc(sizeof(classSizeMap));
+                csm->initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
+            }
+            csm->insertIfAbsent(0, newTad());
+            allThreadsTadMap[0] = newTad();
+            tadMap.insertIfAbsent(tid, csm);
         }
+        //fprintf(stderr, "max class size: %lu\n", *(classSizes.end() - 1));
+        //fprintf(stderr, "min class size: %lu\n", *classSizes.begin());
+            
+        csm = nullptr;
+        if(tadMap.find(tid, &csm)){
+            fprintf(stderr, "current class size: %lu\n", currentClassSize);
+            fprintf(stderr, "found tid -> csm\n");
+            
+            if(csm->find(currentClassSize, &tad)){
+                fprintf(stderr, "found csm -> tad\n");
+                
+                if (!reuseFreeObject){
+                    tad->numMallocFaults += after_faults - before_faults;
+                    tad->numMallocTlbMisses += after_tlb_misses - before_tlb_misses;
+                    tad->numMallocCacheMisses += after_cache_misses - before_cache_misses;
+                    tad->numMallocCacheRefs += after_cache_refs - before_cache_refs;
+                    tad->numMallocInstrs += after_instrs - before_instrs;
+                }
+                else{
+                    numCallocsFFL.fetch_add(1, relaxed);
+                    tad->numMallocFaultsFFL += after_faults - before_faults;
+                    tad->numMallocTlbMissesFFL += after_tlb_misses - before_tlb_misses;
+                    tad->numMallocCacheMissesFFL += after_cache_misses - before_cache_misses;
+                    tad->numMallocCacheRefsFFL += after_cache_refs - before_cache_refs;
+                    tad->numMallocInstrsFFL += after_instrs - before_instrs;
+                }
+            }
+        }
+
         if (after_instrs - before_instrs != 0){
-            fprintf(stderr, "Calloc from thread %lu\n\
-                             From free list:    %s\n\
-                             Num faults:        %ld\n\
-                             Num TLB misses:    %ld\n\
-                             Num cache misses:  %ld\n\
-                             num cache refs:    %ld\n\
-                             Num instructions:  %ld\n\n", 
+            fprintf(stderr, "Calloc from thread %lu\n"
+                            "From free list:    %s\n"
+                            "Num faults:        %ld\n"
+                            "Num TLB misses:    %ld\n"
+                            "Num cache misses:  %ld\n"
+                            "num cache refs:    %ld\n"
+                            "Num instructions:  %ld\n\n", 
                     tid, reuseFreeObject ? "true" : "false",
                     after_faults - before_faults, after_tlb_misses - before_tlb_misses,
                     after_cache_misses - before_cache_misses, after_cache_refs - before_cache_refs,
@@ -844,6 +998,9 @@ extern "C" {
 		if((ptr >= (void *) tmpbuf) && (ptr <= (void *)(tmpbuf + TEMP_MEM_SIZE))) 
 				myFree (ptr);
 
+		else if (!inRealMain) {
+			return RealX::free (ptr);
+		}
 		else {
 
 			uint64_t address = reinterpret_cast <uint64_t> (ptr);
@@ -902,27 +1059,72 @@ extern "C" {
                     &after_cache_refs, &after_instrs);
 			numFrees.fetch_add(1, relaxed);
 			cyclesFree.fetch_add ((after - before), relaxed);
-
-            tadMap.insertIfAbsent(tid, newTad()); 
+        
+            uint64_t currentClassSize = 0;
+            classSizeMap *csm;
             thread_alloc_data *tad;
-            
-            if (tadMap.find(tid, &tad)){
+           /* 
+            if(bibop){   
+                if (classSizes.empty()) refillClassSizes(); //why does the classSizes vector get cleared? 
+                if (!tadMap.find(tid, &csm)){
+                    csm = (classSizeMap*) myMalloc(sizeof(classSizeMap));
+                    csm->initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
+                    //for (auto cSize = classSizes.begin (); cSize != classSizes.end (); cSize++){
+                    //    csm->insertIfAbsent(*cSize, newTad());
+                        //allThreadsTadMap.insertIfAbsent(*cSize, newTad());
+                    //    allThreadsTadMap[*cSize] = newTad();
+                    //}
+                    csm->insertIfAbsent(0, newTad());
+                    allThreadsTadMap[0] = newTad();
+                    tadMap.insertIfAbsent(tid, csm);
+                }
                 
-                tad->numFaults += after_faults - before_faults;
-                tad->numTlbMisses += after_tlb_misses - before_tlb_misses;
-                tad->numCacheMisses += after_cache_misses - before_cache_misses;
-                tad->numCacheRefs += after_cache_refs - before_cache_refs;
-                tad->numFreeInstrs += after_instrs - before_instrs; 
+                //for (auto cSize = classSizes.begin (); cSize != classSizes.end (); cSize++){
+                //        if (sz <= *cSize && sz > *(cSize - 1)) 
+                //            currentClassSize = *cSize;
+                //}
 
+                //if(sz > *(classSizes.end() - 1))
+                //    currentClassSize = 0; // uses 0 for larger than max class size
+                //else if(currentClassSize < *classSizes.begin())
+                //    currentClassSize = *classSizes.begin();
+            }        
+            else{
+                if (!tadMap.find(tid, &csm)){
+                    csm = (classSizeMap*) myMalloc(sizeof(classSizeMap));
+                    csm->initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
+                }
+                csm->insertIfAbsent(0, newTad());
+                allThreadsTadMap[0] = newTad();
+                tadMap.insertIfAbsent(tid, csm);
+            }
+            */
+            //fprintf(stderr, "max class size: %lu\n", *(classSizes.end() - 1));
+            //fprintf(stderr, "min class size: %lu\n", *classSizes.begin());
+                
+            csm = nullptr;
+            if(tadMap.find(tid, &csm)){
+                fprintf(stderr, "current class size: %lu\n", currentClassSize);
+                fprintf(stderr, "found tid -> csm\n");
+                
+                if(csm->find(currentClassSize, &tad)){
+                    fprintf(stderr, "found csm -> tad\n");
+                    
+                    tad->numFreeFaults += after_faults - before_faults;
+                    tad->numFreeTlbMisses += after_tlb_misses - before_tlb_misses;
+                    tad->numFreeCacheMisses += after_cache_misses - before_cache_misses;
+                    tad->numFreeCacheRefs += after_cache_refs - before_cache_refs;
+                    tad->numFreeInstrs += after_instrs - before_instrs;
+                }
             }
 
             if (after_instrs - before_instrs != 0){
-                fprintf(stderr, "Free from thread %lu\n\
-                                 Num faults:        %ld\n\
-                                 Num TLB misses:    %ld\n\
-                                 Num cache misses:  %ld\n\
-                                 num cache refs:    %ld\n\
-                                 Num instructions:  %ld\n\n", 
+                fprintf(stderr, "Free from thread %lu\n"
+                                "Num faults:        %ld\n"
+                                "Num TLB misses:    %ld\n"
+                                "Num cache misses:  %ld\n"
+                                "num cache refs:    %ld\n"
+                                "Num instructions:  %ld\n\n", 
                         tid, after_faults - before_faults, after_tlb_misses - before_tlb_misses,
                         after_cache_misses - before_cache_misses, after_cache_refs - before_cache_refs,
                         after_instrs - before_instrs);
@@ -969,9 +1171,8 @@ extern "C" {
 
 		if (inAllocation) return RealX::realloc (ptr, sz);
 
-      if(mallocInitialized != INITIALIZED) {
-			if(ptr == NULL)
-				return yymalloc(sz);
+		if(mallocInitialized != INITIALIZED) {
+			if(ptr == NULL) return yymalloc(sz);
 
 			yyfree(ptr);
 			return yymalloc(sz);
@@ -981,6 +1182,8 @@ extern "C" {
             initSampling();
             samplingInit = true;
         }
+		
+		if (!inRealMain) return RealX::realloc (ptr, sz);
 
         int64_t before_faults, before_tlb_misses, before_cache_misses, before_cache_refs, before_instrs;
         int64_t after_faults, after_tlb_misses, after_cache_misses, after_cache_refs, after_instrs;
@@ -1120,26 +1323,81 @@ extern "C" {
 
 		numReallocs.fetch_add(1, relaxed);
         
-        tadMap.insertIfAbsent(tid, newTad()); 
+        uint64_t currentClassSize = 0;
+        classSizeMap *csm;
         thread_alloc_data *tad;
         
-        if (tadMap.find(tid, &tad)){
+        if(bibop){   
+            if (classSizes.empty()) refillClassSizes(); //why does the classSizes vector get cleared? 
+            if (!tadMap.find(tid, &csm)){
+                csm = (classSizeMap*) myMalloc(sizeof(classSizeMap));
+                csm->initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
+                for (auto cSize = classSizes.begin (); cSize != classSizes.end (); cSize++){
+                    csm->insertIfAbsent(*cSize, newTad());
+                    //allThreadsTadMap.insertIfAbsent(*cSize, newTad());
+                    allThreadsTadMap[*cSize] = newTad();
+                }
+                csm->insertIfAbsent(0, newTad());
+                allThreadsTadMap[0] = newTad();
+                tadMap.insertIfAbsent(tid, csm);
+            }
             
-            tad->numFaults += after_faults - before_faults;
-            tad->numTlbMisses += after_tlb_misses - before_tlb_misses;
-            tad->numCacheMisses += after_cache_misses - before_cache_misses;
-            tad->numCacheRefs += after_cache_refs - before_cache_refs;
-            tad->numReallocInstrs += after_instrs - before_instrs; 
+            for (auto cSize = classSizes.begin (); cSize != classSizes.end (); cSize++){
+                    if (sz <= *cSize && sz > *(cSize - 1)) 
+                        currentClassSize = *cSize;
+            }
 
+            if(sz > *(classSizes.end() - 1))
+                currentClassSize = 0; // uses 0 for larger than max class size
+            else if(currentClassSize < *classSizes.begin())
+                currentClassSize = *classSizes.begin();
+        }        
+        else{
+            if (!tadMap.find(tid, &csm)){
+                csm = (classSizeMap*) myMalloc(sizeof(classSizeMap));
+                csm->initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
+            }
+            csm->insertIfAbsent(0, newTad());
+            allThreadsTadMap[0] = newTad();
+            tadMap.insertIfAbsent(tid, csm);
         }
+        //fprintf(stderr, "max class size: %lu\n", *(classSizes.end() - 1));
+        //fprintf(stderr, "min class size: %lu\n", *classSizes.begin());
+            
+        csm = nullptr;
+        if(tadMap.find(tid, &csm)){
+            fprintf(stderr, "current class size: %lu\n", currentClassSize);
+            fprintf(stderr, "found tid -> csm\n");
+            
+            if(csm->find(currentClassSize, &tad)){
+                fprintf(stderr, "found csm -> tad\n");
+                
+                if (!reuseFreeObject){
+                    tad->numReallocFaults += after_faults - before_faults;
+                    tad->numReallocTlbMisses += after_tlb_misses - before_tlb_misses;
+                    tad->numReallocCacheMisses += after_cache_misses - before_cache_misses;
+                    tad->numReallocCacheRefs += after_cache_refs - before_cache_refs;
+                    tad->numReallocInstrs += after_instrs - before_instrs;
+                }
+                else{
+                    numReallocsFFL.fetch_add(1, relaxed);
+                    tad->numReallocFaultsFFL += after_faults - before_faults;
+                    tad->numReallocTlbMissesFFL += after_tlb_misses - before_tlb_misses;
+                    tad->numReallocCacheMissesFFL += after_cache_misses - before_cache_misses;
+                    tad->numReallocCacheRefsFFL += after_cache_refs - before_cache_refs;
+                    tad->numReallocInstrsFFL += after_instrs - before_instrs;
+                }
+            }
+        }
+
         if (after_instrs - before_instrs != 0){
-            fprintf(stderr, "Realloc from thread %lu\n\
-                             From free list:    %s\n\
-                             Num faults:        %ld\n\
-                             Num TLB misses:    %ld\n\
-                             Num cache misses:  %ld\n\
-                             num cache refs:    %ld\n\
-                             Num instructions:  %ld\n\n", 
+            fprintf(stderr, "Realloc from thread %lu\n"
+                            "From free list:    %s\n"
+                            "Num faults:        %ld\n"
+                            "Num TLB misses:    %ld\n"
+                            "Num cache misses:  %ld\n"
+                            "num cache refs:    %ld\n"
+                            "Num instructions:  %ld\n\n", 
                     tid, reuseFreeObject ? "true" : "false",
                     after_faults - before_faults, after_tlb_misses - before_tlb_misses,
                     after_cache_misses - before_cache_misses, after_cache_refs - before_cache_refs,
@@ -1478,13 +1736,42 @@ LC* newLC () {
 
 thread_alloc_data* newTad(){
     thread_alloc_data* tad = (thread_alloc_data*) myMalloc (sizeof(thread_alloc_data));
-    tad->numFaults = 0;
-    tad->numTlbMisses = 0;
-    tad->numCacheMisses = 0;
-    tad->numCacheRefs = 0;
+    
+    tad->numMallocFaults = 0;
+    tad->numReallocFaults = 0;
+    tad->numFreeFaults = 0;
+
+    tad->numMallocTlbMisses = 0;
+    tad->numReallocTlbMisses = 0;
+    tad->numFreeTlbMisses = 0;
+
+    tad->numMallocCacheMisses = 0;
+    tad->numReallocCacheMisses = 0;
+    tad->numFreeCacheMisses = 0;
+
+    tad->numMallocCacheRefs = 0;
+    tad->numReallocCacheRefs = 0;
+    tad->numFreeCacheRefs = 0;
+
     tad->numMallocInstrs = 0;
     tad->numReallocInstrs = 0;
     tad->numFreeInstrs = 0;
+
+    tad->numMallocFaultsFFL = 0;
+    tad->numReallocFaultsFFL = 0;
+
+    tad->numMallocTlbMissesFFL = 0;
+    tad->numReallocTlbMissesFFL = 0;
+
+    tad->numMallocCacheMissesFFL = 0;
+    tad->numReallocCacheMissesFFL = 0;
+
+    tad->numMallocCacheRefsFFL = 0;
+    tad->numReallocCacheRefsFFL = 0;
+
+    tad->numMallocInstrsFFL = 0;
+    tad->numReallocInstrsFFL = 0;
+    
     return tad;
 }
 
@@ -1606,6 +1893,35 @@ void getAllocStyle () {
 	}
 }
 
+void refillClassSizes(){
+
+	bool matchFound = false;
+	size_t bytesToRead = 0;
+	char *line;
+	char *token;
+    classSizeFile = fopen(CLASS_SIZE_FILE_NAME, "a+");        
+
+	while(getline(&line, &bytesToRead, classSizeFile) != -1){
+
+		line[strcspn(line, "\n")] = 0;
+
+		if(strcmp(line, allocator_name) == 0)
+             matchFound = true;
+                
+        if(matchFound) break;
+    }
+
+    
+	getline(&line, &bytesToRead, classSizeFile);
+    line[strcspn(line, "\n")] = 0;
+                
+    while( (token = strsep(&line, " ")) ){                    
+        if(atoi(token) != 0){                        
+            classSizes.push_back( (uint64_t) atoi(token));
+        }
+    }
+}
+
 void getClassSizes () {
         
 	size_t bytesToRead = 0;
@@ -1621,24 +1937,23 @@ void getClassSizes () {
 
 		line[strcspn(line, "\n")] = 0;
 
-		if(strcmp(line, allocator_name) == 0){
-         matchFound = true;
-      }
+		if(strcmp(line, allocator_name) == 0)
+            matchFound = true;
                 
-      if(matchFound) break;
+        if(matchFound) break;
    }
         
    if(matchFound){
 		if (debug) printf ("match found\n");
 		getline(&line, &bytesToRead, classSizeFile);
-      line[strcspn(line, "\n")] = 0;
+        line[strcspn(line, "\n")] = 0;
                 
-      while( (token = strsep(&line, " ")) ){
+        while( (token = strsep(&line, " ")) ){
                     
-         if(atoi(token) != 0){                        
-            classSizes.push_back( (uint64_t) atoi(token));
-         }
-      }
+            if(atoi(token) != 0){                        
+                classSizes.push_back( (uint64_t) atoi(token));
+            }
+        }
 
 		auto cSize = classSizes.end();
 		cSize--;
@@ -1728,14 +2043,82 @@ void getMmapThreshold () {
 
 void globalizeThreadAllocData(){
     //HashMap<uint64_t, thread_alloc_data*, spinlock>::iterator i;    
-    for(auto it = tadMap.begin(); it != tadMap.end(); it++){
-        allThreadsNumFaults.fetch_add(it.getData()->numFaults);
-        allThreadsNumTlbMisses.fetch_add(it.getData()->numTlbMisses);
-        allThreadsNumCacheMisses.fetch_add(it.getData()->numCacheMisses);
-        allThreadsNumCacheRefs.fetch_add(it.getData()->numCacheRefs);
-        allThreadsNumMallocInstrs.fetch_add(it.getData()->numMallocInstrs);
-        allThreadsNumReallocInstrs.fetch_add(it.getData()->numReallocInstrs);
-        allThreadsNumFreeInstrs.fetch_add(it.getData()->numFreeInstrs);
+    for(auto it1 = tadMap.begin(); it1 != tadMap.end(); it1++){
+        for(auto it2 = it1.getData()->begin(); it2 != it1.getData()->end(); it2++){
+
+            allThreadsTadMap[it2.getKey()]->numMallocFaults += it2.getData()->numMallocFaults;
+            allThreadsTadMap[it2.getKey()]->numReallocFaults += it2.getData()->numReallocFaults;
+            allThreadsTadMap[it2.getKey()]->numFreeFaults += it2.getData()->numFreeFaults;
+            
+            allThreadsTadMap[it2.getKey()]->numMallocTlbMisses += it2.getData()->numMallocTlbMisses;
+            allThreadsTadMap[it2.getKey()]->numReallocTlbMisses += it2.getData()->numReallocTlbMisses;
+            allThreadsTadMap[it2.getKey()]->numFreeTlbMisses += it2.getData()->numFreeTlbMisses;
+
+            allThreadsTadMap[it2.getKey()]->numMallocCacheMisses += it2.getData()->numMallocCacheMisses;
+            allThreadsTadMap[it2.getKey()]->numReallocCacheMisses += it2.getData()->numReallocCacheMisses;
+            allThreadsTadMap[it2.getKey()]->numFreeCacheMisses += it2.getData()->numFreeCacheMisses;
+
+            allThreadsTadMap[it2.getKey()]->numMallocCacheRefs += it2.getData()->numMallocCacheRefs;
+            allThreadsTadMap[it2.getKey()]->numMallocCacheRefs += it2.getData()->numMallocCacheRefs;
+            allThreadsTadMap[it2.getKey()]->numMallocCacheRefs += it2.getData()->numMallocCacheRefs;
+
+            allThreadsTadMap[it2.getKey()]->numMallocInstrs += it2.getData()->numMallocInstrs;
+            allThreadsTadMap[it2.getKey()]->numReallocInstrs += it2.getData()->numReallocInstrs;
+            allThreadsTadMap[it2.getKey()]->numFreeInstrs += it2.getData()->numFreeInstrs;
+
+            allThreadsTadMap[it2.getKey()]->numMallocFaultsFFL += it2.getData()->numMallocFaultsFFL;
+            allThreadsTadMap[it2.getKey()]->numReallocFaultsFFL += it2.getData()->numReallocFaultsFFL;
+            
+            allThreadsTadMap[it2.getKey()]->numMallocTlbMissesFFL += it2.getData()->numMallocTlbMissesFFL;
+            allThreadsTadMap[it2.getKey()]->numReallocTlbMissesFFL += it2.getData()->numReallocTlbMissesFFL;
+            
+            allThreadsTadMap[it2.getKey()]->numMallocCacheMissesFFL += it2.getData()->numMallocCacheMissesFFL;
+            allThreadsTadMap[it2.getKey()]->numReallocCacheMissesFFL += it2.getData()->numReallocCacheMissesFFL;
+            
+            allThreadsTadMap[it2.getKey()]->numMallocCacheRefsFFL += it2.getData()->numMallocCacheRefsFFL;
+            allThreadsTadMap[it2.getKey()]->numReallocCacheRefsFFL += it2.getData()->numReallocCacheRefsFFL;
+            
+            allThreadsTadMap[it2.getKey()]->numMallocInstrsFFL += it2.getData()->numMallocInstrsFFL;
+            allThreadsTadMap[it2.getKey()]->numReallocInstrsFFL += it2.getData()->numReallocInstrsFFL;
+        /*
+            allThreadsNumMallocFaults.fetch_add(it2.getData()->numMallocFaults);
+            allThreadsNumReallocFaults.fetch_add(it2.getData()->numReallocFaults);
+            allThreadsNumFreeFaults.fetch_add(it2.getData()->numFreeFaults);
+
+            allThreadsNumMallocTlbMisses.fetch_add(it2.getData()->numMallocTlbMisses);
+            allThreadsNumReallocTlbMisses.fetch_add(it2.getData()->numReallocTlbMisses);
+            allThreadsNumFreeTlbMisses.fetch_add(it2.getData()->numFreeTlbMisses);
+
+            allThreadsNumMallocCacheMisses.fetch_add(it2.getData()->numMallocCacheMisses);
+            allThreadsNumReallocCacheMisses.fetch_add(it2.getData()->numReallocCacheMisses);
+            allThreadsNumFreeCacheMisses.fetch_add(it2.getData()->numFreeCacheMisses);
+
+            allThreadsNumMallocCacheRefs.fetch_add(it2.getData()->numMallocCacheRefs);
+            allThreadsNumReallocCacheRefs.fetch_add(it2.getData()->numReallocCacheRefs);
+            allThreadsNumFreeCacheRefs.fetch_add(it2.getData()->numFreeCacheRefs);
+
+            allThreadsNumMallocInstrs.fetch_add(it2.getData()->numMallocInstrs);
+            allThreadsNumReallocInstrs.fetch_add(it2.getData()->numReallocInstrs);
+            allThreadsNumFreeInstrs.fetch_add(it2.getData()->numFreeInstrs);
+            
+            allThreadsNumMallocFaultsFFL.fetch_add(it2.getData()->numMallocFaultsFFL);
+            allThreadsNumReallocFaultsFFL.fetch_add(it2.getData()->numReallocFaultsFFL);
+
+            allThreadsNumMallocTlbMissesFFL.fetch_add(it2.getData()->numMallocTlbMissesFFL);
+            allThreadsNumReallocTlbMissesFFL.fetch_add(it2.getData()->numReallocTlbMissesFFL);
+
+            allThreadsNumMallocCacheMissesFFL.fetch_add(it2.getData()->numMallocCacheMissesFFL);
+            allThreadsNumReallocCacheMissesFFL.fetch_add(it2.getData()->numReallocCacheMissesFFL);
+
+            allThreadsNumMallocCacheRefsFFL.fetch_add(it2.getData()->numMallocCacheRefsFFL);
+            allThreadsNumReallocCacheRefsFFL.fetch_add(it2.getData()->numReallocCacheRefsFFL);
+
+            allThreadsNumMallocInstrsFFL.fetch_add(it2.getData()->numMallocInstrsFFL);
+            allThreadsNumReallocInstrsFFL.fetch_add(it2.getData()->numReallocInstrsFFL);
+        */
+        }
+    }
+  /*      
 
 //        fprintf (thrData.output, "\n>>> Thread ID:     %lu\n", it.getKey());
 //        fprintf (thrData.output, ">>> page faults    %ld\n", it.getData()->numFaults);
@@ -1744,30 +2127,124 @@ void globalizeThreadAllocData(){
 //        fprintf (thrData.output, ">>> cache refs     %ld\n", it.getData()->numCacheRefs);
 //        fprintf (thrData.output, ">>> num instr      %ld\n",it.getData()->numInstrs);
 
-    }  
+    } */ 
 }
 
 void writeAllocData () {
+    fprintf (thrData.output, "\n>>>>> TOTALS NOT FROM FREELIST <<<<<\n");
 
-    fprintf (thrData.output, "\n>>>>> TOTALS <<<<<\n>>> num page faults    %u\n", allThreadsNumFaults.load(relaxed));
-    fprintf (thrData.output, ">>> num TLB misses     %u\n", allThreadsNumTlbMisses.load(relaxed));
-    fprintf (thrData.output, ">>> num cache misses   %u\n", allThreadsNumCacheMisses.load(relaxed));
-    fprintf (thrData.output, ">>> num cache refs     %u\n", allThreadsNumCacheRefs.load(relaxed));
-    fprintf (thrData.output, ">>> cache miss rate    %.2lf%%\n",
-            (double)allThreadsNumCacheMisses.load(relaxed)
-            /(double)allThreadsNumCacheRefs.load(relaxed) * 100 );
-    fprintf (thrData.output, ">>> num malloc instr   %u\n", allThreadsNumMallocInstrs.load(relaxed));
-    fprintf (thrData.output, ">>> num Realloc instr  %u\n", allThreadsNumReallocInstrs.load(relaxed));
-    fprintf (thrData.output, ">>> num free instr     %u\n", allThreadsNumFreeInstrs.load(relaxed));
+    for (auto const &p : allThreadsTadMap){
+        fprintf (thrData.output, "Class Size:       %ld\n", p.first);
+
+        fprintf (thrData.output, "malloc faults         %ld\n", p.second->numMallocFaults);
+        fprintf (thrData.output, "realloc faults        %ld\n", p.second->numReallocFaults);
+        if(p.first == 0)
+            fprintf (thrData.output, "free faults           %ld\n", p.second->numFreeFaults);
+
+        fprintf (thrData.output, "malloc tlb misses     %ld\n", p.second->numMallocTlbMisses);
+        fprintf (thrData.output, "realloc tlb misses    %ld\n", p.second->numReallocTlbMisses);
+        if(p.first == 0)
+            fprintf (thrData.output, "free tlb misses       %ld\n", p.second->numFreeTlbMisses);
+
+        fprintf (thrData.output, "malloc cache misses   %ld\n", p.second->numMallocCacheMisses);
+        fprintf (thrData.output, "realloc cache misses  %ld\n", p.second->numReallocCacheMisses);
+        if(p.first == 0)
+            fprintf (thrData.output, "free cache misses     %ld\n", p.second->numFreeCacheMisses);
+
+        fprintf (thrData.output, "malloc cache refs     %ld\n", p.second->numMallocCacheRefs);
+        fprintf (thrData.output, "realloc cache refs    %ld\n", p.second->numReallocCacheRefs);
+        if(p.first == 0)
+            fprintf (thrData.output, "free cache refs       %ld\n", p.second->numFreeCacheRefs);
+
+        fprintf (thrData.output, "num malloc instr      %ld\n", p.second->numMallocInstrs);
+        fprintf (thrData.output, "num Realloc instr     %ld\n", p.second->numReallocInstrs);
+        if(p.first == 0)
+            fprintf (thrData.output, "num free instr        %ld\n", p.second->numFreeInstrs);
+        fprintf(thrData.output, "\n");
+    }
+
+    fprintf (thrData.output, "\n>>>>> TOTALS FROM FREELIST <<<<<\n");
+    
+    for (auto const &p : allThreadsTadMap){
+        fprintf (thrData.output, "Class Size:       %ld\n", p.first);
+
+        fprintf (thrData.output, "malloc faults         %ld\n", p.second->numMallocFaultsFFL);
+        fprintf (thrData.output, "realloc faults        %ld\n", p.second->numReallocFaultsFFL);
+
+        fprintf (thrData.output, "malloc tlb misses     %ld\n", p.second->numMallocTlbMissesFFL);
+        fprintf (thrData.output, "realloc tlb misses    %ld\n", p.second->numReallocTlbMissesFFL);
+
+        fprintf (thrData.output, "malloc cache misses   %ld\n", p.second->numMallocCacheMissesFFL);
+        fprintf (thrData.output, "realloc cache misses  %ld\n", p.second->numReallocCacheMissesFFL);
+
+        fprintf (thrData.output, "malloc cache refs     %ld\n", p.second->numMallocCacheRefsFFL);
+        fprintf (thrData.output, "realloc cache refs    %ld\n", p.second->numReallocCacheRefsFFL);
+
+        fprintf (thrData.output, "num malloc instr      %ld\n", p.second->numMallocInstrsFFL);
+        fprintf (thrData.output, "num Realloc instr     %ld\n\n", p.second->numReallocInstrsFFL);
+    }
+
+
+/*
+    fprintf (thrData.output, "\n>>>>> TOTALS NOT FROM FREELIST <<<<<\n");
+    fprintf (thrData.output, "malloc faults         %u\n", allThreadsNumMallocFaults.load(relaxed));
+    fprintf (thrData.output, "realloc faults        %u\n", allThreadsNumReallocFaults.load(relaxed));
+    fprintf (thrData.output, "free faults           %u\n", allThreadsNumFreeFaults.load(relaxed));
+
+    fprintf (thrData.output, "malloc tlb misses     %u\n", allThreadsNumMallocTlbMisses.load(relaxed));
+    fprintf (thrData.output, "realloc tlb misses    %u\n", allThreadsNumReallocTlbMisses.load(relaxed));
+    fprintf (thrData.output, "free tlb misses       %u\n", allThreadsNumFreeTlbMisses.load(relaxed));
+
+    fprintf (thrData.output, "malloc cache misses   %u\n", allThreadsNumMallocCacheMisses.load(relaxed));
+    fprintf (thrData.output, "realloc cache misses  %u\n", allThreadsNumReallocCacheMisses.load(relaxed));
+    fprintf (thrData.output, "free cache misses     %u\n", allThreadsNumFreeCacheMisses.load(relaxed));
+
+    fprintf (thrData.output, "malloc cache refs     %u\n", allThreadsNumMallocCacheRefs.load(relaxed));
+    fprintf (thrData.output, "realloc cache refs    %u\n", allThreadsNumReallocCacheRefs.load(relaxed));
+    fprintf (thrData.output, "free cache refs       %u\n", allThreadsNumFreeCacheRefs.load(relaxed));
+
+    fprintf (thrData.output, "num malloc instr      %u\n", allThreadsNumMallocInstrs.load(relaxed));
+    fprintf (thrData.output, "num Realloc instr     %u\n", allThreadsNumReallocInstrs.load(relaxed));
+    fprintf (thrData.output, "num free instr        %u\n", allThreadsNumFreeInstrs.load(relaxed));
+
+    fprintf (thrData.output, "\n>>>>> TOTALS FROM FREELIST <<<<<\n");
+    fprintf (thrData.output, "malloc faults         %u\n", 
+            allThreadsNumMallocFaultsFFL.load(relaxed));
+    fprintf (thrData.output, "realloc faults        %u\n", 
+            allThreadsNumReallocFaultsFFL.load(relaxed));
+
+    fprintf (thrData.output, "malloc tlb misses     %u\n", 
+            allThreadsNumMallocTlbMissesFFL.load(relaxed));
+    fprintf (thrData.output, "realloc tlb misses    %u\n", 
+            allThreadsNumReallocTlbMissesFFL.load(relaxed));
+
+    fprintf (thrData.output, "malloc cache misses   %u\n", 
+            allThreadsNumMallocCacheMissesFFL.load(relaxed));
+    fprintf (thrData.output, "realloc cache misses  %u\n", 
+            allThreadsNumReallocCacheMissesFFL.load(relaxed));
+
+    fprintf (thrData.output, "malloc cache refs     %u\n", 
+            allThreadsNumMallocCacheRefsFFL.load(relaxed));
+    fprintf (thrData.output, "realloc cache refs    %u\n", 
+            allThreadsNumReallocCacheRefsFFL.load(relaxed));
+
+    fprintf (thrData.output, "num malloc instr      %u\n", 
+            allThreadsNumMallocInstrsFFL.load(relaxed));
+    fprintf (thrData.output, "num Realloc instr     %u\n\n", 
+            allThreadsNumReallocInstrsFFL.load(relaxed));
+
     fprintf (thrData.output, ">>> avg instr/alloc    %.2lf\n\n", 
                 (double)(allThreadsNumMallocInstrs.load(relaxed) 
                 + allThreadsNumReallocInstrs.load(relaxed) 
                 + allThreadsNumFreeInstrs.load(relaxed))
                 /(double)(numMallocs.load(relaxed) + numCallocs.load(relaxed)
-                + numReallocs.load(relaxed) + numFrees.load(relaxed)));
+                + numReallocs.load(relaxed) + numFrees.load(relaxed)));*/
 	fprintf (thrData.output, ">>> mallocs            %u\n", numMallocs.load(relaxed));
 	fprintf (thrData.output, ">>> callocs            %u\n", numCallocs.load(relaxed));
 	fprintf (thrData.output, ">>> reallocs           %u\n", numReallocs.load(relaxed));
+	fprintf (thrData.output, ">>> freelist mallocs   %u\n", numMallocsFFL.load(relaxed));
+	fprintf (thrData.output, ">>> freelist callocs   %u\n", numCallocsFFL.load(relaxed));
+	fprintf (thrData.output, ">>> freelist reallocs  %u\n", numReallocsFFL.load(relaxed));
 	fprintf (thrData.output, ">>> new_address        %u\n", new_address.load(relaxed));
 	fprintf (thrData.output, ">>> reused_address     %u\n", reused_address.load(relaxed));
 	fprintf (thrData.output, ">>> frees              %u\n", numFrees.load(relaxed));
@@ -2119,6 +2596,51 @@ int num_used_pages(uintptr_t vstart, uintptr_t vend) {
 
 	close(fdmap);
 	return num_used_pages;
+}
+
+int find_page(uintptr_t vstart, uintptr_t vend) {
+	char pagemap_filename[50];
+	snprintf (pagemap_filename, 50, "/proc/%d/pagemap", pid);
+	int fdmap;
+	uint64_t bitmap;
+	unsigned long pagenum_start, pagenum_end;
+	unsigned num_pages_read = 0;
+	unsigned num_pages_to_read = 0;
+	unsigned num_used_pages = 0;
+	unsigned add_pages = 0;
+
+	if((fdmap = open(pagemap_filename, O_RDONLY)) == -1) {
+		return -1;
+	}
+
+	pagenum_start = vstart >> PAGE_BITS;
+	pagenum_end = vend >> PAGE_BITS;
+	num_pages_to_read = pagenum_end - pagenum_start + 1;
+	if(num_pages_to_read == 0) {
+		close(fdmap);
+		return -1;
+	}
+
+	if(lseek(fdmap, (pagenum_start * ENTRY_SIZE), SEEK_SET) == -1) {
+		close(fdmap);
+		return -1;
+	}
+
+	do {
+		if(read(fdmap, &bitmap, ENTRY_SIZE) != ENTRY_SIZE) {
+			close(fdmap);
+			return -1;
+		}
+
+		num_pages_read++;
+		if((bitmap >> 63) == 1) {
+			break;
+		}
+		add_pages++;
+	} while(num_pages_read < num_pages_to_read);
+
+	close(fdmap);
+	return add_pages;
 }
 
 /*
