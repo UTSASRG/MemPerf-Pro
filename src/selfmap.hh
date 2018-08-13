@@ -22,6 +22,7 @@
 
 #include "interval.hh"
 #include "real.hh"
+#include "memsample.h"
 
 // From heaplayers
 //#include "wrappers/stlallocator.h"
@@ -29,6 +30,8 @@
 using namespace std;
 
 extern char *allocator_name;
+
+extern __thread thread_data thrData;
 
 struct regioninfo {
   void* start;
@@ -147,6 +150,9 @@ class selfmap {
     }
 
     bool isAllocator(void* pcaddr) {
+		if (!haveTextRegions) {
+			getTextRegions();
+		}
       return ((pcaddr >= _allocTextStart) && (pcaddr <= _allocTextEnd));
     }
 
@@ -162,37 +168,40 @@ class selfmap {
     static int getCallStack(void** array);
 
     /// Get information about global regions.
-    void getTextRegions() {
-      for(const auto& entry : _mappings) {
-        const mapping& m = entry.second;
-        if(m.isText()) {
-          if(m.getFile().find("/libmallocprof") != std::string::npos) {
-            _mallocProfTextStart = (void*)m.getBase();
-            _mallocProfTextEnd = (void*)m.getLimit();
-            _currentLibrary = std::string(m.getFile());
-						printf("libmallocprof @ %p ~ %p, file = %s\n", _mallocProfTextStart, _mallocProfTextEnd, _currentLibrary.c_str());
-          } else if(m.getFile() == _main_exe) {
-            _appTextStart = (void*)m.getBase();
-            _appTextEnd = (void*)m.getLimit();
-						printf("application @ %p ~ %p\n", _appTextStart, _appTextEnd);
-          } else {
-							uintptr_t mallocSymbol = (uintptr_t)RealX::malloc;
-							uintptr_t libTextStart = (uintptr_t)m.getBase();
-							uintptr_t libTextEnd = (uintptr_t)m.getLimit();
-							_allocLibrary = std::string(m.getFile());
-							if(mallocSymbol == (uintptr_t)NULL) { continue; }
-							if((libTextStart <= mallocSymbol) && (mallocSymbol <= libTextEnd)) {
-									_allocTextStart = (void *)libTextStart;
-									_allocTextEnd = (void *)libTextEnd;
-                                    strcpy (allocator_name, _allocLibrary.c_str());
-									printf("allocator @ %p ~ %p, file = %s\n", _allocTextStart, _allocTextEnd, _allocLibrary.c_str());
-							} else {
-									printf("unknown library @ %p ~ %p, file = %s\n", _allocTextStart, _allocTextEnd, _allocLibrary.c_str());
-							}
+	void getTextRegions() {
+		for(const auto& entry : _mappings) {
+			const mapping& m = entry.second;
+			if(m.isText()) {
+				if(m.getFile().find("/libmallocprof") != std::string::npos) {
+					_mallocProfTextStart = (void*)m.getBase();
+					_mallocProfTextEnd = (void*)m.getLimit();
+					_currentLibrary = std::string(m.getFile());
+//					fprintf(thrData.output, ">>> libmallocprof @ %p ~ %p, file = %s\n",
+//					_mallocProfTextStart, _mallocProfTextEnd, _currentLibrary.c_str());
+				} else if(m.getFile() == _main_exe) {
+					_appTextStart = (void*)m.getBase();
+					_appTextEnd = (void*)m.getLimit();
+//					fprintf(thrData.output, ">>> application @ %p ~ %p\n", _appTextStart, _appTextEnd);
+				} else {
+					uintptr_t mallocSymbol = (uintptr_t)RealX::malloc;
+					uintptr_t libTextStart = (uintptr_t)m.getBase();
+					uintptr_t libTextEnd = (uintptr_t)m.getLimit();
+					_allocLibrary = std::string(m.getFile());
+					if(mallocSymbol == (uintptr_t)NULL) { continue; }
+					if((libTextStart <= mallocSymbol) && (mallocSymbol <= libTextEnd)) {
+						_allocTextStart = (void *)libTextStart;
+						_allocTextEnd = (void *)libTextEnd;
+						strcpy (allocator_name, _allocLibrary.c_str());
+//						fprintf(thrData.output, ">>> allocator @ %p ~ %p, file = %s\n", _allocTextStart, _allocTextEnd, _allocLibrary.c_str());
+					} else {
+//						fprintf(thrData.output, ">>> unknown library @ %p ~ %p, file = %s\n", _allocTextStart, _allocTextEnd, _allocLibrary.c_str());
 					}
-        }
-      }
-    }
+				}
+			}
+    	}
+		fflush(thrData.output);
+		haveTextRegions = true;
+	}
 
   private:
     selfmap() {
@@ -204,35 +213,36 @@ class selfmap {
       // Build the mappings data structure
       ifstream maps_file("/proc/self/maps");
 
-      while(maps_file.good() && !maps_file.eof()) {
-        mapping m;
-        maps_file >> m;
-        // It is more clean that that of using readlink. 
-        // readlink will have some additional bytes after the executable file 
-        // if there are parameters.	
-        if(!gotMainExe) {
-          _main_exe = std::string(m.getFile());
-          gotMainExe = true;
-        } 
+		while(maps_file.good() && !maps_file.eof()) {
+			mapping m;
+			maps_file >> m;
+			// It is more clean that that of using readlink. 
+			// readlink will have some additional bytes after the executable file 
+			// if there are parameters.	
+			if(!gotMainExe) {
+				_main_exe = std::string(m.getFile());
+				gotMainExe = true;
+			} 
 
-        if(m.valid()) {
-          //	fprintf(stderr, "Base %lx limit %lx\n", m.getBase(), m.getLimit()); 
-          _mappings[interval(m.getBase(), m.getLimit())] = m;
-        }
-      }
-    }
+			if(m.valid()) {
+//				fprintf(stderr, "Base %lx limit %lx\n", m.getBase(), m.getLimit()); 
+				_mappings[interval(m.getBase(), m.getLimit())] = m;
+			}
+		}
+	}
 
-    std::map<interval, mapping, std::less<interval>> _mappings;
+	bool haveTextRegions = false;
+	std::map<interval, mapping, std::less<interval>> _mappings;
 
-    std::string _main_exe;
-    std::string _currentLibrary;
-    std::string _allocLibrary;
-    void* _appTextStart;
-    void* _appTextEnd;
-    void * _allocTextStart;
-    void * _allocTextEnd;
-    void* _mallocProfTextStart;
-    void* _mallocProfTextEnd;
+	std::string _main_exe;
+	std::string _currentLibrary;
+	std::string _allocLibrary;
+	void* _appTextStart;
+	void* _appTextEnd;
+	void * _allocTextStart;
+	void * _allocTextEnd;
+	void* _mallocProfTextStart;
+	void* _mallocProfTextEnd;
 };
 
 #endif

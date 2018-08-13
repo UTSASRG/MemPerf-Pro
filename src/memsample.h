@@ -62,17 +62,17 @@ typedef struct {
 typedef struct {
 
 	uint64_t addr;
-	uint64_t size;
+	size_t size;
 } FreeObject;
 
 typedef struct {
 	uint64_t addr;
 	uint64_t numAccesses;
-	uint64_t szTotal;
-	uint64_t szFreed;
-	uint64_t szUsed;
-	uint32_t numAllocs;
-	uint32_t numFrees;
+	size_t szTotal;
+	size_t szFreed;
+	size_t szUsed;
+	uint64_t numAllocs;
+	uint64_t numFrees;
 } ObjectTuple;
 
 typedef struct {
@@ -81,19 +81,20 @@ typedef struct {
 	uint64_t end;
 	size_t length;
 	uint64_t rw;
+	char origin;
 	pid_t tid;
 	std::atomic_uint allocations;
 } MmapTuple;
 
 typedef struct {
 
-	uint64_t VmSize_start;
-	uint64_t VmSize_end;
-	uint64_t VmPeak;
-	uint64_t VmRSS_start;
-	uint64_t VmRSS_end;
-	uint64_t VmHWM;
-	uint64_t VmLib;
+	size_t VmSize_start;
+	size_t VmSize_end;
+	size_t VmPeak;
+	size_t VmRSS_start;
+	size_t VmRSS_end;
+	size_t VmHWM;
+	size_t VmLib;
 } VmInfo;
 
 typedef struct addr2line_info {
