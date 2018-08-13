@@ -7,9 +7,8 @@
 #include <cstdint>
 
 void* thread_start (void*);
-
-#define NUM_THREADS 32
-#define NUM_MALLOCS 100
+#define NUM_THREADS 2
+#define NUM_MALLOCS 1000
 
 void* thread_start (void*);
 

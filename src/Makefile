@@ -45,20 +45,20 @@ TARGETS =	libmallocprof.so 			\
 
 all: $(TARGETS)
 
-single:  libmallocprof.so \
+single:		libmallocprof.so \
 			test/test-xlibc \
 			test/test-obsd \
 			test/test-freeguard \
 			test/test-dieharder
 
-threads: libmallocprof.so \
+threads:	libmallocprof.so \
 			test/test-xlibc-thread \
 			test/test-dieharder-thread \
 			test/test-freeguard-thread \
 			test/test-obsd-thread
 pmu: test/pmu-libc-test test/pmu-obsd-test test/pmu-dieharder-test test/pmu-freeguard-test
 
-TEST_FILE = pmu-test.cpp
+TEST_FILE = alloc2.cpp
 THREADTEST_FILE = threadTest.cpp
 
 # Libmallocprof

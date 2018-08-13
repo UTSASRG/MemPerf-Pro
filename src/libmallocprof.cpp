@@ -33,7 +33,7 @@
 #include "spinlock.hh"
 #include "selfmap.hh"
 
-#define CALLSITE_MAXIMUM_LENGTH 10
+#define CALLSITE_MAXIMUM_LENGTH 20
 #define ENTRY_SIZE 8
 #define PAGE_BITS 12 
 
@@ -60,7 +60,7 @@ initStatus mallocInitialized = NOT_INITIALIZED;
 
 //Globals
 uint64_t min_pos_callsite_id;
-uint64_t malloc_mmap_threshold = 0;
+size_t malloc_mmap_threshold = 0;
 pid_t pid;
 
 bool bumpPointer = false;
@@ -71,15 +71,17 @@ bool mapsInitialized = false;
 bool mmap_found = false;
 bool gettingClassSizes = false;
 bool inRealMain = false;
-int64_t totalSizeAlloc = 0;
-uint64_t totalSizeFree = 0;
-uint64_t totalSizeDiff = 0;
-uint64_t totalMemOverhead = 0;
+bool firstMalloc = false;
+bool selfmapInitialized = false;
+size_t totalSizeAlloc = 0;
+size_t totalSizeFree = 0;
+size_t totalSizeDiff = 0;
+size_t totalMemOverhead = 0;
 uint64_t unused_mmap_region_size = 0;
 uint64_t unused_mmap_region_count = 0;
 uint64_t metadata_used_pages = 0;
-uint64_t metadata_object = 0;
-uint64_t metadata_overhead = 0;
+size_t metadata_object = 0;
+size_t metadata_overhead = 0;
 float memEfficiency = 0;
 
 //Debugging flags
@@ -88,77 +90,44 @@ const bool d_malloc_info = false;
 const bool d_mprotect = false;
 const bool d_mmap = false;
 const bool d_metadata = false;
+const bool d_bibop_metadata = false;
+const bool d_style = false;
+const bool d_pmuData = false;
 
 //Atomic Globals
-/*
-std::atomic_uint allThreadsNumMallocFaults (0);
-std::atomic_uint allThreadsNumReallocFaults (0);
-std::atomic_uint allThreadsNumFreeFaults (0);
-
-std::atomic_uint allThreadsNumMallocTlbMisses (0);
-std::atomic_uint allThreadsNumReallocTlbMisses (0);
-std::atomic_uint allThreadsNumFreeTlbMisses (0);
-
-std::atomic_uint allThreadsNumMallocCacheMisses (0);
-std::atomic_uint allThreadsNumReallocCacheMisses (0);
-std::atomic_uint allThreadsNumFreeCacheMisses (0);
-
-std::atomic_uint allThreadsNumMallocCacheRefs (0);
-std::atomic_uint allThreadsNumReallocCacheRefs (0);
-std::atomic_uint allThreadsNumFreeCacheRefs (0);
-
-std::atomic_uint allThreadsNumMallocInstrs (0);
-std::atomic_uint allThreadsNumReallocInstrs (0);
-std::atomic_uint allThreadsNumFreeInstrs (0);
-
-std::atomic_uint allThreadsNumMallocFaultsFFL (0);
-std::atomic_uint allThreadsNumReallocFaultsFFL (0);
-
-std::atomic_uint allThreadsNumMallocTlbMissesFFL (0);
-std::atomic_uint allThreadsNumReallocTlbMissesFFL (0);
-
-std::atomic_uint allThreadsNumMallocCacheMissesFFL (0);
-std::atomic_uint allThreadsNumReallocCacheMissesFFL (0);
-
-std::atomic_uint allThreadsNumMallocCacheRefsFFL (0);
-std::atomic_uint allThreadsNumReallocCacheRefsFFL (0);
-
-std::atomic_uint allThreadsNumMallocInstrsFFL (0);
-std::atomic_uint allThreadsNumReallocInstrsFFL (0);
-*/
-std::atomic_uint numFrees (0);
-std::atomic_uint numMallocs (0);
-std::atomic_uint numCallocs (0);
-std::atomic_uint numReallocs (0);
 std::atomic_uint numMallocsFFL (0);
 std::atomic_uint numCallocsFFL (0);
 std::atomic_uint numReallocsFFL (0);
+std::atomic_uint num_free (0);
+std::atomic_uint num_malloc (0);
+std::atomic_uint num_calloc (0);
+std::atomic_uint num_realloc (0);
 std::atomic_uint new_address (0);
 std::atomic_uint reused_address (0);
 std::atomic_uint num_pthread_mutex_locks (0);
-std::atomic_uint trylockAttempts (0);
+std::atomic_uint num_trylock (0);
 std::atomic_uint total_waits (0);
-std::atomic_uint totalTimeWaiting (0);
+std::atomic<std::uint64_t> total_time_wait (0);
 std::atomic_uint dontneed_advice_count (0);
 std::atomic_uint madvise_calls (0);
 std::atomic_uint numSbrks (0);
 std::atomic_uint programBreakChange (0);
 std::atomic_uint malloc_mmaps (0);
 std::atomic_uint total_mmaps (0);
-std::atomic_uint numTempAllocs (0);
-std::atomic_uint tmppos (0);
-std::atomic_uint cyclesFree (0);
-std::atomic_uint cyclesNewAlloc (0);
-std::atomic_uint cyclesReuseAlloc (0);
-std::atomic_uint numThreads (0);
-std::atomic_uint blowup_bytes (0);
+std::atomic_uint temp_alloc (0);
+std::atomic_uint temp_position (0);
+std::atomic<std::uint64_t> cycles_free (0);
+std::atomic<std::uint64_t> cycles_new (0);
+std::atomic<std::uint64_t> cycles_reused (0);
+std::atomic_uint threads (0);
+std::atomic_size_t blowup_bytes (0);
 std::atomic_uint blowup_allocations (0);
-std::atomic_uint summation_blowup_bytes (0);
+std::atomic_size_t summation_blowup_bytes (0);
 std::atomic_uint summation_blowup_allocations (0);
-std::atomic_uint fragmentation (0);
-std::atomic_uint free_bytes (0);
-std::atomic_uint active_mem (0);
-std::atomic_uint active_mem_HWM (0);
+std::atomic_size_t fragmentation (0);
+std::atomic_size_t free_bytes (0);
+std::atomic_size_t active_mem (0);
+std::atomic_size_t active_mem_HWM (0);
 std::atomic_uint num_mprotect (0);
 
 //Vector of class sizes
@@ -253,8 +222,10 @@ void writeMappings();
 int num_used_pages(uintptr_t vstart, uintptr_t vend);
 int find_page(uintptr_t vstart, uintptr_t vend);
 void get_bp_metadata();
+void get_bibop_metadata();
 void clearFreelists();
 void resetAtomics();
+unsigned search_vpage (uintptr_t vpage);
 
 // pre-init private allocator memory
 char tmpbuf[TEMP_MEM_SIZE];
@@ -286,6 +257,7 @@ extern "C" {
 				alias("yyposix_memalign")));
 }
 
+//Constructor
 __attribute__((constructor)) initStatus initializer() {
     
 	if(mallocInitialized == INITIALIZED || mallocInitialized == IN_PROGRESS){
@@ -309,6 +281,8 @@ __attribute__((constructor)) initStatus initializer() {
 	freelistLock.init();
 	mappingsLock.init();
 
+	pid = getpid();
+
 	// Calculate the minimum possible callsite ID by taking the low four bytes
 	// of the start of the program text and repeating them twice, back-to-back,
 	// resulting in eight bytes which resemble: 0x<lowWord><lowWord>
@@ -326,16 +300,30 @@ __attribute__((constructor)) initStatus initializer() {
 
 	mapsInitialized = true;
     allocator_name = (char *) myMalloc(100 * sizeof(char));
-	selfmap::getInstance().getTextRegions();
 
-	mallocInitialized = INITIALIZED;
 	void * program_break = sbrk(0);
 	thrData.stackStart = (char *)__builtin_frame_address(0);
 	thrData.stackEnd = (char *)__libc_stack_end;
 
+	mallocInitialized = INITIALIZED;
+
+	//These have to be done after mallocInitialized = INITIALIZED
+	//This function opens the /proc/self/maps file using ifstream
+	//constructor which calls operator new, which calls malloc
+	//Which then triggers the allocators initializer, which then
+	//mmaps memory. We need to be initialized so we can record mmaps
+	//This wouldn't be a problem if we could intercept that mallocs
+	//However, some allocators (OBSD, DieHarder) intercept
+	//operator new, and directly call their malloc functions
+	//eg. obsd_malloc, xxmalloc.
+	selfmap::getInstance().getTextRegions();
+	selfmapInitialized = true;
+	
+	// Determines allocator style: bump pointer or bibop
+	getAllocStyle ();
+
 	// Generate the name of our output file, then open it for writing.
 	char outputFile[MAX_FILENAME_LEN];
-	pid = getpid();
 	snprintf(outputFile, MAX_FILENAME_LEN, "%s_libmallocprof_%d_main_thread.txt",
 		program_invocation_name, pid);
 	// Will overwrite current file; change the fopen flag to "a" for append.
@@ -349,15 +337,14 @@ __attribute__((constructor)) initStatus initializer() {
 			thrData.stackStart, thrData.stackEnd);
 	fprintf(thrData.output, ">>> program break @ %p\n", program_break);
 	fflush(thrData.output);
-    
 
-	// Determines allocator style: bump pointer or bibop
-	getAllocStyle ();
-	
+    
 	// Determine class size for bibop allocator
 	// If the class sizes are in the class_sizes.txt file
 	// it will read from that. Else if will get the info
-	if (bibop) getClassSizes ();
+	if (bibop) {
+		getClassSizes ();
+	}
 	else {
 		getMmapThreshold();
 		Freelist* small = (Freelist*) myMalloc (sizeof (Freelist));
@@ -367,7 +354,6 @@ __attribute__((constructor)) initStatus initializer() {
 		Freelist* large = (Freelist*) myMalloc (sizeof (Freelist));
 		large->initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 		freelistMap.insert(LARGE_OBJECT, large);
-		if (debug) printf ("Inserting freelistMap[LARGE_OBJECT]\n");
 		get_bp_metadata();
 	}
 
@@ -435,17 +421,17 @@ extern "C" {
 		// using a memory mapped region. Once dlsym finishes, all future malloc
 		// requests will be fulfilled by RealX::malloc, which itself is a
 		// reference to the real malloc routine.
-		if(mallocInitialized != INITIALIZED) {
-			if((tmppos + sz) < TEMP_MEM_SIZE) 
+		if((mallocInitialized != INITIALIZED) || (!selfmapInitialized)) {
+			if((temp_position + sz) < TEMP_MEM_SIZE) 
 				return myMalloc (sz);
 			else {
 				fprintf(stderr, "error: temp allocator out of memory\n");
 				fprintf(stderr, "\t requested size = %zu, total size = %d, total allocs = %u\n",
-						  sz, TEMP_MEM_SIZE, numTempAllocs.load(relaxed));
+						  sz, TEMP_MEM_SIZE, temp_alloc.load(relaxed));
 				abort();
 			}
 		}
-	
+		
 		if (!mapsInitialized) return RealX::malloc (sz);
 
 		//Malloc is being called by a thread that is already in malloc
@@ -463,7 +449,7 @@ extern "C" {
 
 		if (!inRealMain) return RealX::malloc(sz);
 
-        numMallocs.fetch_add(1, relaxed);
+        num_malloc.fetch_add(1, relaxed);
 
         int64_t before_faults, before_tlb_misses, before_cache_misses, before_cache_refs, before_instrs;
         int64_t after_faults, after_tlb_misses, after_cache_misses, after_cache_refs, after_instrs;
@@ -592,12 +578,12 @@ extern "C" {
 			t->numAllocs++;
 			t->szUsed = sz;
 			reused_address.fetch_add (1, relaxed);
-			cyclesReuseAlloc.fetch_add (cyclesForMalloc, relaxed);
+			cycles_reused.fetch_add (cyclesForMalloc, relaxed);
 		}
 
 		else {
 			new_address.fetch_add (1, relaxed);
-			cyclesNewAlloc.fetch_add (cyclesForMalloc, relaxed);
+			cycles_new.fetch_add (cyclesForMalloc, relaxed);
 			addressUsage.insertIfAbsent (address, newObjectTuple(address, sz));
 		}
             
@@ -644,11 +630,14 @@ extern "C" {
             
         csm = nullptr;
         if(tadMap.find(tid, &csm)){
-            fprintf(stderr, "current class size: %lu\n", currentClassSize);
-            fprintf(stderr, "found tid -> csm\n");
-            
+            if(d_pmuData){
+                fprintf(stderr, "current class size: %lu\n", currentClassSize);
+                fprintf(stderr, "found tid -> csm\n");
+            }
+
             if(csm->find(currentClassSize, &tad)){
-                fprintf(stderr, "found csm -> tad\n");
+                if(d_pmuData)
+                    fprintf(stderr, "found csm -> tad\n");
                 
                 if (!reuseFreeObject){
                     tad->numMallocFaults += after_faults - before_faults;
@@ -669,7 +658,7 @@ extern "C" {
         }
         
 
-        if(after_instrs - before_instrs != 0){
+        if(after_instrs - before_instrs != 0 && d_pmuData){
 
             fprintf(stderr, "Malloc from thread %lu\n"
                             "From free list:    %s\n"
@@ -706,6 +695,9 @@ extern "C" {
 		if ((n + sz) > active_mem_HWM) {
 			active_mem_HWM = (n + sz);
 			if (d_malloc_info) printf ("increasing a_m_HWM, n= %u, sz= %zu\n", n, sz);
+		}
+
+		if ((num_malloc.fetch_add(1, relaxed)) == 0) {
 		}
 
 		//thread_local
@@ -865,19 +857,18 @@ extern "C" {
 			t->szUsed = (sz);
 			t->numAllocs++;
 			reused_address.fetch_add(1, relaxed);
-			cyclesReuseAlloc.fetch_add(cyclesForCalloc, relaxed);
-      }
+			cycles_reused.fetch_add(cyclesForCalloc, relaxed);
+        }
       
 		else{
 			new_address.fetch_add (1, relaxed);
-			cyclesNewAlloc.fetch_add (cyclesForCalloc, relaxed);
+			cycles_new.fetch_add (cyclesForCalloc, relaxed);
 			addressUsage.insertIfAbsent(address, newObjectTuple(address, (sz)));
-      }
-
-		numCallocs.fetch_add (1, relaxed);
+        }
         
         uint64_t currentClassSize = 0;
         classSizeMap *csm;
+		num_calloc.fetch_add (1, relaxed);
         thread_alloc_data *tad;
         
         if(bibop){   
@@ -919,11 +910,14 @@ extern "C" {
             
         csm = nullptr;
         if(tadMap.find(tid, &csm)){
-            fprintf(stderr, "current class size: %lu\n", currentClassSize);
-            fprintf(stderr, "found tid -> csm\n");
-            
+            if(d_pmuData){
+                fprintf(stderr, "current class size: %lu\n", currentClassSize);
+                fprintf(stderr, "found tid -> csm\n");
+            }
+
             if(csm->find(currentClassSize, &tad)){
-                fprintf(stderr, "found csm -> tad\n");
+                if(d_pmuData)
+                    fprintf(stderr, "found csm -> tad\n");
                 
                 if (!reuseFreeObject){
                     tad->numMallocFaults += after_faults - before_faults;
@@ -943,7 +937,7 @@ extern "C" {
             }
         }
 
-        if (after_instrs - before_instrs != 0){
+        if (after_instrs - before_instrs != 0 && d_pmuData){
             fprintf(stderr, "Calloc from thread %lu\n"
                             "From free list:    %s\n"
                             "Num faults:        %ld\n"
@@ -1057,11 +1051,11 @@ extern "C" {
            
             getPerfInfo(&after_faults, &after_tlb_misses, &after_cache_misses,
                     &after_cache_refs, &after_instrs);
-			numFrees.fetch_add(1, relaxed);
-			cyclesFree.fetch_add ((after - before), relaxed);
         
             uint64_t currentClassSize = 0;
             classSizeMap *csm;
+			num_free.fetch_add(1, relaxed);
+			cycles_free.fetch_add ((after - before), relaxed);
             thread_alloc_data *tad;
            /* 
             if(bibop){   
@@ -1104,11 +1098,14 @@ extern "C" {
                 
             csm = nullptr;
             if(tadMap.find(tid, &csm)){
-                fprintf(stderr, "current class size: %lu\n", currentClassSize);
-                fprintf(stderr, "found tid -> csm\n");
-                
+                if(d_pmuData){
+                    fprintf(stderr, "current class size: %lu\n", currentClassSize);
+                    fprintf(stderr, "found tid -> csm\n");
+                }
+
                 if(csm->find(currentClassSize, &tad)){
-                    fprintf(stderr, "found csm -> tad\n");
+                    if(d_pmuData)
+                        fprintf(stderr, "found csm -> tad\n");
                     
                     tad->numFreeFaults += after_faults - before_faults;
                     tad->numFreeTlbMisses += after_tlb_misses - before_tlb_misses;
@@ -1118,7 +1115,7 @@ extern "C" {
                 }
             }
 
-            if (after_instrs - before_instrs != 0){
+            if (after_instrs - before_instrs != 0 && d_pmuData){
                 fprintf(stderr, "Free from thread %lu\n"
                                 "Num faults:        %ld\n"
                                 "Num TLB misses:    %ld\n"
@@ -1312,16 +1309,16 @@ extern "C" {
 			t->szUsed = sz;
 			t->numAllocs++;
 			reused_address.fetch_add(1, relaxed);
-			cyclesReuseAlloc.fetch_add (cyclesForRealloc, relaxed);
+			cycles_reused.fetch_add (cyclesForRealloc, relaxed);
 		}
 		
 		else{
 			new_address.fetch_add(1, relaxed);
-			cyclesNewAlloc.fetch_add (cyclesForRealloc, relaxed);
+			cycles_new.fetch_add (cyclesForRealloc, relaxed);
 			addressUsage.insertIfAbsent(address, newObjectTuple(address, sz));
       }
 
-		numReallocs.fetch_add(1, relaxed);
+		num_realloc.fetch_add(1, relaxed);
         
         uint64_t currentClassSize = 0;
         classSizeMap *csm;
@@ -1366,11 +1363,14 @@ extern "C" {
             
         csm = nullptr;
         if(tadMap.find(tid, &csm)){
-            fprintf(stderr, "current class size: %lu\n", currentClassSize);
-            fprintf(stderr, "found tid -> csm\n");
-            
+            if(d_pmuData){
+                fprintf(stderr, "current class size: %lu\n", currentClassSize);
+                fprintf(stderr, "found tid -> csm\n");
+            }
+
             if(csm->find(currentClassSize, &tad)){
-                fprintf(stderr, "found csm -> tad\n");
+                if(d_pmuData)
+                    fprintf(stderr, "found csm -> tad\n");
                 
                 if (!reuseFreeObject){
                     tad->numReallocFaults += after_faults - before_faults;
@@ -1390,7 +1390,7 @@ extern "C" {
             }
         }
 
-        if (after_instrs - before_instrs != 0){
+        if (after_instrs - before_instrs != 0 && d_pmuData){
             fprintf(stderr, "Realloc from thread %lu\n"
                             "From free list:    %s\n"
                             "Num faults:        %ld\n"
@@ -1567,7 +1567,7 @@ extern "C" {
 							 void *(*start_routine)(void *), void * arg) {
 
 		int result = xthreadx::thread_create(tid, attr, start_routine, arg);
-		numThreads.fetch_add(1, relaxed);
+		threads.fetch_add(1, relaxed);
 		return result;
 	}
 
@@ -1616,7 +1616,7 @@ extern "C" {
 		if (waiting) {
 			timeWaiting += ((rdtscp()) - timeAttempted);
 			waiting = false;
-			totalTimeWaiting.fetch_add (timeWaiting, relaxed);
+			total_time_wait.fetch_add (timeWaiting, relaxed);
 		}
 		return result;
 	}
@@ -1650,7 +1650,7 @@ extern "C" {
 		//Try to aquire the lock
 		int result = RealX::pthread_mutex_trylock (mutex);
 		if (result != 0) {
-			trylockAttempts.fetch_add(1, relaxed);
+			num_trylock.fetch_add(1, relaxed);
 		}
 		return result;
 	}
@@ -1712,7 +1712,7 @@ ObjectTuple* newObjectTuple (uint64_t address, size_t size) {
 	return t;
 }
 
-MmapTuple* newMmapTuple (uint64_t address, size_t length, int prot) {
+MmapTuple* newMmapTuple (uint64_t address, size_t length, int prot, char origin) {
 
 	MmapTuple* t = (MmapTuple*) myMalloc (sizeof (MmapTuple));	
 
@@ -1721,7 +1721,9 @@ MmapTuple* newMmapTuple (uint64_t address, size_t length, int prot) {
 	t->end = end;
 	t->length = length;
 	t->rw = 0;
+	t->origin = origin;
 	if (prot == (PROT_READ | PROT_WRITE)) t->rw += length;
+	else if (prot == (PROT_READ | PROT_WRITE | PROT_EXEC)) t->rw += length;
 	t->tid = gettid();
 	t->allocations = 0;
 	return t;
@@ -1787,14 +1789,14 @@ void* myMalloc (size_t size) {
 
 	temp_mem_lock.lock ();
 	void* retptr;
-	if((tmppos + size) < TEMP_MEM_SIZE) {
-		retptr = (void *)(tmpbuf + tmppos);
-		tmppos.fetch_add (size, relaxed);
-		numTempAllocs++;
+	if((temp_position + size) < TEMP_MEM_SIZE) {
+		retptr = (void *)(tmpbuf + temp_position);
+		temp_position.fetch_add (size, relaxed);
+		temp_alloc++;
 	} else {
 		fprintf(stderr, "error: global allocator out of memory\n");
 		fprintf(stderr, "\t requested size = %zu, total size = %d, "
-							 "total allocs = %u\n", size, TEMP_MEM_SIZE, numTempAllocs.load(relaxed));
+							 "total allocs = %u\n", size, TEMP_MEM_SIZE, temp_alloc.load(relaxed));
 		abort();
 	}
 	temp_mem_lock.unlock ();
@@ -1807,8 +1809,8 @@ void myFree (void* ptr) {
 
 	temp_mem_lock.lock();
 	if ((ptr >= tmpbuf) && (ptr <= (tmpbuf + TEMP_MEM_SIZE))) {
-		numTempAllocs--;
-		if(numTempAllocs == 0) tmppos = 0;
+		temp_alloc--;
+		if(temp_alloc == 0) temp_position = 0;
 	}
 	temp_mem_lock.unlock();
 }
@@ -1869,6 +1871,16 @@ void getMemUsageEnd () {
 void getAllocStyle () {
 
 	void* add1 = RealX::malloc (128);
+
+	//Check for mmap'd metadata
+	if (total_mmaps > 0) {
+		if (d_style) printf ("first malloc resulting in mmap, searching for metadata\n");
+		get_bibop_metadata();
+	}
+	else {
+		if (d_style) printf ("total_mmaps <= 0\n");
+	}
+
 	void* add2 = RealX::malloc (2048);
 
 	long address1 = reinterpret_cast<long> (add1);
@@ -1883,13 +1895,13 @@ void getAllocStyle () {
 	if ((address1Page - address2Page) != 0) {
 
 		bibop = true;
-		fprintf (thrData.output, ">>> allocator     bibop\n");
+//		fprintf (thrData.output, ">>> allocator     bibop\n");
 	}
 
 	else {
 
 		bumpPointer = true;
-		fprintf (thrData.output, ">>> allocator     bump-pointer\n");
+//		fprintf (thrData.output, ">>> allocator     bump-pointer\n");
 	}
 }
 
@@ -1977,8 +1989,9 @@ void getClassSizes () {
 			newSize += 8;
 			newAddress = RealX::realloc (oldAddress, newSize);
 			newAddr = reinterpret_cast <uint64_t> (newAddress);
-			if (newAddr != oldAddr)
+			if (newAddr != oldAddr) {
 				classSizes.push_back (oldSize);
+			}
 
 			oldAddr = newAddr;
 			oldAddress = newAddress;
@@ -2184,102 +2197,50 @@ void writeAllocData () {
         fprintf (thrData.output, "num Realloc instr     %ld\n\n", p.second->numReallocInstrsFFL);
     }
 
+	unsigned print_new_address = new_address.load(relaxed);
+	unsigned print_reused_address = reused_address.load(relaxed);
+	unsigned print_num_free = num_free.load(relaxed);
+	unsigned print_total_waits = total_waits.load(relaxed);
 
-/*
-    fprintf (thrData.output, "\n>>>>> TOTALS NOT FROM FREELIST <<<<<\n");
-    fprintf (thrData.output, "malloc faults         %u\n", allThreadsNumMallocFaults.load(relaxed));
-    fprintf (thrData.output, "realloc faults        %u\n", allThreadsNumReallocFaults.load(relaxed));
-    fprintf (thrData.output, "free faults           %u\n", allThreadsNumFreeFaults.load(relaxed));
-
-    fprintf (thrData.output, "malloc tlb misses     %u\n", allThreadsNumMallocTlbMisses.load(relaxed));
-    fprintf (thrData.output, "realloc tlb misses    %u\n", allThreadsNumReallocTlbMisses.load(relaxed));
-    fprintf (thrData.output, "free tlb misses       %u\n", allThreadsNumFreeTlbMisses.load(relaxed));
-
-    fprintf (thrData.output, "malloc cache misses   %u\n", allThreadsNumMallocCacheMisses.load(relaxed));
-    fprintf (thrData.output, "realloc cache misses  %u\n", allThreadsNumReallocCacheMisses.load(relaxed));
-    fprintf (thrData.output, "free cache misses     %u\n", allThreadsNumFreeCacheMisses.load(relaxed));
-
-    fprintf (thrData.output, "malloc cache refs     %u\n", allThreadsNumMallocCacheRefs.load(relaxed));
-    fprintf (thrData.output, "realloc cache refs    %u\n", allThreadsNumReallocCacheRefs.load(relaxed));
-    fprintf (thrData.output, "free cache refs       %u\n", allThreadsNumFreeCacheRefs.load(relaxed));
-
-    fprintf (thrData.output, "num malloc instr      %u\n", allThreadsNumMallocInstrs.load(relaxed));
-    fprintf (thrData.output, "num Realloc instr     %u\n", allThreadsNumReallocInstrs.load(relaxed));
-    fprintf (thrData.output, "num free instr        %u\n", allThreadsNumFreeInstrs.load(relaxed));
-
-    fprintf (thrData.output, "\n>>>>> TOTALS FROM FREELIST <<<<<\n");
-    fprintf (thrData.output, "malloc faults         %u\n", 
-            allThreadsNumMallocFaultsFFL.load(relaxed));
-    fprintf (thrData.output, "realloc faults        %u\n", 
-            allThreadsNumReallocFaultsFFL.load(relaxed));
-
-    fprintf (thrData.output, "malloc tlb misses     %u\n", 
-            allThreadsNumMallocTlbMissesFFL.load(relaxed));
-    fprintf (thrData.output, "realloc tlb misses    %u\n", 
-            allThreadsNumReallocTlbMissesFFL.load(relaxed));
-
-    fprintf (thrData.output, "malloc cache misses   %u\n", 
-            allThreadsNumMallocCacheMissesFFL.load(relaxed));
-    fprintf (thrData.output, "realloc cache misses  %u\n", 
-            allThreadsNumReallocCacheMissesFFL.load(relaxed));
-
-    fprintf (thrData.output, "malloc cache refs     %u\n", 
-            allThreadsNumMallocCacheRefsFFL.load(relaxed));
-    fprintf (thrData.output, "realloc cache refs    %u\n", 
-            allThreadsNumReallocCacheRefsFFL.load(relaxed));
-
-    fprintf (thrData.output, "num malloc instr      %u\n", 
-            allThreadsNumMallocInstrsFFL.load(relaxed));
-    fprintf (thrData.output, "num Realloc instr     %u\n\n", 
-            allThreadsNumReallocInstrsFFL.load(relaxed));
-
-    fprintf (thrData.output, ">>> avg instr/alloc    %.2lf\n\n", 
-                (double)(allThreadsNumMallocInstrs.load(relaxed) 
-                + allThreadsNumReallocInstrs.load(relaxed) 
-                + allThreadsNumFreeInstrs.load(relaxed))
-                /(double)(numMallocs.load(relaxed) + numCallocs.load(relaxed)
-                + numReallocs.load(relaxed) + numFrees.load(relaxed)));*/
-	fprintf (thrData.output, ">>> mallocs            %u\n", numMallocs.load(relaxed));
-	fprintf (thrData.output, ">>> callocs            %u\n", numCallocs.load(relaxed));
-	fprintf (thrData.output, ">>> reallocs           %u\n", numReallocs.load(relaxed));
-	fprintf (thrData.output, ">>> freelist mallocs   %u\n", numMallocsFFL.load(relaxed));
-	fprintf (thrData.output, ">>> freelist callocs   %u\n", numCallocsFFL.load(relaxed));
-	fprintf (thrData.output, ">>> freelist reallocs  %u\n", numReallocsFFL.load(relaxed));
-	fprintf (thrData.output, ">>> new_address        %u\n", new_address.load(relaxed));
-	fprintf (thrData.output, ">>> reused_address     %u\n", reused_address.load(relaxed));
-	fprintf (thrData.output, ">>> frees              %u\n", numFrees.load(relaxed));
-	fprintf (thrData.output, ">>> malloc_mmaps       %u\n", malloc_mmaps.load(relaxed));
-	fprintf (thrData.output, ">>> total_mmaps        %u\n", total_mmaps.load(relaxed));
+	fprintf (thrData.output, ">>> num_malloc              %u\n", num_malloc.load(relaxed));
+	fprintf (thrData.output, ">>> num_calloc              %u\n", num_calloc.load(relaxed));
+	fprintf (thrData.output, ">>> num_realloc             %u\n", num_realloc.load(relaxed));
+	fprintf (thrData.output, ">>> new_address             %u\n", print_new_address);
+	fprintf (thrData.output, ">>> reused_address          %u\n", print_reused_address);
+	fprintf (thrData.output, ">>> num_free                %u\n", print_num_free);
+	fprintf (thrData.output, ">>> malloc_mmaps            %u\n", malloc_mmaps.load(relaxed));
+	fprintf (thrData.output, ">>> total_mmaps             %u\n", total_mmaps.load(relaxed));
 	fprintf (thrData.output, ">>> malloc_mmap_threshold   %zu\n", malloc_mmap_threshold);
+	fprintf (thrData.output, ">>> threads                 %u\n", threads.load(relaxed));
 
-	if (new_address.load(relaxed) > 0)
-		fprintf (thrData.output, ">>> cyclesNewAlloc     %u\n",
-				  (cyclesNewAlloc.load(relaxed) / new_address.load(relaxed)));
+	if (print_new_address)
+		fprintf (thrData.output, ">>> cycles_new         %lu\n", (cycles_new.load(relaxed) / print_new_address));
 
 	else
-		fprintf (thrData.output, ">>> cyclesNewAlloc     N/A\n");
+		fprintf (thrData.output, ">>> cycles_new         N/A\n");
 
-	if (reused_address.load(relaxed) > 0) 
-		fprintf (thrData.output, ">>> cyclesReuseAlloc   %u\n",
-				  (cyclesReuseAlloc.load(relaxed) / reused_address.load(relaxed)));
+	if (print_reused_address) 
+		fprintf (thrData.output, ">>> cycles_reused      %lu\n",
+				  (cycles_reused.load(relaxed) / print_reused_address));
 
-	else fprintf (thrData.output, ">>> cyclesReuseAlloc   N/A\n");
+	else
+		fprintf (thrData.output, ">>> cycles_reused      N/A\n");
 
-	if (numFrees.load(relaxed) > 0)
-		fprintf (thrData.output, ">>> cyclesFree         %u\n",
-				  (cyclesFree.load(relaxed) / numFrees.load(relaxed)));
+	if (num_free.load(relaxed) > 0)
+		fprintf (thrData.output, ">>> cycles_free        %lu\n",
+				  (cycles_free.load(relaxed) / num_free.load(relaxed)));
 
-	else fprintf (thrData.output, ">>> cyclesFree         N/A\n");
+	else
+		fprintf (thrData.output, ">>> cycles_free        N/A\n");
 
 	fprintf (thrData.output, ">>> pthread_mutex_lock %u\n", num_pthread_mutex_locks.load(relaxed));
-	fprintf (thrData.output, ">>> total_waits        %u\n", total_waits.load(relaxed));
-	fprintf (thrData.output, ">>> trylockAttemps     %u\n", trylockAttempts.load(relaxed));
+	fprintf (thrData.output, ">>> total_waits        %u\n", print_total_waits);
+	fprintf (thrData.output, ">>> num_trylock        %u\n", num_trylock.load(relaxed));
 
 	if (total_waits.load(relaxed) > 0) 
-		fprintf (thrData.output, ">>> avgWaitTime        %u\n",
-				  (totalTimeWaiting.load(relaxed)/total_waits.load(relaxed)));
+		fprintf (thrData.output, ">>> avg_wait_time  %lu\n",
+				  (total_time_wait.load(relaxed)/total_waits.load(relaxed)));
 
-	fprintf (thrData.output, ">>> numThreads         %u\n", numThreads.load(relaxed));
 	fprintf(thrData.output, ">>> madvise calls        %u\n", madvise_calls.load(relaxed));
     fprintf(thrData.output, ">>> w/ MADV_DONTNEED     %u\n", dontneed_advice_count.load(relaxed));
 	fprintf(thrData.output, ">>> sbrk calls           %u\n", numSbrks.load(relaxed));
@@ -2293,21 +2254,21 @@ void writeAllocData () {
 	fprintf (thrData.output, ">>> VmHWM(kB)          %zu\n", vmInfo.VmHWM);
 	fprintf (thrData.output, ">>> VmLib(kB)          %zu\n", vmInfo.VmLib);
 
-	fprintf (thrData.output, "\n>>> num_mprotect         %u\n", num_mprotect.load(relaxed));
-	fprintf (thrData.output, ">>> blowup_allocations   %u\n", blowup_allocations.load(relaxed));
-	fprintf (thrData.output, ">>> blowup_bytes         %u\n", blowup_bytes.load(relaxed));
-	fprintf (thrData.output, ">>> fragmentation            %u\n", fragmentation.load(relaxed));
-	fprintf (thrData.output, ">>> unused_mmap_region_count %zu\n", unused_mmap_region_count);
-	fprintf (thrData.output, ">>> unused_mmap_region_size  %#lx\n", unused_mmap_region_size);
-	fprintf (thrData.output, ">>> metadata_used_pages      %zu\n", metadata_used_pages);
-	fprintf (thrData.output, ">>> metadata_object          %lu\n", metadata_object);
-	fprintf (thrData.output, ">>> metadata_overhead        %lu\n", metadata_overhead);
+	fprintf (thrData.output, "\n>>> num_mprotect             %u\n", num_mprotect.load(relaxed));
+	fprintf (thrData.output, ">>> blowup_allocations       %u\n", blowup_allocations.load(relaxed));
+	fprintf (thrData.output, ">>> blowup_bytes             %zu\n", blowup_bytes.load(relaxed));
+	fprintf (thrData.output, ">>> fragmentation            %zu\n", fragmentation.load(relaxed));
+//	fprintf (thrData.output, ">>> unused_mmap_region_count %zu\n", unused_mmap_region_count);
+//	fprintf (thrData.output, ">>> unused_mmap_region_size  %#lx\n", unused_mmap_region_size);
+//	fprintf (thrData.output, ">>> metadata_used_pages      %zu\n", metadata_used_pages);
+	fprintf (thrData.output, ">>> metadata_object          %zu\n", metadata_object);
+	fprintf (thrData.output, ">>> metadata_overhead        %zu\n", metadata_overhead);
 	fprintf (thrData.output, ">>> totalSizeAlloc           %zu\n", totalSizeAlloc);
-	fprintf (thrData.output, ">>> active_mem_HWM           %u\n", active_mem_HWM.load(relaxed));
+	fprintf (thrData.output, ">>> active_mem_HWM           %zu\n", active_mem_HWM.load(relaxed));
 	fprintf (thrData.output, ">>> totalMemOverhead         %zu\n", totalMemOverhead);
 	fprintf (thrData.output, ">>> memEfficiency            %.2f%%\n", memEfficiency);
 
-	fprintf (thrData.output, "\n>>> summation_blowup_bytes         %u\n", summation_blowup_bytes.load(relaxed));
+	fprintf (thrData.output, "\n>>> summation_blowup_bytes         %zu\n", summation_blowup_bytes.load(relaxed));
 	fprintf (thrData.output, ">>> summation_blowup_allocations   %u\n", summation_blowup_allocations.load(relaxed));
 
 	writeAddressUsage();
@@ -2320,7 +2281,7 @@ void writeContention () {
 
 	fprintf (thrData.output, "\n------------lock usage------------\n");
 	for (auto lock = lockUsage.begin(); lock != lockUsage.end(); lock++) 
-		fprintf (thrData.output, "lockAddr= %zx  maxContention= %d\n",
+		fprintf (thrData.output, "lockAddr= %#lx  maxContention= %d\n",
 					lock.getKey(), lock.getData()->maxContention);
 
 	fprintf (thrData.output, "\n");
@@ -2332,79 +2293,24 @@ void writeAddressUsage () {
 
 	for (auto t = addressUsage.begin(); t != addressUsage.end(); t++) {
 		auto data = t.getData();
-		fprintf (thrData.output, ">>> addr:0x%zx numAccesses:%zu szTotal:%zu "
-				"szFreed:%zu numAllocs:%u numFrees:%u\n",
+		fprintf (thrData.output, ">>> addr= %#lx numAccesses= %lu szTotal= %zu "
+				"szFreed= %zu numAllocs= %lu numFrees= %lu\n",
 				data->addr, data->numAccesses, data->szTotal,
 				data->szFreed, data->numAllocs, data->numFrees);
 	}
 }
 
-void test() {
-
-	char fileName[30];
-
-	size_t size = 4;
-	int* p;
-
-	printf ("pid = %d\n", pid);
-	std::snprintf (fileName, 30, "/proc/%d/status", pid);
-
-	int beforeRSS = 0;
-	int afterRSS = 0;
-	int beforeVmSize = 0;
-	int afterVmSize = 0;
-	std::string line;
-
-	std::ifstream file (fileName);
-	for (int i = 0; i <= 41; i++) {
-
-		std::getline (file, line);
-		if (line.find("VmSize") != std::string::npos) {
-			std::sscanf (line.data(), "%*s%d%*s", &beforeVmSize);
-			continue;
-		}
-		else if (line.find("VmRSS") != std::string::npos) {
-			std::sscanf (line.data(), "%*s%d%*s", &beforeRSS);
-			break;;
-		}
-	}
-	file.close();
-
-	p = (int*) RealX::malloc (size);
-//	*p = 100;
-
-	file.open(fileName);
-	for (int i = 0; i <= 41; i++) {
-
-		std::getline (file, line);
-		if (line.find("VmSize") != std::string::npos) {
-			std::sscanf (line.data(), "%*s%d%*s", &afterVmSize);
-			continue;
-		}
-		else if (line.find("VmRSS") != std::string::npos) {
-			std::sscanf (line.data(), "%*s%d%*s", &afterRSS);
-			break;;
-		}
-	}
-	file.close();
-
-	RealX::free (p);
-
-	printf ("beforeVmSize=    %d kB\n"
-			  "afterVmSize=     %d kB\n"
-			  "beforeRSS=       %d kB\n"
-			  "afterRSS=        %d kB\n",
-			  beforeVmSize, afterVmSize, beforeRSS, afterRSS);
-}
-
 void writeMappings () {
 
 	int i = 0;
-	fprintf (thrData.output, "\n----------  mappings  ----------\n");
+	fprintf (thrData.output, "\n------------mappings------------\n");
 	for (auto r = mappings.begin(); r != mappings.end(); r++) {
 		auto data = r.getData();
-		fprintf (thrData.output, "Region[%d]\nstart= 0x%zx, end= 0x%zx, length= %zu, tid= %d, rw= %lu, allocations= %u\n\n",
-								 i, data->start, data->end, data->length, data->tid, data->rw, data->allocations.load(relaxed));
+		fprintf (thrData.output,
+			"Region[%d]\norigin= %c, start= %#lx, end= %#lx, length= %zu, "
+			"tid= %d, rw= %lu, allocations= %u\n\n",
+			i, data->origin, data->start, data->end, data->length,
+			data->tid, data->rw, data->allocations.load(relaxed));
 		i++;
 	}
 }
@@ -2440,19 +2346,6 @@ Freelist* getFreelist (uint64_t size) {
 	return f;
 }
 
-void test4() {
-
-	char fileName[30];
-
-	printf ("pid = %d\n", pid);
-	std::snprintf (fileName, 30, "/proc/%d/pagemap", pid);
-
-	std::string line;
-	std::ifstream file (fileName);
-
-	file.close();
-}
-
 void calculateMemOverhead () {
 
 	totalMemOverhead += fragmentation.load(relaxed);
@@ -2466,6 +2359,7 @@ void calculateMemOverhead () {
 	}
 	
 	//Search the mmap regions for metadata
+	/*
 	if (bibop) {
 		for (auto entry = mappings.begin(); entry != mappings.end(); entry++) {
 			auto data = entry.getData();
@@ -2485,12 +2379,11 @@ void calculateMemOverhead () {
 		}
 		metadata_overhead = metadata_used_pages * 4096;
 	}
+	*/
 
 	//Calculate metadata_overhead by using the per-object value
-	else  {
-		long allocations = (numMallocs.load(relaxed) + numCallocs.load(relaxed) + numReallocs.load(relaxed));
-		metadata_overhead = (allocations * metadata_object);
-	}
+	long allocations = (num_malloc.load(relaxed) + num_calloc.load(relaxed) + num_realloc.load(relaxed));
+	metadata_overhead = (allocations * metadata_object);
 
 	totalMemOverhead += metadata_overhead;
 
@@ -2512,12 +2405,14 @@ void calculateMemOverhead () {
 }
 
 void get_bp_metadata() {
-	size_t size1 = 1;
-	size_t size2 = 1;
+	size_t size1 = 128;
+	size_t size2 = 128;
 	size_t metadata = 0;
 
 	void* ptr1 = RealX::malloc(size1);
+	if (d_metadata) printf ("ptr1= %p\n", ptr1);
 	void* ptr2 = RealX::malloc(size2);
+	if (d_metadata) printf ("ptr2= %p\n", ptr2);
 	void* moved;
 	
 	long first = (long) ptr1;
@@ -2525,8 +2420,9 @@ void get_bp_metadata() {
 	long m = 0;
 
 	long diff = second - first;
-	metadata = diff - 1;
+	metadata = diff - 128;
 
+	//Once object moves, diff will be negative
 	while (diff > 0) {
 		size1++;
 		moved = RealX::realloc(ptr1, size1);
@@ -2541,10 +2437,70 @@ void get_bp_metadata() {
 
 	if (d_metadata) printf ("metadata = %zu\n", metadata);
 
-	RealX::free(moved);
+//	RealX::free(moved);
 	RealX::free(ptr2);
 
 	metadata_object = metadata;
+}
+
+void get_bibop_metadata() {
+	
+	if (d_bibop_metadata) printf ("in get_bibop_metadata\n");
+
+	bool done = false;
+//	bool first = true;
+	int bytes_index = 0;
+	int bytes_max = 0;
+	uintptr_t vpage = 0;
+	unsigned add_pages = 0;
+	unsigned bytes_in_use[100];
+
+
+	for (auto entry = mappings.begin(); entry != mappings.end(); entry++) {
+		if (done == true) break;
+		auto data = entry.getData();
+		if (data->allocations.load(relaxed) > 0) {
+			if (d_bibop_metadata) {}
+		}
+		else {
+			if (d_bibop_metadata) printf ("found unused mmap, start= %#lx, finding page..\n", data->start);
+			add_pages = find_page (data->start, data->end);
+			if (d_bibop_metadata) printf ("add_pages returned %d\n", add_pages);
+			vpage = (data->start + (add_pages*4096));
+			if (d_bibop_metadata) printf ("vpage= %#lx\n", vpage);
+			unsigned bytes = search_vpage(vpage);
+			if (bytes > 0) {
+				bytes_in_use[bytes_index] = bytes;
+				bytes_index++;
+			}
+		}
+	}
+	
+	bytes_max = bytes_index;
+	unsigned smallest = bytes_in_use[0];
+	if (d_bibop_metadata) printf ("bytes_in_use[0] = %u\n", bytes_in_use[0]);
+	for (int i = 1; i < bytes_max; i++) {
+		if (d_bibop_metadata) printf ("bytes_in_use[%d] = %u\n", i, bytes_in_use[i]);
+		if (bytes_in_use[i] < smallest) smallest = bytes_in_use[i];
+	}
+
+	if (d_bibop_metadata) printf ("Finished metadata. Returning\n");
+	metadata_object = smallest;
+}
+
+unsigned search_vpage (uintptr_t vpage) {
+	
+	unsigned bytes = 0;
+	uint64_t zero = 0;
+	uint64_t word;
+	for (unsigned offset = 0; offset <= 4088; offset += 8) {
+
+		word = *((uint64_t*) (vpage + offset));
+		if ((word | zero) > 0) {
+			bytes += 8;
+		}
+	}
+	return bytes;
 }
 
 /*
@@ -2604,12 +2560,12 @@ int find_page(uintptr_t vstart, uintptr_t vend) {
 	int fdmap;
 	uint64_t bitmap;
 	unsigned long pagenum_start, pagenum_end;
-	unsigned num_pages_read = 0;
-	unsigned num_pages_to_read = 0;
-	unsigned num_used_pages = 0;
+	uint64_t num_pages_read = 0;
+	uint64_t num_pages_to_read = 0;
 	unsigned add_pages = 0;
 
 	if((fdmap = open(pagemap_filename, O_RDONLY)) == -1) {
+		perror ("failed to open pagemap_filename");
 		return -1;
 	}
 
@@ -2617,17 +2573,20 @@ int find_page(uintptr_t vstart, uintptr_t vend) {
 	pagenum_end = vend >> PAGE_BITS;
 	num_pages_to_read = pagenum_end - pagenum_start + 1;
 	if(num_pages_to_read == 0) {
+		fprintf (stderr, "num_pages_to_read == 0\n");
 		close(fdmap);
 		return -1;
 	}
 
 	if(lseek(fdmap, (pagenum_start * ENTRY_SIZE), SEEK_SET) == -1) {
+		perror ("failed to lseek on file");
 		close(fdmap);
 		return -1;
 	}
 
 	do {
 		if(read(fdmap, &bitmap, ENTRY_SIZE) != ENTRY_SIZE) {
+			perror ("failed to read 8 bytes");
 			close(fdmap);
 			return -1;
 		}
@@ -2688,19 +2647,13 @@ inline bool isAllocatorInCallStack() {
 
         while(((void *)prev_frame <= stackEnd) && (prev_frame >= current_frame) &&
 				(cur_depth < CALLSITE_MAXIMUM_LENGTH)) {
+
 			void * caller_address = prev_frame->caller_address;
+
 			lastSeenAddress = caller_address;
 
-			if(selfmap::getInstance().isAllocator(caller_address)) {
-				if (debug) printf("current caller is allocator: caller = %p, frame = %p\n",
-									caller_address, prev_frame);
-				//return true;
-				//hasSeenAllocator = true;
+			if(selfmap::getInstance().isAllocator(caller_address)) 
 				allocatorLevel = cur_depth;
-			} else {
-				if (debug) printf("current caller is NOT the allocator: caller = %p, frame = %p\n",
-									caller_address, prev_frame);
-			}
 
             //in some case, "prev" address is the same as current address
             //or there is recursion 
@@ -2715,10 +2668,8 @@ inline bool isAllocatorInCallStack() {
             cur_depth++;
 		}
 
-	if (debug) printf("allocatorLevel = %d, cur_depth = %d\n", allocatorLevel, cur_depth);
-	if((allocatorLevel > -1) && (allocatorLevel < cur_depth - 1)) {
+	if((allocatorLevel > -1) && (allocatorLevel > 1))
 		return true;
-	}	
 
 	return false;
 }
@@ -2771,7 +2722,9 @@ bool mappingEditor (void* addr, size_t len, int prot) {
 extern "C" int mprotect (void* addr, size_t len, int prot) {
 
 	num_mprotect.fetch_add(1, relaxed);
-	if (d_mprotect) printf ("mprotect/found= %s, addr= %p, len= %zu, prot= %d\n", mappingEditor(addr, len, prot) ? "true" : "false", addr, len, prot);
+	if (d_mprotect)
+		printf ("mprotect/found= %s, addr= %p, len= %zu, prot= %d\n",
+		mappingEditor(addr, len, prot) ? "true" : "false", addr, len, prot);
 
 	return RealX::mprotect (addr, len, prot);
 }
@@ -2789,6 +2742,10 @@ extern "C" void * yymmap(void *addr, size_t length, int prot, int flags,
 	if(initializer() == IN_PROGRESS) return RealX::mmap(addr, length, prot, flags, fd, offset);
 
 	if (inMmap) return RealX::mmap (addr, length, prot, flags, fd, offset);
+
+//	if (!selfmapInitialized) {
+//		return RealX::mmap (addr, length, prot, flags, fd, offset);
+//	}
 
 //	if (prot == PROT_NONE) {
 //		return RealX::mmap (addr, length, prot, flags, fd, offset);
@@ -2812,23 +2769,25 @@ extern "C" void * yymmap(void *addr, size_t length, int prot, int flags,
 		if (d_mmap) printf ("mmap direct from allocation function: length= %zu, prot= %d\n", length, prot);
 		malloc_mmaps.fetch_add (1, relaxed);
 		mappingsLock.lock();
-		mappings.insert(address, newMmapTuple(address, length, prot));
+		mappings.insert(address, newMmapTuple(address, length, prot, 'a'));
 		mappingsLock.unlock();
 	}
-	else if (isAllocatorInCallStack()) {
+	//Need to check if selfmap.getInstance().getTextRegions() has
+	//ran. If it hasn't, we can't call isAllocatorInCallStack()
+	else if (selfmapInitialized && isAllocatorInCallStack()) {
 		if (d_mmap) printf ("mmap allocator in callstack: length= %zu, prot= %d\n", length, prot);
 		mappingsLock.lock();
-		mappings.insert(address, newMmapTuple(address, length, prot));
+		mappings.insert(address, newMmapTuple(address, length, prot, 's'));
 		mappingsLock.unlock();
 	}
-//	else {
-//		if (d_mmap) printf ("Unknown mmap: length= %zu, prot= %d\n", length, prot);
-//		mappingsLock.lock();
-//		mappings.insert(address, newMmapTuple(address, length, prot));
-//		mappingsLock.unlock();
-//	}
+	else {
+		if (d_mmap) printf ("Unknown mmap: length= %zu, prot= %d\n", length, prot);
+		mappingsLock.lock();
+		mappings.insert(address, newMmapTuple(address, length, prot, 'u'));
+		mappingsLock.unlock();
+	}
 
-	total_mmaps.fetch_add (1, relaxed);
+	total_mmaps++;
 
 	inMmap = false;
 	return retval;
