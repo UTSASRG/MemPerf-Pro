@@ -158,6 +158,7 @@ template <class KeyType,                    // What is the key? A long or string
 				 first->Lock();
 				 insertEntry(first, key, keylen, value);
 				 first->Unlock();
+					if (DEBUG) printf ("Inserting into freelist first= %p, key= 0x%zx, value= %p\n", first, key, value);
 			 }
 
 			 // Insert a hash table entry if it is not existing.

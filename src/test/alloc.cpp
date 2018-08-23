@@ -15,6 +15,6 @@ int main() {
 		}
 		free(ptr);
 	}
-
+//	getchar();
 	return EXIT_SUCCESS;
 }

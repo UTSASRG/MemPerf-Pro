@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <syscall.h>
 #include <sys/mman.h>
+#include <atomic>
 
 #define MMAP_PAGES 33	// must be in the form of 2^N + 1
 #define DATA_MMAP_PAGES (MMAP_PAGES - 1)
@@ -59,14 +60,42 @@ typedef struct {
 } Tuple;
 
 typedef struct {
+
+	uint64_t addr;
+	size_t size;
+} FreeObject;
+
+typedef struct {
 	uint64_t addr;
 	uint64_t numAccesses;
-	uint64_t szTotal;
-	uint64_t szFreed;
-	uint64_t szUsed;
-	uint32_t numAllocs;
-	uint32_t numFrees;
+	size_t szTotal;
+	size_t szFreed;
+	size_t szUsed;
+	uint64_t numAllocs;
+	uint64_t numFrees;
 } ObjectTuple;
+
+typedef struct {
+
+	uint64_t start;
+	uint64_t end;
+	size_t length;
+	uint64_t rw;
+	char origin;
+	pid_t tid;
+	std::atomic_uint allocations;
+} MmapTuple;
+
+typedef struct {
+
+	size_t VmSize_start;
+	size_t VmSize_end;
+	size_t VmPeak;
+	size_t VmRSS_start;
+	size_t VmRSS_end;
+	size_t VmHWM;
+	size_t VmLib;
+} VmInfo;
 
 typedef struct addr2line_info {
     char exename[15];
@@ -83,10 +112,50 @@ typedef struct {
 typedef struct {
 	int perf_fd_fault;
 	int perf_fd_tlb;
-	int perf_fd_cache;
+	int perf_fd_cache_miss;
+    int perf_fd_cache_ref;
+    int perf_fd_instr;
 	pid_t tid;
 } perf_info;
 
+typedef struct {
+    int64_t numMallocFaults;
+    int64_t numReallocFaults;
+    int64_t numFreeFaults;
+
+    int64_t numMallocTlbMisses;
+    int64_t numReallocTlbMisses;
+    int64_t numFreeTlbMisses;
+
+    int64_t numMallocCacheMisses;
+    int64_t numReallocCacheMisses;
+    int64_t numFreeCacheMisses;
+
+    int64_t numMallocCacheRefs;
+    int64_t numReallocCacheRefs;
+    int64_t numFreeCacheRefs;
+
+    int64_t numMallocInstrs;
+    int64_t numReallocInstrs;
+    int64_t numFreeInstrs;
+    
+    int64_t numMallocFaultsFFL; //from free list
+    int64_t numReallocFaultsFFL;
+
+    int64_t numMallocTlbMissesFFL;
+    int64_t numReallocTlbMissesFFL;
+
+    int64_t numMallocCacheMissesFFL;
+    int64_t numReallocCacheMissesFFL;
+
+    int64_t numMallocCacheRefsFFL;
+    int64_t numReallocCacheRefsFFL;
+
+    int64_t numMallocInstrsFFL;
+    int64_t numReallocInstrsFFL;
+} thread_alloc_data;
+
+void getPerfInfo(int64_t *, int64_t *, int64_t *, int64_t *, int64_t *);
 int initSampling(void);
 void setupSampling(void);
 void doPerfRead(void);

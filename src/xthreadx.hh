@@ -12,6 +12,7 @@ extern "C" pid_t gettid();
 
 thread_local extern uint64_t numWaits;
 thread_local extern uint64_t timeWaiting;
+thread_local extern uint64_t thread_stack_start;
 
 class xthreadx {
 	typedef void * threadFunction(void *);
@@ -44,8 +45,8 @@ class xthreadx {
 		void * result = NULL;
 		size_t stackSize;
 		thread_t * current = (thread_t *) arg;
-		
-		pid_t pid = getpid(); 
+
+		pid_t pid = getpid();
 		pid_t tid = gettid();
 		current->tid = tid;
 
@@ -93,7 +94,7 @@ class xthreadx {
 		void * result = NULL;
 		size_t stackSize;
 		thread_t * current = (thread_t *) arg;
-		
+
 		pid_t tid = gettid();
 		current->tid = tid;
 
