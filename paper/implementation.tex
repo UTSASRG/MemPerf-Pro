@@ -2,7 +2,25 @@
 
 \subsection{Understanding Different Allocators}
 
+How to identify the type of allocators? Typically, most allocators only utilize BUMP pointer based allocators or BIBOP-style allocators. 
+
+\subsubsection{Types of Allocators}
+BIBOP style is the abbreviation of ``Big Bag of Pages''~\cite{hanson1980}.
+For BIBOP-style allocators, one or multiple continuous pages are treated as a ``bag'' that holds objects of the same size class. The metadata of each heap object, such as its size and availability information, is typically stored in a separate area.
+
+Bump pointer
+How to collect the size class information?
+How to solve the issue when connecting to some allocators, such as Guarder, since Guarder interposes the thread execution. 
+
+How to intercept the memory allocations and deallocations? 
+
+Region-based allocators: 
+it is not selected in this study, since we can't find many existing allocators with a high performance. 
+
+
 \subsection{Profiling Performance Overhead}
+
+We differentiate the big objects and small objects. 
 
 \subsection{Profiling Memory Overhead}
 

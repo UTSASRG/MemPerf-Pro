@@ -1,5 +1,18 @@
 \section{Related Work}
 
+\subsection{Study of Memory Allocators}
+
+Mostly, they just run a selective set of applications, and then report some observable behavior of different allocators. However, these existing work does not design a general profiler, which cannot tell the specific issues inside the allocators. For instance, they cannot tell where memory overhead is from, and why the allocator is not scalable, due to the user space contention of kernel space contention. 
+
+~\cite{6118957} ~\cite{ferreira2011comparison} further provides some quantative comparison among some popular allocators. 
+
+
+
+~\cite{Inoue:2009:SMM:1542476.1542520}
+
+~\cite{6084042}.
+
+~\cite{zavrtanikexperimental}
 
 \subsection{Allocation Profiling}
 Existing work mainly focuses on the profiling of memory allocations and deallocations of different applications. 

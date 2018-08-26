@@ -12,7 +12,9 @@ Therefore, we could identify the root causes and not always blame for the applic
 
 \todo{Let's use dedup and facesim to how the performance difference caused by memory allocator: we will use glibc-XX, TCMalloc-2.2, jemalloc-4.2.0, and Hoard-3.11. We will use 10 executions in total.  Then we could say that the performance memory allocator will impose significant difference on the performance of applications.}
 However, the memory allocator itself has not got sufficient attention that it should reserve to. 
-For instance, there is no an dedicate the allocator profiler that can be utilized for identify the allocator's performance. 
+For instance, there is no an dedicate the allocator profiler that can be utilized for identify the allocator's behavior.
+
+Having this profiler will serve two purposes. First, it will help the designers and developers that could discover the issues of memory allocators, without the need of porting or developing the profiler for a specific allocator. Second, it will help users to choose different memory allocators, whenever 
 
 Although TCMalloc have one profiler, but it tends to provide the statistics about the applications, that we can track the memory uses of different functions. However, it doesn't give the statistics of allocators itself. 
 
@@ -23,6 +25,13 @@ We may choose two general-purpose allocators and two secure allocators. Then we 
 The general idea is to understand performance, memory, and scalability of different allocators, while providing some evidence of allocator. During the design of allocator, we usually need to understand the inherent reason. The difficulty is how to collect the information without changing the specific allocator. That is, how to design a general allocator profiler, which can help assist the analysis of different allocators. 
 
 We will work on the allocator profiling to understanding the performance, memory and scalability of memory allocator. We may  memory related those system calls. How long it spent on the memory allocation and deallocation, using rtdsc, which can be caused by long memory allocation time? How much of objects has been re-utilized? How is the memory blowup, what is the memory consumption and how much has been allocated? Can we know lock contention of memory allocation, maybe we could monitor the lock usage, just as SyncPerf, and identify that lock acquisitions are  waiting during allocation? Can we identify is there inter-objects cache contention on these objects? If yes, that is the possible example of these allocators.  
+
+What are the design goals of \MP{}? 
+
+\MP{} needs to be general to different memory allocators, which requires no change of the code at all even when connecting with different allocators. The first target is transparency, which should not require the changes of allocators, if the allocator is working as a dynamic library. 
+
+Second, \MP{} should be able to identify the issues of different allocators. 
+
 
 Overall, it will three categories. Also, we would like to know some internals of inside. 
 
