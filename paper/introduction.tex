@@ -1,5 +1,6 @@
 \section{Introduction}
 
+The memory allocator plays an important role in the performance of applications, which could be as large as 2$\times$ performance difference.  
 
 MallocProfiler will serve two purposes. 
 (1) This will be utilized to get the allocator related parameters. 
@@ -8,7 +9,8 @@ MallocProfiler will serve two purposes.
 Therefore, we could identify the root causes and not always blame for the application writer. 
 
 
-\todo{We may use dedup or freqmine or swaptions (maybe this one) to show the performance difference caused by memory allocator. Then we could say that the performance memory allocator will impose significant difference on the performance of applications.}
+
+\todo{Let's use dedup and facesim to how the performance difference caused by memory allocator: we will use glibc-XX, TCMalloc-2.2, jemalloc-4.2.0, and Hoard-3.11. We will use 10 executions in total.  Then we could say that the performance memory allocator will impose significant difference on the performance of applications.}
 However, the memory allocator itself has not got sufficient attention that it should reserve to. 
 For instance, there is no an dedicate the allocator profiler that can be utilized for identify the allocator's performance. 
 
@@ -37,52 +39,6 @@ How much is running on a different core? But the question is how to know this?
 
 Then maybe we could use it to explain the performance difference of different allocator. 
 
-\subsubsection{Performance Overhead}
-
-We may use the fire-flame figure to show the difference. 
-
-\paragraph{Per-allocation Time:}
-Whether the memory allocator is too slow in allocations and deallocations? 
-Basically, we could collect the cycles spending on each cycle. If the number of cycles is too big, then the allocator is too slow. 
-
-Then we would like to identify the root cause inside each allocator. 
-
-\paragraph{Per-deallocation Time:} 
-How much cycles for each deallocation? 
-
-Can we integrate the cache misses or page faults for each allocation and deallocation, so that we could identify the issue of DieHarder that invokes many unnecessary cache misses?
-
-If we could correlate cache misses to each thread, then we could do this. 
-
-If allocation and deallocation takes too much time, it could be caused by multiple reasons:
-
-(1) First, it just takes a lot of instructions (could we find out the lapsed instructions for each thread?)
-(2) It may be caused by not good algorithm? 
-(3) It can be caused by lock contention?
-(4) It can be caused by system call related contention? 
-
-\subsubsection{Memory Overhead}
-
-How much memory are caused due to the alignment of size classes?
-How much memory are due to memory re-utilization rate? For instance, we may not fully utilize the memory due to the randomization mechanism. We only care about physical memory waste. Then we should also investigate how much memory has been explicitly returned back to the OS. 
-
-How much memory are due to the metadata itself? 
-
-\subsubsection{Scalability Analysis} 
-
-User space contention:
-How many separate locks are explicitly utilized? 
-How many lock acquisitions? How much time are spending on lock waiting for each thread, and in total?
-
-How much time spending on kernel-space contention? For instance, we could infer from memory-related system calls, such as mmap, munmap, madvise, brk, or something else? 
-
-That is, we may have to integrate with SyncPerf for doing this. We will borrow their implementation in order to do this. 
-
-\subsubsection{Application Friendliness} 
-How many page faults and cache misses that are caused by applications? 
-
-\subsubsection{NUMA Friendliness} 
-How many remote accesses? How many interconnect messages? We may employ the PMU mechanism to identify the information.
 
 \begin{comment}
 
@@ -156,3 +112,19 @@ I guess that the memory will be freed before the next allocation. If not, then t
 	
 \end{comment}
  
+\subsection*{Contribution}
+
+This paper makes the following contributions. 
+
+\begin{itemize}
+\item It proposes the first general profiler--\MP{}--to profile different memory allocators, without the change of memory allocators or allocations. \MP{} focuses on the allocation behavior of allocators, instead of focusing on applications.  
+
+\item \MP{} can not only pinpoint the major issues inside the implementation of memory allocators, such as performance, memory, and scalability issues, but also could quantitively pinpoint some cache or page utilization issues of allocators. 
+
+\item This paper performs extensive experiments on multiple memory allocators with a large number of allocations. It pinpoints the reason of the performance or memory issues latent in existing allocators. It also provides an experimental reasons of different allocators in general.  
+
+\end{itemize} 
+
+\subsection*{Outline}
+
+The remained of this paper is organized as follows. Section~\ref{} discusses the overall design purpose of \MP{}, and Section~\ref{} presents the detailed implementation. Section~\ref{} shows the results of experiments on different allocators using \MP{}. Then Section~\ref{} discusses related work in this field, and Section~\ref{} concludes this paper. 
