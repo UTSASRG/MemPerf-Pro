@@ -14,7 +14,7 @@ Therefore, we could identify the root causes and not always blame for the applic
 However, the memory allocator itself has not got sufficient attention that it should reserve to. 
 For instance, there is no an dedicate the allocator profiler that can be utilized for identify the allocator's behavior.
 
-Having this profiler will serve two purposes. First, it will help the designers and developers that could discover the issues of memory allocators, without the need of porting or developing the profiler for a specific allocator. Second, it will help users to choose different memory allocators, whenever 
+Having this profiler will serve three purposes. First, it will help the designers and developers that could discover the issues of memory allocators, without the need of porting or developing the profiler for a specific allocator. Second, it helps programmers to determine whether the performance issue is coming from the memory allocator. Third, it will help users to choose the best memory allocators that is suitable for a specific applications, if there are multiple choices avaiable. 
 
 Although TCMalloc have one profiler, but it tends to provide the statistics about the applications, that we can track the memory uses of different functions. However, it doesn't give the statistics of allocators itself. 
 
