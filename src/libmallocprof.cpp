@@ -95,9 +95,9 @@ const bool d_style = false;
 const bool d_pmuData = false;
 
 //Atomic Globals
-std::atomic_uint numMallocsFFL (0);
-std::atomic_uint numCallocsFFL (0);
-std::atomic_uint numReallocsFFL (0);
+//std::atomic_uint numMallocsFFL (0);
+//std::atomic_uint numCallocsFFL (0);
+//std::atomic_uint numReallocsFFL (0);
 std::atomic_uint num_free (0);
 std::atomic_uint num_malloc (0);
 std::atomic_uint num_calloc (0);
@@ -141,7 +141,7 @@ VmInfo vmInfo;
 #define relaxed std::memory_order_relaxed
 #define acquire std::memory_order_acquire
 #define release std::memory_order_release
-#define TEMP_MEM_SIZE 65536000
+#define TEMP_MEM_SIZE 1024 * 1024 * 1024
 #define LARGE_OBJECT 512
 
 //Thread local variables
@@ -640,6 +640,7 @@ extern "C" {
                     fprintf(stderr, "found csm -> tad\n");
                 
                 if (!reuseFreeObject){
+                    tad->numMallocs += 1;
                     tad->numMallocFaults += after_faults - before_faults;
                     tad->numMallocTlbMisses += after_tlb_misses - before_tlb_misses;
                     tad->numMallocCacheMisses += after_cache_misses - before_cache_misses;
@@ -647,7 +648,7 @@ extern "C" {
                     tad->numMallocInstrs += after_instrs - before_instrs;
                 }
                 else{
-                    numMallocsFFL.fetch_add(1, relaxed);
+                    tad->numMallocsFFL += 1;
                     tad->numMallocFaultsFFL += after_faults - before_faults;
                     tad->numMallocTlbMissesFFL += after_tlb_misses - before_tlb_misses;
                     tad->numMallocCacheMissesFFL += after_cache_misses - before_cache_misses;
@@ -811,6 +812,7 @@ extern "C" {
 							if (address == data->addr) {
 								reuseFreeObject = true;
 								(*freelist).erase(address);
+       
 								free_bytes -= sz;
 								break;
 							}
@@ -920,6 +922,7 @@ extern "C" {
                     fprintf(stderr, "found csm -> tad\n");
                 
                 if (!reuseFreeObject){
+                    tad->numMallocs += 1;
                     tad->numMallocFaults += after_faults - before_faults;
                     tad->numMallocTlbMisses += after_tlb_misses - before_tlb_misses;
                     tad->numMallocCacheMisses += after_cache_misses - before_cache_misses;
@@ -927,7 +930,7 @@ extern "C" {
                     tad->numMallocInstrs += after_instrs - before_instrs;
                 }
                 else{
-                    numCallocsFFL.fetch_add(1, relaxed);
+                    tad->numMallocsFFL += 1;
                     tad->numMallocFaultsFFL += after_faults - before_faults;
                     tad->numMallocTlbMissesFFL += after_tlb_misses - before_tlb_misses;
                     tad->numMallocCacheMissesFFL += after_cache_misses - before_cache_misses;
@@ -1095,7 +1098,19 @@ extern "C" {
             */
             //fprintf(stderr, "max class size: %lu\n", *(classSizes.end() - 1));
             //fprintf(stderr, "min class size: %lu\n", *classSizes.begin());
+            if (bibop && size > 0){
+                if (classSizes.empty()) refillClassSizes(); //why does the classSizes vector get cleared?
                 
+                for (auto cSize = classSizes.begin (); cSize != classSizes.end (); cSize++){
+                        if (size <= *cSize && size > *(cSize - 1)) 
+                            currentClassSize = *cSize;
+                }
+
+                if(size > *(classSizes.end() - 1))
+                    currentClassSize = 0; // uses 0 for larger than max class size
+                else if(currentClassSize < *classSizes.begin())
+                    currentClassSize = *classSizes.begin();
+            }
             csm = nullptr;
             if(tadMap.find(tid, &csm)){
                 if(d_pmuData){
@@ -1107,6 +1122,7 @@ extern "C" {
                     if(d_pmuData)
                         fprintf(stderr, "found csm -> tad\n");
                     
+                    tad->numFrees += 1;
                     tad->numFreeFaults += after_faults - before_faults;
                     tad->numFreeTlbMisses += after_tlb_misses - before_tlb_misses;
                     tad->numFreeCacheMisses += after_cache_misses - before_cache_misses;
@@ -1373,6 +1389,7 @@ extern "C" {
                     fprintf(stderr, "found csm -> tad\n");
                 
                 if (!reuseFreeObject){
+                    tad->numReallocs += 1;
                     tad->numReallocFaults += after_faults - before_faults;
                     tad->numReallocTlbMisses += after_tlb_misses - before_tlb_misses;
                     tad->numReallocCacheMisses += after_cache_misses - before_cache_misses;
@@ -1380,7 +1397,7 @@ extern "C" {
                     tad->numReallocInstrs += after_instrs - before_instrs;
                 }
                 else{
-                    numReallocsFFL.fetch_add(1, relaxed);
+                    tad->numReallocsFFL += 1;
                     tad->numReallocFaultsFFL += after_faults - before_faults;
                     tad->numReallocTlbMissesFFL += after_tlb_misses - before_tlb_misses;
                     tad->numReallocCacheMissesFFL += after_cache_misses - before_cache_misses;
@@ -1932,6 +1949,8 @@ void refillClassSizes(){
             classSizes.push_back( (uint64_t) atoi(token));
         }
     }
+
+    fclose(classSizeFile);
 }
 
 void getClassSizes () {
@@ -2059,6 +2078,13 @@ void globalizeThreadAllocData(){
     for(auto it1 = tadMap.begin(); it1 != tadMap.end(); it1++){
         for(auto it2 = it1.getData()->begin(); it2 != it1.getData()->end(); it2++){
 
+            allThreadsTadMap[it2.getKey()]->numMallocs += it2.getData()->numMallocs;
+            allThreadsTadMap[it2.getKey()]->numReallocs += it2.getData()->numReallocs;
+            allThreadsTadMap[it2.getKey()]->numFrees += it2.getData()->numFrees;
+            
+            allThreadsTadMap[it2.getKey()]->numMallocsFFL += it2.getData()->numMallocsFFL;
+            allThreadsTadMap[it2.getKey()]->numReallocsFFL += it2.getData()->numReallocsFFL;
+
             allThreadsTadMap[it2.getKey()]->numMallocFaults += it2.getData()->numMallocFaults;
             allThreadsTadMap[it2.getKey()]->numReallocFaults += it2.getData()->numReallocFaults;
             allThreadsTadMap[it2.getKey()]->numFreeFaults += it2.getData()->numFreeFaults;
@@ -2072,8 +2098,8 @@ void globalizeThreadAllocData(){
             allThreadsTadMap[it2.getKey()]->numFreeCacheMisses += it2.getData()->numFreeCacheMisses;
 
             allThreadsTadMap[it2.getKey()]->numMallocCacheRefs += it2.getData()->numMallocCacheRefs;
-            allThreadsTadMap[it2.getKey()]->numMallocCacheRefs += it2.getData()->numMallocCacheRefs;
-            allThreadsTadMap[it2.getKey()]->numMallocCacheRefs += it2.getData()->numMallocCacheRefs;
+            allThreadsTadMap[it2.getKey()]->numReallocCacheRefs += it2.getData()->numReallocCacheRefs;
+            allThreadsTadMap[it2.getKey()]->numFreeCacheRefs += it2.getData()->numFreeCacheRefs;
 
             allThreadsTadMap[it2.getKey()]->numMallocInstrs += it2.getData()->numMallocInstrs;
             allThreadsTadMap[it2.getKey()]->numReallocInstrs += it2.getData()->numReallocInstrs;
@@ -2149,30 +2175,29 @@ void writeAllocData () {
     for (auto const &p : allThreadsTadMap){
         fprintf (thrData.output, "Class Size:       %ld\n", p.first);
 
+        fprintf (thrData.output, "mallocs               %ld\n", p.second->numMallocs);
+        fprintf (thrData.output, "reallocs              %ld\n", p.second->numReallocs);
+        fprintf (thrData.output, "frees                 %ld\n", p.second->numFrees);
+
         fprintf (thrData.output, "malloc faults         %ld\n", p.second->numMallocFaults);
         fprintf (thrData.output, "realloc faults        %ld\n", p.second->numReallocFaults);
-        if(p.first == 0)
-            fprintf (thrData.output, "free faults           %ld\n", p.second->numFreeFaults);
+        fprintf (thrData.output, "free faults           %ld\n", p.second->numFreeFaults);
 
         fprintf (thrData.output, "malloc tlb misses     %ld\n", p.second->numMallocTlbMisses);
         fprintf (thrData.output, "realloc tlb misses    %ld\n", p.second->numReallocTlbMisses);
-        if(p.first == 0)
-            fprintf (thrData.output, "free tlb misses       %ld\n", p.second->numFreeTlbMisses);
+        fprintf (thrData.output, "free tlb misses       %ld\n", p.second->numFreeTlbMisses);
 
         fprintf (thrData.output, "malloc cache misses   %ld\n", p.second->numMallocCacheMisses);
         fprintf (thrData.output, "realloc cache misses  %ld\n", p.second->numReallocCacheMisses);
-        if(p.first == 0)
-            fprintf (thrData.output, "free cache misses     %ld\n", p.second->numFreeCacheMisses);
+        fprintf (thrData.output, "free cache misses     %ld\n", p.second->numFreeCacheMisses);
 
         fprintf (thrData.output, "malloc cache refs     %ld\n", p.second->numMallocCacheRefs);
         fprintf (thrData.output, "realloc cache refs    %ld\n", p.second->numReallocCacheRefs);
-        if(p.first == 0)
-            fprintf (thrData.output, "free cache refs       %ld\n", p.second->numFreeCacheRefs);
+        fprintf (thrData.output, "free cache refs       %ld\n", p.second->numFreeCacheRefs);
 
         fprintf (thrData.output, "num malloc instr      %ld\n", p.second->numMallocInstrs);
         fprintf (thrData.output, "num Realloc instr     %ld\n", p.second->numReallocInstrs);
-        if(p.first == 0)
-            fprintf (thrData.output, "num free instr        %ld\n", p.second->numFreeInstrs);
+        fprintf (thrData.output, "num free instr        %ld\n", p.second->numFreeInstrs);
         fprintf(thrData.output, "\n");
     }
 
@@ -2180,6 +2205,9 @@ void writeAllocData () {
     
     for (auto const &p : allThreadsTadMap){
         fprintf (thrData.output, "Class Size:       %ld\n", p.first);
+
+        fprintf (thrData.output, "mallocs               %ld\n", p.second->numMallocsFFL);
+        fprintf (thrData.output, "reallocs              %ld\n", p.second->numReallocsFFL);
 
         fprintf (thrData.output, "malloc faults         %ld\n", p.second->numMallocFaultsFFL);
         fprintf (thrData.output, "realloc faults        %ld\n", p.second->numReallocFaultsFFL);

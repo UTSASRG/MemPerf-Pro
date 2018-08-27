@@ -41,7 +41,10 @@ TARGETS =	libmallocprof.so 			\
 			test/pmu-libc-test			\
 			test/pmu-obsd-test			\
 			test/pmu-dieharder-test		\
-			test/pmu-freeguard-test
+			test/pmu-freeguard-test		\
+
+.EXPORT_ALL_VARIABLES:
+	MALLOC_OPTIONS="p"
 
 all: $(TARGETS)
 
@@ -58,7 +61,7 @@ threads:	libmallocprof.so \
 			test/test-obsd-thread
 pmu: test/pmu-libc-test test/pmu-obsd-test test/pmu-dieharder-test test/pmu-freeguard-test
 
-TEST_FILE = alloc2.cpp
+TEST_FILE = pmu-test.cpp
 THREADTEST_FILE = threadTest.cpp
 
 # Libmallocprof

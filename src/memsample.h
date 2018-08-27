@@ -119,6 +119,13 @@ typedef struct {
 } perf_info;
 
 typedef struct {
+    int64_t numMallocs;
+    int64_t numReallocs;
+    int64_t numFrees;
+
+    int64_t numMallocsFFL;
+    int64_t numReallocsFFL;
+
     int64_t numMallocFaults;
     int64_t numReallocFaults;
     int64_t numFreeFaults;
