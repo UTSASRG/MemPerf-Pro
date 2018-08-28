@@ -66,7 +66,7 @@ template <class KeyType,                    // What is the key? A long or string
 
 				 struct Entry* nextEntry() { return (struct Entry*)list.next; }
 
-				 ValueType getValue() { return value; }
+				 ValueType getData() { return value; }
 
 				 KeyType getKey() { return key; }
 			 };
@@ -275,8 +275,15 @@ template <class KeyType,                    // What is the key? A long or string
 
 				 ~iterator() {}
 
-				 iterator& operator++(int) // in postfix ++  /* parameter? */
-				 {
+                 struct Entry* operator*() { return this->_entry; }
+
+                 iterator& operator++() {
+                     (*this)++;
+                     return this;
+                 }
+
+				 iterator& operator++(int) { // in postfix ++  /* parameter? */
+				 
 					 struct HashEntry* hashentry = _hashmap->getHashEntry(_pos);
 
 					 // Check whether this entry is the last entry in current hash entry.
@@ -314,7 +321,7 @@ template <class KeyType,                    // What is the key? A long or string
 
 				 bool operator!=(const iterator& that) const { return _entry != that._entry; }
 
-				 ValueType getData() { return _entry->getValue(); }
+				 ValueType getData() { return _entry->getData(); }
 
 				 KeyType getKey() { return _entry->getKey(); }
 			 };
