@@ -15,6 +15,8 @@ INCS =		xthreadx.hh		\
 
 DEPS = $(SRCS) $(INCS)
 
+MALLOC_OPTIONS = 'p'
+
 #CXX = g++ 
 CXX = clang++ 
 
@@ -57,8 +59,8 @@ threads:	libmallocprof.so \
 			test/test-freeguard-thread \
 			test/test-obsd-thread
 
-TEST_FILE = alloc2.cpp
-THREADTEST_FILE = threadTest.cpp
+TEST_FILE = ntest.cpp
+THREADTEST_FILE = threadTest2.cpp
 
 # Libmallocprof
 libmallocprof.so: $(DEPS)
@@ -121,6 +123,14 @@ test/pmu-dieharder-test: libmallocprof.so test/pmu-test.cpp
 # Clean
 test/test-clean: test/$(TEST_FILE)
 	$(CXX) $(CFLAGS2) -o test/test-clean test/$(TEST_FILE)
+
+.PHONY: runThreads
+
+runThreads:
+	./test/test-xlibc-thread
+	./test/test-dieharder-thread
+	./test/test-freeguard-thread
+	./test/test-obsd-thread
 
 clean:
 	rm -f $(TARGETS)
