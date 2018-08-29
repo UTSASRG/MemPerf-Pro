@@ -11,7 +11,8 @@ INCS =		xthreadx.hh		\
 			hashfuncs.hh	\
 			interval.hh		\
 			selfmap.hh		\
-			spinlock.hh
+			spinlock.hh		\
+			libmallocprof.h
 
 DEPS = $(SRCS) $(INCS)
 

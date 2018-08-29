@@ -7,51 +7,6 @@
 #define PAGE_BITS 12 
 #define TEMP_MEM_SIZE 1024 * 1024 * 1024
 
-// Functions 
-bool mappingEditor (void* addr, size_t len, int prot);
-inline bool isAllocatorInCallStack();
-inline size_t getClassSizeFor(size_t size);
-int num_used_pages(uintptr_t vstart, uintptr_t vend);
-int find_page(uintptr_t vstart, uintptr_t vend);
-void analyzePerfInfo(PerfReadInfo*, PerfReadInfo*, size_t, bool*, pid_t);
-void analyzeAllocation(size_t size, uint64_t address, uint64_t cycles, size_t, bool*);
-void analyzeFree(uint64_t);
-void calculateMemOverhead ();
-void clearFreelists();
-void doBefore(PerfReadInfo*, uint64_t*);
-void doAfter(PerfReadInfo*, uint64_t*);
-void get_bp_metadata();
-void get_bibop_metadata();
-void getAddressUsage(size_t size, uint64_t address, size_t classSize, uint64_t cycles);
-void getAllocStyle ();
-void getAlignment(size_t size, size_t classSize);
-void getBlowup(size_t size, uint64_t address, size_t classSize, bool*);
-void getClassSizes ();
-void getMappingsUsage(size_t size, uint64_t address, size_t classSize);
-void getMemUsageStart ();
-void getMemUsageEnd ();
-void getMetadata(size_t classSize);
-void getMmapThreshold ();
-void getOverhead(size_t size, uint64_t address, size_t classSize, bool*);
-void getPerfInfo(PerfReadInfo*);
-void globalizeThreadAllocData();
-void increaseMemoryHWM(size_t size);
-void myFree (void* ptr);
-void writeAllocData ();
-void writeContention ();
-void writeMappings();
-void writeOverhead();
-void writeThreadMaps();
-void writeAddressUsage ();
-void* myMalloc (size_t size);
-unsigned search_vpage (uintptr_t vpage);
-FreeObject* newFreeObject (uint64_t addr, uint64_t size);
-Freelist* getFreelist (size_t size);
-LC* newLC ();
-MmapTuple* newMmapTuple (uint64_t address, size_t length, int prot, char origin);
-ObjectTuple* newObjectTuple (uint64_t address, size_t size);
-thread_alloc_data* newTad();
-
 //Structures
 typedef struct {
 	uint64_t addr;
@@ -114,3 +69,46 @@ enum initStatus{
     INITIALIZED = 2
 };
 
+// Functions 
+bool mappingEditor (void* addr, size_t len, int prot);
+inline bool isAllocatorInCallStack();
+inline size_t getClassSizeFor(size_t size);
+int num_used_pages(uintptr_t vstart, uintptr_t vend);
+int find_page(uintptr_t vstart, uintptr_t vend);
+void analyzePerfInfo(PerfReadInfo*, PerfReadInfo*, size_t, bool*, pid_t);
+void analyzeAllocation(size_t size, uint64_t address, uint64_t cycles, size_t, bool*);
+void analyzeFree(uint64_t);
+void calculateMemOverhead ();
+void clearFreelists();
+void doBefore(PerfReadInfo*, uint64_t*);
+void doAfter(PerfReadInfo*, uint64_t*);
+void get_bp_metadata();
+void get_bibop_metadata();
+void getAddressUsage(size_t size, uint64_t address, size_t classSize, uint64_t cycles);
+void getAllocStyle ();
+void getAlignment(size_t size, size_t classSize);
+void getBlowup(size_t size, uint64_t address, size_t classSize, bool*);
+void getClassSizes ();
+void getMappingsUsage(size_t size, uint64_t address, size_t classSize);
+void getMemUsageStart ();
+void getMemUsageEnd ();
+void getMetadata(size_t classSize);
+void getMmapThreshold ();
+void getOverhead(size_t size, uint64_t address, size_t classSize, bool*);
+void getPerfInfo(PerfReadInfo*);
+void globalizeThreadAllocData();
+void increaseMemoryHWM(size_t size);
+void myFree (void* ptr);
+void writeAllocData ();
+void writeContention ();
+void writeMappings();
+void writeOverhead();
+void writeThreadMaps();
+void writeAddressUsage ();
+void* myMalloc (size_t size);
+unsigned search_vpage (uintptr_t vpage);
+FreeObject* newFreeObject (uint64_t addr, uint64_t size);
+LC* newLC ();
+MmapTuple* newMmapTuple (uint64_t address, size_t length, int prot, char origin);
+ObjectTuple* newObjectTuple (uint64_t address, size_t size);
+thread_alloc_data* newTad();

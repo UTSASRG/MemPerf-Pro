@@ -164,6 +164,9 @@ spinlock getFreelistLock;
 spinlock freelistLock;
 spinlock mappingsLock;
 
+//Functions
+Freelist* getFreelist (size_t size);
+
 // pre-init private allocator memory
 char myBuffer[TEMP_MEM_SIZE];
 
