@@ -220,7 +220,7 @@ template <class KeyType,                    // What is the key? A long or string
 			 // Create a new Entry with specified key and value.
 			 struct Entry* createNewEntry(const KeyType& key, size_t keylen, ValueType value) {
 				 struct Entry* entry = (struct Entry*)	myMalloc (sizeof(struct Entry));
-		
+
 				 // Initialize this new entry.
 				 entry->initialize(key, keylen, value);
 				 return entry;
@@ -275,15 +275,14 @@ template <class KeyType,                    // What is the key? A long or string
 
 				 ~iterator() {}
 
-                 struct Entry* operator*() { return this->_entry; }
+                 struct Entry operator*() { return *(this->_entry); }
 
                  iterator& operator++() {
                      (*this)++;
-                     return this;
+                     return *this;
                  }
 
 				 iterator& operator++(int) { // in postfix ++  /* parameter? */
-				 
 					 struct HashEntry* hashentry = _hashmap->getHashEntry(_pos);
 
 					 // Check whether this entry is the last entry in current hash entry.
