@@ -35,6 +35,7 @@ thread_local perf_info perfInfo;
 //		read(perfInfo.perf_fd_instr, instr, sizeof(int64_t));
 //}
 
+//get data from PMU and store it into the PerfReadInfo struct
 void getPerfInfo (PerfReadInfo* i) {
 	
 	read(perfInfo.perf_fd_fault, &(i->faults), sizeof(int64_t));
