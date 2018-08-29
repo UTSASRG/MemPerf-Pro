@@ -1106,7 +1106,7 @@ void getAddressUsage(size_t size, uint64_t address, size_t classSize, uint64_t c
 void getMappingsUsage(size_t size, uint64_t address, size_t classSize) {
 
 	mappingsLock.lock();
-	for (auto entry = mappings.begin(); entry != mappings.end(); entry++) {
+	for (auto entry : mappings) {
 		auto data = entry.getData();
 		if (data->start <= address && address <= data->end) {
 			data->allocations.fetch_add(1, relaxed);
@@ -1161,7 +1161,7 @@ void getBlowup (size_t size, uint64_t address, size_t classSize, bool* reused) {
 		if (size < LARGE_OBJECT) {
 
 			if (freelistMap.find(0, &freelist)) {
-				for (auto f = (*freelist).begin(); f != (*freelist).end(); f++) {
+				for (auto f : (*freelist)) {
 					auto data = f.getData();
 					if (size <= data->size) {
 						reuseFreePossible = true;
@@ -1181,7 +1181,7 @@ void getBlowup (size_t size, uint64_t address, size_t classSize, bool* reused) {
 		}
 		else {
 			if (freelistMap.find(LARGE_OBJECT, &freelist)) {
-				for (auto f = (*freelist).begin(); f != (*freelist).end(); f++) {
+				for (auto f : (*freelist)) {
 					auto data = f.getData();
 					if (size <= data->size) {
 						reuseFreePossible = true;
@@ -1205,7 +1205,7 @@ void getBlowup (size_t size, uint64_t address, size_t classSize, bool* reused) {
 		freelist = getFreelist(size);
 		if ((*freelist).begin() != (*freelist).end()) {
 			reuseFreePossible = true;
-			for (auto f = (*freelist).begin(); f != (*freelist).end(); f++) {
+			for (auto f : (*freelist)) {
 				auto data = f.getData();
 				if (address == data->addr) {
 					reuseFreeObject = true;
@@ -1251,8 +1251,8 @@ size_t getClassSizeFor (size_t size) {
 			abort();
 		}
 
-		for (auto element = classSizes->begin(); element != classSizes->end(); element++) {
-			size_t tempSize = *element;
+		for (auto element : *classSizes) {
+			size_t tempSize = element;
 			if (size > tempSize) continue;
 			else if (size <= tempSize) {
 				sizeToReturn = tempSize;
@@ -1622,8 +1622,8 @@ void getClassSizes () {
 
 		fprintf(classSizeFile, "%s\n", allocator_name);
 
-		for (auto cSize = classSizes->begin(); cSize != classSizes->end(); cSize++) 
-			fprintf (classSizeFile, "%zu ", *cSize);
+		for (auto cSize : *classSizes) 
+			fprintf (classSizeFile, "%zu ", cSize);
 
 		fprintf(classSizeFile, "\n");
 		fflush (classSizeFile);
@@ -1633,8 +1633,8 @@ void getClassSizes () {
 
 	if (!classSizes->empty()) {
 
-		for (auto cSize = classSizes->begin(); cSize != classSizes->end(); cSize++) 
-			fprintf (thrData.output, "%zu ", *cSize);
+		for (auto cSize : *classSizes) 
+			fprintf (thrData.output, "%zu ", cSize);
 	}
 
 	fclose(classSizeFile);
@@ -1644,8 +1644,8 @@ void getClassSizes () {
 	largestClassSize = *(classSizes->end() - 1);
 
 	int i = 0;
-	for (auto cSize = classSizes->begin(); cSize != classSizes->end(); cSize++) {
-		auto classSize = *cSize;
+	for (auto cSize : *classSizes) {
+		auto classSize = cSize;
 		Freelist* f = (Freelist*) myMalloc (sizeof (Freelist));
 		f->initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 		freelistMap.insert(classSize, f);
@@ -1677,8 +1677,8 @@ void getMmapThreshold () {
 
 void globalizeThreadAllocData(){
     //HashMap<uint64_t, thread_alloc_data*, spinlock>::iterator i;    
-    for(auto it1 = tadMap.begin(); it1 != tadMap.end(); it1++){
-        for(auto it2 = it1.getData()->begin(); it2 != it1.getData()->end(); it2++){
+    for(auto it1 : tadMap){
+        for(auto it2 : *it1.getData()){
 
             allThreadsTadMap[it2.getKey()]->numMallocs += it2.getData()->numMallocs;
             allThreadsTadMap[it2.getKey()]->numReallocs += it2.getData()->numReallocs;
@@ -1918,7 +1918,7 @@ void writeThreadMaps () {
 void writeOverhead () {
 
 	fprintf (thrData.output, "\n-------------metadata-------------\n");
-	for (auto o = overhead.begin(); o != overhead.end(); o++) {
+	for (auto o : overhead) {
 
 		auto key = o.getKey();
 		auto data = o.getData();
@@ -1930,7 +1930,7 @@ void writeOverhead () {
 void writeContention () {
 
 	fprintf (thrData.output, "\n------------lock usage------------\n");
-	for (auto lock = lockUsage.begin(); lock != lockUsage.end(); lock++) 
+	for (auto lock : lockUsage) 
 		fprintf (thrData.output, "lockAddr= %#lx  maxContention= %d\n",
 					lock.getKey(), lock.getData()->maxContention);
 
@@ -1940,7 +1940,7 @@ void writeAddressUsage () {
 
 	fprintf (thrData.output, "\n----------memory usage----------\n");
 
-	for (auto t = addressUsage.begin(); t != addressUsage.end(); t++) {
+	for (auto t : addressUsage) {
 		auto data = t.getData();
 		fprintf (thrData.output, ">>> addr= %#lx numAccesses= %lu szTotal= %zu "
 				"szFreed= %zu numAllocs= %lu numFrees= %lu\n",
@@ -1953,7 +1953,7 @@ void writeMappings () {
 
 	int i = 0;
 	fprintf (thrData.output, "\n------------mappings------------\n");
-	for (auto r = mappings.begin(); r != mappings.end(); r++) {
+	for (auto r : mappings) {
 		auto data = r.getData();
 		fprintf (thrData.output,
 			"Region[%d]: origin= %c, start= %#lx, end= %#lx, length= %zu, "
@@ -1996,7 +1996,7 @@ Freelist* getFreelist (size_t size) {
 
 void calculateMemOverhead () {
 
-	for (auto o = overhead.begin(); o != overhead.end(); o++) {
+	for (auto o : overhead) {
 		
 		auto data = o.getData();
 		alignment += data->getAlignment();
@@ -2006,7 +2006,7 @@ void calculateMemOverhead () {
 	totalMemOverhead += alignment;
 	totalMemOverhead += blowup_bytes;
 
-	for (auto t = addressUsage.begin(); t != addressUsage.end(); t++) {
+	for (auto t : addressUsage) {
 		auto data = t.getData();
 		totalSizeAlloc += data->szTotal;
 		totalSizeFree += data->szFreed;
@@ -2069,7 +2069,7 @@ void get_bibop_metadata() {
 	unsigned add_pages = 0;
 	unsigned bytes_in_use[100];
 
-	for (auto entry = mappings.begin(); entry != mappings.end(); entry++) {
+	for (auto entry : mappings) {
 		if (done == true) break;
 		auto data = entry.getData();
 		char origin = data->origin;
@@ -2282,10 +2282,10 @@ void clearFreelists() {
 	
 	uint64_t keys [10];
 
-	for (auto freelist = freelistMap.begin(); freelist != freelistMap.end(); freelist++) {
+	for (auto freelist : freelistMap) {
 		int i = 0;
 		auto f = *(freelist.getData());
-		for (auto entry = f.begin(); entry != f.end(); entry++) {
+		for (auto entry : f) {
 			auto key = entry.getKey();
 			keys[i] = key;
 			i++;
@@ -2300,7 +2300,7 @@ void clearFreelists() {
 bool mappingEditor (void* addr, size_t len, int prot) {
 	
 	bool found = false;
-	for (auto mapping = mappings.begin(); mapping != mappings.end(); mapping++) {
+	for (auto mapping : mappings) {
 		auto tuple = mapping.getData();
 		uint64_t address = (uint64_t) addr;
 		if ((tuple->start <= address) && (address <= tuple->end)) {
@@ -2339,9 +2339,9 @@ void analyzePerfInfo (PerfReadInfo* before, PerfReadInfo* after, size_t classSiz
 		if (!tadMap.find(tid, &csm)){
 			csm = (classSizeMap*) myMalloc(sizeof(classSizeMap));
 			csm->initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
-			for (auto cSize = classSizes->begin (); cSize != classSizes->end (); cSize++){
-				csm->insertIfAbsent(*cSize, newTad());
-				allThreadsTadMap[*cSize] = newTad();
+			for (auto cSize : *classSizes){
+				csm->insertIfAbsent(cSize, newTad());
+				allThreadsTadMap[cSize] = newTad();
 			}
 			csm->insertIfAbsent(0, newTad());
 			allThreadsTadMap[0] = newTad();
