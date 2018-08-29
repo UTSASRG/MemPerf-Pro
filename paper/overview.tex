@@ -1,0 +1,48 @@
+\section{Overview of mmprof}
+
+\subsection{Performance Overhead}
+
+We may use the fire-flame figure to show the difference. 
+
+\paragraph{Per-allocation Time:}
+Whether the memory allocator is too slow in allocations and deallocations? 
+Basically, we could collect the cycles spending on each cycle. If the number of cycles is too big, then the allocator is too slow. 
+
+Then we would like to identify the root cause inside each allocator. 
+
+\paragraph{Per-deallocation Time:} 
+How much cycles for each deallocation? 
+
+Can we integrate the cache misses or page faults for each allocation and deallocation, so that we could identify the issue of DieHarder that invokes many unnecessary cache misses?
+
+If we could correlate cache misses to each thread, then we could do this. 
+
+If allocation and deallocation takes too much time, it could be caused by multiple reasons:
+
+(1) First, it just takes a lot of instructions (could we find out the lapsed instructions for each thread?)
+(2) It may be caused by not good algorithm? 
+(3) It can be caused by lock contention?
+(4) It can be caused by system call related contention? 
+
+\subsection{Memory Overhead}
+
+How much memory are caused due to the alignment of size classes?
+How much memory are due to memory re-utilization rate? For instance, we may not fully utilize the memory due to the randomization mechanism. We only care about physical memory waste. Then we should also investigate how much memory has been explicitly returned back to the OS. 
+
+How much memory are due to the metadata itself? 
+
+\subsection{Scalability Analysis} 
+
+User space contention:
+How many separate locks are explicitly utilized? 
+How many lock acquisitions? How much time are spending on lock waiting for each thread, and in total?
+
+How much time spending on kernel-space contention? For instance, we could infer from memory-related system calls, such as mmap, munmap, madvise, brk, or something else? 
+
+That is, we may have to integrate with SyncPerf for doing this. We will borrow their implementation in order to do this. 
+
+\subsection{Application Friendliness} 
+How many page faults and cache misses that are caused by applications? 
+
+\subsubsection{NUMA Friendliness} 
+How many remote accesses? How many interconnect messages? We may employ the PMU mechanism to identify the information.

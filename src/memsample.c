@@ -25,13 +25,22 @@ __thread extern thread_data thrData;
 
 thread_local perf_info perfInfo;
 
-void getPerfInfo(int64_t *fault, int64_t *tlb, int64_t *cache_miss, int64_t *cache_ref, int64_t *instr){
-   
-		read(perfInfo.perf_fd_fault, fault, sizeof(int64_t));
-		read(perfInfo.perf_fd_tlb, tlb, sizeof(int64_t));
-		read(perfInfo.perf_fd_cache_miss, cache_miss, sizeof(int64_t));
-		read(perfInfo.perf_fd_cache_ref, cache_ref, sizeof(int64_t));
-		read(perfInfo.perf_fd_instr, instr, sizeof(int64_t));
+//void getPerfInfo(int64_t *fault, int64_t *tlb, int64_t *cache_miss, int64_t *cache_ref, int64_t *instr){
+//   
+//		read(perfInfo.perf_fd_fault, fault, sizeof(int64_t));
+//		read(perfInfo.perf_fd_tlb, tlb, sizeof(int64_t));
+//		read(perfInfo.perf_fd_cache_miss, cache_miss, sizeof(int64_t));
+//		read(perfInfo.perf_fd_cache_ref, cache_ref, sizeof(int64_t));
+//		read(perfInfo.perf_fd_instr, instr, sizeof(int64_t));
+//}
+
+void getPerfInfo (PerfReadInfo* i) {
+	
+	read(perfInfo.perf_fd_fault, &(i->faults), sizeof(int64_t));
+	read(perfInfo.perf_fd_tlb, &(i->tlb_misses), sizeof(int64_t));
+	read(perfInfo.perf_fd_cache_miss, &(i->cache_misses), sizeof(int64_t));
+	read(perfInfo.perf_fd_cache_ref, &(i->cache_refs), sizeof(int64_t));
+	read(perfInfo.perf_fd_instr, &(i->instructions), sizeof(int64_t));
 }
 
 void doPerfRead() {

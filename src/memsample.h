@@ -59,44 +59,6 @@ typedef struct {
     long numAccesses;
 } Tuple;
 
-typedef struct {
-
-	uint64_t addr;
-	size_t size;
-} FreeObject;
-
-typedef struct {
-	uint64_t addr;
-	uint64_t numAccesses;
-	size_t szTotal;
-	size_t szFreed;
-	size_t szUsed;
-	uint64_t numAllocs;
-	uint64_t numFrees;
-} ObjectTuple;
-
-typedef struct {
-
-	uint64_t start;
-	uint64_t end;
-	size_t length;
-	uint64_t rw;
-	char origin;
-	pid_t tid;
-	std::atomic_uint allocations;
-} MmapTuple;
-
-typedef struct {
-
-	size_t VmSize_start;
-	size_t VmSize_end;
-	size_t VmPeak;
-	size_t VmRSS_start;
-	size_t VmRSS_end;
-	size_t VmHWM;
-	size_t VmLib;
-} VmInfo;
-
 typedef struct addr2line_info {
     char exename[15];
     unsigned int lineNum;
@@ -119,14 +81,50 @@ typedef struct {
 } perf_info;
 
 typedef struct {
-    int64_t numFaults;
-    int64_t numTlbMisses;
-    int64_t numCacheMisses;
-    int64_t numCacheRefs;
-    int64_t numInstrs;
+    int64_t numMallocs;
+    int64_t numReallocs;
+    int64_t numFrees;
+
+    int64_t numMallocsFFL;
+    int64_t numReallocsFFL;
+
+    int64_t numMallocFaults;
+    int64_t numReallocFaults;
+    int64_t numFreeFaults;
+
+    int64_t numMallocTlbMisses;
+    int64_t numReallocTlbMisses;
+    int64_t numFreeTlbMisses;
+
+    int64_t numMallocCacheMisses;
+    int64_t numReallocCacheMisses;
+    int64_t numFreeCacheMisses;
+
+    int64_t numMallocCacheRefs;
+    int64_t numReallocCacheRefs;
+    int64_t numFreeCacheRefs;
+
+    int64_t numMallocInstrs;
+    int64_t numReallocInstrs;
+    int64_t numFreeInstrs;
+    
+    int64_t numMallocFaultsFFL; //from free list
+    int64_t numReallocFaultsFFL;
+
+    int64_t numMallocTlbMissesFFL;
+    int64_t numReallocTlbMissesFFL;
+
+    int64_t numMallocCacheMissesFFL;
+    int64_t numReallocCacheMissesFFL;
+
+    int64_t numMallocCacheRefsFFL;
+    int64_t numReallocCacheRefsFFL;
+
+    int64_t numMallocInstrsFFL;
+    int64_t numReallocInstrsFFL;
 } thread_alloc_data;
 
-void getPerfInfo(int64_t *, int64_t *, int64_t *, int64_t *, int64_t *);
+//void getPerfInfo(int64_t *, int64_t *, int64_t *, int64_t *, int64_t *);
 int initSampling(void);
 void setupSampling(void);
 void doPerfRead(void);
