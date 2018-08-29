@@ -30,8 +30,8 @@
 using namespace std;
 
 extern char *allocator_name;
-
 extern __thread thread_data thrData;
+extern bool opening_maps_file;
 
 struct regioninfo {
   void* start;
@@ -211,7 +211,9 @@ class selfmap {
       //_main_exe = std::string(buffer);
       bool gotMainExe = false;
       // Build the mappings data structure
+	  opening_maps_file = true;
       ifstream maps_file("/proc/self/maps");
+	  opening_maps_file = false;
 
 		while(maps_file.good() && !maps_file.eof()) {
 			mapping m;

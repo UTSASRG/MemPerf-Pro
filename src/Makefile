@@ -43,9 +43,6 @@ TARGETS =	libmallocprof.so 			\
 			test/pmu-dieharder-test		\
 			test/pmu-freeguard-test		\
 
-.EXPORT_ALL_VARIABLES:
-	MALLOC_OPTIONS="p"
-
 all: $(TARGETS)
 
 single:		libmallocprof.so \
@@ -125,6 +122,14 @@ test/pmu-dieharder-test: libmallocprof.so test/pmu-test.cpp
 # Clean
 test/test-clean: test/$(TEST_FILE)
 	$(CXX) $(CFLAGS2) -o test/test-clean test/$(TEST_FILE)
+
+.PHONY: runThreads
+
+runThreads:
+	./test/test-xlibc-thread
+	./test/test-dieharder-thread
+	./test/test-freeguard-thread
+	./test/test-obsd-thread
 
 clean:
 	rm -f $(TARGETS)

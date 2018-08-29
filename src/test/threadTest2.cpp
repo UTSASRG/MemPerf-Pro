@@ -2,7 +2,7 @@
 #include <thread>
 #include <pthread.h>
 
-#define NUM_ITER 100
+#define NUM_ITERATIONS 100
 
 pthread_barrier_t barrier;
 pthread_mutex_t lock;
@@ -35,7 +35,7 @@ int main() {
 void t1 () {
 
 	void* object;
-	for (int i = 0; i < NUM_ITER; i++) {
+	for (int i = 0; i < NUM_ITERATIONS; i++) {
 		pthread_mutex_lock (&lock);
 		while (t != 1) pthread_cond_wait (&cond, &lock);
 
@@ -50,7 +50,7 @@ void t1 () {
 
 void t2 () {
 
-	for (int i = 0; i < NUM_ITER; i++) {
+	for (int i = 0; i < NUM_ITERATIONS; i++) {
 		pthread_mutex_lock (&lock);
 
 		while (t != 2) pthread_cond_wait (&cond, &lock);

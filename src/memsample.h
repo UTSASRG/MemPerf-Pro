@@ -59,44 +59,6 @@ typedef struct {
     long numAccesses;
 } Tuple;
 
-typedef struct {
-
-	uint64_t addr;
-	size_t size;
-} FreeObject;
-
-typedef struct {
-	uint64_t addr;
-	uint64_t numAccesses;
-	size_t szTotal;
-	size_t szFreed;
-	size_t szUsed;
-	uint64_t numAllocs;
-	uint64_t numFrees;
-} ObjectTuple;
-
-typedef struct {
-
-	uint64_t start;
-	uint64_t end;
-	size_t length;
-	uint64_t rw;
-	char origin;
-	pid_t tid;
-	std::atomic_uint allocations;
-} MmapTuple;
-
-typedef struct {
-
-	size_t VmSize_start;
-	size_t VmSize_end;
-	size_t VmPeak;
-	size_t VmRSS_start;
-	size_t VmRSS_end;
-	size_t VmHWM;
-	size_t VmLib;
-} VmInfo;
-
 typedef struct addr2line_info {
     char exename[15];
     unsigned int lineNum;
@@ -162,7 +124,7 @@ typedef struct {
     int64_t numReallocInstrsFFL;
 } thread_alloc_data;
 
-void getPerfInfo(int64_t *, int64_t *, int64_t *, int64_t *, int64_t *);
+//void getPerfInfo(int64_t *, int64_t *, int64_t *, int64_t *, int64_t *);
 int initSampling(void);
 void setupSampling(void);
 void doPerfRead(void);
