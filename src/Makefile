@@ -16,6 +16,8 @@ INCS =		xthreadx.hh		\
 
 DEPS = $(SRCS) $(INCS)
 
+MALLOC_OPTIONS = 'p'
+
 #CXX = g++ 
 CXX = clang++ 
 
