@@ -68,9 +68,6 @@ size_t totalSizeFree = 0;
 size_t totalSizeDiff = 0;
 size_t totalMemOverhead = 0;
 uint64_t min_pos_callsite_id;
-uint64_t metadata_used_pages = 0;
-uint64_t unused_mmap_region_size = 0;
-uint64_t unused_mmap_region_count = 0;
 
 //Debugging flags
 const bool debug = false;
@@ -102,10 +99,10 @@ std::atomic_uint reused_address (0);
 std::atomic_uint num_pthread_mutex_locks (0);
 std::atomic_uint num_trylock (0);
 std::atomic_uint total_waits (0);
-std::atomic_uint dontneed_advice_count (0);
-std::atomic_uint madvise_calls (0);
-std::atomic_uint numSbrks (0);
-std::atomic_uint programBreakChange (0);
+std::atomic_uint num_dontneed (0);
+std::atomic_uint num_madvise (0);
+std::atomic_uint num_sbrk (0);
+std::atomic_uint size_sbrk (0);
 std::atomic_uint malloc_mmaps (0);
 std::atomic_uint total_mmaps (0);
 std::atomic_uint temp_alloc (0);
@@ -930,9 +927,9 @@ extern "C" {
 	int madvise(void *addr, size_t length, int advice){
 
 		if (advice == MADV_DONTNEED)
-			dontneed_advice_count.fetch_add(1, relaxed);
+			num_dontneed.fetch_add(1, relaxed);
 
-		madvise_calls.fetch_add(1, relaxed);
+		num_madvise.fetch_add(1, relaxed);
 		return RealX::madvise(addr, length, advice);
 	}
 
@@ -944,8 +941,8 @@ extern "C" {
         uint64_t oldProgramBreak = (uint64_t) retptr;
         uint64_t sizeChange = newProgramBreak - oldProgramBreak;
 
-        programBreakChange.fetch_add(sizeChange, relaxed);
-        numSbrks.fetch_add(1, relaxed);
+        size_sbrk.fetch_add(sizeChange, relaxed);
+        num_sbrk.fetch_add(1, relaxed);
 
         return retptr;
     }
@@ -1777,77 +1774,70 @@ void writeAllocData () {
 	unsigned print_num_free = num_free.load(relaxed);
 	unsigned print_total_waits = total_waits.load(relaxed);
 
-	fprintf (thrData.output, ">>> num_malloc              %u\n", num_malloc.load(relaxed));
-	fprintf (thrData.output, ">>> num_actual_malloc       %u\n", num_actual_malloc.load(relaxed));
-	fprintf (thrData.output, ">>> num_calloc              %u\n", num_calloc.load(relaxed));
-	fprintf (thrData.output, ">>> num_realloc             %u\n", num_realloc.load(relaxed));
-	fprintf (thrData.output, ">>> num_operator_new        %u\n", num_operator_new.load(relaxed));
-	fprintf (thrData.output, ">>> new_address             %u\n", print_new_address);
-	fprintf (thrData.output, ">>> reused_address          %u\n", print_reused_address);
-	fprintf (thrData.output, ">>> num_free                %u\n", print_num_free);
-	fprintf (thrData.output, ">>> num_operator_delete     %u\n", num_operator_delete.load(relaxed));
-	fprintf (thrData.output, ">>> malloc_mmaps            %u\n", malloc_mmaps.load(relaxed));
-	fprintf (thrData.output, ">>> total_mmaps             %u\n", total_mmaps.load(relaxed));
-	fprintf (thrData.output, ">>> malloc_mmap_threshold   %zu\n", malloc_mmap_threshold);
-	fprintf (thrData.output, ">>> threads                 %u\n", threads.load(relaxed));
+	fprintf(thrData.output, "\n");
+	fprintf(thrData.output, ">>> num_malloc               %u\n", num_malloc.load(relaxed));
+	fprintf(thrData.output, ">>> num_actual_malloc        %u\n", num_actual_malloc.load(relaxed));
+	fprintf(thrData.output, ">>> num_calloc               %u\n", num_calloc.load(relaxed));
+	fprintf(thrData.output, ">>> num_realloc              %u\n", num_realloc.load(relaxed));
+	fprintf(thrData.output, ">>> num_operator_new         %u\n", num_operator_new.load(relaxed));
+	fprintf(thrData.output, ">>> new_address              %u\n", print_new_address);
+	fprintf(thrData.output, ">>> reused_address           %u\n", print_reused_address);
+	fprintf(thrData.output, ">>> num_free                 %u\n", print_num_free);
+	fprintf(thrData.output, ">>> num_operator_delete      %u\n", num_operator_delete.load(relaxed));
+	fprintf(thrData.output, ">>> malloc_mmaps             %u\n", malloc_mmaps.load(relaxed));
+	fprintf(thrData.output, ">>> total_mmaps              %u\n", total_mmaps.load(relaxed));
+	fprintf(thrData.output, ">>> malloc_mmap_threshold    %zu\n", malloc_mmap_threshold);
+	fprintf(thrData.output, ">>> threads                  %u\n", threads.load(relaxed));
 
 	if (print_new_address)
-		fprintf (thrData.output, ">>> cycles_new         %lu\n", (cycles_new.load(relaxed) / print_new_address));
-
+	fprintf(thrData.output, ">>> cycles_new               %lu\n",
+							(cycles_new.load(relaxed) / print_new_address));
 	else
-		fprintf (thrData.output, ">>> cycles_new         N/A\n");
+	fprintf(thrData.output, ">>> cycles_new               N/A\n");
 
 	if (print_reused_address) 
-		fprintf (thrData.output, ">>> cycles_reused      %lu\n",
-				  (cycles_reused.load(relaxed) / print_reused_address));
-
+	fprintf(thrData.output, ">>> cycles_reused            %lu\n",
+							(cycles_reused.load(relaxed) / print_reused_address));
 	else
-		fprintf (thrData.output, ">>> cycles_reused      N/A\n");
+	fprintf(thrData.output, ">>> cycles_reused            N/A\n");
 
-	if (num_free.load(relaxed) > 0)
-		fprintf (thrData.output, ">>> cycles_free        %lu\n",
-				  (cycles_free.load(relaxed) / num_free.load(relaxed)));
-
+	if (print_num_free)
+	fprintf(thrData.output, ">>> cycles_free              %lu\n",
+							(cycles_free.load(relaxed) / print_num_free));
 	else
-		fprintf (thrData.output, ">>> cycles_free        N/A\n");
+	fprintf(thrData.output, ">>> cycles_free              N/A\n");
 
-	fprintf (thrData.output, ">>> pthread_mutex_lock %u\n", num_pthread_mutex_locks.load(relaxed));
-	fprintf (thrData.output, ">>> total_waits        %u\n", print_total_waits);
-	fprintf (thrData.output, ">>> num_trylock        %u\n", num_trylock.load(relaxed));
+	fprintf(thrData.output, ">>> pthread_mutex_lock       %u\n", num_pthread_mutex_locks.load(relaxed));
+	fprintf(thrData.output, ">>> total_waits              %u\n", print_total_waits);
+	fprintf(thrData.output, ">>> num_trylock              %u\n", num_trylock.load(relaxed));
 
-	if (total_waits.load(relaxed) > 0) 
-		fprintf (thrData.output, ">>> avg_wait_time  %lu\n",
-				  (total_time_wait.load(relaxed)/total_waits.load(relaxed)));
+	if (print_total_waits) 
+	fprintf(thrData.output, ">>> avg_wait_time            %lu\n",
+							(total_time_wait.load(relaxed) / print_total_waits));
 
-	fprintf(thrData.output, ">>> madvise calls        %u\n", madvise_calls.load(relaxed));
-    fprintf(thrData.output, ">>> w/ MADV_DONTNEED     %u\n", dontneed_advice_count.load(relaxed));
-	fprintf(thrData.output, ">>> sbrk calls           %u\n", numSbrks.load(relaxed));
-	fprintf(thrData.output, ">>> program size added   %u\n", programBreakChange.load(relaxed));
-
-	fprintf (thrData.output, ">>> VmSize_start(kB)       %zu\n", vmInfo.VmSize_start);
-	fprintf (thrData.output, ">>> VmSize_end(kB)         %zu\n", vmInfo.VmSize_end);
-	fprintf (thrData.output, ">>> VmPeak(kB)             %zu\n", vmInfo.VmPeak);
-	fprintf (thrData.output, ">>> VmRSS_start(kB)        %zu\n", vmInfo.VmRSS_start);
-	fprintf (thrData.output, ">>> VmRSS_end(kB)          %zu\n", vmInfo.VmRSS_end);
-	fprintf (thrData.output, ">>> VmHWM(kB)          %zu\n", vmInfo.VmHWM);
-	fprintf (thrData.output, ">>> VmLib(kB)          %zu\n", vmInfo.VmLib);
-
-	fprintf (thrData.output, "\n>>> num_mprotect             %u\n", num_mprotect.load(relaxed));
-	fprintf (thrData.output, ">>> blowup_allocations       %u\n", blowup_allocations.load(relaxed));
-	fprintf (thrData.output, ">>> blowup_bytes             %zu\n", blowup_bytes);
-	fprintf (thrData.output, ">>> alignment            %zu\n", alignment);
-//	fprintf (thrData.output, ">>> unused_mmap_region_count %zu\n", unused_mmap_region_count);
-//	fprintf (thrData.output, ">>> unused_mmap_region_size  %#lx\n", unused_mmap_region_size);
-//	fprintf (thrData.output, ">>> metadata_used_pages      %zu\n", metadata_used_pages);
-	fprintf (thrData.output, ">>> metadata_object          %zu\n", metadata_object);
-	fprintf (thrData.output, ">>> metadata_overhead        %zu\n", metadata_overhead);
-	fprintf (thrData.output, ">>> totalSizeAlloc           %zu\n", totalSizeAlloc);
-	fprintf (thrData.output, ">>> active_mem_HWM           %zu\n", active_mem_HWM.load(relaxed));
-	fprintf (thrData.output, ">>> totalMemOverhead         %zu\n", totalMemOverhead);
-	fprintf (thrData.output, ">>> memEfficiency            %.2f%%\n", memEfficiency);
-
-	fprintf (thrData.output, "\n>>> summation_blowup_bytes         %zu\n", summation_blowup_bytes.load(relaxed));
-	fprintf (thrData.output, ">>> summation_blowup_allocations   %u\n", summation_blowup_allocations.load(relaxed));
+	fprintf(thrData.output, ">>> num_madvise              %u\n", num_madvise.load(relaxed));
+    fprintf(thrData.output, ">>> num_dontneed             %u\n", num_dontneed.load(relaxed));
+	fprintf(thrData.output, ">>> num_sbrk                 %u\n", num_sbrk.load(relaxed));
+	fprintf(thrData.output, ">>> size_sbrk                %u\n", size_sbrk.load(relaxed));
+	fprintf(thrData.output, ">>> VmSize_start(kB)         %zu\n", vmInfo.VmSize_start);
+	fprintf(thrData.output, ">>> VmSize_end(kB)           %zu\n", vmInfo.VmSize_end);
+	fprintf(thrData.output, ">>> VmPeak(kB)               %zu\n", vmInfo.VmPeak);
+	fprintf(thrData.output, ">>> VmRSS_start(kB)          %zu\n", vmInfo.VmRSS_start);
+	fprintf(thrData.output, ">>> VmRSS_end(kB)            %zu\n", vmInfo.VmRSS_end);
+	fprintf(thrData.output, ">>> VmHWM(kB)                %zu\n", vmInfo.VmHWM);
+	fprintf(thrData.output, ">>> VmLib(kB)                %zu\n", vmInfo.VmLib);
+	fprintf(thrData.output, ">>> num_mprotect             %u\n", num_mprotect.load(relaxed));
+	fprintf(thrData.output, ">>> blowup_allocations       %u\n", blowup_allocations.load(relaxed));
+	fprintf(thrData.output, ">>> blowup_bytes             %zu\n", blowup_bytes);
+	fprintf(thrData.output, ">>> alignment                %zu\n", alignment);
+	fprintf(thrData.output, ">>> metadata_object          %zu\n", metadata_object);
+	fprintf(thrData.output, ">>> metadata_overhead        %zu\n", metadata_overhead);
+	fprintf(thrData.output, ">>> totalSizeAlloc           %zu\n", totalSizeAlloc);
+	fprintf(thrData.output, ">>> active_mem_HWM           %zu\n", active_mem_HWM.load(relaxed));
+	fprintf(thrData.output, ">>> totalMemOverhead         %zu\n", totalMemOverhead);
+	fprintf(thrData.output, ">>> memEfficiency            %.2f%%\n", memEfficiency);
+	fprintf(thrData.output, ">>> summation_blowup_bytes         %zu\n", summation_blowup_bytes.load(relaxed));
+	fprintf(thrData.output, ">>> summation_blowup_allocations   %u\n", summation_blowup_allocations.load(relaxed));
 
 	writeOverhead();
 	writeAddressUsage();
