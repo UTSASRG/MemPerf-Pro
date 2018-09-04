@@ -12,7 +12,7 @@
 //Bump-pointer key to overhead hashmap
 #define BP_OVERHEAD 0
 #define PAGE_BITS 12 
-#define TEMP_MEM_SIZE 1024 * 1024 * 1024
+#define TEMP_MEM_SIZE 1024 * 1024 * 1024 //1GB
 
 //Structures
 typedef struct {
@@ -69,8 +69,8 @@ struct stack_frame {
 };
 
 //Enumerations
-enum initStatus{
-    INIT_ERROR = -1,
+enum initStatus{            //enum to keep track of libmallocprof's constuction status 
+    INIT_ERROR = -1,        //allocation calls are just passed on to RealX if libmallocprof isn't ready
     NOT_INITIALIZED = 0, 
     IN_PROGRESS = 1, 
     INITIALIZED = 2
@@ -84,7 +84,7 @@ int num_used_pages(uintptr_t vstart, uintptr_t vend);
 int find_page(uintptr_t vstart, uintptr_t vend);
 void analyzePerfInfo(PerfReadInfo*, PerfReadInfo*, size_t, bool*, pid_t);
 void analyzeAllocation(size_t size, uint64_t address, uint64_t cycles, size_t, bool*);
-void analyzeFree(uint64_t);
+size_t analyzeFree(uint64_t);
 void calculateMemOverhead ();
 void clearFreelists();
 void doBefore(PerfReadInfo*, uint64_t*);

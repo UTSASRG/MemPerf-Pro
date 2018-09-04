@@ -324,6 +324,8 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
 
    // Register our cleanup routine as an on-exit handler.
 	atexit(exitHandler);
+
+    //if the PMU sampler has not yet been set up for this thread, set it up now
     if(!samplingInit){
 	    initSampling();
         samplingInit = true;
@@ -384,6 +386,8 @@ extern "C" {
 		//which calls malloc, also fopen calls malloc
 		if(gettingClassSizes) return RealX::malloc(sz);
 
+
+        //if the PMU sampler has not yet been set up for this thread, set it up now
         if(!samplingInit){
             initSampling();
             samplingInit = true;
@@ -451,6 +455,8 @@ extern "C" {
 			return RealX::calloc(nelem, elsize);
 		}
 
+
+        //if the PMU sampler has not yet been set up for this thread, set it up now
         if(!samplingInit){
             initSampling();
             samplingInit = true;
@@ -504,6 +510,7 @@ extern "C" {
 		if(ptr == NULL)
 			return;
 
+        //if the PMU sampler has not yet been set up for this thread, set it up now
         if(!samplingInit){
             initSampling();
             samplingInit = true;
@@ -540,7 +547,7 @@ extern "C" {
 		uint64_t size = 0;
 		uint64_t address = reinterpret_cast <uint64_t> (ptr);
 
-		currentClassSize = getClassSizeFor(size);
+		//currentClassSize = getClassSizeFor(size);
 
 		//Do before free
 		doBefore(&before, &tsc_before);
@@ -552,12 +559,13 @@ extern "C" {
 		doAfter(&after, &tsc_after);
 
 		//Insert object into our freelist
-		analyzeFree(address);
+		currentClassSize = analyzeFree(address);
 
 		//Update atomics
 		cycles_free.fetch_add ((tsc_after - tsc_before), relaxed);
 		num_free.fetch_add(1, relaxed);
-        
+       
+        //determine which size class the object being freed belonged to
 		csm = nullptr;
 		if(tadMap.find(tid, &csm)){
 			if(d_pmuData){
@@ -565,6 +573,7 @@ extern "C" {
 				fprintf(stderr, "found tid -> csm\n");
 			}
 
+            //
 			if(csm->find(currentClassSize, &tad)){
 				if(d_pmuData)
 					fprintf(stderr, "found csm -> tad\n");
@@ -603,6 +612,7 @@ extern "C" {
 			return yymalloc(sz);
 		}
 
+        //if the PMU sampler has not yet been set up for this thread, set it up now
         if(!samplingInit){
             initSampling();
             samplingInit = true;
@@ -1143,16 +1153,19 @@ void analyzeAllocation(size_t size, uint64_t address, uint64_t cycles, size_t cl
 	increaseMemoryHWM(size);
 }
 
-void analyzeFree(uint64_t address) {
+size_t analyzeFree(uint64_t address) {
 
 	ObjectTuple* t;
 	size_t size = 0;
+    size_t current_class_size = 0;
 
 	if (addressUsage.find(address, &t)){
 		size = t->szUsed;
 		t->szFreed += size;
 		t->numAccesses++;
 		t->numFrees++;
+
+        current_class_size = getClassSizeFor(size);
 
 		//Add this object to it's Freelist
 		//If bump pointer, add to freelistMap[0]
@@ -1189,6 +1202,8 @@ void analyzeFree(uint64_t address) {
 			freelistLock.unlock();
 		}
 	}
+
+    return current_class_size;
 }
 
 void increaseMemoryHWM(size_t size) {

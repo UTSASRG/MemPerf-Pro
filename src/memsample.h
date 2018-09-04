@@ -80,9 +80,9 @@ typedef struct {
 	pid_t tid;
 } perf_info;
 
-typedef struct {
-    int64_t numMallocs;
-    int64_t numReallocs;
+typedef struct {            //struct for holding data about allocations
+    int64_t numMallocs;     //includes data from PMU and counts for types of alloc calls 
+    int64_t numReallocs;    //FFL = from free list, data for allocations that came from freed objects
     int64_t numFrees;
 
     int64_t numMallocsFFL;
@@ -108,7 +108,7 @@ typedef struct {
     int64_t numReallocInstrs;
     int64_t numFreeInstrs;
     
-    int64_t numMallocFaultsFFL; //from free list
+    int64_t numMallocFaultsFFL;
     int64_t numReallocFaultsFFL;
 
     int64_t numMallocTlbMissesFFL;
