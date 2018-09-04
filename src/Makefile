@@ -33,10 +33,14 @@ TARGETS =	libmallocprof.so 			\
 			test/test-obsd 				\
 			test/test-freeguard 		\
 			test/test-dieharder 		\
+			test/test-tcmalloc			\
+			test/test-tcmalloc-thread	\
+			test/test-tcmalloc-noprof	\
 			test/test-xlibc-thread 		\
 			test/test-obsd-thread 		\
 			test/test-freeguard-thread	\
 			test/test-dieharder-thread	\
+			test/test-tcmalloc-thread	\
 			test/bs-obsd				\
 			test/bs-libc				\
 			test/bs-freeguard			\
@@ -52,21 +56,35 @@ single:		libmallocprof.so \
 			test/test-xlibc \
 			test/test-obsd \
 			test/test-freeguard \
-			test/test-dieharder
+			test/test-dieharder \
+			test/test-tcmalloc	\
+			test/test-tcmalloc-noprof
 
 threads:	libmallocprof.so \
 			test/test-xlibc-thread \
 			test/test-dieharder-thread \
 			test/test-freeguard-thread \
-			test/test-obsd-thread
+			test/test-obsd-thread \
+			test/test-tcmalloc-thread
+
 pmu: test/pmu-libc-test test/pmu-obsd-test test/pmu-dieharder-test test/pmu-freeguard-test
 
-TEST_FILE = pmu-test.cpp
+TEST_FILE = ntest.cpp
 THREADTEST_FILE = threadTest.cpp
 
 # Libmallocprof
 libmallocprof.so: $(DEPS)
 	$(CXX) $(CFLAGS2) $(INCLUDE_DIRS) -shared -fPIC $(SRCS) -o libmallocprof.so -ldl -lpthread
+
+# TCMalloc 4.2.6
+test/test-tcmalloc-noprof: test/$(TEST_FILE)
+	$(CXX) $(CFLAGS2) -o test/test-tcmalloc-noprof test/$(TEST_FILE) -ltcmalloc
+
+test/test-tcmalloc: libmallocprof.so test/$(TEST_FILE)
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -o test/test-tcmalloc test/$(TEST_FILE) -ltcmalloc
+
+test/test-tcmalloc-thread: libmallocprof.so test/$(THREADTEST_FILE)
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -o test/test-tcmalloc-thread test/$(THREADTEST_FILE) -lpthread -ltcmalloc
 
 # OpenBSD
 test/test-obsd: libmallocprof.so test/$(TEST_FILE)
@@ -126,14 +144,18 @@ test/pmu-dieharder-test: libmallocprof.so test/pmu-test.cpp
 test/test-clean: test/$(TEST_FILE)
 	$(CXX) $(CFLAGS2) -o test/test-clean test/$(TEST_FILE)
 
-.PHONY: runThreads
+clean:
+	rm -f $(TARGETS)
+	rm -f test/*.txt
 
+# Executions
+.PHONY: runThreads
 runThreads:
 	./test/test-xlibc-thread
 	./test/test-dieharder-thread
 	./test/test-freeguard-thread
 	./test/test-obsd-thread
 
-clean:
-	rm -f $(TARGETS)
-	rm -f test/*.txt
+.PHONY: runTC
+runTC:
+	./test/test-tcmalloc

@@ -44,6 +44,7 @@ bool inRealMain = false;
 bool mapsInitialized = false;
 bool mmap_found = false;
 bool opening_maps_file = false;
+bool realInitialized = false;
 bool selfmapInitialized = false;
 bool usingRealloc = false;
 char* allocator_name;
@@ -55,7 +56,7 @@ extern void * __libc_stack_end;
 extern char __executable_start;
 FILE *classSizeFile;
 float memEfficiency = 0;
-initStatus mallocInitialized = NOT_INITIALIZED;
+initStatus profilerInitialized = NOT_INITIALIZED;
 pid_t pid;
 size_t alignment = 0;
 size_t blowup_bytes = 0;
@@ -196,12 +197,15 @@ extern "C" {
 
 //Constructor
 __attribute__((constructor)) initStatus initializer() {
-    
-	if(mallocInitialized == INITIALIZED || mallocInitialized == IN_PROGRESS){
-            return mallocInitialized;
+
+	RealX::initializer();
+	realInitialized = true;
+
+	if(profilerInitialized != INITIALIZED){
+            return profilerInitialized;
     }
 	
-	mallocInitialized = IN_PROGRESS;
+	profilerInitialized = IN_PROGRESS;
 
 	// Ensure we are operating on a system using 64-bit pointers.
 	// This is necessary, as later we'll be taking the low 8-byte word
@@ -225,8 +229,6 @@ __attribute__((constructor)) initStatus initializer() {
 	uint64_t btext = (uint64_t)&__executable_start & 0xFFFFFFFF;
 	min_pos_callsite_id = (btext << 32) | btext;
 
-	RealX::initializer();
-
     tadMap.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
     //allThreadsTadMap.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 	addressUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
@@ -235,6 +237,7 @@ __attribute__((constructor)) initStatus initializer() {
 	freelistMap.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 	overhead.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 
+	mapsInitialized = true;
 	classSizes = new std::vector<size_t>();
     allocator_name = (char *) myMalloc(100 * sizeof(char));
 
@@ -252,6 +255,7 @@ __attribute__((constructor)) initStatus initializer() {
 	char outputFile[MAX_FILENAME_LEN];
 	snprintf(outputFile, MAX_FILENAME_LEN, "%s_libmallocprof_%d_main_thread.txt",
 		program_invocation_name, pid);
+
 	// Will overwrite current file; change the fopen flag to "a" for append.
 	thrData.output = fopen(outputFile, "w");
 	if(thrData.output == NULL) {
@@ -277,10 +281,10 @@ __attribute__((constructor)) initStatus initializer() {
 		//Find the malloc_mmap_threshold
 		getMmapThreshold();
 
-		//Create the freelist for small objects
+		//Create the freelist for small objects, key SMALL_OBJECT == 0
 		Freelist* small = (Freelist*) myMalloc (sizeof (Freelist));
 		small->initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
-		freelistMap.insert(0, small);
+		freelistMap.insert(SMALL_OBJECT, small);
 
 		//Create the freelist for objects >= 512 Bytes
 		Freelist* large = (Freelist*) myMalloc (sizeof (Freelist));
@@ -291,19 +295,16 @@ __attribute__((constructor)) initStatus initializer() {
 		get_bp_metadata();
 
 		//Create an entry in the overhead hashmap with key 0
-		overhead.insert(0, new Overhead());
+		overhead.insert(BP_OVERHEAD, new Overhead());
 	}
 
-	mapsInitialized = true;
-	mallocInitialized = INITIALIZED;
+	profilerInitialized = INITIALIZED;
 	getMemUsageStart();
 
-	return mallocInitialized;
+	return profilerInitialized;
 }
 
-__attribute__((destructor)) void finalizer_mallocprof () {
-	fclose(thrData.output);
-}
+__attribute__((destructor)) void finalizer_mallocprof () {}
 
 void exitHandler() {
 
@@ -315,6 +316,7 @@ void exitHandler() {
     globalizeThreadAllocData();
 	writeAllocData();
 	writeContention();
+	fclose(thrData.output);
 }
 
 // MallocProf's main function
@@ -361,7 +363,7 @@ extern "C" {
 		// using a memory mapped region. Once dlsym finishes, all future malloc
 		// requests will be fulfilled by RealX::malloc, which itself is a
 		// reference to the real malloc routine.
-		if((mallocInitialized != INITIALIZED) || (!selfmapInitialized)) {
+		if((profilerInitialized != INITIALIZED) || (!selfmapInitialized)) {
 			if((temp_position + sz) < TEMP_MEM_SIZE) 
 				return myMalloc (sz);
 			else {
@@ -371,6 +373,8 @@ extern "C" {
 				abort();
 			}
 		}
+
+		if (!realInitialized) RealX::initializer();
 		
 		//Malloc is being called by a thread that is already in malloc
 		if (inAllocation) return RealX::malloc (sz);
@@ -433,13 +437,15 @@ extern "C" {
 
 	void * yycalloc(size_t nelem, size_t elsize) {
 
-		if (mallocInitialized != INITIALIZED) {
+		if (profilerInitialized != INITIALIZED) {
 
 			void * ptr = NULL;
 			ptr = yymalloc (nelem * elsize);
 			if (ptr) memset(ptr, 0, nelem * elsize);
 			return ptr;
 		}
+		
+		if (!realInitialized) RealX::initializer();
 		
 		if (inAllocation) {
 			return RealX::calloc(nelem, elsize);
@@ -510,7 +516,9 @@ extern "C" {
 			return;
 		}
 
-		if (mallocInitialized != INITIALIZED) {
+		if (!realInitialized) RealX::initializer();
+		
+		if (profilerInitialized != INITIALIZED) {
 			RealX::free (ptr);
 			return;
 		}
@@ -588,11 +596,7 @@ extern "C" {
 
 	void * yyrealloc(void * ptr, size_t sz) {
 
-		if (!mapsInitialized) return RealX::realloc (ptr, sz);
-
-		if (inAllocation) return RealX::realloc (ptr, sz);
-
-		if(mallocInitialized != INITIALIZED) {
+		if(profilerInitialized != INITIALIZED) {
 			if(ptr == NULL) return yymalloc(sz);
 
 			yyfree(ptr);
@@ -604,6 +608,12 @@ extern "C" {
             samplingInit = true;
         }
 		
+		if (!realInitialized) RealX::initializer();
+		
+		if (!mapsInitialized) return RealX::realloc (ptr, sz);
+
+		if (inAllocation) return RealX::realloc (ptr, sz);
+
 		if (!inRealMain) return RealX::realloc (ptr, sz);
 
 		num_realloc.fetch_add(1, relaxed);
@@ -825,6 +835,8 @@ extern "C" {
 
 	int pthread_join(pthread_t thread, void **retval) {
 
+		if (!realInitialized) RealX::initializer();
+		
 		int result = RealX::pthread_join (thread, retval);
         //fprintf(stderr, "Thread: %lX\n", thread);
 		return result;
@@ -832,9 +844,8 @@ extern "C" {
 
 	int pthread_mutex_lock(pthread_mutex_t *mutex) {
 	
-		if (!mapsInitialized) 
-			return RealX::pthread_mutex_lock (mutex);
-
+		if (!realInitialized) RealX::initializer();
+		
 		uint64_t lockAddr = reinterpret_cast <uint64_t> (mutex);
 
 		//Is this thread doing allocation
@@ -849,10 +860,10 @@ extern "C" {
 					thisLock->maxContention = thisLock->contention;
 
 				if (thisLock->contention > 1) {
-				   timeAttempted = rdtscp();
 					numWaits++;
 					total_waits.fetch_add(1, relaxed);
 					waiting = true;
+					timeAttempted = rdtscp();
 				}
 			}	
 
@@ -875,6 +886,8 @@ extern "C" {
 
 	int pthread_mutex_trylock (pthread_mutex_t *mutex) {
 
+		if (!realInitialized) RealX::initializer();
+		
 		if (!mapsInitialized)
 			return RealX::pthread_mutex_trylock (mutex);
 	
@@ -909,6 +922,8 @@ extern "C" {
 
 	int pthread_mutex_unlock(pthread_mutex_t *mutex) {
 
+		if (!realInitialized) RealX::initializer();
+		
 		if (!mapsInitialized)
 			return RealX::pthread_mutex_unlock (mutex);
 
@@ -926,6 +941,8 @@ extern "C" {
 
 	int madvise(void *addr, size_t length, int advice){
 
+		if (!realInitialized) RealX::initializer();
+		
 		if (advice == MADV_DONTNEED)
 			num_dontneed.fetch_add(1, relaxed);
 
@@ -934,7 +951,9 @@ extern "C" {
 	}
 
     void *sbrk(intptr_t increment){
-        if(mallocInitialized != INITIALIZED) return RealX::sbrk(increment);
+		if (!realInitialized) RealX::initializer();
+		
+        if(profilerInitialized != INITIALIZED) return RealX::sbrk(increment);
 
         void *retptr = RealX::sbrk(increment);
         uint64_t newProgramBreak = (uint64_t) RealX::sbrk(0);
@@ -949,6 +968,8 @@ extern "C" {
 
 	int mprotect (void* addr, size_t len, int prot) {
 
+		if (!realInitialized) RealX::initializer();
+		
 		num_mprotect.fetch_add(1, relaxed);
 		if (d_mprotect)
 			printf ("mprotect/found= %s, addr= %p, len= %zu, prot= %d\n",
@@ -959,8 +980,13 @@ extern "C" {
 
 	void * yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset) {
 
-		if((initializer() == IN_PROGRESS) && !inGetMmapThreshold && !inGetAllocStyle)
+		if (!realInitialized) RealX::initializer();
+		
+		if(((profilerInitialized != INITIALIZED)) && !inGetMmapThreshold && !inGetAllocStyle)
 			return RealX::mmap(addr, length, prot, flags, fd, offset);
+
+//		if((initializer() == IN_PROGRESS) && !inGetMmapThreshold && !inGetAllocStyle)
+//			return RealX::mmap(addr, length, prot, flags, fd, offset);
 
 		if (inMmap) return RealX::mmap (addr, length, prot, flags, fd, offset);
 
@@ -1008,6 +1034,100 @@ extern "C" {
 	}
 }//End of extern "C"
 
+/*
+//I pulled these from OpenBSD's wrapper.cpp file
+//Changed OBSD's "CUSTOM_MALLOC" and "CUSTOM_FREE"
+//to our functions
+#ifndef NEW_INCLUDED
+#define NEW_INCLUDED
+
+void * operator new (size_t sz)
+#if defined(_GLIBCXX_THROW)
+	_GLIBCXX_THROW (std::bad_alloc)
+#endif
+{
+	void * ptr = yymalloc (sz);
+	if (ptr == NULL) {
+		throw std::bad_alloc();
+	} else {
+		return ptr;
+	}
+}
+
+void operator delete (void * ptr)
+#if !defined(linux_)
+	throw ()
+#endif
+{
+	yyfree (ptr);
+}
+
+#if !defined(__SUNPRO_CC) || __SUNPRO_CC > 0x420
+void * operator new (size_t sz, const std::nothrow_t&) throw() {
+	return yymalloc(sz);
+}
+
+void * operator new[] (size_t size)
+#if defined(_GLIBCXX_THROW)
+	_GLIBCXX_THROW (std::bad_alloc)
+#endif
+{
+	//I don't want ifstream's constructor to initialize
+	//the allocator. So satisfy through myMalloc
+	if (opening_maps_file) {
+		void* p = myMalloc(size);
+		return p;
+	}
+	void * ptr = yymalloc(size);
+	if (ptr == NULL) {
+		throw std::bad_alloc();
+	} else {
+		return ptr;
+	}
+}
+
+void * operator new[] (size_t sz, const std::nothrow_t&)
+throw()
+{
+	return yymalloc(sz);
+}
+
+void operator delete[] (void * ptr)
+#if defined(_GLIBCXX_USE_NOEXCEPT)
+	_GLIBCXX_USE_NOEXCEPT
+#else
+#if defined(__GNUC__)
+	// clang + libcxx on linux
+	_NOEXCEPT
+#endif
+#endif
+{
+	yyfree (ptr);
+}
+
+#if defined(__cpp_sized_deallocation) && __cpp_sized_deallocation >= 201309
+
+void operator delete(void * ptr, size_t)
+#if !defined(linux_)
+	throw ()
+#endif
+{
+	yyfree (ptr);
+}
+
+void operator delete[](void * ptr, size_t)
+#if defined(__GNUC__)
+	_GLIBCXX_USE_NOEXCEPT
+#endif
+{
+	yyfree (ptr);
+}
+#endif
+
+#endif
+#endif
+*/
+
 void analyzeAllocation(size_t size, uint64_t address, uint64_t cycles, size_t classSize, bool* reused) {
 
 	//Analyzes for alignment and blowup
@@ -1041,7 +1161,7 @@ void analyzeFree(uint64_t address) {
 			if (!bibop) {
 				if (size < LARGE_OBJECT) {
 					Freelist* f;
-					if (freelistMap.find(0, &f)) {
+					if (freelistMap.find(SMALL_OBJECT, &f)) {
 						(*f).insert(address, newFreeObject(address, size));
 					}
 					else {
@@ -1157,7 +1277,7 @@ void getBlowup (size_t size, uint64_t address, size_t classSize, bool* reused) {
 	if (!bibop) {
 		if (size < LARGE_OBJECT) {
 
-			if (freelistMap.find(0, &freelist)) {
+			if (freelistMap.find(SMALL_OBJECT, &freelist)) {
 				for (auto f : (*freelist)) {
 					auto data = f.getData();
 					if (size <= data->size) {
@@ -1259,98 +1379,6 @@ size_t getClassSizeFor (size_t size) {
 	}
 	return sizeToReturn;
 }
-
-//I pulled these from OpenBSD's wrapper.cpp file
-//Changed OBSD's "CUSTOM_MALLOC" and "CUSTOM_FREE"
-//to our functions
-#ifndef NEW_INCLUDED
-#define NEW_INCLUDED
-
-void * operator new (size_t sz)
-#if defined(_GLIBCXX_THROW)
-	_GLIBCXX_THROW (std::bad_alloc)
-#endif
-{
-	void * ptr = yymalloc (sz);
-	if (ptr == NULL) {
-		throw std::bad_alloc();
-	} else {
-		return ptr;
-	}
-}
-
-void operator delete (void * ptr)
-#if !defined(linux_)
-	throw ()
-#endif
-{
-	yyfree (ptr);
-}
-
-#if !defined(__SUNPRO_CC) || __SUNPRO_CC > 0x420
-void * operator new (size_t sz, const std::nothrow_t&) throw() {
-	return yymalloc(sz);
-}
-
-void * operator new[] (size_t size)
-#if defined(_GLIBCXX_THROW)
-	_GLIBCXX_THROW (std::bad_alloc)
-#endif
-{
-	//I don't want ifstream's constructor to initialize
-	//the allocator. So satisfy through myMalloc
-	if (opening_maps_file) {
-		void* p = myMalloc(size);
-		return p;
-	}
-	void * ptr = yymalloc(size);
-	if (ptr == NULL) {
-		throw std::bad_alloc();
-	} else {
-		return ptr;
-	}
-}
-
-void * operator new[] (size_t sz, const std::nothrow_t&)
-throw()
-{
-	return yymalloc(sz);
-}
-
-void operator delete[] (void * ptr)
-#if defined(_GLIBCXX_USE_NOEXCEPT)
-	_GLIBCXX_USE_NOEXCEPT
-#else
-#if defined(__GNUC__)
-	// clang + libcxx on linux
-	_NOEXCEPT
-#endif
-#endif
-{
-	yyfree (ptr);
-}
-
-#if defined(__cpp_sized_deallocation) && __cpp_sized_deallocation >= 201309
-
-void operator delete(void * ptr, size_t)
-#if !defined(linux_)
-	throw ()
-#endif
-{
-	yyfree (ptr);
-}
-
-void operator delete[](void * ptr, size_t)
-#if defined(__GNUC__)
-	_GLIBCXX_USE_NOEXCEPT
-#endif
-{
-	yyfree (ptr);
-}
-#endif
-
-#endif
-#endif
 
 // Create tuple for hashmap
 ObjectTuple* newObjectTuple (uint64_t address, size_t size) {
@@ -1877,7 +1905,7 @@ void writeThreadMaps () {
         fprintf (thrData.output, "num malloc instr      %ld\n", p.second->numMallocInstrs);
         fprintf (thrData.output, "num Realloc instr     %ld\n", p.second->numReallocInstrs);
         fprintf (thrData.output, "num free instr        %ld\n", p.second->numFreeInstrs);
-        fprintf(thrData.output, "\n");
+        fprintf (thrData.output, "\n");
     }
 
     fprintf (thrData.output, "\n>>>>> TOTALS FROM FREELIST <<<<<\n");
@@ -1924,6 +1952,7 @@ void writeContention () {
 		fprintf (thrData.output, "lockAddr= %#lx  maxContention= %d\n",
 					lock.getKey(), lock.getData()->maxContention);
 
+	fflush(thrData.output);
 }
 
 void writeAddressUsage () {

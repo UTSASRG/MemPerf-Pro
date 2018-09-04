@@ -9,9 +9,8 @@ __thread extern thread_data thrData;
 
 extern "C" void printHashMap();
 extern "C" pid_t gettid();
+extern void* myMalloc(size_t);
 
-thread_local extern uint64_t numWaits;
-thread_local extern uint64_t timeWaiting;
 thread_local extern uint64_t thread_stack_start;
 
 class xthreadx {
@@ -26,7 +25,7 @@ class xthreadx {
 
 	public:
 	static int thread_create(pthread_t * tid, const pthread_attr_t * attr, threadFunction * fn, void * arg) {
-		thread_t * children = (thread_t *) RealX::malloc(sizeof(thread_t));
+		thread_t * children = (thread_t *) myMalloc(sizeof(thread_t));
 		children->thread = tid;
 		children->startArg = arg;
 		children->startRoutine = fn;
@@ -72,9 +71,7 @@ class xthreadx {
 			fprintf(stderr, "error: unable to get stack values: %s\n", strerror(errno));
 			abort();
 		}
-		char * firstHeapObj = (char *)RealX::malloc(sizeof(char));
 		thrData.stackStart = thrData.stackEnd + stackSize;
-		RealX::free(firstHeapObj);
 
 		fprintf(thrData.output, ">>> thread %d stack start @ %p, stack end @ %p\n", tid,
 				  thrData.stackStart, thrData.stackEnd);
@@ -82,9 +79,6 @@ class xthreadx {
 		initSampling();
 		result = current->startRoutine(current->startArg);
 		doPerfRead();
-
-		fprintf (thrData.output, ">>> numWaits = %zu\n", numWaits);
-		fprintf (thrData.output, ">>> timeWaiting = %zu\n", timeWaiting);
 
 		fclose(thrData.output);
 		return result;
@@ -108,10 +102,7 @@ class xthreadx {
 			abort();
 		}
 
-		char * firstHeapObj = (char *)RealX::malloc(sizeof(char));
 		thrData.stackStart = thrData.stackEnd + stackSize;
-		RealX::free(firstHeapObj);
-
 		initSampling();
 		result = current->startRoutine(current->startArg);
 		doPerfRead_noFile();

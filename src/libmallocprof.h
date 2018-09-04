@@ -3,7 +3,14 @@
 #define release std::memory_order_release
 #define CALLSITE_MAXIMUM_LENGTH 20
 #define ENTRY_SIZE 8
+//Keys to bump-pointer freelist hashmap.
+//512 is a large object for GlibC, and
+//will be placed on a large object freelist.
+//Hopefully other bp allocators are similar
 #define LARGE_OBJECT 512
+#define SMALL_OBJECT 0
+//Bump-pointer key to overhead hashmap
+#define BP_OVERHEAD 0
 #define PAGE_BITS 12 
 #define TEMP_MEM_SIZE 1024 * 1024 * 1024
 
