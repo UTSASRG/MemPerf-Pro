@@ -1,3 +1,5 @@
+#include "memsample.h"
+
 #define relaxed std::memory_order_relaxed
 #define acquire std::memory_order_acquire
 #define release std::memory_order_release
@@ -13,6 +15,7 @@
 #define BP_OVERHEAD 0
 #define PAGE_BITS 12 
 #define TEMP_MEM_SIZE 1024 * 1024 * 1024 //1GB
+#define MAX_CLASS_SIZE 1050000
 
 //Structures
 typedef struct {

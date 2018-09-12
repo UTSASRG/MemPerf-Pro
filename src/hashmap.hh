@@ -20,9 +20,7 @@
 
 void* myMalloc (size_t size);
 void myFree (void* ptr);
-void* allocNewThread (size_t size);
-void freeThread (void* ptr);
-bool DEBUG = false;
+bool debug_hashmap = false;
 
 template <class KeyType,                    // What is the key? A long or string
 		 class ValueType,                  // What is the value there?
@@ -133,7 +131,7 @@ template <class KeyType,                    // What is the key? A long or string
 				 assert(_initialized == true);
 				 size_t hindex = hashIndex(key, keylen);
 				 struct HashEntry* first = getHashEntry(hindex);
-				 if (DEBUG) printf (" IN FIND\n");
+				 if (debug_hashmap) printf (" IN FIND\n");
 
 				 bool isFound = false;
 					first->Lock();
@@ -158,7 +156,7 @@ template <class KeyType,                    // What is the key? A long or string
 				 first->Lock();
 				 insertEntry(first, key, keylen, value);
 				 first->Unlock();
-					if (DEBUG) printf ("Inserting into freelist first= %p, key= 0x%zx, value= %p\n", first, key, value);
+					if (debug_hashmap) printf ("Inserting into freelist first= %p, key= 0x%zx, value= %p\n", first, key, value);
 			 }
 
 			 // Insert a hash table entry if it is not existing.
@@ -241,14 +239,14 @@ template <class KeyType,                    // What is the key? A long or string
 
 				 // Check all _entries with the same hindex.
 				 int count = first->count;
-				 if (DEBUG) printf ("getEntry called, count= %d\n", count);
+				 if (debug_hashmap) printf ("getEntry called, count= %d\n", count);
 				 while(count > 0) {
 
-					 if (DEBUG) printf ("entry:key= %zu\n ", (unsigned long) entry->getKey());
+					 if (debug_hashmap) printf ("entry:key= %zu\n ", (unsigned long) entry->getKey());
 
 					 if(entry->keylen == keylen && _keycmp(entry->key, key, keylen)) {
 						 result = entry;
-						 if (DEBUG) printf ("key found\n");
+						 if (debug_hashmap) printf ("key found\n");
 						 break;
 					 }
 

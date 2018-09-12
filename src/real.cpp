@@ -7,6 +7,7 @@
 #define INIT_WRAPPER(name, handle) name = (decltype(::name)*)dlsym(handle, #name);
 
 extern bool realInitialized;
+
 namespace RealX {
 	DEFINE_WRAPPER(brk);
 	DEFINE_WRAPPER(sbrk);
@@ -24,7 +25,9 @@ namespace RealX {
     DEFINE_WRAPPER(mprotect);
 
 	void initializer() {
+
 		if (realInitialized) return;
+
 		INIT_WRAPPER(brk, RTLD_NEXT);
 		INIT_WRAPPER(sbrk, RTLD_NEXT);
 		INIT_WRAPPER(free, RTLD_NEXT);
@@ -39,8 +42,7 @@ namespace RealX {
 		INIT_WRAPPER(pthread_mutex_lock, RTLD_NEXT);
 		INIT_WRAPPER(pthread_mutex_unlock, RTLD_NEXT);
 		INIT_WRAPPER(pthread_mutex_trylock, RTLD_NEXT);
-		realInitialized = true;
 
-//        INIT_WRAPPER(mremap, RTLD_NEXT);
+		realInitialized = true;
 	}
 }
