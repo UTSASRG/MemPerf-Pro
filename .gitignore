@@ -2,4 +2,6 @@
 *.o
 */test/*
 !*/test/*.cpp
+.tags
 libmallocprof.so
+class_sizes.txt
