@@ -59,7 +59,7 @@ size_t totalSizeDiff = 0;
 size_t totalMemOverhead = 0;
 uint64_t min_pos_callsite_id;
 
-//Debugging flags
+//Debugging flags DEBUG
 const bool debug = false;
 const bool d_malloc_info = false;
 const bool d_mprotect = false;
@@ -70,12 +70,14 @@ const bool d_style = false;
 const bool d_getFreelist = false;
 const bool d_getClassSizes = false;
 const bool d_pmuData = false;
+const bool d_write_address = false;
+const bool d_write_mappings = true;
+const bool d_write_tad = false;
 
-//Atomic Globals
-std::atomic<std::uint64_t> cycles_free (0);
-std::atomic<std::uint64_t> cycles_new (0);
-std::atomic<std::uint64_t> cycles_reused (0);
-std::atomic<std::uint64_t> total_time_wait (0);
+//Atomic Globals ATOMIC
+std::atomic_bool mmap_active(false);
+std::atomic_bool sbrk_active(false);
+std::atomic_bool madvise_active(false);
 std::atomic_size_t summation_blowup_bytes (0);
 std::atomic_size_t free_bytes (0);
 std::atomic_size_t active_mem (0);
@@ -88,7 +90,6 @@ std::atomic_uint new_address (0);
 std::atomic_uint reused_address (0);
 std::atomic_uint num_pthread_mutex_locks (0);
 std::atomic_uint num_trylock (0);
-std::atomic_uint total_waits (0);
 std::atomic_uint num_dontneed (0);
 std::atomic_uint num_madvise (0);
 std::atomic_uint num_sbrk (0);
@@ -101,9 +102,11 @@ std::atomic_uint threads (0);
 std::atomic_uint blowup_allocations (0);
 std::atomic_uint summation_blowup_allocations (0);
 std::atomic_uint num_mprotect (0);
-std::atomic_uint num_operator_new (0);
-std::atomic_uint num_operator_delete (0);
 std::atomic_uint num_actual_malloc (0);
+std::atomic<std::uint64_t> cycles_free (0);
+std::atomic<std::uint64_t> cycles_new (0);
+std::atomic<std::uint64_t> cycles_reused (0);
+std::atomic<std::uint64_t> total_time_wait (0);
 
 //Vector of class sizes
 std::vector<size_t>* classSizes;
@@ -113,13 +116,12 @@ VmInfo vmInfo;
 
 //Thread local variables
 __thread thread_data thrData;
-thread_local uint64_t timeAttempted;
-thread_local uint64_t timeWaiting;
-thread_local uint64_t numWaits;
 thread_local bool waiting;
 thread_local bool inAllocation;
 thread_local bool inMmap;
 thread_local bool samplingInit = false;
+thread_local uint64_t timeAttempted;
+thread_local uint64_t timeWaiting;
 
 //Hashmap of thread IDs to class sizes to their thread_alloc_data structs
 typedef HashMap <uint64_t, thread_alloc_data*, spinlock> classSizeMap;
@@ -144,6 +146,9 @@ HashMap <uint64_t, Freelist*, spinlock> freelistMap;
 
 //Hashmap of Overhead objects
 HashMap <size_t, Overhead*, spinlock> overhead;
+
+//Hashmap of tid to ThreadContention*
+HashMap <uint64_t, ThreadContention*, spinlock> threadContention;
 
 //Spinlocks
 spinlock temp_mem_lock;
@@ -224,6 +229,7 @@ __attribute__((constructor)) initStatus initializer() {
 	mappings.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 	freelistMap.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 	overhead.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
+	threadContention.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 	mapsInitialized = true;
 
 	classSizes = new std::vector<size_t>();
@@ -437,17 +443,15 @@ extern "C" {
 			return ptr;
 		}
 		
-		if (inAllocation) {
-			return RealX::calloc(nelem, elsize);
-		}
+		if (inAllocation) return RealX::calloc(nelem, elsize);
+
+		if (!inRealMain) return RealX::calloc (nelem, elsize);
 
         //if the PMU sampler has not yet been set up for this thread, set it up now
         if(!samplingInit){
             initSampling();
             samplingInit = true;
         }
-
-		if (!inRealMain) return RealX::calloc (nelem, elsize);
 		
         //thread_local
 		inAllocation = true;
@@ -493,15 +497,7 @@ extern "C" {
 
 	void yyfree(void * ptr) {
 		if (!realInitialized) RealX::initializer();
-		
-		if(ptr == NULL)
-			return;
-
-        //if the PMU sampler has not yet been set up for this thread, set it up now
-        if(!samplingInit){
-            initSampling();
-            samplingInit = true;
-        }
+		if(ptr == NULL) return;
 
 		// Determine whether the specified object came from our global buffer;
 		// only call RealX::free() if the object did not come from here.
@@ -520,7 +516,13 @@ extern "C" {
 			return;
 		}
 
-		//Data we need for each allocation
+        //if the PMU sampler has not yet been set up for this thread, set it up now
+        if(!samplingInit){
+            initSampling();
+            samplingInit = true;
+        }
+
+		//Data we need for each free
         classSizeMap *csm;
 		PerfReadInfo before;
 		PerfReadInfo after;
@@ -548,7 +550,6 @@ extern "C" {
 		cycles_free.fetch_add ((tsc_after - tsc_before), relaxed);
 		num_free.fetch_add(1, relaxed);
        
-        //determine which size class the object being freed belonged to
 		csm = nullptr;
 		if(tadMap.find(tid, &csm)){
 			if(d_pmuData){
@@ -586,27 +587,23 @@ extern "C" {
 	}
 
 	void * yyrealloc(void * ptr, size_t sz) {
+
 		if (!realInitialized) RealX::initializer();
-		
-
-		if(profilerInitialized != INITIALIZED) {
+		if (profilerInitialized != INITIALIZED) {
 			if(ptr == NULL) return yymalloc(sz);
-
 			yyfree(ptr);
 			return yymalloc(sz);
 		}
+
+		if (!mapsInitialized) return RealX::realloc (ptr, sz);
+		if (inAllocation) return RealX::realloc (ptr, sz);
+		if (!inRealMain) return RealX::realloc (ptr, sz);
 
         //if the PMU sampler has not yet been set up for this thread, set it up now
         if(!samplingInit){
             initSampling();
             samplingInit = true;
         }
-		
-		if (!mapsInitialized) return RealX::realloc (ptr, sz);
-
-		if (inAllocation) return RealX::realloc (ptr, sz);
-
-		if (!inRealMain) return RealX::realloc (ptr, sz);
 
 		num_realloc.fetch_add(1, relaxed);
 
@@ -815,7 +812,7 @@ extern "C" {
 		return info;
 	}
 
-	// Intercept thread creation
+	// PTHREAD_CREATE
 	int pthread_create(pthread_t * tid, const pthread_attr_t * attr,
 							 void *(*start_routine)(void *), void * arg) {
 		if (!realInitialized) RealX::initializer();
@@ -825,6 +822,7 @@ extern "C" {
 		return result;
 	}
 
+	// PTHREAD_JOIN
 	int pthread_join(pthread_t thread, void **retval) {
 		if (!realInitialized) RealX::initializer();
 
@@ -833,10 +831,14 @@ extern "C" {
 		return result;
 	}
 
+	// PTHREAD_MUTEX_LOCK
 	int pthread_mutex_lock(pthread_mutex_t *mutex) {
 		if (!realInitialized) RealX::initializer();
 	
+		uint64_t tid = pthread_self();
 		uint64_t lockAddr = reinterpret_cast <uint64_t> (mutex);
+
+		ThreadContention* tc;
 
 		//Is this thread doing allocation
 		if (inAllocation) {
@@ -850,8 +852,6 @@ extern "C" {
 					thisLock->maxContention = thisLock->contention;
 
 				if (thisLock->contention > 1) {
-					numWaits++;
-					total_waits.fetch_add(1, relaxed);
 					waiting = true;
 					timeAttempted = rdtscp();
 				}
@@ -869,11 +869,26 @@ extern "C" {
 		if (waiting) {
 			timeWaiting += ((rdtscp()) - timeAttempted);
 			waiting = false;
-			total_time_wait.fetch_add (timeWaiting, relaxed);
+			if (threadContention.find(tid, &tc)) {
+				tc->mutex_waits++;
+				tc->mutex_wait_cycles += timeWaiting;
+			}
+			else {
+				threadContention.insertIfAbsent(tid, newThreadContention(tid));
+				if (threadContention.find(tid, &tc)) {
+					tc->mutex_waits++;
+					tc->mutex_wait_cycles += timeWaiting;
+				}
+				else {
+					fprintf(stderr, "failed to insert tid into threadContention, mutex\n");
+					abort();
+				}
+			}
 		}
 		return result;
 	}
 
+	// PTHREAD_MUTEX_TRYLOCK
 	int pthread_mutex_trylock (pthread_mutex_t *mutex) {
 		if (!realInitialized) RealX::initializer();
 
@@ -881,6 +896,8 @@ extern "C" {
 			return RealX::pthread_mutex_trylock (mutex);
 	
 		uint64_t lockAddr = reinterpret_cast <uint64_t> (mutex);
+		uint64_t tid = pthread_self();
+		ThreadContention* tc;
 
 		//Is this thread doing allocation
 		if (inAllocation) {
@@ -905,10 +922,24 @@ extern "C" {
 		int result = RealX::pthread_mutex_trylock (mutex);
 		if (result != 0) {
 			num_trylock.fetch_add(1, relaxed);
+			if (threadContention.find(tid, &tc)) {
+				tc->mutex_trylock_fails++;
+			}
+			else {
+				threadContention.insertIfAbsent(tid, newThreadContention(tid));
+				if (threadContention.find(tid, &tc)) {
+					tc->mutex_trylock_fails++;
+				}
+				else {
+					fprintf(stderr, "failed to insert tid into threadContention, mutex_trylock\n");
+					abort();
+				}
+			}
 		}
 		return result;
 	}
 
+	// PTHREAD_MUTEX_UNLOCK
 	int pthread_mutex_unlock(pthread_mutex_t *mutex) {
 		if (!realInitialized) RealX::initializer();
 
@@ -927,21 +958,90 @@ extern "C" {
 		return RealX::pthread_mutex_unlock (mutex);
 	}
 
+	// MADVISE
 	int madvise(void *addr, size_t length, int advice){
 		if (!realInitialized) RealX::initializer();
 
 		if (advice == MADV_DONTNEED)
 			num_dontneed.fetch_add(1, relaxed);
 
-		num_madvise.fetch_add(1, relaxed);
-		return RealX::madvise(addr, length, advice);
+		uint64_t timeStart = 0;
+		uint64_t timeStop = 0;
+		bool madvise_wait = false;
+		ThreadContention* tc;
+		uint64_t tid = pthread_self();
+
+		if (madvise_active.load()) {
+			madvise_wait = true;
+			timeStart = rdtscp();
+		}
+
+		madvise_active = true;
+		int result = RealX::madvise(addr, length, advice);
+		madvise_active = false;
+
+		if (madvise_wait) {
+			timeStop = rdtscp();
+
+			if (threadContention.find(tid, &tc)) {
+				tc->madvise_waits++;
+				tc->madvise_wait_cycles += (timeStop - timeStart);
+			}
+			else {
+				threadContention.insertIfAbsent(tid, newThreadContention(tid));
+				if (threadContention.find(tid, &tc)) {
+					tc->madvise_waits++;
+					tc->madvise_wait_cycles += (timeStop - timeStart);
+				}
+				else {
+					fprintf(stderr, "failed to insert tid into threadContention, mmap\n");
+					abort();
+				}
+			}
+		}
+		return result;
 	}
 
+	// SBRK
     void *sbrk(intptr_t increment){
 		if (!realInitialized) RealX::initializer();
         if(profilerInitialized != INITIALIZED) return RealX::sbrk(increment);
 
+		uint64_t timeStart = 0;
+		uint64_t timeStop = 0;
+		bool sbrk_wait = false;
+		ThreadContention* tc;
+		uint64_t tid = pthread_self();
+
+		if (sbrk_active.load()) {
+			sbrk_wait = true;
+			timeStart = rdtscp();
+		}
+
+		sbrk_active = true;
         void *retptr = RealX::sbrk(increment);
+		sbrk_active = false;
+
+		if (sbrk_wait) {
+			timeStop = rdtscp();
+
+			if (threadContention.find(tid, &tc)) {
+				tc->sbrk_waits++;
+				tc->sbrk_wait_cycles += (timeStop - timeStart);
+			}
+			else {
+				threadContention.insertIfAbsent(tid, newThreadContention(tid));
+				if (threadContention.find(tid, &tc)) {
+					tc->sbrk_waits++;
+					tc->sbrk_wait_cycles += (timeStop - timeStart);
+				}
+				else {
+					fprintf(stderr, "failed to insert tid into threadContention, mmap\n");
+					abort();
+				}
+			}
+		}
+
         uint64_t newProgramBreak = (uint64_t) RealX::sbrk(0);
         uint64_t oldProgramBreak = (uint64_t) retptr;
         uint64_t sizeChange = newProgramBreak - oldProgramBreak;
@@ -952,6 +1052,7 @@ extern "C" {
         return retptr;
     }
 
+	// MPROTECT
 	int mprotect (void* addr, size_t len, int prot) {
 		if (!realInitialized) RealX::initializer();
 
@@ -963,6 +1064,7 @@ extern "C" {
 		return RealX::mprotect (addr, len, prot);
 	}
 
+	// MMAP
 	void * yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset) {
 		if (!realInitialized) RealX::initializer();
 
@@ -970,14 +1072,53 @@ extern "C" {
 
 		if (inMmap) return RealX::mmap (addr, length, prot, flags, fd, offset);
 
+		uint64_t timeStart = 0;
+		uint64_t timeStop = 0;
+		bool mmap_wait = false;
+
+		if (mmap_active.load()) {
+			timeStart = rdtscp();
+			mmap_wait = true;
+		}
+
+		ThreadContention* tc;
+		uint64_t tid = pthread_self();
+
+		//thread_local
 		inMmap = true;
+
+		//global atomic
+		mmap_active = true;
 		void* retval = RealX::mmap(addr, length, prot, flags, fd, offset);
+		mmap_active = false;
+
+		if (mmap_wait) {
+			timeStop = rdtscp();
+			if (threadContention.find(tid, &tc)) {
+				tc->mmap_waits++;
+				tc->mmap_wait_cycles += (timeStop - timeStart);
+			}
+			else {
+				threadContention.insertIfAbsent(tid, newThreadContention(tid));
+				if (threadContention.find(tid, &tc)) {
+					tc->mmap_waits++;
+					tc->mmap_wait_cycles += (timeStop - timeStart);
+				}
+				else {
+					fprintf(stderr, "failed to insert tid into threadContention, mmap\n");
+					abort();
+				}
+			}
+		}
+
 		uint64_t address = reinterpret_cast <uint64_t> (retval);
 
+		//If getting mmap threshold no need to save data
 		if (inGetMmapThreshold) {
 			malloc_mmap_threshold = length;
 			mmap_found = true;
 			inMmap = false;
+			mmap_active = false;
 			return retval;
 		}
 
@@ -1330,6 +1471,13 @@ MmapTuple* newMmapTuple (uint64_t address, size_t length, int prot, char origin)
 	t->tid = gettid();
 	t->allocations = 0;
 	return t;
+}
+
+ThreadContention* newThreadContention (uint64_t threadID) {
+
+	ThreadContention* tc = (ThreadContention*) myMalloc (sizeof (ThreadContention));
+	tc->tid = threadID;
+	return tc;
 }
 
 LC* newLC () {
@@ -1726,18 +1874,15 @@ void writeAllocData () {
 	unsigned print_new_address = new_address.load(relaxed);
 	unsigned print_reused_address = reused_address.load(relaxed);
 	unsigned print_num_free = num_free.load(relaxed);
-	unsigned print_total_waits = total_waits.load(relaxed);
 
 	fprintf(thrData.output, "\n");
 	fprintf(thrData.output, ">>> num_malloc               %u\n", num_malloc.load(relaxed));
 	fprintf(thrData.output, ">>> num_actual_malloc        %u\n", num_actual_malloc.load(relaxed));
 	fprintf(thrData.output, ">>> num_calloc               %u\n", num_calloc.load(relaxed));
 	fprintf(thrData.output, ">>> num_realloc              %u\n", num_realloc.load(relaxed));
-	fprintf(thrData.output, ">>> num_operator_new         %u\n", num_operator_new.load(relaxed));
 	fprintf(thrData.output, ">>> new_address              %u\n", print_new_address);
 	fprintf(thrData.output, ">>> reused_address           %u\n", print_reused_address);
 	fprintf(thrData.output, ">>> num_free                 %u\n", print_num_free);
-	fprintf(thrData.output, ">>> num_operator_delete      %u\n", num_operator_delete.load(relaxed));
 	fprintf(thrData.output, ">>> malloc_mmaps             %u\n", malloc_mmaps.load(relaxed));
 	fprintf(thrData.output, ">>> total_mmaps              %u\n", total_mmaps.load(relaxed));
 	fprintf(thrData.output, ">>> malloc_mmap_threshold    %zu\n", malloc_mmap_threshold);
@@ -1762,13 +1907,7 @@ void writeAllocData () {
 	fprintf(thrData.output, ">>> cycles_free              N/A\n");
 
 	fprintf(thrData.output, ">>> pthread_mutex_lock       %u\n", num_pthread_mutex_locks.load(relaxed));
-	fprintf(thrData.output, ">>> total_waits              %u\n", print_total_waits);
 	fprintf(thrData.output, ">>> num_trylock              %u\n", num_trylock.load(relaxed));
-
-	if (print_total_waits) 
-	fprintf(thrData.output, ">>> avg_wait_time            %lu\n",
-							(total_time_wait.load(relaxed) / print_total_waits));
-
 	fprintf(thrData.output, ">>> num_madvise              %u\n", num_madvise.load(relaxed));
     fprintf(thrData.output, ">>> num_dontneed             %u\n", num_dontneed.load(relaxed));
 	fprintf(thrData.output, ">>> num_sbrk                 %u\n", num_sbrk.load(relaxed));
@@ -1794,11 +1933,32 @@ void writeAllocData () {
 	fprintf(thrData.output, ">>> summation_blowup_allocations   %u\n", summation_blowup_allocations.load(relaxed));
 
 	writeOverhead();
-	writeAddressUsage();
-	writeMappings();
-//	writeThreadMaps();
+	if (d_write_address) writeAddressUsage();
+	if (d_write_mappings) writeMappings();
+	if (d_write_tad) writeThreadMaps();
+	writeThreadContention();
 
 	fflush (thrData.output);
+}
+
+void writeThreadContention() {
+
+	fprintf (thrData.output, "\n--------------------ThreadContention--------------------\n\n");
+
+	for (auto tc : threadContention) {
+		auto data = tc.getData();
+
+		fprintf (thrData.output, ">>> tid                  %lu\n", data->tid);
+		fprintf (thrData.output, ">>> mutex_waits          %lu\n", data->mutex_waits);
+		fprintf (thrData.output, ">>> mutex_wait_cycles    %lu\n", data->mutex_wait_cycles);
+		fprintf (thrData.output, ">>> mutex_trylock_fails  %lu\n", data->mutex_trylock_fails);
+		fprintf (thrData.output, ">>> mmap_waits           %lu\n", data->mmap_waits);
+		fprintf (thrData.output, ">>> mmap_wait_cycles     %lu\n", data->mmap_wait_cycles);
+		fprintf (thrData.output, ">>> sbrk_waits           %lu\n", data->sbrk_waits);
+		fprintf (thrData.output, ">>> sbrk_wait_cycles     %lu\n", data->sbrk_wait_cycles);
+		fprintf (thrData.output, ">>> madvise_waits        %lu\n", data->madvise_waits);
+		fprintf (thrData.output, ">>> madvise_wait_cycles  %lu\n\n", data->madvise_wait_cycles);
+	}
 }
 
 void writeThreadMaps () {
@@ -1858,7 +2018,7 @@ void writeThreadMaps () {
         fprintf (thrData.output, "num Realloc instr     %ld\n\n", p.second->numReallocInstrsFFL);
     }
 }
-
+ 
 void writeOverhead () {
 
 	fprintf (thrData.output, "\n-------------Overhead-------------\n");
@@ -1866,8 +2026,8 @@ void writeOverhead () {
 
 		auto key = o.getKey();
 		auto data = o.getData();
-		fprintf (thrData.output, ">>> classSize %zu\tmetadata %zu\tblowup %zu\talignment %zu\n",
-				 key, data->getMetadata(), data->getBlowup(), data->getAlignment());
+		fprintf (thrData.output, "classSize %s:\nmetadata %zu\nblowup %zu\nalignment %zu\n\n",
+				 key ? std::to_string(key).c_str() : "BumpPointer", data->getMetadata(), data->getBlowup(), data->getAlignment());
 	}
 }
 

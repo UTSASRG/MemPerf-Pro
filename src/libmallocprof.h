@@ -5,19 +5,35 @@
 #define release std::memory_order_release
 #define CALLSITE_MAXIMUM_LENGTH 20
 #define ENTRY_SIZE 8
+
 //Keys to bump-pointer freelist hashmap.
 //512 is a large object for GlibC, and
 //will be placed on a large object freelist.
 //Hopefully other bp allocators are similar
 #define LARGE_OBJECT 512
 #define SMALL_OBJECT 0
+
 //Bump-pointer key to overhead hashmap
 #define BP_OVERHEAD 0
+
 #define PAGE_BITS 12 
 #define TEMP_MEM_SIZE 1024 * 1024 * 1024 //1GB
 #define MAX_CLASS_SIZE 1050000
 
 //Structures
+typedef struct {
+	uint64_t tid = 0;
+	uint64_t mutex_waits = 0;
+	uint64_t mutex_wait_cycles = 0;
+	uint64_t mutex_trylock_fails = 0;
+	uint64_t mmap_waits = 0;
+	uint64_t mmap_wait_cycles = 0;
+	uint64_t sbrk_waits = 0;
+	uint64_t sbrk_wait_cycles = 0;
+	uint64_t madvise_waits = 0;
+	uint64_t madvise_wait_cycles = 0;
+} ThreadContention;
+
 typedef struct {
 	uint64_t addr;
 	size_t size;
@@ -113,6 +129,7 @@ void writeAllocData ();
 void writeContention ();
 void writeMappings();
 void writeOverhead();
+void writeThreadContention();
 void writeThreadMaps();
 void writeAddressUsage ();
 void* myMalloc (size_t size);
@@ -121,4 +138,5 @@ FreeObject* newFreeObject (uint64_t addr, uint64_t size);
 LC* newLC ();
 MmapTuple* newMmapTuple (uint64_t address, size_t length, int prot, char origin);
 ObjectTuple* newObjectTuple (uint64_t address, size_t size);
+ThreadContention* newThreadContention (uint64_t);
 thread_alloc_data* newTad();
