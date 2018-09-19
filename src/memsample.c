@@ -121,11 +121,13 @@ void setupSampling(void) {
 	//Exclude_xxx: Do not sample a specified side of events, 
 	//user, kernel, or hypevisor
 	//pe_fault.exclude_user = 0;
-	pe_fault.exclude_kernel = 0;
+	pe_fault.exclude_kernel = 1;
 	pe_fault.exclude_hv = 1;
 
 	//Precise_ip: This controls the amount of skid. See perf_event.h
 	pe_fault.precise_ip = 1;
+	pe_fault.freq = 0;
+	pe_fault.sample_period = 10000;
 
 	//Sample_id_all: TID, TIME, ID, STREAM_ID, and CPU added to every sample.
 	pe_fault.sample_id_all = 0;

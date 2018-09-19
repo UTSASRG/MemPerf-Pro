@@ -72,7 +72,7 @@ const bool d_getClassSizes = false;
 const bool d_pmuData = false;
 const bool d_write_address = false;
 const bool d_write_mappings = true;
-const bool d_write_tad = false;
+const bool d_write_tad = true;
 
 //Atomic Globals ATOMIC
 std::atomic_bool mmap_active(false);
