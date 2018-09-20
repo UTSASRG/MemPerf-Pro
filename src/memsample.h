@@ -73,7 +73,8 @@ typedef struct {
 
 typedef struct {
 	int perf_fd_fault;
-	int perf_fd_tlb;
+	int perf_fd_tlb_reads;
+	int perf_fd_tlb_writes;
 	int perf_fd_cache_miss;
     int perf_fd_cache_ref;
     int perf_fd_instr;
@@ -92,7 +93,8 @@ typedef struct {            //struct for holding data about allocations
     int64_t numReallocFaults;
     int64_t numFreeFaults;
 
-    int64_t numMallocTlbMisses;
+    int64_t numMallocTlbReadMisses;
+    int64_t numMallocTlbWriteMisses;
     int64_t numReallocTlbMisses;
     int64_t numFreeTlbMisses;
 

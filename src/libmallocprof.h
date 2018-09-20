@@ -71,7 +71,8 @@ typedef struct {
 
 typedef struct {
 	uint64_t faults = 0;
-	uint64_t tlb_misses = 0;
+	uint64_t tlb_read_misses = 0;
+	uint64_t tlb_write_misses = 0;
 	uint64_t cache_misses = 0;
 	uint64_t cache_refs = 0;
 	uint64_t instructions = 0;
