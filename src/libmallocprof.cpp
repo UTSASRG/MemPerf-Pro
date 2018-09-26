@@ -2473,6 +2473,7 @@ void collectAllocMetaData(allocation_metadata *metadata) {
 				metadata->tad->numMallocCacheRefsFFL += metadata->after.cache_refs - metadata->before.cache_refs;
 				metadata->tad->numMallocInstrsFFL += metadata->after.instructions - metadata->before.instructions;
 			}
+			break;
 		case REALLOC:
 			if (!metadata->reused){
 				metadata->tad->numReallocs += 1;
@@ -2492,6 +2493,7 @@ void collectAllocMetaData(allocation_metadata *metadata) {
 				metadata->tad->numReallocCacheRefsFFL += metadata->after.cache_refs - metadata->before.cache_refs;
 				metadata->tad->numReallocInstrsFFL += metadata->after.instructions - metadata->before.instructions;
 			}
+			break;
 		case CALLOC:
 			if (!metadata->reused){
 				metadata->tad->numCallocs += 1;
@@ -2511,6 +2513,7 @@ void collectAllocMetaData(allocation_metadata *metadata) {
 				metadata->tad->numCallocCacheRefsFFL += metadata->after.cache_refs - metadata->before.cache_refs;
 				metadata->tad->numCallocInstrsFFL += metadata->after.instructions - metadata->before.instructions;
 			}
+			break;
 	}
 }
 
