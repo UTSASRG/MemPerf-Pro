@@ -26,6 +26,8 @@
 #define NO_CALLSITE 0xffffffffffffffff
 #define LOAD_ACCESS 0x1cd
 #define STORE_ACCESS 0x2cd
+//#define LOAD_ACCESS 0x81d0
+//#define STORE_ACCESS 0x82d0
 #define MALLOC_HEADER_SIZE (sizeof(size_t))
 #define EIGHT_BYTES 8
 #define EIGHT_MB 8388608
