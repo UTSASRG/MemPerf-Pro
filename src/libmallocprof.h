@@ -71,7 +71,8 @@ typedef struct {
 
 typedef struct {
 	uint64_t faults = 0;
-	uint64_t tlb_misses = 0;
+	uint64_t tlb_read_misses = 0;
+	uint64_t tlb_write_misses = 0;
 	uint64_t cache_misses = 0;
 	uint64_t cache_refs = 0;
 	uint64_t instructions = 0;
@@ -87,6 +88,7 @@ struct stack_frame {
 	void * caller_address;		// the address of caller
 };
 
+
 //Enumerations
 enum initStatus{            //enum to keep track of libmallocprof's constuction status 
     INIT_ERROR = -1,        //allocation calls are just passed on to RealX if libmallocprof isn't ready
@@ -95,19 +97,52 @@ enum initStatus{            //enum to keep track of libmallocprof's constuction 
     INITIALIZED = 2
 };
 
+
+/*
+ * AllocType
+ *
+ *    Tracks which type of metadata should we obtain and
+ *    what to add to the collected metadata
+ */
+enum memAllocType {
+	REALLOC,
+	MALLOC,
+	CALLOC,
+	FREE
+};
+
+
+typedef struct  {
+	bool reused;
+	pid_t tid;
+	PerfReadInfo before;
+	PerfReadInfo after;
+	size_t size;
+	size_t classSize;
+	uint64_t cycles;
+	uint64_t address;
+	uint64_t tsc_before;
+	uint64_t tsc_after;
+	enum memAllocType type;
+	thread_alloc_data *tad;
+} allocation_metadata;
+
+
 // Functions 
 bool mappingEditor (void* addr, size_t len, int prot);
 inline bool isAllocatorInCallStack();
 inline size_t getClassSizeFor(size_t size);
 int num_used_pages(uintptr_t vstart, uintptr_t vend);
 int find_page(uintptr_t vstart, uintptr_t vend);
-void analyzePerfInfo(PerfReadInfo*, PerfReadInfo*, size_t, bool*, pid_t);
-void analyzeAllocation(size_t size, uint64_t address, uint64_t cycles, size_t, bool*);
+// void analyzePerfInfo(PerfReadInfo*, PerfReadInfo*, size_t, bool*, pid_t);
+void analyzePerfInfo(allocation_metadata *metadata);
+// void analyzeAllocation(size_t size, uint64_t address, uint64_t cycles, size_t, bool*);
+void analyzeAllocation(allocation_metadata *metadata);
 size_t analyzeFree(uint64_t);
 void calculateMemOverhead ();
 void clearFreelists();
-void doBefore(PerfReadInfo*, uint64_t*);
-void doAfter(PerfReadInfo*, uint64_t*);
+void doBefore(allocation_metadata *metadata);
+void doAfter(allocation_metadata *metadata);
 void get_bp_metadata();
 void get_bibop_metadata();
 void getAddressUsage(size_t size, uint64_t address, size_t classSize, uint64_t cycles);
@@ -140,3 +175,4 @@ MmapTuple* newMmapTuple (uint64_t address, size_t length, int prot, char origin)
 ObjectTuple* newObjectTuple (uint64_t address, size_t size);
 ThreadContention* newThreadContention (uint64_t);
 thread_alloc_data* newTad();
+allocation_metadata init_allocation(size_t sz, enum memAllocType type);

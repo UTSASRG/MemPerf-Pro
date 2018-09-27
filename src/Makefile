@@ -50,6 +50,8 @@ TARGETS =	libmallocprof.so 			\
 			test/pmu-dieharder-test		\
 			test/pmu-freeguard-test		\
 
+default: threads
+
 all: $(TARGETS)
 
 single:		libmallocprof.so \
@@ -69,7 +71,6 @@ threads:	libmallocprof.so \
 
 pmu: test/pmu-libc-test test/pmu-obsd-test test/pmu-dieharder-test test/pmu-freeguard-test
 
-TEST_FILE = ntest.cpp
 THREADTEST_FILE = threadTest.cpp
 
 # Libmallocprof
