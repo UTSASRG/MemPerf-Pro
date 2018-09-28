@@ -5,3 +5,4 @@
 .tags
 libmallocprof.so
 class_sizes.txt
+cscope.*
