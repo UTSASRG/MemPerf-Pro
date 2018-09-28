@@ -151,9 +151,7 @@ typedef struct {            //struct for holding data about allocations
     int64_t numCallocInstrsFFL;
 } thread_alloc_data;
 
-//void getPerfInfo(int64_t *, int64_t *, int64_t *, int64_t *, int64_t *);
 int initSampling(void);
 void setupSampling(void);
 void doPerfRead(void);
-void doPerfRead_noFile(void);
 #endif

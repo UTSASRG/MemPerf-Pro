@@ -152,9 +152,6 @@ HashMap <uint64_t, ThreadContention*, spinlock> threadContention;
 
 //Spinlocks
 spinlock temp_mem_lock;
-spinlock getFreelistLock;
-spinlock freelistLock;
-spinlock mappingsLock;
 
 //Functions
 Freelist* getFreelist (size_t size);
@@ -212,9 +209,6 @@ __attribute__((constructor)) initStatus initializer() {
 	realInitialized = true;
 
 	temp_mem_lock.init ();
-	getFreelistLock.init ();
-	freelistLock.init();
-	mappingsLock.init();
 	pid = getpid();
 
 	// Calculate the minimum possible callsite ID by taking the low four bytes
@@ -223,13 +217,13 @@ __attribute__((constructor)) initStatus initializer() {
 	uint64_t btext = (uint64_t)&__executable_start & 0xFFFFFFFF;
 	min_pos_callsite_id = (btext << 32) | btext;
 
-    tadMap.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
-	addressUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
-	lockUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
-	mappings.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
-	freelistMap.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
-	overhead.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
-	threadContention.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
+	tadMap.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 65536);
+	addressUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 65536);
+	lockUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 65536);
+	mappings.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 65536);
+	freelistMap.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 65536);
+	overhead.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 65536);
+	threadContention.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 65536);
 	mapsInitialized = true;
 
 	classSizes = new std::vector<size_t>();
@@ -301,29 +295,35 @@ __attribute__((constructor)) initStatus initializer() {
 __attribute__((destructor)) void finalizer_mallocprof () {}
 
 void exitHandler() {
-
 	inRealMain = false;
+	#ifndef NO_PMU
 	doPerfRead();
+	#endif
 	getMemUsageEnd();
 	calculateMemOverhead();
-	fflush(thrData.output);
-    globalizeThreadAllocData();
+	if(thrData.output) {
+		fflush(thrData.output);
+	}
+  globalizeThreadAllocData();
 	writeAllocData();
 	writeContention();
-	fclose(thrData.output);
+	if(thrData.output) {
+		fclose(thrData.output);
+	}
 }
 
 // MallocProf's main function
 int libmallocprof_main(int argc, char ** argv, char ** envp) {
-
-   // Register our cleanup routine as an on-exit handler.
+	// Register our cleanup routine as an on-exit handler.
 	atexit(exitHandler);
 
-    //if the PMU sampler has not yet been set up for this thread, set it up now
-    if(!samplingInit){
-	    initSampling();
-        samplingInit = true;
-    }
+	#ifndef NO_PMU
+	// If the PMU sampler has not yet been set up for this thread, set it up now
+	if(!samplingInit){
+			initSampling();
+			samplingInit = true;
+	}
+	#endif
 
 	inRealMain = true;
 	return real_main_mallocprof (argc, argv, envp);
@@ -383,8 +383,8 @@ extern "C" {
 
         //if the PMU sampler has not yet been set up for this thread, set it up now
         if(!samplingInit){
-            initSampling();
             samplingInit = true;
+            initSampling();
         }
 
 		if (!inRealMain) return RealX::malloc(sz);
@@ -1100,24 +1100,18 @@ extern "C" {
 		if (inAllocation) {
 			if (d_mmap) printf ("mmap direct from allocation function: length= %zu, prot= %d\n", length, prot);
 			malloc_mmaps.fetch_add (1, relaxed);
-			mappingsLock.lock();
 			mappings.insert(address, newMmapTuple(address, length, prot, 'a'));
-			mappingsLock.unlock();
 		}
 
 		//Need to check if selfmap.getInstance().getTextRegions() has
 		//ran. If it hasn't, we can't call isAllocatorInCallStack()
 		else if (selfmapInitialized && isAllocatorInCallStack()) {
 			if (d_mmap) printf ("mmap allocator in callstack: length= %zu, prot= %d\n", length, prot);
-			mappingsLock.lock();
 			mappings.insert(address, newMmapTuple(address, length, prot, 's'));
-			mappingsLock.unlock();
 		}
 		else {
 			if (d_mmap) printf ("mmap from unknown source: length= %zu, prot= %d\n", length, prot);
-			mappingsLock.lock();
 			mappings.insert(address, newMmapTuple(address, length, prot, 'u'));
-			mappingsLock.unlock();
 		}
 
 		total_mmaps++;
@@ -1127,34 +1121,20 @@ extern "C" {
 	}
 }//End of extern "C"
 
-void * operator new[] (size_t size)
-#if defined(_GLIBCXX_THROW)
-	_GLIBCXX_THROW (std::bad_alloc)
-#endif
-{
-	if (opening_maps_file) {
-		void* p = myMalloc(size);
-		return p;
-	}
-	void * ptr = yymalloc(size);
-	if (ptr == NULL) {
-		throw std::bad_alloc();
-	} else {
-		return ptr;
-	}
+void * operator new (size_t sz) {
+		return yymalloc(sz);
 }
 
-void operator delete[] (void * ptr)
-#if defined(_GLIBCXX_USE_NOEXCEPT)
-	_GLIBCXX_USE_NOEXCEPT
-#else
-#if defined(__GNUC__)
-	// clang + libcxx on linux
-	_NOEXCEPT
-#endif
-#endif
-{
-	yyfree (ptr);
+void operator delete (void * ptr) __THROW {
+		yyfree (ptr);
+}
+
+void * operator new[] (size_t size) {
+		return yymalloc(size);
+}
+
+void operator delete[] (void * ptr) __THROW {
+		yyfree (ptr);
 }
 
 // void analyzeAllocation(size_t size, uint64_t address, uint64_t cycles, size_t classSize, bool* reused) {
@@ -1193,7 +1173,7 @@ size_t analyzeFree(uint64_t address) {
 		//Add this object to it's Freelist
 		//If bump pointer, add to freelistMap[0]
 		if (size <= malloc_mmap_threshold) {
-			freelistLock.lock();
+			//freelistLock.lock();
 			if (!bibop) {
 				if (size < LARGE_OBJECT) {
 					Freelist* f;
@@ -1222,7 +1202,7 @@ size_t analyzeFree(uint64_t address) {
 				Freelist* f = getFreelist(size);
 				(*f).insert(address, newFreeObject(address, size));
 			}
-			freelistLock.unlock();
+			//freelistLock.unlock();
 		}
 	}
 
@@ -1260,7 +1240,6 @@ void getAddressUsage(size_t size, uint64_t address, size_t classSize, uint64_t c
 
 void getMappingsUsage(size_t size, uint64_t address, size_t classSize) {
 
-	mappingsLock.lock();
 	for (auto entry : mappings) {
 		auto data = entry.getData();
 		if (data->start <= address && address <= data->end) {
@@ -1268,7 +1247,6 @@ void getMappingsUsage(size_t size, uint64_t address, size_t classSize) {
 			break;
 		}
 	}
-	mappingsLock.unlock();
 }
 
 void getOverhead (size_t size, uint64_t address, size_t classSize, bool* reused) {
@@ -1307,7 +1285,7 @@ void getAlignment (size_t size, size_t classSize) {
 
 void getBlowup (size_t size, uint64_t address, size_t classSize, bool* reused) {
 
-	freelistLock.lock();
+	//freelistLock.lock();
 	Freelist* freelist;
 	bool reuseFreePossible = false;
 	bool reuseFreeObject = false;
@@ -1383,7 +1361,7 @@ void getBlowup (size_t size, uint64_t address, size_t classSize, bool* reused) {
 		blowup_allocations.fetch_add(1, relaxed);
 	}
 
-	freelistLock.unlock();
+	//freelistLock.unlock();
 
 	//If there is enough free bytes to satisfy the allocation
 	//Regardless of where they came from, such as memory that
@@ -2113,7 +2091,6 @@ void writeMappings () {
 //Get the freelist for this objects class size
 Freelist* getFreelist (size_t size) {
 
-	getFreelistLock.lock();
 	Freelist* f = nullptr;
 
 	if (classSizes->empty()) {
@@ -2136,7 +2113,6 @@ Freelist* getFreelist (size_t size) {
 		abort();
 	}
 
-	getFreelistLock.unlock();
 	return f;
 }
 
@@ -2514,6 +2490,7 @@ void collectAllocMetaData(allocation_metadata *metadata) {
 				metadata->tad->numCallocInstrsFFL += metadata->after.instructions - metadata->before.instructions;
 			}
 			break;
+		default: ;
 	}
 }
 
