@@ -219,10 +219,10 @@ __attribute__((constructor)) initStatus initializer() {
 	uint64_t btext = (uint64_t)&__executable_start & 0xFFFFFFFF;
 	min_pos_callsite_id = (btext << 32) | btext;
 
-	tadMap.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
+	tadMap.initialize(HashFuncs::hashInt, HashFuncs::compareInt, 128);
 	addressUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 	lockUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 128);
-	freelistMap.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
+	freelistMap.initialize(HashFuncs::hashInt, HashFuncs::compareInt, 64);
 	smallFreelistMap.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 	largeFreelistMap.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 	overhead.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
@@ -233,6 +233,7 @@ __attribute__((constructor)) initStatus initializer() {
     allocator_name = (char *) myMalloc(100 * sizeof(char));
 
 	void * program_break = RealX::sbrk(0);
+	thrData.tid = syscall(__NR_gettid);
 	thrData.stackStart = (char *)__builtin_frame_address(0);
 	thrData.stackEnd = (char *)__libc_stack_end;
 
@@ -415,7 +416,7 @@ extern "C" {
 		allocData.address = reinterpret_cast <uint64_t> (object);
 
 		// Gets overhead, address usage, mmap usage, memHWM, and prefInfo
-		//analyzeAllocation(&allocData);
+		analyzeAllocation(&allocData);
 
 
 		// thread_local
@@ -502,7 +503,7 @@ extern "C" {
         }
 
 		//Data we need for each free
-        classSizeMap *csm;
+				classSizeMap *csm;
 		allocation_metadata allocData = init_allocation(0, FREE);
 		allocData.address = reinterpret_cast <uint64_t> (ptr);
 
@@ -543,6 +544,7 @@ extern "C" {
 			}
 		}
 
+		//printf("classSizeMap associated with tadMap %p = %p\n", &tadMap, csm);
 		if (((allocData.after.instructions - allocData.before.instructions) != 0) && d_pmuData){
 			fprintf(stderr, "Free from thread %d\n"
 							"Num faults:              %ld\n"
@@ -613,7 +615,7 @@ extern "C" {
 		analyzeAllocation(&allocData);
 
 		//Get perf info
-		// analyzePerfInfo(&before, &after, classSize, &reused, tid);
+		//analyzePerfInfo(&before, &after, classSize, &reused, tid);
 
 		//thread_local
 		inAllocation = false;
@@ -921,13 +923,15 @@ extern "C" {
 		if (!mapsInitialized)
 			return RealX::pthread_mutex_unlock (mutex);
 
-		uint64_t lockAddr = reinterpret_cast <uint64_t> (mutex);
+		if (inAllocation) {
+				uint64_t lockAddr = reinterpret_cast <uint64_t> (mutex);
 
-		//Decrement contention on this LC if this lock is
-		//in our map
-		LC* thisLock;
-		if (lockUsage.find (lockAddr, &thisLock)) {
-			thisLock->contention--;
+				//Decrement contention on this LC if this lock is
+				//in our map
+				LC* thisLock;
+				if (lockUsage.find (lockAddr, &thisLock)) {
+						thisLock->contention--;
+				}
 		}
 
 		return RealX::pthread_mutex_unlock (mutex);
@@ -2476,9 +2480,7 @@ void analyzePerfInfo(allocation_metadata *metadata) {
 			allThreadsTadMap[0] = newTad();
 			tadMap.insertIfAbsent(metadata->tid, csm);
 		}
-	}
-
-	else {
+	} else {
 		if (!tadMap.find(metadata->tid, &csm)){
 			csm = (classSizeMap*) myMalloc(sizeof(classSizeMap));
 			csm->initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
@@ -2488,19 +2490,16 @@ void analyzePerfInfo(allocation_metadata *metadata) {
 		tadMap.insertIfAbsent(metadata->tid, csm);
 	}
 
-	csm = nullptr;
-	if(tadMap.find(metadata->tid, &csm)){
-		if(d_pmuData){
+	if(d_pmuData){
 			fprintf(stderr, "current class size: %lu\n", metadata->classSize);
 			fprintf(stderr, "found tid -> csm\n");
-		}
+	}
 
-		if(csm->find(metadata->classSize, &(metadata->tad))){
+	if(csm->find(metadata->classSize, &(metadata->tad))){
 			if(d_pmuData)
-				fprintf(stderr, "found csm -> tad\n");
+					fprintf(stderr, "found csm -> tad\n");
 
 			collectAllocMetaData(metadata);
-		}
 	}
 
 	if (metadata->after.instructions - metadata->before.instructions != 0 && d_pmuData){

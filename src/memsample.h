@@ -71,6 +71,7 @@ typedef struct {
 	char * stackEnd = NULL;
 	void * maxObjAddr = (void *)0x0;
 	FILE * output = NULL;
+	pid_t tid = 0;
 } thread_data;
 
 typedef struct {
