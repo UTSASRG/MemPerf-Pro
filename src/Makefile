@@ -19,10 +19,14 @@ DEPS = $(SRCS) $(INCS)
 MALLOC_OPTIONS = 'p'
 
 #CXX = g++ 
+CC = clang
 CXX = clang++ 
 
 CFLAGS += -O2 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-frame-pointer
 CFLAGS2 += -O0 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-frame-pointer
+
+#CFLAGS += -DNO_PMU
+#CFLAGS2 += -DNO_PMU
 
 INCLUDE_DIRS = -I. -I/usr/include/x86_64-linux-gnu/c++/4.8/
 LIBS     := dl pthread
@@ -103,10 +107,10 @@ test/test-freeguard-thread: libmallocprof.so test/$(THREADTEST_FILE)
 
 # DieHarder
 test/test-dieharder: libmallocprof.so test/$(TEST_FILE)
-	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/sam/Memoryallocators/DieHard/src/libdieharder.so -o test/test-dieharder test/$(TEST_FILE)
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/sam/Memoryallocators/DieHard-old/src/libdieharder.so -o test/test-dieharder test/$(TEST_FILE)
 
 test/test-dieharder-thread: libmallocprof.so test/$(THREADTEST_FILE)
-	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/sam/Memoryallocators/DieHard/src/libdieharder.so -o test/test-dieharder-thread test/$(THREADTEST_FILE) -lpthread
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/sam/Memoryallocators/DieHard-old/src/libdieharder.so -o test/test-dieharder-thread test/$(THREADTEST_FILE) -lpthread
 
 # Libc
 test/test-xlibc: libmallocprof.so test/$(TEST_FILE)
@@ -123,7 +127,7 @@ test/bs-obsd: libmallocprof.so test/blackscholes-pthread.cpp
 	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/sam/Memoryallocators/OpenBSD-6.0/libomalloc.so -o test/bs-obsd test/blackscholes-pthread.cpp -lpthread -DENABLE_THREADS
 
 test/bs-dieharder: libmallocprof.so test/blackscholes-pthread.cpp
-	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/sam/Memoryallocators/DieHard/src/libdieharder.so -o test/bs-dieharder test/blackscholes-pthread.cpp -lpthread -DENABLE_THREADS  
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/sam/Memoryallocators/DieHard-old/src/libdieharder.so -o test/bs-dieharder test/blackscholes-pthread.cpp -lpthread -DENABLE_THREADS  
 
 test/bs-freeguard: libmallocprof.so test/blackscholes-pthread.cpp
 	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/daniel/mem-alloc-project/FreeGuard/libfreeguard.so -o test/bs-freeguard test/blackscholes-pthread.cpp -lpthread -DENABLE_THREADS
@@ -139,7 +143,7 @@ test/pmu-freeguard-test: libmallocprof.so test/pmu-test.cpp
 	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/daniel/mem-alloc-project/FreeGuard/libfreeguard.so -o test/pmu-freeguard-test test/pmu-test.cpp
 
 test/pmu-dieharder-test: libmallocprof.so test/pmu-test.cpp
-	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/sam/Memoryallocators/DieHard/src/libdieharder.so -o test/pmu-dieharder-test test/pmu-test.cpp
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/sam/Memoryallocators/DieHard-old/src/libdieharder.so -o test/pmu-dieharder-test test/pmu-test.cpp
 
 # Clean
 test/test-clean: test/$(TEST_FILE)

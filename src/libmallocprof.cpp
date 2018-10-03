@@ -143,6 +143,8 @@ HashMap <uint64_t, MmapTuple*, spinlock> mappings;
 //Hashmap of freelists, key 0 is bump pointer
 typedef HashMap <uint64_t, FreeObject*, spinlock> Freelist;
 HashMap <uint64_t, Freelist*, spinlock> freelistMap;
+HashMap <uint64_t, FreeObject*, spinlock> smallFreelistMap;
+HashMap <uint64_t, FreeObject*, spinlock> largeFreelistMap;
 
 //Hashmap of Overhead objects
 HashMap <size_t, Overhead*, spinlock> overhead;
@@ -217,13 +219,14 @@ __attribute__((constructor)) initStatus initializer() {
 	uint64_t btext = (uint64_t)&__executable_start & 0xFFFFFFFF;
 	min_pos_callsite_id = (btext << 32) | btext;
 
-	tadMap.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 65536);
-	addressUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 65536);
-	lockUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 65536);
-	mappings.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 65536);
-	freelistMap.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 65536);
-	overhead.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 65536);
-	threadContention.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 65536);
+	tadMap.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
+	addressUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
+	lockUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 128);
+	freelistMap.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
+	smallFreelistMap.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
+	largeFreelistMap.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
+	overhead.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
+	threadContention.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 	mapsInitialized = true;
 
 	classSizes = new std::vector<size_t>();
@@ -270,14 +273,12 @@ __attribute__((constructor)) initStatus initializer() {
 		getMmapThreshold();
 
 		//Create the freelist for small objects, key SMALL_OBJECT == 0
-		Freelist* small = (Freelist*) myMalloc (sizeof (Freelist));
-		small->initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
-		freelistMap.insert(SMALL_OBJECT, small);
+		//Freelist* small = (Freelist*) myMalloc (sizeof (Freelist));
+		smallFreelistMap.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 
 		//Create the freelist for objects >= 512 Bytes
-		Freelist* large = (Freelist*) myMalloc (sizeof (Freelist));
-		large->initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
-		freelistMap.insert(LARGE_OBJECT, large);
+		//Freelist* large = (Freelist*) myMalloc (sizeof (Freelist));
+		largeFreelistMap.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 
 		//Find metadata size for bump pointer allocator
 		get_bp_metadata();
@@ -414,7 +415,7 @@ extern "C" {
 		allocData.address = reinterpret_cast <uint64_t> (object);
 
 		// Gets overhead, address usage, mmap usage, memHWM, and prefInfo
-		analyzeAllocation(&allocData);
+		//analyzeAllocation(&allocData);
 
 
 		// thread_local
@@ -1085,7 +1086,7 @@ extern "C" {
 			}
 		}
 
-		uint64_t address = reinterpret_cast <uint64_t> (retval);
+		//uint64_t address = reinterpret_cast <uint64_t> (retval);
 
 		//If getting mmap threshold no need to save data
 		if (inGetMmapThreshold) {
@@ -1100,18 +1101,18 @@ extern "C" {
 		if (inAllocation) {
 			if (d_mmap) printf ("mmap direct from allocation function: length= %zu, prot= %d\n", length, prot);
 			malloc_mmaps.fetch_add (1, relaxed);
-			mappings.insert(address, newMmapTuple(address, length, prot, 'a'));
+			//mappings.insert(address, newMmapTuple(address, length, prot, 'a'));
 		}
 
 		//Need to check if selfmap.getInstance().getTextRegions() has
 		//ran. If it hasn't, we can't call isAllocatorInCallStack()
 		else if (selfmapInitialized && isAllocatorInCallStack()) {
 			if (d_mmap) printf ("mmap allocator in callstack: length= %zu, prot= %d\n", length, prot);
-			mappings.insert(address, newMmapTuple(address, length, prot, 's'));
+			//mappings.insert(address, newMmapTuple(address, length, prot, 's'));
 		}
 		else {
 			if (d_mmap) printf ("mmap from unknown source: length= %zu, prot= %d\n", length, prot);
-			mappings.insert(address, newMmapTuple(address, length, prot, 'u'));
+			//mappings.insert(address, newMmapTuple(address, length, prot, 'u'));
 		}
 
 		total_mmaps++;
@@ -1147,10 +1148,10 @@ void analyzeAllocation(allocation_metadata *metadata) {
 	getAddressUsage(metadata->size, metadata->address, metadata->classSize, metadata->cycles);
 
 	//Update mmap region info
-	getMappingsUsage(metadata->size, metadata->address, metadata->classSize);
+	//getMappingsUsage(metadata->size, metadata->address, metadata->classSize);
 
 	//Increase "active mem"
-	increaseMemoryHWM(metadata->size);
+	//increaseMemoryHWM(metadata->size);
 
 	// Analyze perfinfo
 	analyzePerfInfo(metadata);
@@ -1173,40 +1174,22 @@ size_t analyzeFree(uint64_t address) {
 		//Add this object to it's Freelist
 		//If bump pointer, add to freelistMap[0]
 		if (size <= malloc_mmap_threshold) {
-			//freelistLock.lock();
 			if (!bibop) {
 				if (size < LARGE_OBJECT) {
-					Freelist* f;
-					if (freelistMap.find(SMALL_OBJECT, &f)) {
-						(*f).insert(address, newFreeObject(address, size));
-					}
-					else {
-						printf ("Freelist[0] not found.\n");
-						abort ();
-					}
-				}
-				else {
-					Freelist* f;
-					if (freelistMap.find(LARGE_OBJECT, &f)) {
-						(*f).insert(address, newFreeObject(address, size));
-					}
-					else {
-						printf ("Freelist[LARGE_OBJECT] not found.\n");
-						abort();
-					}
+						smallFreelistMap.insert(address, newFreeObject(address, size));
+				} else {
+						largeFreelistMap.insert(address, newFreeObject(address, size));
 				}
 			}
-
 			//If bibop, add to freelistMap[size]
 			else {
 				Freelist* f = getFreelist(size);
 				(*f).insert(address, newFreeObject(address, size));
 			}
-			//freelistLock.unlock();
 		}
 	}
 
-    return current_class_size;
+	return current_class_size;
 }
 
 void increaseMemoryHWM(size_t size) {
@@ -1285,52 +1268,38 @@ void getAlignment (size_t size, size_t classSize) {
 
 void getBlowup (size_t size, uint64_t address, size_t classSize, bool* reused) {
 
-	//freelistLock.lock();
-	Freelist* freelist;
+	Freelist* freelist = nullptr;
 	bool reuseFreePossible = false;
 	bool reuseFreeObject = false;
 
 	if (!bibop) {
 		if (size < LARGE_OBJECT) {
-
-			if (freelistMap.find(SMALL_OBJECT, &freelist)) {
-				for (auto f : (*freelist)) {
+				for (auto f : smallFreelistMap) {
 					auto data = f.getData();
 					if (size <= data->size) {
 						reuseFreePossible = true;
 					}
 					if (address == data->addr) {
 						reuseFreeObject = true;
-						(*freelist).erase(address);
+						smallFreelistMap.erase(address);
 						free_bytes -= size;
 						break;
 					}
 				}
-			}
-			else {
-				printf ("Freelist[0] not found.\n");
-				abort();
-			}
 		}
 		else {
-			if (freelistMap.find(LARGE_OBJECT, &freelist)) {
-				for (auto f : (*freelist)) {
+				for (auto f : largeFreelistMap) {
 					auto data = f.getData();
 					if (size <= data->size) {
 						reuseFreePossible = true;
 					}
 					if (address == data->addr) {
 						reuseFreeObject = true;
-						(*freelist).erase(address);
+						largeFreelistMap.erase(address);
 						free_bytes -= size;
 						break;
 					}
 				}
-			}
-			else {
-				printf ("Freelist[LARGE_OBJECT] not found.\n");
-				abort();
-			}
 		}
 	}
 
@@ -1360,8 +1329,6 @@ void getBlowup (size_t size, uint64_t address, size_t classSize, bool* reused) {
 		}
 		blowup_allocations.fetch_add(1, relaxed);
 	}
-
-	//freelistLock.unlock();
 
 	//If there is enough free bytes to satisfy the allocation
 	//Regardless of where they came from, such as memory that
