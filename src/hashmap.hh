@@ -13,6 +13,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <signal.h>
 #include <atomic>
 
 #include "list.hh"
@@ -134,7 +135,7 @@ template <class KeyType,                    // What is the key? A long or string
 				 if (debug_hashmap) printf (" IN FIND\n");
 
 				 bool isFound = false;
-					first->Lock();
+				 first->Lock();
 				 struct Entry* entry = getEntry(first, key, keylen);
 
 				 if(entry) {
@@ -142,7 +143,7 @@ template <class KeyType,                    // What is the key? A long or string
 					 isFound = true;
 				 }
 
-					first->Unlock();
+				 first->Unlock();
 
 				 return isFound;
 			 }
@@ -230,6 +231,7 @@ template <class KeyType,                    // What is the key? A long or string
 				 struct Entry* entry = createNewEntry(key, keylen, value);
 				 listInsertTail(&entry->list, &head->list);
 				 head->count++;
+				 //printUtilization();
 			 }
 
 			 // Search the entry in the corresponding list.
@@ -253,6 +255,7 @@ template <class KeyType,                    // What is the key? A long or string
 					 entry = entry->nextEntry();
 					 count--;
 				 }
+
 				 return result;
 			 }
 
@@ -345,6 +348,35 @@ template <class KeyType,                    // What is the key? A long or string
 			 }
 
 			 iterator end() { return iterator(NULL, 0, this); }
-		 };
 
+			 void printUtilization() {
+					 size_t pos = 0;
+					 struct HashEntry* head = NULL;
+					 size_t numEntries = 0;
+					 size_t bucketsUsed = 0;
+					 size_t emptyBuckets = 0;
+					 size_t firstBucket = 0;
+
+					 while(pos < _buckets) {
+							 head = getHashEntry(pos);
+							 if(head->count == 0) {
+									 emptyBuckets++;
+							 } else {
+									 if(firstBucket == 0) {
+											 firstBucket = pos;
+									 }
+									 bucketsUsed++;
+									 numEntries += head->count;
+							 }
+							 //fprintf(stderr, "map %p -> bucket %04zu -> count = %zu\n", this, pos, head->count);
+							 //entry = (struct Entry*)head->getFirstEntry();
+							 //return iterator(entry, pos, this);
+							 pos++;
+					 }
+
+					 fprintf(stderr, "map %p -> bucketsUsed = %zu , firstBucket = %zu, emptyBuckets = %zu, total entries = %zu\n",
+									 this, bucketsUsed, firstBucket, emptyBuckets, numEntries);
+
+			 }
+		 };
 #endif

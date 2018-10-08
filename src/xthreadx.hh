@@ -9,7 +9,7 @@ extern __thread thread_data thrData;
 
 extern "C" void printHashMap();
 extern "C" pid_t gettid();
-extern void* myMalloc(size_t);
+extern void * myMalloc(size_t);
 
 thread_local extern uint64_t thread_stack_start;
 
@@ -30,11 +30,9 @@ class xthreadx {
 		children->startArg = arg;
 		children->startRoutine = fn;
 
-//		int result = RealX::pthread_create(tid, attr, xthreadx::startThread, (void *)children);
-		int result = RealX::pthread_create(tid, attr, xthreadx::startThread_noFile, (void *)children);
+		int result = RealX::pthread_create(tid, attr, xthreadx::startThread, (void *)children);
 		if(result) {
-			perror("ERROR: pthread_create failed");
-			abort();
+			fprintf(stderr, "error: pthread_create failed: %s\n", strerror(errno));
 		}
 
 		return result;
@@ -45,22 +43,25 @@ class xthreadx {
 		size_t stackSize;
 		thread_t * current = (thread_t *) arg;
 
-		pid_t pid = getpid();
 		pid_t tid = gettid();
 		current->tid = tid;
 
+		#ifdef THREAD_OUTPUT
+		pid_t pid = getpid();
 		char outputFile[MAX_FILENAME_LEN];
 
 		snprintf(outputFile, MAX_FILENAME_LEN, "%s_libmallocprof_%d_tid_%d.txt",
-				program_invocation_name, pid, tid);
+						program_invocation_name, pid, tid);
 
 		// Presently set to overwrite file; change fopen flag to "a" for append.
 		thrData.output = fopen(outputFile, "w");
 		if(thrData.output == NULL) {
-			fprintf(stderr, "error: unable to open output file for writing hash map\n");
-			fprintf(stderr, "error: %s\n", strerror (errno));
-			abort();
+				fprintf(stderr, "error: unable to open output file for writing hash map: %s\n", strerror(errno));
+				current->output = false;
 		}
+		#else
+		thrData.output = NULL;
+		#endif
 
 		pthread_attr_t attrs;
 		if(pthread_getattr_np(pthread_self(), &attrs) != 0) {
@@ -73,40 +74,22 @@ class xthreadx {
 		}
 		thrData.stackStart = thrData.stackEnd + stackSize;
 
-		fprintf(thrData.output, ">>> thread %d stack start @ %p, stack end @ %p\n", tid,
-				  thrData.stackStart, thrData.stackEnd);
+		if(thrData.output) {
+			fprintf(thrData.output, ">>> thread %d stack start @ %p, stack end @ %p\n", tid,
+				thrData.stackStart, thrData.stackEnd);
+		}
 
+		#ifndef NO_PMU
 		initSampling();
+		#endif
 		result = current->startRoutine(current->startArg);
+		#ifndef NO_PMU
 		doPerfRead();
+		#endif
 
-		fclose(thrData.output);
-		return result;
-	}
-
-	static void * startThread_noFile(void * arg) {
-		void * result = NULL;
-		size_t stackSize;
-		thread_t * current = (thread_t *) arg;
-
-		pid_t tid = gettid();
-		current->tid = tid;
-
-		pthread_attr_t attrs;
-		if(pthread_getattr_np(pthread_self(), &attrs) != 0) {
-			fprintf(stderr, "error: unable to get thread attributes: %s\n", strerror(errno));
-			abort();
+		if(thrData.output) {
+			fclose(thrData.output);
 		}
-		if(pthread_attr_getstack(&attrs, (void **)&thrData.stackEnd, &stackSize) != 0) {
-			fprintf(stderr, "error: unable to get stack values: %s\n", strerror(errno));
-			abort();
-		}
-
-		thrData.stackStart = thrData.stackEnd + stackSize;
-		initSampling();
-		result = current->startRoutine(current->startArg);
-		doPerfRead_noFile();
-
 		return result;
 	}
 };

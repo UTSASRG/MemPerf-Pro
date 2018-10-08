@@ -71,6 +71,7 @@ typedef struct {
 	char * stackEnd = NULL;
 	void * maxObjAddr = (void *)0x0;
 	FILE * output = NULL;
+	pid_t tid = 0;
 } thread_data;
 
 typedef struct {
@@ -151,9 +152,7 @@ typedef struct {            //struct for holding data about allocations
     int64_t numCallocInstrsFFL;
 } thread_alloc_data;
 
-//void getPerfInfo(int64_t *, int64_t *, int64_t *, int64_t *, int64_t *);
 int initSampling(void);
 void setupSampling(void);
 void doPerfRead(void);
-void doPerfRead_noFile(void);
 #endif
