@@ -18,9 +18,10 @@ DEPS = $(SRCS) $(INCS)
 
 MALLOC_OPTIONS = 'p'
 
-#CXX = g++ 
-CC = clang
-CXX = clang++ 
+CC = gcc
+CXX = g++ 
+#CC = clang
+#CXX = clang++ 
 
 CFLAGS += -O2 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-frame-pointer
 CFLAGS2 += -O0 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-frame-pointer

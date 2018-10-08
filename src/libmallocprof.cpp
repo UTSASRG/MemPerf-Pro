@@ -5,7 +5,7 @@
  * @author Richard Salcedo <kbgagt@gmail.com>
  */
 
-#pragma GCC diagnostic ignored "-Wreturn-type-c-linkage"
+//#pragma GCC diagnostic ignored "-Wreturn-type-c-linkage"
 //#define _GNU_SOURCE       /* See feature_test_macros(7) */
 
 #include <atomic>
@@ -1463,16 +1463,20 @@ thread_alloc_data* newTad(){
 }
 
 allocation_metadata init_allocation(size_t sz, enum memAllocType type) {
+	PerfReadInfo empty;
 	allocation_metadata new_metadata = {
-		.reused = false,
-		.tid = gettid(),
-		.size = sz,
-		.classSize = getClassSizeFor(sz),
-		.cycles = 0,
-		.address = 0,
-		.tsc_before = 0,
-		.tsc_after = 0,
-		.type = type
+		reused : false,
+		tid : gettid(),
+		before : empty,
+		after : empty,
+		size : sz,
+		classSize : getClassSizeFor(sz),
+		cycles : 0,
+		address : 0,
+		tsc_before : 0,
+		tsc_after : 0,
+		type : type,
+		tad : NULL
 	};
 	return new_metadata;
 }

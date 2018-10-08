@@ -24,7 +24,7 @@ extern "C" {
 	}
 }
 
-__thread extern thread_data thrData;
+extern __thread thread_data thrData;
 
 thread_local perf_info perfInfo;
 
