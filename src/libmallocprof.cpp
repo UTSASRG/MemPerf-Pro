@@ -168,7 +168,6 @@ extern "C" {
 				alias("yyaligned_alloc")));
 	void * memalign(size_t, size_t) __attribute__ ((weak, alias("yymemalign")));
 	void * pvalloc(size_t) __attribute__ ((weak, alias("yypvalloc")));
-	void * alloca(size_t) __attribute__ ((weak, alias("yyalloca")));
 	int posix_memalign(void **, size_t, size_t) __attribute__ ((weak,
 				alias("yyposix_memalign")));
 }
@@ -614,10 +613,6 @@ extern "C" {
 		fprintf(thrData.output,
 				"ERROR: call to unsupported memory function: %s\n",
 				__FUNCTION__);
-	}
-	void * yyalloca(size_t size) {
-		logUnsupportedOp();
-		return NULL;
 	}
 	void * yyvalloc(size_t size) {
 		logUnsupportedOp();
