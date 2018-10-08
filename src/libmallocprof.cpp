@@ -8,15 +8,13 @@
 #pragma GCC diagnostic ignored "-Wreturn-type-c-linkage"
 //#define _GNU_SOURCE       /* See feature_test_macros(7) */
 
-#include <atomic>
+#include <atomic>  //atomic vars
 #include <dlfcn.h> //dlsym
 #include <fcntl.h> //fopen flags
-#include <stdio.h> //print
-#include <vector>
+#include <stdio.h> //print, getline
 #include "hashmap.hh"
 #include "hashfuncs.hh"
 #include "libmallocprof.h"
-#include "Overhead.H"
 #include "real.hh"
 #include "spinlock.hh"
 #include "selfmap.hh"
@@ -25,31 +23,23 @@
 //Globals
 bool bibop = false;
 bool bumpPointer = false;
-bool inGetClassSizes = false;
-bool firstMalloc = false;
-bool inGetAllocStyle = false;
-bool inGetMmapThreshold = false;
 bool inRealMain = false;
 bool mapsInitialized = false;
-bool mmap_found = false;
 bool opening_maps_file = false;
 bool realInitialized = false;
 bool selfmapInitialized = false;
-bool usingRealloc = false;
 char* allocator_name;
-const char* CLASS_SIZE_FILE_NAME = "class_sizes.txt";
+char* allocatorFileName;
 extern char data_start;
 extern char _etext;
 extern char * program_invocation_name;
 extern void * __libc_stack_end;
 extern char __executable_start;
-FILE *classSizeFile;
 float memEfficiency = 0;
 initStatus profilerInitialized = NOT_INITIALIZED;
 pid_t pid;
 size_t alignment = 0;
 size_t blowup_bytes = 0;
-size_t largestClassSize;
 size_t malloc_mmap_threshold = 0;
 size_t metadata_object = 0;
 size_t metadata_overhead = 0;
@@ -59,20 +49,21 @@ size_t totalSizeDiff = 0;
 size_t totalMemOverhead = 0;
 uint64_t min_pos_callsite_id;
 
+//Array of class sizes
+int num_class_sizes;
+size_t* class_sizes;
+
 //Debugging flags DEBUG
-const bool debug = false;
 const bool d_malloc_info = false;
 const bool d_mprotect = false;
 const bool d_mmap = false;
-const bool d_metadata = false;
-const bool d_bibop_metadata = false;
-const bool d_style = false;
 const bool d_getFreelist = false;
-const bool d_getClassSizes = false;
+const bool d_class_sizes = false;
 const bool d_pmuData = false;
 const bool d_write_address = false;
 const bool d_write_mappings = true;
 const bool d_write_tad = true;
+const bool d_readFile = false;
 
 //Atomic Globals ATOMIC
 std::atomic_bool mmap_active(false);
@@ -107,9 +98,6 @@ std::atomic<std::uint64_t> cycles_free (0);
 std::atomic<std::uint64_t> cycles_new (0);
 std::atomic<std::uint64_t> cycles_reused (0);
 std::atomic<std::uint64_t> total_time_wait (0);
-
-//Vector of class sizes
-std::vector<size_t>* classSizes;
 
 //Struct of virtual memory info
 VmInfo vmInfo;
@@ -209,7 +197,6 @@ __attribute__((constructor)) initStatus initializer() {
 	}
 
 	RealX::initializer();
-	realInitialized = true;
 
 	temp_mem_lock.init ();
 	getFreelistLock.init ();
@@ -232,18 +219,27 @@ __attribute__((constructor)) initStatus initializer() {
 	threadContention.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 	mapsInitialized = true;
 
-	classSizes = new std::vector<size_t>();
-    allocator_name = (char *) myMalloc(100 * sizeof(char));
-
 	void * program_break = RealX::sbrk(0);
 	thrData.stackStart = (char *)__builtin_frame_address(0);
 	thrData.stackEnd = (char *)__libc_stack_end;
 
+    allocator_name = (char*) myMalloc(100);
 	selfmap::getInstance().getTextRegions();
 	selfmapInitialized = true;
 
-	// Determines allocator style: bump pointer or bibop
-	getAllocStyle();
+	// After this, we have the filename we need to read from
+	// in the form of "allocator.info" in allocatorFileName
+	allocator_name = strrchr(allocator_name, '/') + 1;
+	char* period = strchr(allocator_name, '.');
+	uint64_t bytes = (uint64_t)period - (uint64_t)allocator_name;
+	size_t extensionBytes = 6;
+	allocatorFileName = (char*) myMalloc (bytes+extensionBytes);
+	memcpy (allocatorFileName, allocator_name, bytes);
+	snprintf (allocatorFileName+bytes, extensionBytes, ".info");
+	myFree(allocator_name);
+
+	// Load info from allocatorInfoFile
+	readAllocatorFile();
 
 	// Generate the name of our output file, then open it for writing.
 	char outputFile[MAX_FILENAME_LEN];
@@ -262,19 +258,28 @@ __attribute__((constructor)) initStatus initializer() {
 	fprintf(thrData.output, ">>> program break @ %p\n", program_break);
 	fflush(thrData.output);
 
-	// Determine class size for bibop allocator
-	// If the class sizes are in the class_sizes.txt file
-	// it will read from that. Else if will get the info
 	if (bibop) {
-		//This function also assigns elements to:
-		//freelist hashmap
-		//overhead hashmap
-		getClassSizes ();
+		//Print class sizes to thrData output
+		fprintf (thrData.output, ">>> class_sizes ");
+
+		//Create and init freelists for each class size
+		//Create and init Overhead for each class size
+		for (int i = 0; i < num_class_sizes; i++) {
+			
+			size_t cs = class_sizes[i];
+			
+			if (d_class_sizes) printf ("hashmap entry %d key is %zu\n", i, cs);
+			fprintf (thrData.output, "%zu ", cs);
+			Freelist* f = (Freelist*) myMalloc (sizeof (Freelist));
+			f->initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
+			freelistMap.insert(cs, f);
+			overhead.insert(cs, newOverhead());
+		}
+
+		fprintf (thrData.output, "\n");
+		fflush(thrData.output);
 	}
 	else {
-		//Find the malloc_mmap_threshold
-		getMmapThreshold();
-
 		//Create the freelist for small objects, key SMALL_OBJECT == 0
 		Freelist* small = (Freelist*) myMalloc (sizeof (Freelist));
 		small->initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
@@ -285,15 +290,11 @@ __attribute__((constructor)) initStatus initializer() {
 		large->initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 		freelistMap.insert(LARGE_OBJECT, large);
 
-		//Find metadata size for bump pointer allocator
-		get_bp_metadata();
-
 		//Create an entry in the overhead hashmap with key 0
-		overhead.insert(BP_OVERHEAD, new Overhead());
+		overhead.insert(BP_OVERHEAD, newOverhead());
 	}
 
 	profilerInitialized = INITIALIZED;
-	getMemUsageStart();
 
 	return profilerInitialized;
 }
@@ -304,7 +305,6 @@ void exitHandler() {
 
 	inRealMain = false;
 	doPerfRead();
-	getMemUsageEnd();
 	calculateMemOverhead();
 	fflush(thrData.output);
     globalizeThreadAllocData();
@@ -375,12 +375,6 @@ extern "C" {
 		//Malloc is being called by a thread that is already in malloc
 		if (inAllocation) return RealX::malloc (sz);
 
-		//If in our getClassSizes function, use RealX
-		//We need this because the vector uses push_back
-		//which calls malloc, also fopen calls malloc
-		if(inGetClassSizes) return RealX::malloc(sz);
-
-
         //if the PMU sampler has not yet been set up for this thread, set it up now
         if(!samplingInit){
             initSampling();
@@ -398,9 +392,6 @@ extern "C" {
 		allocation_metadata allocData = init_allocation(sz, MALLOC);
 		void* object;
 
-		// thread_local
-		inAllocation = true;
-
 		//Do before
 		doBefore(&allocData);
 
@@ -415,7 +406,6 @@ extern "C" {
 
 		// Gets overhead, address usage, mmap usage, memHWM, and prefInfo
 		analyzeAllocation(&allocData);
-
 
 		// thread_local
 		inAllocation = false;
@@ -1087,15 +1077,6 @@ extern "C" {
 
 		uint64_t address = reinterpret_cast <uint64_t> (retval);
 
-		//If getting mmap threshold no need to save data
-		if (inGetMmapThreshold) {
-			malloc_mmap_threshold = length;
-			mmap_found = true;
-			inMmap = false;
-			mmap_active = false;
-			return retval;
-		}
-
 		//If this thread currently doing an allocation
 		if (inAllocation) {
 			if (d_mmap) printf ("mmap direct from allocation function: length= %zu, prot= %d\n", length, prot);
@@ -1401,13 +1382,14 @@ size_t getClassSizeFor (size_t size) {
 
 	size_t sizeToReturn = 0;
 	if (bibop) {
-		if (classSizes->empty()) {
-			fprintf (stderr, "classSizes is empty. Abort()\n");
+		if (num_class_sizes == 0) {
+			fprintf (stderr, "num_class_sizes == 0. Figure out why. Abort()\n");
 			abort();
 		}
 
-		for (auto element : *classSizes) {
-			size_t tempSize = element;
+		for (int i = 0; i < num_class_sizes; i++) {
+
+			size_t tempSize = class_sizes[i];;
 			if (size > tempSize) continue;
 			else if (size <= tempSize) {
 				sizeToReturn = tempSize;
@@ -1463,6 +1445,13 @@ LC* newLC () {
 	lc->contention = 1;
 	lc->maxContention = 1;
 	return lc;
+}
+
+Overhead* newOverhead () {
+	
+	Overhead* o = (Overhead*) myMalloc(sizeof(Overhead));
+	o->init();
+	return o;
 }
 
 thread_alloc_data* newTad(){
@@ -1564,213 +1553,6 @@ void myFree (void* ptr) {
 		if(temp_alloc == 0) temp_position = 0;
 	}
 	temp_mem_lock.unlock();
-}
-
-void getMemUsageStart () {
-
-	std::ifstream file ("/proc/self/status");
-	std::string line;
-
-	for (int i = 0; i <= 41; i++) {
-
-		std::getline (file, line);
-		if (line.find("VmSize") != std::string::npos) {
-			std::sscanf (line.data(), "%*s%zu%*s", &vmInfo.VmSize_start);
-		}
-
-		else if (line.find("VmRSS") != std::string::npos) {
-			std::sscanf (line.data(), "%*s%zu%*s", &vmInfo.VmRSS_start);
-		}
-
-		else if (line.find("VmLib") != std::string::npos) {
-			std::sscanf (line.data(), "%*s%zu%*s", &vmInfo.VmLib);
-		}
-	}
-
-	file.close();
-}
-
-void getMemUsageEnd () {
-
-	std::ifstream file ("/proc/self/status");
-	std::string line;
-
-	for (int i = 0; i <= 41; i++) {
-
-		std::getline (file, line);
-		if (line.find("VmSize") != std::string::npos) {
-			std::sscanf (line.data(), "%*s%zu%*s", &vmInfo.VmSize_end);
-		}
-
-		else if (line.find("VmRSS") != std::string::npos) {
-			std::sscanf (line.data(), "%*s%zu%*s", &vmInfo.VmRSS_end);
-		}
-
-		else if (line.find("VmPeak") != std::string::npos) {
-			std::sscanf (line.data(), "%*s%zu%*s", &vmInfo.VmPeak);
-		}
-
-		else if (line.find("VmHWM") != std::string::npos) {
-			std::sscanf (line.data(), "%*s%zu%*s", &vmInfo.VmHWM);
-		}
-	}
-
-	file.close();
-}
-
-// Try to figure out which allocator is being used
-void getAllocStyle () {
-
-	inGetAllocStyle = true;
-
-	//Hopefully this is first malloc to initialize the allocator
-	void* add1 = RealX::malloc (128);
-
-	//If the allocator mmap'd memory, check it for metadata
-	//Assuming the allocator used mmap for metadata
-	if (total_mmaps > 0) {
-		if (d_style) printf ("mmaps > 0. get_bibop_metadata()...\n");
-		get_bibop_metadata();
-	}
-	else {
-		if (d_style) printf ("total_mmaps <= 0\n");
-	}
-
-	void* add2 = RealX::malloc (2048);
-
-	long address1 = reinterpret_cast<long> (add1);
-	long address2 = reinterpret_cast<long> (add2);
-
-	RealX::free (add1);
-	RealX::free (add2);
-
-	long address1Page = address1 / 4096;
-	long address2Page = address2 / 4096;
-
-	if ((address1Page - address2Page) != 0) {bibop = true;}
-	else {bumpPointer = true;}
-
-	inGetAllocStyle = false;
-}
-
-void getClassSizes () {
-
-	size_t bytesToRead = 0;
-	bool matchFound = false;
-	inGetClassSizes = true;
-	char *line;
-	char *token;
-
-	allocator_name = strrchr(allocator_name, '/') + 1;
-	classSizeFile = fopen(CLASS_SIZE_FILE_NAME, "a+");
-
-	while(getline(&line, &bytesToRead, classSizeFile) != -1){
-
-		line[strcspn(line, "\n")] = 0;
-		if(strcmp(line, allocator_name) == 0) {
-			matchFound = true;
-			break;
-		}
-	}
-
-	if (matchFound){
-		if (debug) printf ("match found\n");
-		getline(&line, &bytesToRead, classSizeFile);
-        line[strcspn(line, "\n")] = 0;
-
-        while( (token = strsep(&line, " ")) ){
-			if(atoi(token) != 0){
-				classSizes->push_back( (uint64_t) atoi(token));
-			}
-		}
-		malloc_mmap_threshold = *(classSizes->end() - 1);
-   }
-
-   if(!matchFound){
-
-		if (debug) printf ("match not found\n");
-		getMmapThreshold();
-        void* oldAddress;
-		void* newAddress;
-		uint64_t oldAddr = 0, newAddr = 0;
-		size_t oldSize = 8, newSize = 8;
-
-		oldAddress = RealX::malloc (oldSize);
-		oldAddr = reinterpret_cast <uint64_t> (oldAddress);
-
-		while ((newSize <= malloc_mmap_threshold) && (newSize <= MAX_CLASS_SIZE)) {
-
-			newSize += 8;
-			newAddress = RealX::realloc (oldAddress, newSize);
-			newAddr = reinterpret_cast <uint64_t> (newAddress);
-			if (newAddr != oldAddr) {
-				classSizes->push_back (oldSize);
-			}
-
-			oldAddr = newAddr;
-			oldAddress = newAddress;
-			oldSize = newSize;
-		}
-
-		RealX::free (newAddress);
-
-		fprintf(classSizeFile, "%s\n", allocator_name);
-
-		for (auto cSize : *classSizes)
-			fprintf (classSizeFile, "%zu ", cSize);
-
-		fprintf(classSizeFile, "\n");
-		fflush (classSizeFile);
-   }
-
-	fprintf (thrData.output, ">>> classSizes    ");
-
-	if (!classSizes->empty()) {
-
-		for (auto cSize : *classSizes)
-			fprintf (thrData.output, "%zu ", cSize);
-	}
-
-	fclose(classSizeFile);
-	fprintf (thrData.output, "\n");
-	fflush (thrData.output);
-
-	largestClassSize = *(classSizes->end() - 1);
-
-	int i = 0;
-	for (auto cSize : *classSizes) {
-		auto classSize = cSize;
-		Freelist* f = (Freelist*) myMalloc (sizeof (Freelist));
-		f->initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
-		freelistMap.insert(classSize, f);
-		if (d_getClassSizes) printf ("initializing overhead hashmap. key %d is %zu\n", i, classSize);
-		overhead.insert(classSize, new Overhead());
-		i++;
-	}
-
-	inGetClassSizes = false;
-}
-
-void getMmapThreshold () {
-
-	inGetMmapThreshold = true;
-	size_t size = 3000;
-	void* mallocPtr;
-
-	// Find malloc mmap threshold
-	while (!mmap_found && (size < MAX_CLASS_SIZE)) {
-
-		mallocPtr = RealX::malloc (size);
-		RealX::free (mallocPtr);
-		size += 8;
-	}
-
-	if (malloc_mmap_threshold == 0) {
-		fprintf (stderr, "malloc_mmap_threshold not found. Abort()\n");
-		abort();
-	}
-
-	inGetMmapThreshold = false;
 }
 
 //Holy
@@ -1933,13 +1715,6 @@ void writeAllocData () {
     fprintf(thrData.output, ">>> num_dontneed             %u\n", num_dontneed.load(relaxed));
 	fprintf(thrData.output, ">>> num_sbrk                 %u\n", num_sbrk.load(relaxed));
 	fprintf(thrData.output, ">>> size_sbrk                %u\n", size_sbrk.load(relaxed));
-	fprintf(thrData.output, ">>> VmSize_start(kB)         %zu\n", vmInfo.VmSize_start);
-	fprintf(thrData.output, ">>> VmSize_end(kB)           %zu\n", vmInfo.VmSize_end);
-	fprintf(thrData.output, ">>> VmPeak(kB)               %zu\n", vmInfo.VmPeak);
-	fprintf(thrData.output, ">>> VmRSS_start(kB)          %zu\n", vmInfo.VmRSS_start);
-	fprintf(thrData.output, ">>> VmRSS_end(kB)            %zu\n", vmInfo.VmRSS_end);
-	fprintf(thrData.output, ">>> VmHWM(kB)                %zu\n", vmInfo.VmHWM);
-	fprintf(thrData.output, ">>> VmLib(kB)                %zu\n", vmInfo.VmLib);
 	fprintf(thrData.output, ">>> num_mprotect             %u\n", num_mprotect.load(relaxed));
 	fprintf(thrData.output, ">>> blowup_allocations       %u\n", blowup_allocations.load(relaxed));
 	fprintf(thrData.output, ">>> blowup_bytes             %zu\n", blowup_bytes);
@@ -2116,8 +1891,8 @@ Freelist* getFreelist (size_t size) {
 	getFreelistLock.lock();
 	Freelist* f = nullptr;
 
-	if (classSizes->empty()) {
-		fprintf (stderr, "ClassSizes is empty. Abort\n");
+	if (num_class_sizes == 0) {
+		fprintf (stderr, "class_sizes is empty. Abort\n");
 		abort();
 	}
 
@@ -2165,116 +1940,6 @@ void calculateMemOverhead () {
 
 	totalMemOverhead += metadata_overhead;
 	memEfficiency = ((float) totalSizeAlloc / (totalSizeAlloc + totalMemOverhead)) * 100;
-}
-
-void get_bp_metadata() {
-	size_t size1 = 128;
-	size_t size2 = 128;
-	size_t metadata = 0;
-
-	void* ptr1 = RealX::malloc(size1);
-	if (d_metadata) printf ("ptr1= %p\n", ptr1);
-	void* ptr2 = RealX::malloc(size2);
-	if (d_metadata) printf ("ptr2= %p\n", ptr2);
-	void* moved;
-
-	long first = (long) ptr1;
-	long second = (long) ptr2;
-	long m = 0;
-
-	long diff = second - first;
-	metadata = diff - 128;
-
-	//Once object moves, diff will be negative
-	while (diff > 0) {
-		size1++;
-		moved = RealX::realloc(ptr1, size1);
-		m = (long) moved;
-		if ((diff = second - m) < 0) break;
-		if (d_metadata) {
-			printf ("size1 = %zu\n", size1);
-			printf ("diff = %lu\n", diff);
-		}
-		metadata--;
-	}
-
-	if (d_metadata) printf ("metadata = %zu\n", metadata);
-
-	RealX::free(ptr2);
-	metadata_object = metadata;
-}
-
-void get_bibop_metadata() {
-
-	if (d_bibop_metadata) printf ("in get_bibop_metadata\n");
-
-	bool done = false;
-	int bytes_index = 0;
-	int bytes_max = 0;
-	uintptr_t vpage = 0;
-	unsigned add_pages = 0;
-	unsigned bytes_in_use[100];
-
-	for (auto entry : mappings) {
-		if (done == true) break;
-		auto data = entry.getData();
-		if (data->allocations > 0) {
-			//Don't look for metadata here
-			if (d_bibop_metadata) {}
-		}
-		//This mmap wasn't used for satisfying allocations
-		//Check for metadata
-		else {
-			if (d_bibop_metadata) printf ("found unused mmap, start= %#lx, finding page..\n", data->start);
-
-			add_pages = find_page (data->start, data->end);
-
-			if (d_bibop_metadata) printf ("add_pages returned %d\n", add_pages);
-
-			vpage = (data->start + (add_pages*4096));
-
-			if (d_bibop_metadata) printf ("vpage= %#lx\n", vpage);
-
-			unsigned bytes = search_vpage(vpage);
-			if (bytes > 0) {
-				//Keep track of values return from search_vpage function
-				//Store in array to get the lowest value later
-				bytes_in_use[bytes_index] = bytes;
-				bytes_index++;
-			}
-		}
-	}
-
-	bytes_max = bytes_index;
-	unsigned smallest = bytes_in_use[0];
-	if (d_bibop_metadata) printf ("bytes_in_use[0] = %u\n", bytes_in_use[0]);
-	for (int i = 1; i < bytes_max; i++) {
-		if (d_bibop_metadata) printf ("bytes_in_use[%d] = %u\n", i, bytes_in_use[i]);
-		if (bytes_in_use[i] < smallest) smallest = bytes_in_use[i];
-	}
-
-	if (d_bibop_metadata) printf ("Finished metadata. Returning\n");
-	metadata_object = smallest;
-}
-
-/*
-Read in 8 bytes at a time on this vpage and compare it
-with 0. Looking for "used" bytes. If the value is anything
-other than 0, consider it used.
-*/
-unsigned search_vpage (uintptr_t vpage) {
-
-	unsigned bytes = 0;
-	uint64_t zero = 0;
-	uint64_t word;
-	for (unsigned offset = 0; offset <= 4088; offset += 8) {
-
-		word = *((uint64_t*) (vpage + offset));
-		if ((word | zero) > 0) {
-			bytes += 8;
-		}
-	}
-	return bytes;
 }
 
 /*
@@ -2326,60 +1991,6 @@ int num_used_pages(uintptr_t vstart, uintptr_t vend) {
 
 	close(fdmap);
 	return num_used_pages;
-}
-
-//Read 8 byte increments from the pagemap file looking for
-//vpages that are physically backed. "add_pages" will count how
-//many pages it searched before it found a physically backed
-//page. Then we can take that value and add it to the starting
-//mmap address, then we have the address of the first vpage
-//in this mmap region with a physical page backing
-int find_page(uintptr_t vstart, uintptr_t vend) {
-	char pagemap_filename[50];
-	snprintf (pagemap_filename, 50, "/proc/%d/pagemap", pid);
-	int fdmap;
-	uint64_t bitmap;
-	unsigned long pagenum_start, pagenum_end;
-	uint64_t num_pages_read = 0;
-	uint64_t num_pages_to_read = 0;
-	unsigned add_pages = 0;
-
-	if((fdmap = open(pagemap_filename, O_RDONLY)) == -1) {
-		perror ("failed to open pagemap_filename");
-		return -1;
-	}
-
-	pagenum_start = vstart >> PAGE_BITS;
-	pagenum_end = vend >> PAGE_BITS;
-	num_pages_to_read = pagenum_end - pagenum_start + 1;
-	if(num_pages_to_read == 0) {
-		fprintf (stderr, "num_pages_to_read == 0\n");
-		close(fdmap);
-		return -1;
-	}
-
-	if(lseek(fdmap, (pagenum_start * ENTRY_SIZE), SEEK_SET) == -1) {
-		perror ("failed to lseek on file");
-		close(fdmap);
-		return -1;
-	}
-
-	do {
-		if(read(fdmap, &bitmap, ENTRY_SIZE) != ENTRY_SIZE) {
-			perror ("failed to read 8 bytes");
-			close(fdmap);
-			return -1;
-		}
-
-		num_pages_read++;
-		if((bitmap >> 63) == 1) {
-			break;
-		}
-		add_pages++;
-	} while(num_pages_read < num_pages_to_read);
-
-	close(fdmap);
-	return add_pages;
 }
 
 inline bool isAllocatorInCallStack() {
@@ -2524,7 +2135,8 @@ void analyzePerfInfo(allocation_metadata *metadata) {
 		if (!tadMap.find(metadata->tid, &csm)){
 			csm = (classSizeMap*) myMalloc(sizeof(classSizeMap));
 			csm->initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
-			for (auto cSize : *classSizes){
+			for (int i = 0; i < num_class_sizes; i++){
+				size_t cSize = class_sizes[i];
 				csm->insertIfAbsent(cSize, newTad());
 				allThreadsTadMap[cSize] = newTad();
 			}
@@ -2576,4 +2188,80 @@ void analyzePerfInfo(allocation_metadata *metadata) {
 				metadata->after.cache_refs - metadata->before.cache_refs,
 				metadata->after.instructions - metadata->before.instructions);
 	}
+}
+
+void readAllocatorFile() {
+
+	size_t bufferSize = 1024;
+	FILE* infile = nullptr;
+	char* buffer = (char*) myMalloc(bufferSize);
+	char* token;
+
+	if ((infile = fopen (allocatorFileName, "r")) == NULL) {
+		perror("Failed to open allocator info file. Make sure to run the prerun lib and"
+				"\nthe file (i.e. allocator.info) is in this directory. Quit");
+		abort();
+	}
+
+	while ((getline(&buffer, &bufferSize, infile)) > 0) {
+
+		if (d_readFile) printf ("buffer= %s\n", buffer);
+
+		token = strtok(buffer, " ");
+		if (d_readFile) printf ("token= %s\n", token);
+		
+		if ((strcmp(token, "style")) == 0) {
+			if (d_readFile) printf ("token matched style\n");
+
+			token = strtok(NULL, " ");
+
+			if (d_readFile) printf ("styleToken= %s\n", token);
+
+			if ((strcmp(token, "bibop\n")) == 0) {
+				if (d_readFile) printf ("styleToken matched bibop\n");
+				bibop = true;
+			}
+			else {
+				bumpPointer = true;
+				if (d_readFile) printf ("styleToken matched bump_pointer\n");
+			}
+			continue;
+		}
+
+		else if ((strcmp(token, "class_sizes")) == 0) {
+			if (d_readFile) printf ("token matched class_sizes\n");
+
+			token = strtok(NULL, " ");
+			num_class_sizes = atoi(token);
+			if (d_readFile) printf ("num_class_sizes= %d\n", num_class_sizes);
+
+			class_sizes = (size_t*) myMalloc (num_class_sizes*sizeof(size_t));
+
+			for (int i = 0; i < num_class_sizes; i++) {
+				token = strtok(NULL, " ");
+				class_sizes[i] = (size_t) atoi(token);
+				if (d_readFile) printf ("class_size[%d]= %zu\n", i, class_sizes[i]);
+			}
+			continue;
+		}
+
+		else if ((strcmp(token, "malloc_mmap_threshold")) == 0) {
+			if (d_readFile) printf ("token matched malloc_mmap_threshold\n");
+			token = strtok(NULL, " ");
+			malloc_mmap_threshold = (size_t) atoi(token);
+			if (d_readFile) printf ("malloc_mmap_threshold= %zu\n", malloc_mmap_threshold);
+			continue;
+		}
+
+		else if ((strcmp(token, "metadata_object")) == 0) {
+			if (d_readFile) printf ("token matched metadata_object\n");
+			token = strtok(NULL, " ");
+			metadata_object = (size_t) atoi(token);
+			if (d_readFile) printf ("metadata_object= %zu\n", metadata_object);
+			continue;
+		}
+		if (d_readFile) printf ("\n");
+	}
+
+	myFree(buffer);
 }

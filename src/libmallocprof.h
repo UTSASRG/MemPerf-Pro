@@ -60,6 +60,32 @@ typedef struct {
 } MmapTuple;
 
 typedef struct {
+	std::atomic_size_t metadata;
+	std::atomic_size_t blowup;
+	std::atomic_size_t alignment;
+	void addMetadata(size_t size) {metadata.fetch_add(size, relaxed);}
+	void addBlowup(size_t size) {blowup.fetch_add(size, relaxed);}
+	void addAlignment(size_t size) {alignment.fetch_add(size, relaxed);}
+	size_t getMetadata() {
+		size_t temp = metadata.load();
+		return temp;
+	}
+	size_t getBlowup() {
+		size_t temp = blowup.load();
+		return temp;
+	}
+	size_t getAlignment() {
+		size_t temp = alignment.load();
+		return temp;
+	}
+	void init() {
+		metadata = 0;
+		blowup = 0;
+		alignment = 0;
+	}
+} Overhead;
+
+typedef struct {
 	size_t VmSize_start;
 	size_t VmSize_end;
 	size_t VmPeak;
@@ -87,7 +113,6 @@ struct stack_frame {
 	struct stack_frame * prev;	// pointing to previous stack_frame
 	void * caller_address;		// the address of caller
 };
-
 
 //Enumerations
 enum initStatus{            //enum to keep track of libmallocprof's constuction status 
@@ -132,8 +157,8 @@ typedef struct  {
 bool mappingEditor (void* addr, size_t len, int prot);
 inline bool isAllocatorInCallStack();
 inline size_t getClassSizeFor(size_t size);
+int find_pages(uintptr_t vstart, uintptr_t vend, unsigned long[]);
 int num_used_pages(uintptr_t vstart, uintptr_t vend);
-int find_page(uintptr_t vstart, uintptr_t vend);
 // void analyzePerfInfo(PerfReadInfo*, PerfReadInfo*, size_t, bool*, pid_t);
 void analyzePerfInfo(allocation_metadata *metadata);
 // void analyzeAllocation(size_t size, uint64_t address, uint64_t cycles, size_t, bool*);
@@ -160,6 +185,7 @@ void getPerfInfo(PerfReadInfo*);
 void globalizeThreadAllocData();
 void increaseMemoryHWM(size_t size);
 void myFree (void* ptr);
+void readAllocatorFile();
 void writeAllocData ();
 void writeContention ();
 void writeMappings();
@@ -173,6 +199,7 @@ FreeObject* newFreeObject (uint64_t addr, uint64_t size);
 LC* newLC ();
 MmapTuple* newMmapTuple (uint64_t address, size_t length, int prot, char origin);
 ObjectTuple* newObjectTuple (uint64_t address, size_t size);
+Overhead* newOverhead();
 ThreadContention* newThreadContention (uint64_t);
 thread_alloc_data* newTad();
 allocation_metadata init_allocation(size_t sz, enum memAllocType type);

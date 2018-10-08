@@ -5,7 +5,7 @@
 #include "memsample.h"
 #include "real.hh"
 
-__thread extern thread_data thrData;
+extern __thread thread_data thrData;
 
 extern "C" void printHashMap();
 extern "C" pid_t gettid();
