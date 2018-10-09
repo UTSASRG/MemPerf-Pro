@@ -24,7 +24,7 @@ CXX = g++
 #CXX = clang++ 
 
 CFLAGS += -O2 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-frame-pointer
-CFLAGS2 += -O0 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-frame-pointer -rdynamic 
+CFLAGS2 += -O0 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-frame-pointer -Wl,--no-as-needed
 
 #CFLAGS += -DNO_PMU
 #CFLAGS2 += -DNO_PMU
@@ -84,67 +84,67 @@ libmallocprof.so: $(DEPS)
 
 # TCMalloc 4.2.6
 test/test-tcmalloc-noprof: test/$(TEST_FILE)
-	$(CXX) $(CFLAGS2) -o test/test-tcmalloc-noprof test/$(TEST_FILE) -Wl,--no-as-needed -ltcmalloc
+	$(CXX) $(CFLAGS2) -o test/test-tcmalloc-noprof test/$(TEST_FILE) -ltcmalloc
 
 test/test-tcmalloc: libmallocprof.so test/$(TEST_FILE)
-	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -o test/test-tcmalloc test/$(TEST_FILE) -Wl,--no-as-needed -ltcmalloc
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -o test/test-tcmalloc test/$(TEST_FILE) -ltcmalloc
 
 test/test-tcmalloc-thread: libmallocprof.so test/$(THREADTEST_FILE)
-	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -o test/test-tcmalloc-thread test/$(THREADTEST_FILE) -lpthread -Wl,--no-as-needed -ltcmalloc
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -o test/test-tcmalloc-thread test/$(THREADTEST_FILE) -lpthread -ltcmalloc
 
 # OpenBSD
 test/test-obsd: libmallocprof.so test/$(TEST_FILE)
-	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -Wl,--no-as-needed -rdynamic /home/sam/Memoryallocators/OpenBSD-6.0/libomalloc.so -o test/test-obsd test/$(TEST_FILE)
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/sam/Memoryallocators/OpenBSD-6.0/libomalloc.so -o test/test-obsd test/$(TEST_FILE)
 
 test/test-obsd-thread: libmallocprof.so test/$(THREADTEST_FILE)
-	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -Wl,--no-as-needed -rdynamic /home/sam/Memoryallocators/OpenBSD-6.0/libomalloc.so -o test/test-obsd-thread test/$(THREADTEST_FILE) -lpthread
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/sam/Memoryallocators/OpenBSD-6.0/libomalloc.so -o test/test-obsd-thread test/$(THREADTEST_FILE) -lpthread
 
 # FreeGuard
 test/test-freeguard: libmallocprof.so test/$(TEST_FILE)
-	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -Wl,--no-as-needed -rdynamic /home/richard/FreeGuard/libfreeguard.so -o test/test-freeguard test/$(TEST_FILE)
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/richard/FreeGuard/libfreeguard.so -o test/test-freeguard test/$(TEST_FILE)
 
 test/test-freeguard-thread: libmallocprof.so test/$(THREADTEST_FILE)
-	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -Wl,--no-as-needed -rdynamic /home/richard/FreeGuard/libfreeguard.so -o test/test-freeguard-thread test/$(THREADTEST_FILE) -lpthread
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/richard/FreeGuard/libfreeguard.so -o test/test-freeguard-thread test/$(THREADTEST_FILE) -lpthread
 
 # DieHarder
 test/test-dieharder: libmallocprof.so test/$(TEST_FILE)
-	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -Wl,--no-as-needed -rdynamic /home/sam/Memoryallocators/DieHard-old/src/libdieharder.so -o test/test-dieharder test/$(TEST_FILE)
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/sam/Memoryallocators/DieHard-old/src/libdieharder.so -o test/test-dieharder test/$(TEST_FILE)
 
 test/test-dieharder-thread: libmallocprof.so test/$(THREADTEST_FILE)
-	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -Wl,--no-as-needed -rdynamic /home/sam/Memoryallocators/DieHard-old/src/libdieharder.so -o test/test-dieharder-thread test/$(THREADTEST_FILE) -lpthread
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/sam/Memoryallocators/DieHard-old/src/libdieharder.so -o test/test-dieharder-thread test/$(THREADTEST_FILE) -lpthread
 
 # Libc
 test/test-xlibc: libmallocprof.so test/$(TEST_FILE)
-	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -Wl,--no-as-needed -rdynamic /home/richard/Memoryallocators/libc-2.24/libmalloc.so -o test/test-xlibc test/$(TEST_FILE)
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/richard/Memoryallocators/libc-2.24/libmalloc.so -o test/test-xlibc test/$(TEST_FILE)
 
 test/test-xlibc-thread: libmallocprof.so test/$(THREADTEST_FILE)
-	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -Wl,--no-as-needed -rdynamic /home/richard/Memoryallocators/libc-2.24/libmalloc.so -o test/test-xlibc-thread test/$(THREADTEST_FILE) -pthread
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/richard/Memoryallocators/libc-2.24/libmalloc.so -o test/test-xlibc-thread test/$(THREADTEST_FILE) -pthread
 
 #Parsec Black-Scholes multithreaded
 test/bs-libc: libmallocprof.so test/blackscholes-pthread.cpp
-	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -Wl,--no-as-needed -rdynamic /home/richard/Memoryallocators/libc-2.24/libmalloc.so -o test/bs-libc test/blackscholes-pthread.cpp -lpthread -DENABLE_THREADS
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/richard/Memoryallocators/libc-2.24/libmalloc.so -o test/bs-libc test/blackscholes-pthread.cpp -lpthread -DENABLE_THREADS
 
 test/bs-obsd: libmallocprof.so test/blackscholes-pthread.cpp
-	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -Wl,--no-as-needed -rdynamic /home/sam/Memoryallocators/OpenBSD-6.0/libomalloc.so -o test/bs-obsd test/blackscholes-pthread.cpp -lpthread -DENABLE_THREADS
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/sam/Memoryallocators/OpenBSD-6.0/libomalloc.so -o test/bs-obsd test/blackscholes-pthread.cpp -lpthread -DENABLE_THREADS
 
 test/bs-dieharder: libmallocprof.so test/blackscholes-pthread.cpp
-	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -Wl,--no-as-needed -rdynamic /home/sam/Memoryallocators/DieHard-old/src/libdieharder.so -o test/bs-dieharder test/blackscholes-pthread.cpp -lpthread -DENABLE_THREADS  
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/sam/Memoryallocators/DieHard-old/src/libdieharder.so -o test/bs-dieharder test/blackscholes-pthread.cpp -lpthread -DENABLE_THREADS  
 
 test/bs-freeguard: libmallocprof.so test/blackscholes-pthread.cpp
-	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -Wl,--no-as-needed -rdynamic /home/daniel/mem-alloc-project/FreeGuard/libfreeguard.so -o test/bs-freeguard test/blackscholes-pthread.cpp -lpthread -DENABLE_THREADS
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/daniel/mem-alloc-project/FreeGuard/libfreeguard.so -o test/bs-freeguard test/blackscholes-pthread.cpp -lpthread -DENABLE_THREADS
 
 #tests for pmu accuracy
 test/pmu-libc-test: libmallocprof.so test/pmu-test.cpp
-	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -Wl,--no-as-needed -rdynamic /home/richard/Memoryallocators/libc-2.24/libmalloc.so -o test/pmu-libc-test test/pmu-test.cpp
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/richard/Memoryallocators/libc-2.24/libmalloc.so -o test/pmu-libc-test test/pmu-test.cpp
 
 test/pmu-obsd-test: libmallocprof.so test/pmu-test.cpp
-	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -Wl,--no-as-needed -rdynamic /home/sam/Memoryallocators/OpenBSD-6.0/libomalloc.so -o test/pmu-obsd-test test/pmu-test.cpp
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/sam/Memoryallocators/OpenBSD-6.0/libomalloc.so -o test/pmu-obsd-test test/pmu-test.cpp
 
 test/pmu-freeguard-test: libmallocprof.so test/pmu-test.cpp
-	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -Wl,--no-as-needed -rdynamic /home/daniel/mem-alloc-project/FreeGuard/libfreeguard.so -o test/pmu-freeguard-test test/pmu-test.cpp
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/daniel/mem-alloc-project/FreeGuard/libfreeguard.so -o test/pmu-freeguard-test test/pmu-test.cpp
 
 test/pmu-dieharder-test: libmallocprof.so test/pmu-test.cpp
-	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -Wl,--no-as-needed -rdynamic /home/sam/Memoryallocators/DieHard-old/src/libdieharder.so -o test/pmu-dieharder-test test/pmu-test.cpp
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/sam/Memoryallocators/DieHard-old/src/libdieharder.so -o test/pmu-dieharder-test test/pmu-test.cpp
 
 # Clean
 test/test-clean: test/$(TEST_FILE)
@@ -157,10 +157,10 @@ clean:
 # Executions
 .PHONY: runThreads
 runThreads:
-	./test/test-xlibc-thread
-	./test/test-dieharder-thread
-	./test/test-freeguard-thread
-	./test/test-obsd-thread
+	/usr/bin/time ./test/test-xlibc-thread
+	/usr/bin/time ./test/test-dieharder-thread
+	/usr/bin/time ./test/test-freeguard-thread
+	/usr/bin/time ./test/test-obsd-thread
 
 .PHONY: runTC
 runTC:

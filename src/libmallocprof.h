@@ -6,10 +6,7 @@
 #define CALLSITE_MAXIMUM_LENGTH 20
 #define ENTRY_SIZE 8
 
-//Keys to bump-pointer freelist hashmap.
-//512 is a large object for GlibC, and
-//will be placed on a large object freelist.
-//Hopefully other bp allocators are similar
+//For libc, bump pointer
 #define LARGE_OBJECT 512
 #define SMALL_OBJECT 0
 
@@ -19,6 +16,7 @@
 #define PAGE_BITS 12 
 #define TEMP_MEM_SIZE 1024 * 1024 * 1024 //1GB
 #define MAX_CLASS_SIZE 1050000
+
 
 //Structures
 typedef struct {
@@ -173,7 +171,8 @@ void get_bibop_metadata();
 void getAddressUsage(size_t size, uint64_t address, size_t classSize, uint64_t cycles);
 void getAllocStyle ();
 void getAlignment(size_t size, size_t classSize);
-void getBlowup(size_t size, uint64_t address, size_t classSize, bool*);
+//void getBlowup(size_t size, uint64_t address, size_t classSize, bool*);
+void getBlowup(size_t size, size_t classSize, bool*);
 void getClassSizes ();
 void getMappingsUsage(size_t size, uint64_t address, size_t classSize);
 void getMemUsageStart ();
@@ -185,6 +184,7 @@ void getPerfInfo(PerfReadInfo*);
 void globalizeThreadAllocData();
 void increaseMemoryHWM(size_t size);
 void myFree (void* ptr);
+void* myMalloc (size_t size);
 void readAllocatorFile();
 void writeAllocData ();
 void writeContention ();
@@ -193,7 +193,6 @@ void writeOverhead();
 void writeThreadContention();
 void writeThreadMaps();
 void writeAddressUsage ();
-void* myMalloc (size_t size);
 unsigned search_vpage (uintptr_t vpage);
 FreeObject* newFreeObject (uint64_t addr, uint64_t size);
 LC* newLC ();

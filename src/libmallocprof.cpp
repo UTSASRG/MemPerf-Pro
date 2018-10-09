@@ -61,15 +61,16 @@ const bool d_write_address = false;
 const bool d_write_mappings = true;
 const bool d_write_tad = true;
 const bool d_readFile = false;
+const bool d_initLocal = false;
+const bool d_initGlobal = false;
+const bool d_getBlowup = false;
+const bool d_updateCounters = false;
 
 //Atomic Globals ATOMIC
 std::atomic_bool mmap_active(false);
 std::atomic_bool sbrk_active(false);
 std::atomic_bool madvise_active(false);
-std::atomic_size_t summation_blowup_bytes (0);
 std::atomic_size_t free_bytes (0);
-std::atomic_size_t active_mem (0);
-std::atomic_size_t active_mem_HWM (0);
 std::atomic_uint num_free (0);
 std::atomic_uint num_malloc (0);
 std::atomic_uint num_calloc (0);
@@ -88,16 +89,13 @@ std::atomic_uint temp_alloc (0);
 std::atomic_uint temp_position (0);
 std::atomic_uint threads (0);
 std::atomic_uint blowup_allocations (0);
-std::atomic_uint summation_blowup_allocations (0);
 std::atomic_uint num_mprotect (0);
 std::atomic_uint num_actual_malloc (0);
 std::atomic<std::uint64_t> cycles_free (0);
 std::atomic<std::uint64_t> cycles_new (0);
 std::atomic<std::uint64_t> cycles_reused (0);
 std::atomic<std::uint64_t> total_time_wait (0);
-
-//Struct of virtual memory info
-VmInfo vmInfo;
+std::atomic<unsigned>* globalFreeArray = nullptr;
 
 //Thread local variables
 __thread thread_data thrData;
@@ -107,6 +105,8 @@ thread_local bool inMmap;
 thread_local bool samplingInit = false;
 thread_local uint64_t timeAttempted;
 thread_local uint64_t timeWaiting;
+thread_local unsigned* localFreeArray = nullptr;
+thread_local bool localFreeArrayInitialized = false;
 
 //Hashmap of thread IDs to class sizes to their thread_alloc_data structs
 typedef HashMap <uint64_t, thread_alloc_data*, spinlock> classSizeMap;
@@ -125,12 +125,6 @@ HashMap <uint64_t, LC*, spinlock> lockUsage;
 //Hashmap of mmap addrs to tuple:
 HashMap <uint64_t, MmapTuple*, spinlock> mappings;
 
-//Hashmap of freelists, key 0 is bump pointer
-typedef HashMap <uint64_t, FreeObject*, spinlock> Freelist;
-HashMap <uint64_t, Freelist*, spinlock> freelistMap;
-HashMap <uint64_t, FreeObject*, spinlock> smallFreelistMap;
-HashMap <uint64_t, FreeObject*, spinlock> largeFreelistMap;
-
 //Hashmap of Overhead objects
 HashMap <size_t, Overhead*, spinlock> overhead;
 
@@ -141,7 +135,11 @@ HashMap <uint64_t, ThreadContention*, spinlock> threadContention;
 spinlock temp_mem_lock;
 
 //Functions
-Freelist* getFreelist (size_t size);
+//Freelist* getFreelist (size_t size);
+size_t updateFreeCounters(uint64_t address);
+short getSizeIndex(size_t size);
+void initGlobalFreeArray();
+void initLocalFreeArray();
 
 // pre-init private allocator memory
 char myBuffer[TEMP_MEM_SIZE];
@@ -205,9 +203,6 @@ __attribute__((constructor)) initStatus initializer() {
 	tadMap.initialize(HashFuncs::hashInt, HashFuncs::compareInt, 128);
 	addressUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 	lockUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 128);
-	freelistMap.initialize(HashFuncs::hashInt, HashFuncs::compareInt, 64);
-	smallFreelistMap.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
-	largeFreelistMap.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 	overhead.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 	threadContention.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 	mapsInitialized = true;
@@ -235,6 +230,8 @@ __attribute__((constructor)) initStatus initializer() {
 	// Load info from allocatorInfoFile
 	readAllocatorFile();
 
+	initGlobalFreeArray();
+
 	// Generate the name of our output file, then open it for writing.
 	char outputFile[MAX_FILENAME_LEN];
 	snprintf(outputFile, MAX_FILENAME_LEN, "%s_libmallocprof_%d_main_thread.txt",
@@ -256,7 +253,6 @@ __attribute__((constructor)) initStatus initializer() {
 		//Print class sizes to thrData output
 		fprintf (thrData.output, ">>> class_sizes ");
 
-		//Create and init freelists for each class size
 		//Create and init Overhead for each class size
 		for (int i = 0; i < num_class_sizes; i++) {
 			
@@ -264,9 +260,6 @@ __attribute__((constructor)) initStatus initializer() {
 			
 			if (d_class_sizes) printf ("hashmap entry %d key is %zu\n", i, cs);
 			fprintf (thrData.output, "%zu ", cs);
-			Freelist* f = (Freelist*) myMalloc (sizeof (Freelist));
-			f->initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
-			freelistMap.insert(cs, f);
 			overhead.insert(cs, newOverhead());
 		}
 
@@ -274,14 +267,6 @@ __attribute__((constructor)) initStatus initializer() {
 		fflush(thrData.output);
 	}
 	else {
-		//Create the freelist for small objects, key SMALL_OBJECT == 0
-		//Freelist* small = (Freelist*) myMalloc (sizeof (Freelist));
-		smallFreelistMap.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
-
-		//Create the freelist for objects >= 512 Bytes
-		//Freelist* large = (Freelist*) myMalloc (sizeof (Freelist));
-		largeFreelistMap.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
-
 		//Create an entry in the overhead hashmap with key 0
 		overhead.insert(BP_OVERHEAD, newOverhead());
 	}
@@ -384,6 +369,10 @@ extern "C" {
 		//thread_local
 		inAllocation = true;
 
+		if (!localFreeArrayInitialized) {
+			initLocalFreeArray();
+		}
+
         num_malloc.fetch_add(1, relaxed);
 
 		//Data we need for each allocation
@@ -433,6 +422,10 @@ extern "C" {
 
         // thread_local
 		inAllocation = true;
+
+		if (!localFreeArrayInitialized) {
+			initLocalFreeArray();
+		}
 
 		num_calloc.fetch_add(1, relaxed);
 
@@ -488,8 +481,12 @@ extern "C" {
             samplingInit = true;
         }
 
+		if (!localFreeArrayInitialized) {
+			initLocalFreeArray();
+		}
+
 		//Data we need for each free
-				classSizeMap *csm;
+		classSizeMap *csm;
 		allocation_metadata allocData = init_allocation(0, FREE);
 		allocData.address = reinterpret_cast <uint64_t> (ptr);
 
@@ -502,8 +499,8 @@ extern "C" {
 		//Do after free
 		doAfter(&allocData);
 
-		//Insert object into our freelist
-		allocData.classSize = analyzeFree(allocData.address);
+		//Update free counters
+		allocData.classSize = updateFreeCounters(allocData.address);
 
 		//Update atomics
 		cycles_free.fetch_add ((allocData.tsc_after - allocData.tsc_before), relaxed);
@@ -548,7 +545,6 @@ extern "C" {
 		}
 
 		free_bytes += allocData.size;
-		active_mem -= allocData.size;
 	}
 
 	void * yyrealloc(void * ptr, size_t sz) {
@@ -580,6 +576,10 @@ extern "C" {
 
 		//thread_local
 		inAllocation = true;
+
+		if (!localFreeArrayInitialized) {
+			initLocalFreeArray();
+		}
 
 		//Do before
 		// doBefore(&before, &tsc_before);
@@ -1127,15 +1127,12 @@ void analyzeAllocation(allocation_metadata *metadata) {
 	//Update mmap region info
 	//getMappingsUsage(metadata->size, metadata->address, metadata->classSize);
 
-	//Increase "active mem"
-	//increaseMemoryHWM(metadata->size);
-
 	// Analyze perfinfo
 	analyzePerfInfo(metadata);
 }
 
-size_t analyzeFree(uint64_t address) {
-
+size_t updateFreeCounters(uint64_t address) {
+	
 	ObjectTuple* t;
 	size_t size = 0;
     size_t current_class_size = 0;
@@ -1148,34 +1145,33 @@ size_t analyzeFree(uint64_t address) {
 
         current_class_size = getClassSizeFor(size);
 
-		//Add this object to it's Freelist
-		//If bump pointer, add to freelistMap[0]
+		//Increase the free object counter for this class size
+		//GetSizeIndex returns class size for bibop
+		//0 or 1 for bump pointer / 0 for small, 1 for large objects
 		if (size <= malloc_mmap_threshold) {
-			if (!bibop) {
-				if (size < LARGE_OBJECT) {
-						smallFreelistMap.insert(address, newFreeObject(address, size));
-				} else {
-						largeFreelistMap.insert(address, newFreeObject(address, size));
-				}
-			}
-			//If bibop, add to freelistMap[size]
-			else {
-				Freelist* f = getFreelist(size);
-				(*f).insert(address, newFreeObject(address, size));
-			}
+			short index = getSizeIndex(size);
+			localFreeArray[index]++;
+			globalFreeArray[index]++;
+			if (d_updateCounters) printf ("globalFreeArray[%d]++\n", index);
 		}
 	}
 
 	return current_class_size;
 }
 
-void increaseMemoryHWM(size_t size) {
-
-	uint32_t n = active_mem += size;
-	if ((n + size) > active_mem_HWM) {
-		active_mem_HWM = (n + size);
-		if (d_malloc_info) printf ("increasing a_m_HWM, n= %u, size= %zu\n", n, size);
+short getSizeIndex(size_t size) {
+	if (bumpPointer) {
+		if (size < LARGE_OBJECT) return 0;
+		else return 1;
 	}
+
+	short index = 0;
+	for (int i = 0; i < num_class_sizes; i++) {
+		if (size > class_sizes[i]) continue;
+		index = i;
+		break;
+	}
+	return index;
 }
 
 void getAddressUsage(size_t size, uint64_t address, size_t classSize, uint64_t cycles) {
@@ -1219,7 +1215,7 @@ void getOverhead (size_t size, uint64_t address, size_t classSize, bool* reused)
 		if (bibop) getAlignment(size, classSize);
 
 		//Check for memory blowup
-		getBlowup(size, address, classSize, reused);
+		getBlowup(size, classSize, reused);
 
 		//Add metadata for this overhead object
 		getMetadata(classSize);
@@ -1243,79 +1239,38 @@ void getAlignment (size_t size, size_t classSize) {
 	}
 }
 
-void getBlowup (size_t size, uint64_t address, size_t classSize, bool* reused) {
+void getBlowup (size_t size, size_t classSize, bool* reused) {
 
-	Freelist* freelist = nullptr;
-	bool reuseFreePossible = false;
-	bool reuseFreeObject = false;
-
-	if (!bibop) {
-		if (size < LARGE_OBJECT) {
-				for (auto f : smallFreelistMap) {
-					auto data = f.getData();
-					if (size <= data->size) {
-						reuseFreePossible = true;
-					}
-					if (address == data->addr) {
-						reuseFreeObject = true;
-						smallFreelistMap.erase(address);
-						free_bytes -= size;
-						break;
-					}
-				}
-		}
-		else {
-				for (auto f : largeFreelistMap) {
-					auto data = f.getData();
-					if (size <= data->size) {
-						reuseFreePossible = true;
-					}
-					if (address == data->addr) {
-						reuseFreeObject = true;
-						largeFreelistMap.erase(address);
-						free_bytes -= size;
-						break;
-					}
-				}
-		}
+	short index = getSizeIndex(size);
+	
+	//If I have free objects on my local list
+	if (localFreeArray[index] > 0) {
+		*reused = true;
+		localFreeArray[index]--;
+		globalFreeArray[index]--;
+		if (d_getBlowup) printf ("I have free. globalFreeArray[%d]--\n", index);
+		return;
 	}
 
+	//I don't have free objects on my local list, check global
 	else {
-		freelist = getFreelist(size);
-		if ((*freelist).begin() != (*freelist).end()) {
-			reuseFreePossible = true;
-			for (auto f : (*freelist)) {
-				auto data = f.getData();
-				if (address == data->addr) {
-					reuseFreeObject = true;
-					(*freelist).erase(address);
-					free_bytes -= size;
-					break;
-				}
-			}
+		if (globalFreeArray[index] > 0) {
+			globalFreeArray[index]--;
+			if (d_getBlowup) printf ("I don't have free. globalFreeArray[%d]--\n", index);
+		}
+		//I don't have free objects, and no one else does either
+		else {
+			return;
 		}
 	}
 
-	//If Reuse was possible, but didn't reuse
-	if (reuseFreePossible && !reuseFreeObject) {
-		//possible memory blowup has occurred
-		//get size of allocation
-		Overhead* o;
-		if (overhead.find(classSize, &o)) {
-			o->addBlowup(size);
-		}
-		blowup_allocations.fetch_add(1, relaxed);
+	//If we've made it here, this is a blowup allocation
+	//Increment the blowup for this class size
+	Overhead* o;
+	if (overhead.find(classSize, &o)) {
+		o->addBlowup(size);
 	}
-
-	//If there is enough free bytes to satisfy the allocation
-	//Regardless of where they came from, such as memory that
-	//was freed during intialization or setup, and not necessarily
-	//from objects freed within the main function
-	if (size <= free_bytes) {
-		summation_blowup_bytes.fetch_add(size, relaxed);
-		summation_blowup_allocations.fetch_add(1, relaxed);
-	}
-	*reused = reuseFreeObject;
+	blowup_allocations.fetch_add(1, relaxed);
 }
 
 //Return the appropriate class size that this object should be in
@@ -1667,11 +1622,8 @@ void writeAllocData () {
 	fprintf(thrData.output, ">>> metadata_object          %zu\n", metadata_object);
 	fprintf(thrData.output, ">>> metadata_overhead        %zu\n", metadata_overhead);
 	fprintf(thrData.output, ">>> totalSizeAlloc           %zu\n", totalSizeAlloc);
-	fprintf(thrData.output, ">>> active_mem_HWM           %zu\n", active_mem_HWM.load(relaxed));
 	fprintf(thrData.output, ">>> totalMemOverhead         %zu\n", totalMemOverhead);
 	fprintf(thrData.output, ">>> memEfficiency            %.2f%%\n", memEfficiency);
-	fprintf(thrData.output, ">>> summation_blowup_bytes         %zu\n", summation_blowup_bytes.load(relaxed));
-	fprintf(thrData.output, ">>> summation_blowup_allocations   %u\n", summation_blowup_allocations.load(relaxed));
 
 	writeOverhead();
 	if (d_write_address) writeAddressUsage();
@@ -1787,8 +1739,10 @@ void writeOverhead () {
 
 		auto key = o.getKey();
 		auto data = o.getData();
+		char size[10];
+		sprintf (size, "%zu", key);
 		fprintf (thrData.output, "classSize %s:\nmetadata %zu\nblowup %zu\nalignment %zu\n\n",
-				 key ? std::to_string(key).c_str() : "BumpPointer", data->getMetadata(), data->getBlowup(), data->getAlignment());
+			key ? size : "BumpPointer", data->getMetadata(), data->getBlowup(), data->getAlignment());
 	}
 }
 
@@ -1828,34 +1782,6 @@ void writeMappings () {
 			data->tid, data->rw, data->allocations.load(relaxed));
 		i++;
 	}
-}
-
-//Get the freelist for this objects class size
-Freelist* getFreelist (size_t size) {
-
-	Freelist* f = nullptr;
-
-	if (num_class_sizes == 0) {
-		fprintf (stderr, "class_sizes is empty. Abort\n");
-		abort();
-	}
-
-	size_t classSize = getClassSizeFor(size);
-
-	if (freelistMap.find(classSize, &f)) {
-		if (d_getFreelist) printf ("Freelist for size %zu found. Returning freelist[%zu]\n", size, classSize);
-	}
-
-	else {
-		printf ("Didn't find Freelist for size %zu\n", size);
-	}
-
-	if (f == nullptr) {
-		printf ("Can't find freelist, aborting\n");
-		abort();
-	}
-
-	return f;
 }
 
 void calculateMemOverhead () {
@@ -2203,4 +2129,27 @@ void readAllocatorFile() {
 	}
 
 	myFree(buffer);
+}
+
+void initLocalFreeArray () {
+	if (bibop) {
+		localFreeArray = (unsigned*) myMalloc(num_class_sizes*sizeof(unsigned));
+	}
+
+	else {
+		localFreeArray = (unsigned*) myMalloc(2*sizeof(unsigned));
+	}
+	if (d_initLocal) printf ("tid %zu - initLocalFreeArray\n", pthread_self());
+	localFreeArrayInitialized = true;
+}
+
+void initGlobalFreeArray () {
+	if (bibop) {
+		globalFreeArray = (std::atomic<unsigned>*) myMalloc(num_class_sizes*sizeof(unsigned));
+	}
+
+	else {
+		globalFreeArray = (std::atomic<unsigned>*) myMalloc(2*sizeof(unsigned));
+	}
+	if (d_initGlobal) printf ("initGlobalFreeArray\n");
 }

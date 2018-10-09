@@ -147,7 +147,7 @@ int helper_main (int argc, char ** argv, char ** envp) {
 
 	selfmap::getInstance().getTextRegions();
 	allocator_name = strrchr(allocator_name, '/') + 1;
-	char* period = strchr(allocator_name, '.');
+	char* period = strrchr(allocator_name, '.');
 	uint64_t bytes = (uint64_t)period - (uint64_t)allocator_name;
 	size_t extensionBytes = 6;
 	char filename[bytes+extensionBytes];
