@@ -63,13 +63,19 @@ char myBuffer [BUFFER_SIZE];
 unsigned long temp_position = 0;
 unsigned long temp_allocations = 0;
 
-
 typedef int (*main_fn_t)(int, char **, char **);
 main_fn_t real_main;
 
 void exitHandler();
 void printFromGlobal(char*);
 void writeClassSizes();
+void getAllocStyle();
+void getClassSizes();
+void getMmapThreshold();
+void get_bp_metadata();
+void get_bibop_metadata();
+unsigned search_vpage (uintptr_t vpage);
+int find_pages (uintptr_t vstart, uintptr_t vend, unsigned long pagesFound[]);
 
 //Hashmap of mmap addrs to tuple:
 HashMap <uint64_t, MmapTuple*, spinlock> mappings;
@@ -327,32 +333,27 @@ extern "C" {
 
 void* myMalloc (size_t size) {
 
-	temp_mem_lock.lock ();
-	void* retptr;
-	if((temp_position + size) < BUFFER_SIZE) {
-		retptr = (void *)(myBuffer + temp_position);
+	void* p;
+	if((temp_position + size) < TEMP_MEM_SIZE) {
+		p = (void *)(myBuffer + temp_position);
 		temp_position += size;
 		temp_allocations++;
 	} else {
 		fprintf(stderr, "error: global allocator out of memory\n");
 		fprintf(stderr, "\t requested size = %zu, total size = %d, "
-							 "total allocs = %zu\n", size, BUFFER_SIZE, temp_allocations);
+						"total allocs = %lu\n", size, TEMP_MEM_SIZE, temp_allocations);
 		abort();
 	}
-	temp_mem_lock.unlock ();
-	return retptr;
+	return p;
 }
 
 void myFree (void* ptr) {
 
 	if (ptr == NULL) return;
-
-	temp_mem_lock.lock();
-	if ((ptr >= (void*)myBuffer) && (ptr <= ((void*)(myBuffer + BUFFER_SIZE)))) {
+	if ((ptr >= (void*)myBuffer) && (ptr <= ((void*)(myBuffer + TEMP_MEM_SIZE)))) {
 		temp_allocations--;
-		if(temp_allocations == 0) temp_position = 0;
+		if (temp_allocations == 0) temp_position = 0;
 	}
-	temp_mem_lock.unlock();
 }
 
 // Try to figure out which allocator is being used
@@ -521,35 +522,25 @@ void get_bibop_metadata() {
 
 		auto data = entry.getData();
 
-//		if (data->allocations > 0) {
-		if (false) {
-			//Don't look for metadata here
-			if (d_bibop_metadata) {}
-		}
+		unsigned long pages[1000];
+		unsigned numEntries = 0;
 
-		//This mmap wasn't used for satisfying allocations
-		//Check for metadata
-		else {
-			unsigned long pages[1000];
-			unsigned numEntries = 0;
+		if (d_bibop_metadata) printf ("found unused mmap, start= %#lx, finding physically backed pages..\n", data->start);
 
-			if (d_bibop_metadata) printf ("found unused mmap, start= %#lx, finding physically backed pages..\n", data->start);
+		numEntries = find_pages(data->start, data->end, pages);
+		if (d_bibop_metadata) printf ("Finished. Found %u physically backed vpages.\n", numEntries);
 
-			numEntries = find_pages(data->start, data->end, pages);
-			if (d_bibop_metadata) printf ("Finished. Found %u physically backed vpages.\n", numEntries);
+		if (d_bibop_metadata) printf ("Searching vpages for usage..\n");
+		for (unsigned i = 0; i < numEntries; i++) {
 
-			if (d_bibop_metadata) printf ("Searching vpages for usage..\n");
-			for (unsigned i = 0; i < numEntries; i++) {
+			vpage = (data->start + (pages[i]*PAGE_SIZE));
 
-				vpage = (data->start + (pages[i]*PAGE_SIZE));
-
-				unsigned bytes = search_vpage(vpage);
-				if (bytes > 0) {
-					//Keep track of values return from search_vpage function
-					//Store in array to get the lowest value later
-					bytes_in_use[bytes_index] = bytes;
-					bytes_index++;
-				}
+			unsigned bytes = search_vpage(vpage);
+			if (bytes > 0) {
+				//Keep track of values return from search_vpage function
+				//Store in array to get the lowest value later
+				bytes_in_use[bytes_index] = bytes;
+				bytes_index++;
 			}
 		}
 	}

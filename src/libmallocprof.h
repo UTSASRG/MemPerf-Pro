@@ -17,7 +17,6 @@
 #define TEMP_MEM_SIZE 1024 * 1024 * 1024 //1GB
 #define MAX_CLASS_SIZE 1050000
 
-
 //Structures
 typedef struct {
 	uint64_t tid = 0;
@@ -33,18 +32,7 @@ typedef struct {
 } ThreadContention;
 
 typedef struct {
-	uint64_t addr;
-	size_t size;
-} FreeObject;
-
-typedef struct {
-	uint64_t addr;
-	uint64_t numAccesses;
-	size_t szTotal;
-	size_t szFreed;
 	size_t szUsed;
-	uint64_t numAllocs;
-	uint64_t numFrees;
 } ObjectTuple;
 
 typedef struct {
@@ -84,16 +72,6 @@ typedef struct {
 } Overhead;
 
 typedef struct {
-	size_t VmSize_start;
-	size_t VmSize_end;
-	size_t VmPeak;
-	size_t VmRSS_start;
-	size_t VmRSS_end;
-	size_t VmHWM;
-	size_t VmLib;
-} VmInfo;
-
-typedef struct {
 	uint64_t faults = 0;
 	uint64_t tlb_read_misses = 0;
 	uint64_t tlb_write_misses = 0;
@@ -120,7 +98,6 @@ enum initStatus{            //enum to keep track of libmallocprof's constuction 
     INITIALIZED = 2
 };
 
-
 /*
  * AllocType
  *
@@ -133,7 +110,6 @@ enum memAllocType {
 	CALLOC,
 	FREE
 };
-
 
 typedef struct  {
 	bool reused;
@@ -150,39 +126,24 @@ typedef struct  {
 	thread_alloc_data *tad;
 } allocation_metadata;
 
-
 // Functions 
 bool mappingEditor (void* addr, size_t len, int prot);
 inline bool isAllocatorInCallStack();
 inline size_t getClassSizeFor(size_t size);
-int find_pages(uintptr_t vstart, uintptr_t vend, unsigned long[]);
 int num_used_pages(uintptr_t vstart, uintptr_t vend);
-// void analyzePerfInfo(PerfReadInfo*, PerfReadInfo*, size_t, bool*, pid_t);
 void analyzePerfInfo(allocation_metadata *metadata);
-// void analyzeAllocation(size_t size, uint64_t address, uint64_t cycles, size_t, bool*);
 void analyzeAllocation(allocation_metadata *metadata);
-size_t analyzeFree(uint64_t);
 void calculateMemOverhead ();
-void clearFreelists();
 void doBefore(allocation_metadata *metadata);
 void doAfter(allocation_metadata *metadata);
-void get_bp_metadata();
-void get_bibop_metadata();
-void getAddressUsage(size_t size, uint64_t address, size_t classSize, uint64_t cycles);
-void getAllocStyle ();
+void getAddressUsage(size_t size, uint64_t address, uint64_t cycles);
 void getAlignment(size_t size, size_t classSize);
-//void getBlowup(size_t size, uint64_t address, size_t classSize, bool*);
 void getBlowup(size_t size, size_t classSize, bool*);
-void getClassSizes ();
 void getMappingsUsage(size_t size, uint64_t address, size_t classSize);
-void getMemUsageStart ();
-void getMemUsageEnd ();
 void getMetadata(size_t classSize);
-void getMmapThreshold ();
 void getOverhead(size_t size, uint64_t address, size_t classSize, bool*);
 void getPerfInfo(PerfReadInfo*);
 void globalizeThreadAllocData();
-void increaseMemoryHWM(size_t size);
 void myFree (void* ptr);
 void* myMalloc (size_t size);
 void readAllocatorFile();
@@ -192,9 +153,6 @@ void writeMappings();
 void writeOverhead();
 void writeThreadContention();
 void writeThreadMaps();
-void writeAddressUsage ();
-unsigned search_vpage (uintptr_t vpage);
-FreeObject* newFreeObject (uint64_t addr, uint64_t size);
 LC* newLC ();
 MmapTuple* newMmapTuple (uint64_t address, size_t length, int prot, char origin);
 ObjectTuple* newObjectTuple (uint64_t address, size_t size);
@@ -202,3 +160,7 @@ Overhead* newOverhead();
 ThreadContention* newThreadContention (uint64_t);
 thread_alloc_data* newTad();
 allocation_metadata init_allocation(size_t sz, enum memAllocType type);
+size_t updateFreeCounters(uint64_t address);
+short getSizeIndex(size_t size);
+void initGlobalFreeArray();
+void initLocalFreeArray();

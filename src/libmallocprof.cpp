@@ -54,10 +54,8 @@ size_t* class_sizes;
 const bool d_malloc_info = false;
 const bool d_mprotect = false;
 const bool d_mmap = false;
-const bool d_getFreelist = false;
 const bool d_class_sizes = false;
 const bool d_pmuData = false;
-const bool d_write_address = false;
 const bool d_write_mappings = true;
 const bool d_write_tad = true;
 const bool d_readFile = false;
@@ -70,7 +68,6 @@ const bool d_updateCounters = false;
 std::atomic_bool mmap_active(false);
 std::atomic_bool sbrk_active(false);
 std::atomic_bool madvise_active(false);
-std::atomic_size_t free_bytes (0);
 std::atomic_uint num_free (0);
 std::atomic_uint num_malloc (0);
 std::atomic_uint num_calloc (0);
@@ -85,8 +82,6 @@ std::atomic_uint num_sbrk (0);
 std::atomic_uint size_sbrk (0);
 std::atomic_uint malloc_mmaps (0);
 std::atomic_uint total_mmaps (0);
-std::atomic_uint temp_alloc (0);
-std::atomic_uint temp_position (0);
 std::atomic_uint threads (0);
 std::atomic_uint blowup_allocations (0);
 std::atomic_uint num_mprotect (0);
@@ -95,6 +90,7 @@ std::atomic<std::uint64_t> cycles_free (0);
 std::atomic<std::uint64_t> cycles_new (0);
 std::atomic<std::uint64_t> cycles_reused (0);
 std::atomic<std::uint64_t> total_time_wait (0);
+std::atomic<std::size_t> totalMemAllocated (0);
 std::atomic<unsigned>* globalFreeArray = nullptr;
 
 //Thread local variables
@@ -131,18 +127,12 @@ HashMap <size_t, Overhead*, spinlock> overhead;
 //Hashmap of tid to ThreadContention*
 HashMap <uint64_t, ThreadContention*, spinlock> threadContention;
 
-//Spinlocks
-spinlock temp_mem_lock;
-
-//Functions
-//Freelist* getFreelist (size_t size);
-size_t updateFreeCounters(uint64_t address);
-short getSizeIndex(size_t size);
-void initGlobalFreeArray();
-void initLocalFreeArray();
-
 // pre-init private allocator memory
 char myBuffer[TEMP_MEM_SIZE];
+void* myBufferEnd;
+uint64_t myBufferPosition = 0;
+uint64_t myBufferAllocations = 0;
+spinlock myBufferLock;
 
 typedef int (*main_fn_t)(int, char **, char **);
 main_fn_t real_main_mallocprof;
@@ -191,7 +181,8 @@ __attribute__((constructor)) initStatus initializer() {
 
 	RealX::initializer();
 
-	temp_mem_lock.init ();
+	myBufferEnd = (void*) (myBuffer + TEMP_MEM_SIZE);
+	myBufferLock.init();
 	pid = getpid();
 
 	// Calculate the minimum possible callsite ID by taking the low four bytes
@@ -345,12 +336,12 @@ extern "C" {
 		// requests will be fulfilled by RealX::malloc, which itself is a
 		// reference to the real malloc routine.
 		if((profilerInitialized != INITIALIZED) || (!selfmapInitialized)) {
-			if((temp_position + sz) < TEMP_MEM_SIZE)
+			if((myBufferPosition + sz) < TEMP_MEM_SIZE)
 				return myMalloc (sz);
 			else {
 				fprintf(stderr, "error: temp allocator out of memory\n");
-				fprintf(stderr, "\t requested size = %zu, total size = %d, total allocs = %u\n",
-						  sz, TEMP_MEM_SIZE, temp_alloc.load(relaxed));
+				fprintf(stderr, "\t requested size = %zu, total size = %d, total allocs = %lu\n",
+						  sz, TEMP_MEM_SIZE, myBufferAllocations);
 				abort();
 			}
 		}
@@ -393,6 +384,8 @@ extern "C" {
 
 		// Gets overhead, address usage, mmap usage, memHWM, and prefInfo
 		analyzeAllocation(&allocData);
+
+		totalMemAllocated.fetch_add(sz, relaxed);
 
 		// thread_local
 		inAllocation = false;
@@ -448,6 +441,8 @@ extern "C" {
 		// Gets overhead, address usage, mmap usage, memHWM, and perfInfo
 		analyzeAllocation(&allocData);
 
+		totalMemAllocated.fetch_add(nelem*elsize, relaxed);
+
 		//thread_local
 		inAllocation = false;
 
@@ -460,7 +455,7 @@ extern "C" {
 
 		// Determine whether the specified object came from our global buffer;
 		// only call RealX::free() if the object did not come from here.
-		if ((ptr >= (void *) myBuffer) && (ptr <= ((void *)(myBuffer + TEMP_MEM_SIZE)))) {
+		if (ptr >= (void *)myBuffer && ptr <= myBufferEnd) {
 			myFree (ptr);
 			return;
 		}
@@ -543,8 +538,6 @@ extern "C" {
 			allocData.after.cache_refs - allocData.before.cache_refs,
 			allocData.after.instructions - allocData.before.instructions);
 		}
-
-		free_bytes += allocData.size;
 	}
 
 	void * yyrealloc(void * ptr, size_t sz) {
@@ -602,6 +595,8 @@ extern "C" {
 
 		//Get perf info
 		//analyzePerfInfo(&before, &after, classSize, &reused, tid);
+
+		totalMemAllocated.fetch_add(sz, relaxed);
 
 		//thread_local
 		inAllocation = false;
@@ -1122,10 +1117,10 @@ void analyzeAllocation(allocation_metadata *metadata) {
 	getOverhead(metadata->size, metadata->address, metadata->classSize, &(metadata->reused));
 
 	//Analyze address usage
-	getAddressUsage(metadata->size, metadata->address, metadata->classSize, metadata->cycles);
+	getAddressUsage(metadata->size, metadata->address, metadata->cycles);
 
 	//Update mmap region info
-	//getMappingsUsage(metadata->size, metadata->address, metadata->classSize);
+	getMappingsUsage(metadata->size, metadata->address, metadata->classSize);
 
 	// Analyze perfinfo
 	analyzePerfInfo(metadata);
@@ -1139,9 +1134,6 @@ size_t updateFreeCounters(uint64_t address) {
 
 	if (addressUsage.find(address, &t)){
 		size = t->szUsed;
-		t->szFreed += size;
-		t->numAccesses++;
-		t->numFrees++;
 
         current_class_size = getClassSizeFor(size);
 
@@ -1174,14 +1166,11 @@ short getSizeIndex(size_t size) {
 	return index;
 }
 
-void getAddressUsage(size_t size, uint64_t address, size_t classSize, uint64_t cycles) {
+void getAddressUsage(size_t size, uint64_t address, uint64_t cycles) {
 
 	ObjectTuple* t;
 	//Has this address been used before
 	if (addressUsage.find (address, &t)) {
-		t->numAccesses++;
-		t->szTotal += size;
-		t->numAllocs++;
 		t->szUsed = size;
 		reused_address.fetch_add (1, relaxed);
 		cycles_reused.fetch_add (cycles, relaxed);
@@ -1300,14 +1289,7 @@ size_t getClassSizeFor (size_t size) {
 ObjectTuple* newObjectTuple (uint64_t address, size_t size) {
 
 	ObjectTuple* t = (ObjectTuple*) myMalloc (sizeof (ObjectTuple));
-
-	t->addr = address;
-	t->numAccesses = 1;
-	t->szTotal = size;
 	t->szUsed = size;
-	t->szFreed = 0;
-	t->numAllocs = 1;
-	t->numFrees = 0;
 
 	return t;
 }
@@ -1417,42 +1399,33 @@ allocation_metadata init_allocation(size_t sz, enum memAllocType type) {
 	return new_metadata;
 }
 
-FreeObject* newFreeObject (uint64_t addr, uint64_t size) {
-
-	FreeObject* f = (FreeObject*) myMalloc (sizeof (FreeObject));
-	f->addr = addr;
-	f->size = size;
-	return f;
-}
-
 void* myMalloc (size_t size) {
 
-	temp_mem_lock.lock ();
-	void* retptr;
-	if((temp_position + size) < TEMP_MEM_SIZE) {
-		retptr = (void *)(myBuffer + temp_position);
-		temp_position.fetch_add (size, relaxed);
-		temp_alloc++;
+	myBufferLock.lock ();
+	void* p;
+	if((myBufferPosition + size) < TEMP_MEM_SIZE) {
+		p = (void *)(myBuffer + myBufferPosition);
+		myBufferPosition += size;
+		myBufferAllocations++;
 	} else {
 		fprintf(stderr, "error: global allocator out of memory\n");
 		fprintf(stderr, "\t requested size = %zu, total size = %d, "
-							 "total allocs = %u\n", size, TEMP_MEM_SIZE, temp_alloc.load(relaxed));
+							 "total allocs = %lu\n", size, TEMP_MEM_SIZE, myBufferAllocations);
 		abort();
 	}
-	temp_mem_lock.unlock ();
-	return retptr;
+	myBufferLock.unlock ();
+	return p;
 }
 
 void myFree (void* ptr) {
-
 	if (ptr == NULL) return;
 
-	temp_mem_lock.lock();
-	if ((ptr >= (void*)myBuffer) && (ptr <= ((void*)(myBuffer + TEMP_MEM_SIZE)))) {
-		temp_alloc--;
-		if(temp_alloc == 0) temp_position = 0;
+	myBufferLock.lock();
+	if (ptr >= (void*)myBuffer && ptr <= myBufferEnd) {
+		myBufferAllocations--;
+		if(myBufferAllocations == 0) myBufferPosition = 0;
 	}
-	temp_mem_lock.unlock();
+	myBufferLock.unlock();
 }
 
 //Holy
@@ -1626,7 +1599,6 @@ void writeAllocData () {
 	fprintf(thrData.output, ">>> memEfficiency            %.2f%%\n", memEfficiency);
 
 	writeOverhead();
-	if (d_write_address) writeAddressUsage();
 	if (d_write_mappings) writeMappings();
 	if (d_write_tad) writeThreadMaps();
 	writeThreadContention();
@@ -1727,7 +1699,7 @@ void writeThreadMaps () {
         fprintf (thrData.output, "calloc cache refs           %ld\n",   p.second->numCallocCacheRefsFFL);
 
         fprintf (thrData.output, "num malloc instr            %ld\n",   p.second->numMallocInstrsFFL);
-        fprintf (thrData.output, "num realloc instr           %ld\n\n", p.second->numReallocInstrsFFL);
+        fprintf (thrData.output, "num realloc instr           %ld\n", p.second->numReallocInstrsFFL);
         fprintf (thrData.output, "num calloc instr            %ld\n\n", p.second->numCallocInstrsFFL);
     }
 }
@@ -1754,19 +1726,6 @@ void writeContention () {
 					lock.getKey(), lock.getData()->maxContention);
 
 	fflush(thrData.output);
-}
-
-void writeAddressUsage () {
-
-	fprintf (thrData.output, "\n----------memory usage----------\n");
-
-	for (auto t : addressUsage) {
-		auto data = t.getData();
-		fprintf (thrData.output, ">>> addr= %#lx numAccesses= %lu szTotal= %zu "
-				"szFreed= %zu numAllocs= %lu numFrees= %lu\n",
-				data->addr, data->numAccesses, data->szTotal,
-				data->szFreed, data->numAllocs, data->numFrees);
-	}
 }
 
 void writeMappings () {
@@ -1796,15 +1755,9 @@ void calculateMemOverhead () {
 	totalMemOverhead += alignment;
 	totalMemOverhead += blowup_bytes;
 
-	for (auto t : addressUsage) {
-		auto data = t.getData();
-		totalSizeAlloc += data->szTotal;
-		totalSizeFree += data->szFreed;
-		totalSizeDiff = totalSizeAlloc - totalSizeFree;
-	}
-
+	totalSizeAlloc = totalMemAllocated.load();
 	//Calculate metadata_overhead by using the per-object value
-	long allocations = (num_malloc.load(relaxed) + num_calloc.load(relaxed) + num_realloc.load(relaxed));
+	uint64_t allocations = (num_malloc.load() + num_calloc.load() + num_realloc.load());
 	metadata_overhead = (allocations * metadata_object);
 
 	totalMemOverhead += metadata_overhead;
@@ -2129,6 +2082,7 @@ void readAllocatorFile() {
 	}
 
 	myFree(buffer);
+	myFree(allocatorFileName);
 }
 
 void initLocalFreeArray () {
