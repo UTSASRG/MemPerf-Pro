@@ -1,6 +1,9 @@
 \section{Introduction}
 
-The memory allocator plays an important role in the performance of applications, which could be as large as 2$\times$ performance difference.  
+The management of the main memory has a significant performance impact on the performance of applications, which could lead to as large as 2$\times$ performance difference when the same application is installed with different allocators. 
+
+The lack of a general profiler for memory allocators typically cause different allocator designers to design a custom allocator for its own allocation, which causes the waste of human resources each time. Also, due to the nonexistence of a general profiler, the comparison of multiple existing allocators can be only evaluated by a set of applications~\cite{}. However, all existing comparisons cannot reach very insightful guideline about allocators, since they can only infer the potential issues of a specific allocator. 
+
 
 MallocProfiler will serve two purposes. 
 (1) This will be utilized to get the allocator related parameters. 
@@ -9,6 +12,11 @@ MallocProfiler will serve two purposes.
 Therefore, we could identify the root causes and not always blame for the application writer. 
 
 
+
+\todo{Why existing general profiler won't work?} 
+They could perform the execution information of programs, but they cannot differentiate operations inside the memory allocators or not.
+
+ 
 
 \todo{Let's use dedup and facesim to how the performance difference caused by memory allocator: we will use glibc-XX, TCMalloc-2.2, jemalloc-4.2.0, and Hoard-3.11. We will use 10 executions in total.  Then we could say that the performance memory allocator will impose significant difference on the performance of applications.}
 However, the memory allocator itself has not got sufficient attention that it should reserve to. 
