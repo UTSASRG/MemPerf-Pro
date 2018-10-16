@@ -2,7 +2,10 @@
 
 The management of the main memory has a significant performance impact on the performance of applications, which could lead to as large as 2$\times$ performance difference when the same application is installed with different allocators. 
 
-The lack of a general profiler for memory allocators typically cause different allocator designers to design a custom allocator for its own allocation, which causes the waste of human resources each time. Also, due to the nonexistence of a general profiler, the comparison of multiple existing allocators can be only evaluated by a set of applications~\cite{}. However, all existing comparisons cannot reach very insightful guideline about allocators, since they can only infer the potential issues of a specific allocator. 
+The lack of a general profiler for memory allocators typically cause different allocator designers to design a custom allocator for its own allocation, which causes the waste of human resources each time. Also, due to the nonexistence of a general profiler, the comparison of multiple existing allocators can be only evaluated by a set of applications~\cite{Barroso:1998:MSC:279358.279363, Masmano:2006:CMA:1167999.1168012, ferreira2011experimental}. However, all existing comparisons cannot reach very insightful guideline about allocators, since they can only infer the potential issues of a specific allocator. They cannot provide quantitative data about each allocator. 
+Even if they find out that one allocator is not good at the performance by running a serial of applications, they cannot further pinpoint what issues inside the allocators. Therefore, they cannot guide the allocator designer to further fix the issues inside, or prevent such issues in the future design. 
+
+
 
 
 MallocProfiler will serve two purposes. 
