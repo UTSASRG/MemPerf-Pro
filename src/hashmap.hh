@@ -13,6 +13,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <signal.h>
 #include <atomic>
 
 #include "list.hh"
@@ -20,9 +21,7 @@
 
 void* myMalloc (size_t size);
 void myFree (void* ptr);
-void* allocNewThread (size_t size);
-void freeThread (void* ptr);
-bool DEBUG = false;
+bool debug_hashmap = false;
 
 template <class KeyType,                    // What is the key? A long or string
 		 class ValueType,                  // What is the value there?
@@ -66,7 +65,7 @@ template <class KeyType,                    // What is the key? A long or string
 
 				 struct Entry* nextEntry() { return (struct Entry*)list.next; }
 
-				 ValueType getValue() { return value; }
+				 ValueType getData() { return value; }
 
 				 KeyType getKey() { return key; }
 			 };
@@ -133,10 +132,10 @@ template <class KeyType,                    // What is the key? A long or string
 				 assert(_initialized == true);
 				 size_t hindex = hashIndex(key, keylen);
 				 struct HashEntry* first = getHashEntry(hindex);
-				 if (DEBUG) printf (" IN FIND\n");
+				 if (debug_hashmap) printf (" IN FIND\n");
 
 				 bool isFound = false;
-					first->Lock();
+				 first->Lock();
 				 struct Entry* entry = getEntry(first, key, keylen);
 
 				 if(entry) {
@@ -144,7 +143,7 @@ template <class KeyType,                    // What is the key? A long or string
 					 isFound = true;
 				 }
 
-					first->Unlock();
+				 first->Unlock();
 
 				 return isFound;
 			 }
@@ -158,7 +157,7 @@ template <class KeyType,                    // What is the key? A long or string
 				 first->Lock();
 				 insertEntry(first, key, keylen, value);
 				 first->Unlock();
-					if (DEBUG) printf ("Inserting into freelist first= %p, key= 0x%zx, value= %p\n", first, key, value);
+					if (debug_hashmap) printf ("Inserting into freelist first= %p, key= 0x%zx, value= %p\n", first, key, value);
 			 }
 
 			 // Insert a hash table entry if it is not existing.
@@ -220,7 +219,7 @@ template <class KeyType,                    // What is the key? A long or string
 			 // Create a new Entry with specified key and value.
 			 struct Entry* createNewEntry(const KeyType& key, size_t keylen, ValueType value) {
 				 struct Entry* entry = (struct Entry*)	myMalloc (sizeof(struct Entry));
-		
+
 				 // Initialize this new entry.
 				 entry->initialize(key, keylen, value);
 				 return entry;
@@ -232,6 +231,7 @@ template <class KeyType,                    // What is the key? A long or string
 				 struct Entry* entry = createNewEntry(key, keylen, value);
 				 listInsertTail(&entry->list, &head->list);
 				 head->count++;
+				 //printUtilization();
 			 }
 
 			 // Search the entry in the corresponding list.
@@ -241,20 +241,21 @@ template <class KeyType,                    // What is the key? A long or string
 
 				 // Check all _entries with the same hindex.
 				 int count = first->count;
-				 if (DEBUG) printf ("getEntry called, count= %d\n", count);
+				 if (debug_hashmap) printf ("getEntry called, count= %d\n", count);
 				 while(count > 0) {
 
-					 if (DEBUG) printf ("entry:key= %zu\n ", (unsigned long) entry->getKey());
+					 if (debug_hashmap) printf ("entry:key= %zu\n ", (unsigned long) entry->getKey());
 
 					 if(entry->keylen == keylen && _keycmp(entry->key, key, keylen)) {
 						 result = entry;
-						 if (DEBUG) printf ("key found\n");
+						 if (debug_hashmap) printf ("key found\n");
 						 break;
 					 }
 
 					 entry = entry->nextEntry();
 					 count--;
 				 }
+
 				 return result;
 			 }
 
@@ -275,8 +276,14 @@ template <class KeyType,                    // What is the key? A long or string
 
 				 ~iterator() {}
 
-				 iterator& operator++(int) // in postfix ++  /* parameter? */
-				 {
+                 struct Entry operator*() { return *(this->_entry); }
+
+                 iterator& operator++() {
+                     (*this)++;
+                     return *this;
+                 }
+
+				 iterator& operator++(int) { // in postfix ++  /* parameter? */
 					 struct HashEntry* hashentry = _hashmap->getHashEntry(_pos);
 
 					 // Check whether this entry is the last entry in current hash entry.
@@ -314,7 +321,7 @@ template <class KeyType,                    // What is the key? A long or string
 
 				 bool operator!=(const iterator& that) const { return _entry != that._entry; }
 
-				 ValueType getData() { return _entry->getValue(); }
+				 ValueType getData() { return _entry->getData(); }
 
 				 KeyType getKey() { return _entry->getKey(); }
 			 };
@@ -341,6 +348,35 @@ template <class KeyType,                    // What is the key? A long or string
 			 }
 
 			 iterator end() { return iterator(NULL, 0, this); }
-		 };
 
+			 void printUtilization() {
+					 size_t pos = 0;
+					 struct HashEntry* head = NULL;
+					 size_t numEntries = 0;
+					 size_t bucketsUsed = 0;
+					 size_t emptyBuckets = 0;
+					 size_t firstBucket = 0;
+
+					 while(pos < _buckets) {
+							 head = getHashEntry(pos);
+							 if(head->count == 0) {
+									 emptyBuckets++;
+							 } else {
+									 if(firstBucket == 0) {
+											 firstBucket = pos;
+									 }
+									 bucketsUsed++;
+									 numEntries += head->count;
+							 }
+							 //fprintf(stderr, "map %p -> bucket %04zu -> count = %zu\n", this, pos, head->count);
+							 //entry = (struct Entry*)head->getFirstEntry();
+							 //return iterator(entry, pos, this);
+							 pos++;
+					 }
+
+					 fprintf(stderr, "map %p -> bucketsUsed = %zu , firstBucket = %zu, emptyBuckets = %zu, total entries = %zu\n",
+									 this, bucketsUsed, firstBucket, emptyBuckets, numEntries);
+
+			 }
+		 };
 #endif

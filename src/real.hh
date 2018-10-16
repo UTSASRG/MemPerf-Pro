@@ -23,7 +23,6 @@ namespace RealX {
 	DECLARE_WRAPPER(pthread_mutex_trylock);
     DECLARE_WRAPPER(madvise);
     DECLARE_WRAPPER(mprotect);
-//    DECLARE_WRAPPER(mremap);
 };
 
 #endif
