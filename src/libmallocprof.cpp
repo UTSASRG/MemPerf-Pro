@@ -13,8 +13,10 @@
 #include "hashfuncs.hh"
 #include "libmallocprof.h"
 #include "real.hh"
-#include "spinlock.hh"
+#include "rangetree.hh"
 #include "selfmap.hh"
+#include "shadowmemory.hh"
+#include "spinlock.hh"
 #include "xthreadx.hh"
 
 //Globals
@@ -130,6 +132,8 @@ HashMap <size_t, Overhead*, spinlock> overhead;
 
 //Hashmap of tid to ThreadContention*
 HashMap <uint64_t, ThreadContention*, spinlock> threadContention;
+
+RangeTree<ShadowMemory*> shadowtree;
 
 //Spinlocks
 spinlock temp_mem_lock;
@@ -384,12 +388,12 @@ extern "C" {
 
 		//Do allocation
 		object = RealX::malloc(sz);
+		allocData.address = reinterpret_cast <uint64_t> (object);
 
 		//Do after
 		doAfter(&allocData);
 
         allocData.cycles = allocData.tsc_after - allocData.tsc_before;
-		allocData.address = reinterpret_cast <uint64_t> (object);
 
 		// Gets overhead, address usage, mmap usage, memHWM, and prefInfo
 		analyzeAllocation(&allocData);
@@ -438,12 +442,12 @@ extern "C" {
 
 		// Do allocation
 		object = RealX::calloc(nelem, elsize);
+		allocData.address = reinterpret_cast <uint64_t> (object);
 
 		// Do after
 		doAfter(&allocData);
 
         allocData.cycles = allocData.tsc_after - allocData.tsc_before;
-		allocData.address = reinterpret_cast <uint64_t> (object);
 
 		// Gets overhead, address usage, mmap usage, memHWM, and perfInfo
 		analyzeAllocation(&allocData);
@@ -587,6 +591,7 @@ extern "C" {
 
 		//Do allocation
 		object = RealX::realloc(ptr, sz);
+		allocData.address = reinterpret_cast <uint64_t> (object);
 
 		//Do after
 		// doAfter(&after, &tsc_after);
@@ -594,7 +599,6 @@ extern "C" {
 
         // cyclesForRealloc = tsc_after - tsc_before;
         allocData.cycles = allocData.tsc_after - allocData.tsc_before;
-		allocData.address = reinterpret_cast <uint64_t> (object);
 
 		//Gets overhead, address usage, mmap usage, memHWM
 		// analyzeAllocation(sz, address, cyclesForRealloc, classSize, &reused);
@@ -1053,6 +1057,11 @@ extern "C" {
 		void* retval = RealX::mmap(addr, length, prot, flags, fd, offset);
 		mmap_active = false;
 
+		ShadowMemory *memory = nullptr;
+		memory = (ShadowMemory *)myMalloc(sizeof(ShadowMemory));
+		memory->initialize((size_t)retval, length);
+		shadowtree.insert((size_t)retval, (size_t)retval + length, memory);
+
 		if (mmap_wait) {
 			timeStop = rdtscp();
 			if (threadContention.find(tid, &tc)) {
@@ -1122,6 +1131,7 @@ void analyzeAllocation(allocation_metadata *metadata) {
 	getOverhead(metadata->size, metadata->address, metadata->classSize, &(metadata->reused));
 
 	//Analyze address usage
+	/* NOTE(Stefen): We are switching into the address usage for the shadow memory */
 	getAddressUsage(metadata->size, metadata->address, metadata->classSize, metadata->cycles);
 
 	//Update mmap region info
@@ -1508,7 +1518,6 @@ void globalizeThreadAllocData(){
             allThreadsTadMap[it2.getKey()]->numReallocTlbReadMissesFFL += it2.getData()->numReallocTlbReadMissesFFL;
             allThreadsTadMap[it2.getKey()]->numReallocTlbWriteMissesFFL += it2.getData()->numReallocTlbWriteMissesFFL;
 
-			/* NOTE(STEFEN): CALLOC TLB ARE STILL MISSING RETARD */
             allThreadsTadMap[it2.getKey()]->numCallocTlbReadMissesFFL += it2.getData()->numCallocTlbReadMissesFFL;
             allThreadsTadMap[it2.getKey()]->numCallocTlbWriteMissesFFL += it2.getData()->numCallocTlbWriteMissesFFL;
 
@@ -1922,6 +1931,17 @@ bool mappingEditor (void* addr, size_t len, int prot) {
 	return found;
 }
 
+void updateShadowMemory(size_t address, size_t size) {
+	ShadowMemory *memory = nullptr;
+	shadowtree.find(address, &memory);
+	if (memory == nullptr) {
+		fprintf(stderr, "Failed to find %#x\n", (unsigned int)address);
+	} else {
+		fprintf(stderr, "Found: %#x\n", (unsigned int)address);
+		memory->update(address, size);
+	}
+}
+
 void doBefore (allocation_metadata *metadata) {
 	getPerfInfo(&(metadata->before));
 	metadata->tsc_before = rdtscp();
@@ -1930,6 +1950,7 @@ void doBefore (allocation_metadata *metadata) {
 void doAfter (allocation_metadata *metadata) {
 	getPerfInfo(&(metadata->after));
 	metadata->tsc_after = rdtscp();
+	updateShadowMemory(metadata->address, metadata->size);
 }
 
 void collectAllocMetaData(allocation_metadata *metadata) {
@@ -2074,7 +2095,7 @@ void readAllocatorFile() {
 
 		token = strtok(buffer, " ");
 		if (d_readFile) printf ("token= %s\n", token);
-		
+
 		if ((strcmp(token, "style")) == 0) {
 			if (d_readFile) printf ("token matched style\n");
 

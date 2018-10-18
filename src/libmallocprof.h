@@ -1,3 +1,6 @@
+#ifndef __LIBMALLOCPROF_H__
+#define __LIBMALLOCPROF_H__
+
 #include "memsample.h"
 
 #define relaxed std::memory_order_relaxed
@@ -202,3 +205,5 @@ Overhead* newOverhead();
 ThreadContention* newThreadContention (uint64_t);
 thread_alloc_data* newTad();
 allocation_metadata init_allocation(size_t sz, enum memAllocType type);
+
+#endif /* end of include guard: __LIBMALLOCPROF_H__ */

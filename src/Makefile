@@ -1,6 +1,7 @@
 SRCS =   	libmallocprof.cpp	\
 			real.cpp			\
 			selfmap.cpp			\
+			shadowmemory.cpp	\
 			memsample.c
 
 INCS =		xthreadx.hh		\
@@ -10,8 +11,10 @@ INCS =		xthreadx.hh		\
 			list.hh			\
 			hashfuncs.hh	\
 			interval.hh		\
+			rangetree.hh	\
 			selfmap.hh		\
 			spinlock.hh		\
+			shadowmemory.hh	\
 			libmallocprof.h
 
 DEPS = $(SRCS) $(INCS)

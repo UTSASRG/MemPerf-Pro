@@ -46,7 +46,7 @@ void selfmap::printCallStack(int frames, void** array) {
     else if(isAllocator((void *)addr)) {
       addr = (void *)((intptr_t)addr - (intptr_t)_allocTextStart);
       sprintf(buf, "addr2line -e %s %p", _allocLibrary.c_str(), addr);
-    } 
+    }
     else {
       sprintf(buf, "addr2line -a -i -e %s %p", _main_exe.c_str(), addr);
     }
