@@ -17,6 +17,8 @@
 #define TEMP_MEM_SIZE 1024 * 1024 * 1024 //1GB
 #define MAX_CLASS_SIZE 1050000
 
+#define LOCAL_BUF_SIZE 204800000
+
 //Structures
 typedef struct {
 	uint64_t tid = 0;
@@ -32,7 +34,7 @@ typedef struct {
 } ThreadContention;
 
 typedef struct {
-	size_t szUsed;
+	unsigned szUsed;
 } ObjectTuple;
 
 typedef struct {
@@ -161,6 +163,10 @@ ThreadContention* newThreadContention (uint64_t);
 thread_alloc_data* newTad();
 allocation_metadata init_allocation(size_t sz, enum memAllocType type);
 size_t updateFreeCounters(uint64_t address);
-short getSizeIndex(size_t size);
+short getClassSizeIndex(size_t size);
 void initGlobalFreeArray();
 void initLocalFreeArray();
+void initMyLocalMem();
+void* myLocalMalloc(size_t);
+void myLocalFree(void*);
+void printMyMemUtilization();

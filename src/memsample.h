@@ -85,71 +85,55 @@ typedef struct {
 } perf_info;
 
 typedef struct {            //struct for holding data about allocations
-    int64_t numMallocs;     //includes data from PMU and counts for types of alloc calls
-    int64_t numReallocs;    //FFL = from free list, data for allocations that came from freed objects
-    int64_t numCallocs;
-    int64_t numFrees;
-
-    int64_t numMallocsFFL;
-    int64_t numReallocsFFL;
-    int64_t numCallocsFFL;
-
-    int64_t numMallocFaults;
-    int64_t numReallocFaults;
-    int64_t numCallocFaults;
-    int64_t numFreeFaults;
-
-    int64_t numMallocTlbReadMisses;
-    int64_t numMallocTlbWriteMisses;
-
-    int64_t numReallocTlbReadMisses;
-    int64_t numReallocTlbWriteMisses;
-
-    int64_t numCallocTlbReadMisses;
-    int64_t numCallocTlbWriteMisses;
-
+    uint64_t numMallocs;     //includes data from PMU and counts for types of alloc calls
+    uint64_t numReallocs;    //FFL = from free list, data for allocations that came from freed objects
+    uint64_t numCallocs;
+    uint64_t numFrees;
+    uint64_t numMallocsFFL;
+    uint64_t numReallocsFFL;
+    uint64_t numCallocsFFL;
+    uint64_t numMallocFaults;
+    uint64_t numReallocFaults;
+    uint64_t numCallocFaults;
+    uint64_t numFreeFaults;
+    uint64_t numMallocTlbReadMisses;
+    uint64_t numMallocTlbWriteMisses;
+    uint64_t numReallocTlbReadMisses;
+    uint64_t numReallocTlbWriteMisses;
+    uint64_t numCallocTlbReadMisses;
+    uint64_t numCallocTlbWriteMisses;
     /* NOTE(Stefen): Do we need to track free misses? */
-    int64_t numFreeTlbMisses;
-
-    int64_t numMallocCacheMisses;
-    int64_t numReallocCacheMisses;
-    int64_t numCallocCacheMisses;
-    int64_t numFreeCacheMisses;
-
-    int64_t numMallocCacheRefs;
-    int64_t numReallocCacheRefs;
-    int64_t numCallocCacheRefs;
-    int64_t numFreeCacheRefs;
-
-    int64_t numMallocInstrs;
-    int64_t numReallocInstrs;
-    int64_t numCallocInstrs;
-    int64_t numFreeInstrs;
-
-    int64_t numMallocFaultsFFL;
-    int64_t numReallocFaultsFFL;
-    int64_t numCallocFaultsFFL;
-
-    int64_t numMallocTlbReadMissesFFL;
-    int64_t numMallocTlbWriteMissesFFL;
-
-    int64_t numReallocTlbReadMissesFFL;
-    int64_t numReallocTlbWriteMissesFFL;
-
-    int64_t numCallocTlbReadMissesFFL;
-    int64_t numCallocTlbWriteMissesFFL;
-
-    int64_t numMallocCacheMissesFFL;
-    int64_t numReallocCacheMissesFFL;
-    int64_t numCallocCacheMissesFFL;
-
-    int64_t numMallocCacheRefsFFL;
-    int64_t numReallocCacheRefsFFL;
-    int64_t numCallocCacheRefsFFL;
-
-    int64_t numMallocInstrsFFL;
-    int64_t numReallocInstrsFFL;
-    int64_t numCallocInstrsFFL;
+    uint64_t numFreeTlbMisses;
+    uint64_t numMallocCacheMisses;
+    uint64_t numReallocCacheMisses;
+    uint64_t numCallocCacheMisses;
+    uint64_t numFreeCacheMisses;
+    uint64_t numMallocCacheRefs;
+    uint64_t numReallocCacheRefs;
+    uint64_t numCallocCacheRefs;
+    uint64_t numFreeCacheRefs;
+    uint64_t numMallocInstrs;
+    uint64_t numReallocInstrs;
+    uint64_t numCallocInstrs;
+    uint64_t numFreeInstrs;
+    uint64_t numMallocFaultsFFL;
+    uint64_t numReallocFaultsFFL;
+    uint64_t numCallocFaultsFFL;
+    uint64_t numMallocTlbReadMissesFFL;
+    uint64_t numMallocTlbWriteMissesFFL;
+    uint64_t numReallocTlbReadMissesFFL;
+    uint64_t numReallocTlbWriteMissesFFL;
+    uint64_t numCallocTlbReadMissesFFL;
+    uint64_t numCallocTlbWriteMissesFFL;
+    uint64_t numMallocCacheMissesFFL;
+    uint64_t numReallocCacheMissesFFL;
+    uint64_t numCallocCacheMissesFFL;
+    uint64_t numMallocCacheRefsFFL;
+    uint64_t numReallocCacheRefsFFL;
+    uint64_t numCallocCacheRefsFFL;
+    uint64_t numMallocInstrsFFL;
+    uint64_t numReallocInstrsFFL;
+    uint64_t numCallocInstrsFFL;
 } thread_alloc_data;
 
 int initSampling(void);
