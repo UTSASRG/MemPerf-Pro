@@ -66,11 +66,11 @@ const bool d_initGlobal = false;
 const bool d_getBlowup = false;
 const bool d_updateCounters = false;
 const bool d_myLocalMalloc = false;
-const bool d_initMyLocalBuffer = true;
+const bool d_initMyLocalBuffer = false;
 const bool d_checkSizes = false;
-const bool d_myMemUsage = true;
+const bool d_myMemUsage = false;
 const bool d_dumpHashmaps = false;
-const bool d_trace = true;
+const bool d_trace = false;
 
 //Atomic Globals ATOMIC
 std::atomic_bool mmap_active(false);
