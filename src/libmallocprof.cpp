@@ -217,6 +217,7 @@ __attribute__((constructor)) initStatus initializer() {
 	lockUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 128);
 	overhead.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 	threadContention.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
+	mappings.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 	mapsInitialized = true;
 
 	void * program_break = RealX::sbrk(0);
@@ -1134,24 +1135,24 @@ extern "C" {
 			}
 		}
 
-		//uint64_t address = reinterpret_cast <uint64_t> (retval);
+		uint64_t address = (uint64_t)retval;
 
 		//If this thread currently doing an allocation
 		if (inAllocation) {
 			if (d_mmap) printf ("mmap direct from allocation function: length= %zu, prot= %d\n", length, prot);
 			malloc_mmaps.fetch_add (1, relaxed);
-			//mappings.insert(address, newMmapTuple(address, length, prot, 'a'));
+			mappings.insert(address, newMmapTuple(address, length, prot, 'a'));
 		}
 
 		//Need to check if selfmap.getInstance().getTextRegions() has
 		//ran. If it hasn't, we can't call isAllocatorInCallStack()
 		else if (selfmapInitialized && isAllocatorInCallStack()) {
 			if (d_mmap) printf ("mmap allocator in callstack: length= %zu, prot= %d\n", length, prot);
-			//mappings.insert(address, newMmapTuple(address, length, prot, 's'));
+			mappings.insert(address, newMmapTuple(address, length, prot, 's'));
 		}
 		else {
 			if (d_mmap) printf ("mmap from unknown source: length= %zu, prot= %d\n", length, prot);
-			//mappings.insert(address, newMmapTuple(address, length, prot, 'u'));
+			mappings.insert(address, newMmapTuple(address, length, prot, 'u'));
 		}
 
 		total_mmaps++;

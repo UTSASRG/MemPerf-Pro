@@ -26,7 +26,7 @@ CFLAGS2 += -O0 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-f
 
 PROFILER_FLAGS += -D USE_THREAD_LOCAL 
 #PROFILER_FLAGS += 
-THREADTEST_FILE = malloc-and-free.cpp
+THREADTEST_FILE = threadTest.cpp
 #No Blowup, all new addresses
 #THREADTEST_FILE = malloc-then-free.cpp
 NUM_THREADS = 20
