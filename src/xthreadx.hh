@@ -11,7 +11,6 @@ extern "C" void printHashMap();
 extern "C" pid_t gettid();
 void* myMalloc(size_t);
 void initMyLocalMem();
-bool d_threadPosition = false;
 
 thread_local extern uint64_t thread_stack_start;
 thread_local extern uint64_t myThreadID;
@@ -101,7 +100,7 @@ class xthreadx {
 		#endif
 
 		#ifdef USE_THREAD_LOCAL
-		if (d_threadPosition) fprintf (stderr, "Thread %lu myLocalPosition= %zu\n", myThreadID, myLocalPosition);
+		fprintf (stderr, "Thread %lu myLocalPosition= %zu\n", myThreadID, myLocalPosition);
 		#endif
 
 		if(thrData.output) {

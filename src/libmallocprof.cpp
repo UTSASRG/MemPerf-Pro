@@ -272,7 +272,7 @@ __attribute__((constructor)) initStatus initializer() {
 			
 			if (d_class_sizes) printf ("hashmap entry %d key is %zu\n", i, cs);
 			fprintf (thrData.output, "%zu ", cs);
-			overhead.insertIfAbsent(cs, newOverhead());
+			overhead.insert(cs, newOverhead());
 		}
 
 		fprintf (thrData.output, "\n");
@@ -280,7 +280,7 @@ __attribute__((constructor)) initStatus initializer() {
 	}
 	else {
 		//Create an entry in the overhead hashmap with key 0
-		overhead.insertIfAbsent(BP_OVERHEAD, newOverhead());
+		overhead.insert(BP_OVERHEAD, newOverhead());
 	}
 
 	if (d_checkSizes) {
@@ -881,7 +881,7 @@ extern "C" {
 			//Add lock to lockUsage hashmap
 			else {
 				num_pthread_mutex_locks.fetch_add(1, relaxed);
-				lockUsage.insertIfAbsent(lockAddr, newLC());
+				lockUsage.insert(lockAddr, newLC());
 			}
 		}
 
@@ -895,7 +895,7 @@ extern "C" {
 				tc->mutex_wait_cycles += timeWaiting;
 			}
 			else {
-				threadContention.insertIfAbsent(tid, newThreadContention(tid));
+				threadContention.insert(tid, newThreadContention(tid));
 				if (threadContention.find(tid, &tc)) {
 					tc->mutex_waits++;
 					tc->mutex_wait_cycles += timeWaiting;
@@ -935,7 +935,7 @@ extern "C" {
 			else {
 				num_pthread_mutex_locks.fetch_add(1, relaxed);
 				LC* lc = newLC();
-				lockUsage.insertIfAbsent (lockAddr, lc);
+				lockUsage.insert (lockAddr, lc);
 			}
 		}
 
@@ -947,7 +947,7 @@ extern "C" {
 				tc->mutex_trylock_fails++;
 			}
 			else {
-				threadContention.insertIfAbsent(tid, newThreadContention(tid));
+				threadContention.insert(tid, newThreadContention(tid));
 				if (threadContention.find(tid, &tc)) {
 					tc->mutex_trylock_fails++;
 				}
@@ -1011,7 +1011,7 @@ extern "C" {
 				tc->madvise_wait_cycles += (timeStop - timeStart);
 			}
 			else {
-				threadContention.insertIfAbsent(tid, newThreadContention(tid));
+				threadContention.insert(tid, newThreadContention(tid));
 				if (threadContention.find(tid, &tc)) {
 					tc->madvise_waits++;
 					tc->madvise_wait_cycles += (timeStop - timeStart);
@@ -1053,7 +1053,7 @@ extern "C" {
 				tc->sbrk_wait_cycles += (timeStop - timeStart);
 			}
 			else {
-				threadContention.insertIfAbsent(tid, newThreadContention(tid));
+				threadContention.insert(tid, newThreadContention(tid));
 				if (threadContention.find(tid, &tc)) {
 					tc->sbrk_waits++;
 					tc->sbrk_wait_cycles += (timeStop - timeStart);
@@ -1122,7 +1122,7 @@ extern "C" {
 				tc->mmap_wait_cycles += (timeStop - timeStart);
 			}
 			else {
-				threadContention.insertIfAbsent(tid, newThreadContention(tid));
+				threadContention.insert(tid, newThreadContention(tid));
 				if (threadContention.find(tid, &tc)) {
 					tc->mmap_waits++;
 					tc->mmap_wait_cycles += (timeStop - timeStart);
@@ -1245,7 +1245,7 @@ void getAddressUsage(size_t size, uint64_t address, uint64_t cycles) {
 	else {
 		new_address.fetch_add (1, relaxed);
 		cycles_new.fetch_add (cycles, relaxed);
-		addressUsage.insertIfAbsent (address, newObjectTuple(address, size));
+		addressUsage.insert (address, newObjectTuple(address, size));
 	}
 }
 
@@ -2046,10 +2046,10 @@ void analyzePerfInfo(allocation_metadata *metadata) {
 			class_size_tad->initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 128);
 			for (int i = 0; i < num_class_sizes; i++){
 				size_t cSize = class_sizes[i];
-				class_size_tad->insertIfAbsent(cSize, newTad());
+				class_size_tad->insert(cSize, newTad());
 				allThreadsTadMap[cSize] = newTad();
 			}
-			threadToCSM.insertIfAbsent(metadata->tid, class_size_tad);
+			threadToCSM.insert(metadata->tid, class_size_tad);
 		}
 	}
 	
@@ -2058,10 +2058,10 @@ void analyzePerfInfo(allocation_metadata *metadata) {
 		if (!threadToCSM.find(metadata->tid, &class_size_tad)){
 			class_size_tad = (Class_Size_TAD*) myMalloc(sizeof(Class_Size_TAD));
 			class_size_tad->initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 128);
-			class_size_tad->insertIfAbsent(0, newTad());
+			class_size_tad->insert(0, newTad());
 			allThreadsTadMap[0] = newTad();
+			threadToCSM.insert(metadata->tid, class_size_tad);
 		}
-		threadToCSM.insertIfAbsent(metadata->tid, class_size_tad);
 	}
 
 	if(d_pmuData){

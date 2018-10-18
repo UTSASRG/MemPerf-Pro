@@ -16,7 +16,6 @@
 #define PAGE_BITS 12 
 #define TEMP_MEM_SIZE 1024 * 1024 * 1024 //1GB
 #define MAX_CLASS_SIZE 1050000
-
 #define LOCAL_BUF_SIZE 204800000
 
 //Structures
