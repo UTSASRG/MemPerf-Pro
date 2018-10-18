@@ -1,6 +1,36 @@
 \section{Introduction}
 
-The memory allocator plays an important role in the performance of applications, which could be as large as 2$\times$ performance difference.  
+The memory management has a significant performance impact on the performance of applications, which could lead to as large as $9.7\times$ performance difference when an application is installed with different allocators, as shown in Figure~\ref{fig:motivation}. Figure~\ref{fig:motivation} evaluates the performance of five applications from two popular benchmark suite, PARSEC-2.0~\cite{} and Phoenix~\cite{}, with the default Linux allocator (Glibc-XXX), TCMalloc-2.2, jemalloc-4.2.0, and Hoard-3.11. The figure shows that choosing a different allocator may cause the performance difference between 32\% faster to 9.7$\times$ slower.   
+
+\begin{figure}[!ht]
+\centering
+\includegraphics[width=3.3in]{figures/motivation}
+\caption{Performance with Different Allocators\label{fig:motivation}}
+\end{figure}
+
+Facing with this vast performance difference of different allocators, application programmers may want to choose an appropriate allocator for their applications, in order to maximize the performance potential that is hard to achieve via other approaches. From the point view of allocators designers, it is extremely helpful to know the underlying reason of such performance slowdown (or speedup), so that they could further improve their design. Both of their targets could be satisfied with an allocator profiler.  
+
+However, there is no such allocator profiler exist to the best of our knowledge. Memory allocation  profiling, such as mprof~\cite{Zorn:1988:MAP:894814}, TCMalloc Heap Profiler~\cite{tcmalloc-profiler}, CLR profiler~\cite{lupasc2014dynamic} or others~\cite{ hirotaka2003developing}, typically focus on memory allocation behavior of applications. For instance, mprof integrates the memory allocations based on the callstack, while TCMalloc Profiler could report program sites with a large number of allocations, locate memory leaks, and report heap usage of any time. However, these profilers are not focusing  allocators themselves, but only on application behaviors.  Also, it is worthy noting that general profilers cannot be utilized as well, since they typically cannot differentiate the behavior caused by allocators or applications~\cite{}. 
+ 
+The lack of a general profiler typically makes  allocator developers design their custom profilers every time, which causes the waste of human resources each time. Also, the nonexistence of a general profiler makes the quantitative comparisons of different allocations very difficult. The comparisons, as all existing work~\cite{Barroso:1998:MSC:279358.279363, Masmano:2006:CMA:1167999.1168012, ferreira2011experimental}, can be only achieved by evaluating the performance  on a set of applications. Even if the comparison could find out whether one allocator has the best performance on average, it could not pinpoint the underlying reason behind that. Also, it could not guide the choice of allocators well, since the best performance on these applications may not be good for a specific applications. 
+%Even if they find out that one allocator is not good at the performance by running a serial of applications, they cannot further pinpoint what issues inside the allocators. Therefore, they cannot guide the allocator designer to further fix the issues inside, or prevent such issues in the future design. 
+
+
+This paper, \MP{}, designs a novel  profiler that focuses on the profiling of allocation/deallocation behavior within allocators. \MP{} focuses the following attributes of the allocator: performance overhead, memory overhead, scalability, and applications friendliness, which covers all most important attributes of the allocator. 
+
+For performance overhead, \MP{} focuses on the following items: 
+
+
+Since memory overhead can be caused by multiple factors, such as metadata overhead, alignment overhead (internal fragmentation), and memory blowup. Memory blowup is defined as ,. 
+
+For scalability, \MP{} not only focuses on the potential bottleneck within the user space, but also includes the potential bottleneck caused by the allocator. Programmers have identified one particular performance bottleneck of applications, such as dedup issue. 
+It won't cause the . 
+
+\MP{} also aims to answer whether an allocator is friendly to the applications or not, such as . . 
+
+
+   
+
 
 MallocProfiler will serve two purposes. 
 (1) This will be utilized to get the allocator related parameters. 
@@ -10,15 +40,14 @@ Therefore, we could identify the root causes and not always blame for the applic
 
 
 
-\todo{Let's use dedup and facesim to how the performance difference caused by memory allocator: we will use glibc-XX, TCMalloc-2.2, jemalloc-4.2.0, and Hoard-3.11. We will use 10 executions in total.  Then we could say that the performance memory allocator will impose significant difference on the performance of applications.}
+ 
+
 However, the memory allocator itself has not got sufficient attention that it should reserve to. 
 For instance, there is no an dedicate the allocator profiler that can be utilized for identify the allocator's behavior.
 
-Having this profiler will serve three purposes. First, it will help the designers and developers that could discover the issues of memory allocators, without the need of porting or developing the profiler for a specific allocator. Second, it helps programmers to determine whether the performance issue is coming from the memory allocator. Third, it will help users to choose the best memory allocators that is suitable for a specific applications, if there are multiple choices avaiable. 
+Having this profiler will serve three purposes. First, it will help the designers and developers that could discover the issues of memory allocators, without the need of porting or developing the profiler for a specific allocator. Second, it helps programmers to determine whether the performance issue is coming from the memory allocator. Third, it will help users to choose the best memory allocators that is suitable for a specific applications, if there are multiple choices available. 
 
-Although TCMalloc have one profiler, but it tends to provide the statistics about the applications, that we can track the memory uses of different functions. However, it doesn't give the statistics of allocators itself. 
-
-Then we have utilized this profiler to identify the root cause of performance difference in existing allocators, such as Linux, OpenBSD, DieHarder, or TCMalloc. Then shows the internal reason of why some are slower than others. 
+ Linux, TCMalloc, Jemalloc, Hoard, OpenBSD, DieHarder. Then shows the internal reason of why some are slower than others. 
 
 We may choose two general-purpose allocators and two secure allocators. Then we know why secure allocators are slower, currently. 
 
