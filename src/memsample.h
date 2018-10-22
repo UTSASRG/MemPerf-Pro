@@ -79,8 +79,8 @@ typedef struct {
 	int perf_fd_tlb_reads;
 	int perf_fd_tlb_writes;
 	int perf_fd_cache_miss;
-    int perf_fd_cache_ref;
-    int perf_fd_instr;
+	int perf_fd_cache_ref;
+	int perf_fd_instr;
 	pid_t tid;
 } perf_info;
 
@@ -102,8 +102,8 @@ typedef struct {            //struct for holding data about allocations
     uint64_t numReallocTlbWriteMisses;
     uint64_t numCallocTlbReadMisses;
     uint64_t numCallocTlbWriteMisses;
-    /* NOTE(Stefen): Do we need to track free misses? */
-    uint64_t numFreeTlbMisses;
+    uint64_t numFreeTlbReadMisses;
+    uint64_t numFreeTlbWriteMisses;
     uint64_t numMallocCacheMisses;
     uint64_t numReallocCacheMisses;
     uint64_t numCallocCacheMisses;

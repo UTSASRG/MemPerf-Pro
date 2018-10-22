@@ -598,10 +598,9 @@ extern "C" {
 
 				allocData.tad->numFrees += 1;
 				allocData.tad->numFreeFaults += allocData.after.faults - allocData.before.faults;
-				allocData.tad->numFreeTlbMisses += allocData.after.tlb_read_misses - allocData.before.tlb_read_misses;
-				// tad->numFreeTlbMisses += after.tlb_write_misses - before.tlb_write_misses;
+				allocData.tad->numFreeTlbReadMisses += allocData.after.tlb_read_misses - allocData.before.tlb_read_misses;
+				allocData.tad->numFreeTlbWriteMisses += allocData.after.tlb_write_misses - allocData.before.tlb_write_misses;
 				allocData.tad->numFreeCacheMisses += allocData.after.cache_misses - allocData.before.cache_misses;
-				allocData.tad->numFreeCacheRefs += allocData.after.cache_refs - allocData.before.cache_refs;
 				allocData.tad->numFreeInstrs += allocData.after.instructions - allocData.before.instructions;
 			}
 		}
@@ -613,13 +612,11 @@ extern "C" {
 							"Num TLB read misses:     %ld\n"
 							"Num TLB write misses:    %ld\n"
 							"Num cache misses:        %ld\n"
-							"num cache refs:          %ld\n"
 							"Num instructions:        %ld\n\n",
 			allocData.tid, allocData.after.faults - allocData.before.faults,
 			allocData.after.tlb_read_misses - allocData.before.tlb_read_misses,
 			allocData.after.tlb_write_misses - allocData.before.tlb_write_misses,
 			allocData.after.cache_misses - allocData.before.cache_misses,
-			allocData.after.cache_refs - allocData.before.cache_refs,
 			allocData.after.instructions - allocData.before.instructions);
 		}
 	}
@@ -1361,7 +1358,8 @@ thread_alloc_data* newTad(){
     tad->numReallocTlbReadMisses = 0;
     tad->numReallocTlbWriteMisses = 0;
 
-    tad->numFreeTlbMisses = 0;
+    tad->numFreeTlbReadMisses = 0;
+    tad->numFreeTlbWriteMisses = 0;
 
     tad->numMallocCacheMisses = 0;
     tad->numReallocCacheMisses = 0;
@@ -1487,7 +1485,8 @@ void globalizeThreadAllocData(){
             allThreadsTadMap[it2.getKey()]->numReallocTlbWriteMisses += it2.getData()->numReallocTlbWriteMisses;
             allThreadsTadMap[it2.getKey()]->numCallocTlbReadMisses += it2.getData()->numCallocTlbReadMisses;
             allThreadsTadMap[it2.getKey()]->numCallocTlbWriteMisses += it2.getData()->numCallocTlbWriteMisses;
-            allThreadsTadMap[it2.getKey()]->numFreeTlbMisses += it2.getData()->numFreeTlbMisses;
+            allThreadsTadMap[it2.getKey()]->numFreeTlbReadMisses += it2.getData()->numFreeTlbReadMisses;
+            allThreadsTadMap[it2.getKey()]->numFreeTlbWriteMisses += it2.getData()->numFreeTlbWriteMisses;
 
             allThreadsTadMap[it2.getKey()]->numMallocCacheMisses += it2.getData()->numMallocCacheMisses;
             allThreadsTadMap[it2.getKey()]->numReallocCacheMisses += it2.getData()->numReallocCacheMisses;
@@ -1572,7 +1571,6 @@ void globalizeThreadAllocData(){
 //        fprintf (thrData.output, ">>> page faults    %ld\n", it.getData()->numFaults);
 //        fprintf (thrData.output, ">>> TLB misses     %ld\n", it.getData()->numTlbMisses);
 //        fprintf (thrData.output, ">>> cache misses   %ld\n", it.getData()->numCacheMisses);
-//        fprintf (thrData.output, ">>> cache refs     %ld\n", it.getData()->numCacheRefs);
 //        fprintf (thrData.output, ">>> num instr      %ld\n",it.getData()->numInstrs);
 
     } */
@@ -1682,7 +1680,8 @@ void writeThreadMaps () {
         fprintf (thrData.output, "realloc tlb write misses    %lu\n", p.second->numReallocTlbWriteMisses);
         fprintf (thrData.output, "calloc tlb read misses      %lu\n", p.second->numCallocTlbReadMisses);
         fprintf (thrData.output, "calloc tlb write misses     %lu\n", p.second->numCallocTlbWriteMisses);
-        fprintf (thrData.output, "free tlb misses             %lu\n", p.second->numFreeTlbMisses);
+        fprintf (thrData.output, "free tlb read misses        %lu\n", p.second->numFreeTlbReadMisses);
+        fprintf (thrData.output, "free tlb write misses       %lu\n", p.second->numFreeTlbWriteMisses);
 
         fprintf (thrData.output, "malloc cache misses         %lu\n", p.second->numMallocCacheMisses);
         fprintf (thrData.output, "realloc cache misses        %lu\n", p.second->numReallocCacheMisses);
@@ -1936,7 +1935,6 @@ void collectAllocMetaData(allocation_metadata *metadata) {
 				metadata->tad->numMallocTlbReadMisses += metadata->after.tlb_read_misses - metadata->before.tlb_read_misses;
 				metadata->tad->numMallocTlbWriteMisses += metadata->after.tlb_write_misses - metadata->before.tlb_write_misses;
 				metadata->tad->numMallocCacheMisses += metadata->after.cache_misses - metadata->before.cache_misses;
-				metadata->tad->numMallocCacheRefs += metadata->after.cache_refs - metadata->before.cache_refs;
 				metadata->tad->numMallocInstrs += metadata->after.instructions - metadata->before.instructions;
 			}
 			else{
@@ -1945,7 +1943,6 @@ void collectAllocMetaData(allocation_metadata *metadata) {
 				metadata->tad->numMallocTlbReadMissesFFL += metadata->after.tlb_read_misses - metadata->before.tlb_read_misses;
 				metadata->tad->numMallocTlbWriteMissesFFL += metadata->after.tlb_write_misses - metadata->before.tlb_write_misses;
 				metadata->tad->numMallocCacheMissesFFL += metadata->after.cache_misses - metadata->before.cache_misses;
-				metadata->tad->numMallocCacheRefsFFL += metadata->after.cache_refs - metadata->before.cache_refs;
 				metadata->tad->numMallocInstrsFFL += metadata->after.instructions - metadata->before.instructions;
 			}
 			break;
@@ -1956,7 +1953,6 @@ void collectAllocMetaData(allocation_metadata *metadata) {
 				metadata->tad->numReallocTlbReadMisses += metadata->after.tlb_read_misses - metadata->before.tlb_read_misses;
 				metadata->tad->numReallocTlbWriteMisses += metadata->after.tlb_write_misses - metadata->before.tlb_write_misses;
 				metadata->tad->numReallocCacheMisses += metadata->after.cache_misses - metadata->before.cache_misses;
-				metadata->tad->numReallocCacheRefs += metadata->after.cache_refs - metadata->before.cache_refs;
 				metadata->tad->numReallocInstrs += metadata->after.instructions - metadata->before.instructions;
 			}
 			else{
@@ -1965,7 +1961,6 @@ void collectAllocMetaData(allocation_metadata *metadata) {
 				metadata->tad->numReallocTlbReadMissesFFL += metadata->after.tlb_read_misses - metadata->before.tlb_read_misses;
 				metadata->tad->numReallocTlbWriteMissesFFL += metadata->after.tlb_write_misses - metadata->before.tlb_write_misses;
 				metadata->tad->numReallocCacheMissesFFL += metadata->after.cache_misses - metadata->before.cache_misses;
-				metadata->tad->numReallocCacheRefsFFL += metadata->after.cache_refs - metadata->before.cache_refs;
 				metadata->tad->numReallocInstrsFFL += metadata->after.instructions - metadata->before.instructions;
 			}
 			break;
@@ -1976,7 +1971,6 @@ void collectAllocMetaData(allocation_metadata *metadata) {
 				metadata->tad->numCallocTlbReadMisses += metadata->after.tlb_read_misses - metadata->before.tlb_read_misses;
 				metadata->tad->numCallocTlbWriteMisses += metadata->after.tlb_write_misses - metadata->before.tlb_write_misses;
 				metadata->tad->numCallocCacheMisses += metadata->after.cache_misses - metadata->before.cache_misses;
-				metadata->tad->numCallocCacheRefs += metadata->after.cache_refs - metadata->before.cache_refs;
 				metadata->tad->numCallocInstrs += metadata->after.instructions - metadata->before.instructions;
 			}
 			else{
@@ -1985,7 +1979,6 @@ void collectAllocMetaData(allocation_metadata *metadata) {
 				metadata->tad->numCallocTlbReadMissesFFL += metadata->after.tlb_read_misses - metadata->before.tlb_read_misses;
 				metadata->tad->numCallocTlbWriteMissesFFL += metadata->after.tlb_write_misses - metadata->before.tlb_write_misses;
 				metadata->tad->numCallocCacheMissesFFL += metadata->after.cache_misses - metadata->before.cache_misses;
-				metadata->tad->numCallocCacheRefsFFL += metadata->after.cache_refs - metadata->before.cache_refs;
 				metadata->tad->numCallocInstrsFFL += metadata->after.instructions - metadata->before.instructions;
 			}
 			break;
@@ -2040,14 +2033,12 @@ void analyzePerfInfo(allocation_metadata *metadata) {
 						"Num TLB read misses:     %ld\n"
 						"Num TLB write misses:    %ld\n"
 						"Num cache misses:        %ld\n"
-						"Num cache refs:          %ld\n"
 						"Num instructions:        %ld\n\n",
 				metadata->tid, metadata->reused ? "true" : "false",
 				metadata->after.faults - metadata->before.faults,
 				metadata->after.tlb_read_misses - metadata->before.tlb_read_misses,
 				metadata->after.tlb_write_misses - metadata->before.tlb_write_misses,
 				metadata->after.cache_misses - metadata->before.cache_misses,
-				metadata->after.cache_refs - metadata->before.cache_refs,
 				metadata->after.instructions - metadata->before.instructions);
 	}
 }

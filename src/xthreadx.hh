@@ -14,6 +14,7 @@ void initMyLocalMem();
 
 thread_local extern uint64_t thread_stack_start;
 thread_local extern uint64_t myThreadID;
+thread_local extern perf_info perfInfo;
 #ifdef USE_THREAD_LOCAL
 thread_local extern uint64_t myLocalPosition;
 #endif
@@ -106,6 +107,13 @@ class xthreadx {
 		if(thrData.output) {
 			fclose(thrData.output);
 		}
+
+		close(perfInfo.perf_fd_fault);
+		close(perfInfo.perf_fd_tlb_reads);
+		close(perfInfo.perf_fd_tlb_writes);
+		close(perfInfo.perf_fd_cache_miss);
+		close(perfInfo.perf_fd_instr);
+
 		return result;
 	}
 };
