@@ -19,8 +19,6 @@ INCS =		xthreadx.hh		\
 
 DEPS = $(SRCS) $(INCS)
 
-MALLOC_OPTIONS = 'p'
-
 CC = gcc
 CXX = g++ 
 #CC = clang
@@ -28,6 +26,15 @@ CXX = g++
 
 CFLAGS += -O2 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-frame-pointer
 CFLAGS2 += -O0 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-frame-pointer -Wl,--no-as-needed
+
+PROFILER_FLAGS += -D USE_THREAD_LOCAL 
+#PROFILER_FLAGS += 
+THREADTEST_FILE = threadTest.cpp
+#No Blowup, all new addresses
+#THREADTEST_FILE = malloc-then-free.cpp
+NUM_THREADS = 20
+NUM_MALLOCS = 80000
+
 
 #CFLAGS += -DNO_PMU
 #CFLAGS2 += -DNO_PMU
@@ -79,11 +86,9 @@ threads:	libmallocprof.so \
 
 pmu: test/pmu-libc-test test/pmu-obsd-test test/pmu-dieharder-test test/pmu-freeguard-test
 
-THREADTEST_FILE = threadTest.cpp
-
 # Libmallocprof
 libmallocprof.so: $(DEPS)
-	$(CXX) $(CFLAGS2) $(INCLUDE_DIRS) -shared -fPIC $(SRCS) -o libmallocprof.so -ldl -lpthread
+	$(CXX) $(CFLAGS2) $(PROFILER_FLAGS) $(INCLUDE_DIRS) -shared -fPIC $(SRCS) -o libmallocprof.so -ldl -lpthread
 
 # TCMalloc 4.2.6
 test/test-tcmalloc-noprof: test/$(TEST_FILE)
@@ -104,10 +109,10 @@ test/test-obsd-thread: libmallocprof.so test/$(THREADTEST_FILE)
 
 # FreeGuard
 test/test-freeguard: libmallocprof.so test/$(TEST_FILE)
-	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/richard/FreeGuard/libfreeguard.so -o test/test-freeguard test/$(TEST_FILE)
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/sam/FreeGuard/libfreeguard.so -o test/test-freeguard test/$(TEST_FILE)
 
 test/test-freeguard-thread: libmallocprof.so test/$(THREADTEST_FILE)
-	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/richard/FreeGuard/libfreeguard.so -o test/test-freeguard-thread test/$(THREADTEST_FILE) -lpthread
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/sam/FreeGuard/libfreeguard.so -o test/test-freeguard-thread test/$(THREADTEST_FILE) -lpthread
 
 # DieHarder
 test/test-dieharder: libmallocprof.so test/$(TEST_FILE)
@@ -160,10 +165,9 @@ clean:
 # Executions
 .PHONY: runThreads
 runThreads:
-	/usr/bin/time ./test/test-xlibc-thread
-	/usr/bin/time ./test/test-dieharder-thread
-	/usr/bin/time ./test/test-freeguard-thread
-	/usr/bin/time ./test/test-obsd-thread
+	/usr/bin/time ./test/test-xlibc-thread $(NUM_THREADS) $(NUM_MALLOCS)
+	/usr/bin/time ./test/test-dieharder-thread $(NUM_THREADS) $(NUM_MALLOCS)
+	/usr/bin/time ./test/test-obsd-thread $(NUM_THREADS) $(NUM_MALLOCS)
 
 .PHONY: runTC
 runTC:

@@ -9,9 +9,14 @@ extern __thread thread_data thrData;
 
 extern "C" void printHashMap();
 extern "C" pid_t gettid();
-extern void * myMalloc(size_t);
+void* myMalloc(size_t);
+void initMyLocalMem();
 
 thread_local extern uint64_t thread_stack_start;
+thread_local extern uint64_t myThreadID;
+#ifdef USE_THREAD_LOCAL
+thread_local extern uint64_t myLocalPosition;
+#endif
 
 class xthreadx {
 	typedef void * threadFunction(void *);
@@ -39,6 +44,13 @@ class xthreadx {
 	}
 
 	static void * startThread(void * arg) {
+
+		myThreadID = pthread_self();
+
+		#ifdef USE_THREAD_LOCAL
+			initMyLocalMem();
+		#endif
+
 		void * result = NULL;
 		size_t stackSize;
 		thread_t * current = (thread_t *) arg;
@@ -85,6 +97,10 @@ class xthreadx {
 		result = current->startRoutine(current->startArg);
 		#ifndef NO_PMU
 		doPerfRead();
+		#endif
+
+		#ifdef USE_THREAD_LOCAL
+		fprintf (stderr, "Thread %lu myLocalPosition= %zu\n", myThreadID, myLocalPosition);
 		#endif
 
 		if(thrData.output) {

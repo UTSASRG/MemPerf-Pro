@@ -1,7 +1,6 @@
 #ifndef __RANGETREE_HH__
 #define __RANGETREE_HH__
 
-#include <iostream>
 #include <sstream>
 
 #include <malloc.h>
@@ -91,25 +90,6 @@ class RangeTree {
                 else
                     tracker = tracker->right;
             }
-        }
-
-        friend std::string getAllFrom(node_t *node, std::stringstream &ss) {
-            if (node == nullptr)
-                return ss.str();
-            ss << getAllFrom(node->right, ss);
-            ss << "Obj(" << node->data << ")" << ": range<" << node->startRange << "," << node->endRange << ">" << std::endl;
-            ss << getAllFrom(node->left, ss);
-            return ss.str();
-        }
-
-        friend std::ostream &operator<<(std::ostream &os, const RangeTree &rhs) {
-            std::stringstream ss;
-            // node_t *tracker = rhs.root;
-            ss << getAllFrom(rhs.root, ss);
-            // ss << "Obj(" << tracker->data << ")" << ": range<" << tracker->startRange << "," << tracker->endRange << ">" << std::endl;
-            // ss << getAllFrom(tracker->right, ss);
-            os << ss.str();
-            return os;
         }
 };
 
