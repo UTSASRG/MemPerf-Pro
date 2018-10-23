@@ -1,3 +1,6 @@
+#ifndef __LIBMALLOCPROF_H__
+#define __LIBMALLOCPROF_H__
+
 #include "memsample.h"
 
 #define relaxed std::memory_order_relaxed
@@ -78,7 +81,6 @@ typedef struct {
 	uint64_t tlb_read_misses = 0;
 	uint64_t tlb_write_misses = 0;
 	uint64_t cache_misses = 0;
-	uint64_t cache_refs = 0;
 	uint64_t instructions = 0;
 } PerfReadInfo;
 
@@ -171,3 +173,5 @@ void* myLocalMalloc(size_t);
 void myLocalFree(void*);
 void printMyMemUtilization();
 void initGlobalCSM();
+
+#endif /* end of include guard: __LIBMALLOCPROF_H__ */

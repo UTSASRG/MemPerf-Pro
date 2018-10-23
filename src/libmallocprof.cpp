@@ -3,6 +3,7 @@
  * @author Tongping Liu <http://www.cs.utsa.edu/~tongpingliu>
  * @author Sam Silvestro <sam.silvestro@utsa.edu>
  * @author Richard Salcedo <kbgagt@gmail.com>
+ * @author Stefen Ramirez <stfnrmz0@gmail.com>
  */
 
 #include <atomic>  //atomic vars
@@ -13,8 +14,10 @@
 #include "hashfuncs.hh"
 #include "libmallocprof.h"
 #include "real.hh"
-#include "spinlock.hh"
+#include "rangetree.hh"
 #include "selfmap.hh"
+#include "shadowmemory.hh"
+#include "spinlock.hh"
 #include "xthreadx.hh"
 
 //Globals
@@ -153,12 +156,25 @@ HashMap <size_t, Overhead*, spinlock> overhead;
 //Hashmap of tid to ThreadContention*
 HashMap <uint64_t, ThreadContention*, spinlock> threadContention;
 
+RangeTree<ShadowMemory*> shadowtree;
+
+//Spinlocks
+spinlock temp_mem_lock;
+
+//Functions
+//Freelist* getFreelist (size_t size);
+size_t updateFreeCounters(uint64_t address);
+short getSizeIndex(size_t size);
+void initGlobalFreeArray();
+void initLocalFreeArray();
+
+// pre-init private allocator memory
+char myBuffer[TEMP_MEM_SIZE];
 typedef int (*main_fn_t)(int, char **, char **);
 main_fn_t real_main_mallocprof;
 
 extern "C" {
 	// Function prototypes
-	addrinfo addr2line(void * addr);
 	size_t getTotalAllocSize(size_t sz);
 	void exitHandler();
 	inline void getCallsites(void **callsites);
@@ -316,8 +332,8 @@ __attribute__((destructor)) void finalizer_mallocprof () {}
 
 void dumpHashmaps() {
 
-	fprintf(stderr, "addressUsage.printUtilization():\n");
-	addressUsage.printUtilization();
+	// fprintf(stderr, "addressUsage.printUtilization():\n");
+	// addressUsage.printUtilization();
 
 	fprintf(stderr, "overhead.printUtilization():\n");
 	overhead.printUtilization();
@@ -448,12 +464,12 @@ extern "C" {
 
 		//Do allocation
 		object = RealX::malloc(sz);
+		allocData.address = reinterpret_cast <uint64_t> (object);
 
 		//Do after
 		doAfter(&allocData);
 
         allocData.cycles = allocData.tsc_after - allocData.tsc_before;
-		allocData.address = (uint64_t) object;
 
 		// Gets overhead, address usage, mmap usage, memHWM, and prefInfo
 		analyzeAllocation(&allocData);
@@ -506,12 +522,12 @@ extern "C" {
 
 		// Do allocation
 		object = RealX::calloc(nelem, elsize);
+		allocData.address = reinterpret_cast <uint64_t> (object);
 
 		// Do after
 		doAfter(&allocData);
 
         allocData.cycles = allocData.tsc_after - allocData.tsc_before;
-		allocData.address = reinterpret_cast <uint64_t> (object);
 
 		// Gets overhead, address usage, mmap usage, memHWM, and perfInfo
 		analyzeAllocation(&allocData);
@@ -584,10 +600,9 @@ extern "C" {
 
 				allocData.tad->numFrees += 1;
 				allocData.tad->numFreeFaults += allocData.after.faults - allocData.before.faults;
-				allocData.tad->numFreeTlbMisses += allocData.after.tlb_read_misses - allocData.before.tlb_read_misses;
-				// tad->numFreeTlbMisses += after.tlb_write_misses - before.tlb_write_misses;
+				allocData.tad->numFreeTlbReadMisses += allocData.after.tlb_read_misses - allocData.before.tlb_read_misses;
+				allocData.tad->numFreeTlbWriteMisses += allocData.after.tlb_write_misses - allocData.before.tlb_write_misses;
 				allocData.tad->numFreeCacheMisses += allocData.after.cache_misses - allocData.before.cache_misses;
-				allocData.tad->numFreeCacheRefs += allocData.after.cache_refs - allocData.before.cache_refs;
 				allocData.tad->numFreeInstrs += allocData.after.instructions - allocData.before.instructions;
 			}
 		}
@@ -599,13 +614,11 @@ extern "C" {
 							"Num TLB read misses:     %ld\n"
 							"Num TLB write misses:    %ld\n"
 							"Num cache misses:        %ld\n"
-							"num cache refs:          %ld\n"
 							"Num instructions:        %ld\n\n",
 			allocData.tid, allocData.after.faults - allocData.before.faults,
 			allocData.after.tlb_read_misses - allocData.before.tlb_read_misses,
 			allocData.after.tlb_write_misses - allocData.before.tlb_write_misses,
 			allocData.after.cache_misses - allocData.before.cache_misses,
-			allocData.after.cache_refs - allocData.before.cache_refs,
 			allocData.after.instructions - allocData.before.instructions);
 		}
 	}
@@ -650,6 +663,7 @@ extern "C" {
 
 		//Do allocation
 		object = RealX::realloc(ptr, sz);
+		allocData.address = reinterpret_cast <uint64_t> (object);
 
 		//Do after
 		// doAfter(&after, &tsc_after);
@@ -657,7 +671,6 @@ extern "C" {
 
         // cyclesForRealloc = tsc_after - tsc_before;
         allocData.cycles = allocData.tsc_after - allocData.tsc_before;
-		allocData.address = reinterpret_cast <uint64_t> (object);
 
 		//Gets overhead, address usage, mmap usage
 		// analyzeAllocation(sz, address, cyclesForRealloc, classSize, &reused);
@@ -760,80 +773,6 @@ extern "C" {
 		}
 
 		return usableSize;
-	}
-
-	addrinfo addr2line(void * addr) {
-		static bool initialized = false;
-		static int fd[2][2];
-		char strCallsite[20];
-		char strInfo[512];
-		addrinfo info;
-
-		if(!initialized) {
-			if((pipe(fd[0]) == -1) || (pipe(fd[1]) == -1)) {
-				perror("error: unable to create pipe for addr2line\n");
-				fprintf(thrData.output,
-						"error: unable to create pipe for addr2line\n");
-				strcpy(info.exename, "error");
-				info.lineNum = 0;
-				return info;
-			}
-
-			pid_t parent;
-			switch(parent = fork()) {
-				case -1:
-					perror("error: unable to fork addr2line process\n");
-					fprintf(thrData.output,
-							"error: unable to fork addr2line process\n");
-					strcpy(info.exename, "error");
-					info.lineNum = 0;
-					return info;
-				case 0:		// child
-					dup2(fd[1][0], STDIN_FILENO);
-					dup2(fd[0][1], STDOUT_FILENO);
-					// Close unneeded pipe ends for the child
-					close(fd[0][0]);
-					close(fd[1][1]);
-					execlp("addr2line", "addr2line", "-s", "-e",
-							program_invocation_name, "--", (char *)NULL);
-					exit(EXIT_FAILURE);	// if we're still here then exec failed
-					break;
-				default:	// parent
-					// Close unneeded pipe ends for the parent
-					close(fd[0][1]);
-					close(fd[1][0]);
-					initialized = true;
-			}
-		}
-
-		sprintf(strCallsite, "%p\n", addr);
-		int szToWrite = strlen(strCallsite);
-		if(write(fd[1][1], strCallsite, szToWrite) < szToWrite) {
-			perror("error: incomplete write to pipe facing addr2line\n");
-			fprintf(thrData.output,
-					"error: incomplete write to pipe facing addr2line\n");
-		}
-
-		if(read(fd[0][0], strInfo, 512) == -1) {
-			perror("error: unable to read from pipe facing addr2line\n");
-			fprintf(thrData.output,
-					"error: unable to read from pipe facing addr2line\n");
-			strcpy(info.exename, "error");
-			info.lineNum = 0;
-			return info;
-		}
-
-		// Tokenize the return string, breaking apart by ':'.
-		// Take the second token, which will be the line number.
-		// Only copies the first 14 characters of the file name in order to
-		// prevent misalignment in the program output.
-		char * token = strtok(strInfo, ":");
-		strncpy(info.exename, token, 14);
-		info.exename[14] = '\0';	// null terminate the exename field
-		token = strtok(NULL, ":");
-		info.lineNum = atoi(token);
-
-		return info;
 	}
 
 	// PTHREAD_CREATE
@@ -1118,6 +1057,7 @@ extern "C" {
 		void* retval = RealX::mmap(addr, length, prot, flags, fd, offset);
 		mmap_active = false;
 
+
 		if (mmap_wait) {
 			timeStop = rdtscp();
 			if (threadContention.find(tid, &tc)) {
@@ -1157,6 +1097,11 @@ extern "C" {
 			mappings.insert(address, newMmapTuple(address, length, prot, 'u'));
 		}
 
+		ShadowMemory *memory = nullptr;
+		memory = (ShadowMemory *)myMalloc(sizeof(ShadowMemory));
+		memory->initialize(address, length);
+		shadowtree.insert(address, address + length, memory);
+
 		total_mmaps++;
 
 		inMmap = false;
@@ -1186,6 +1131,7 @@ void analyzeAllocation(allocation_metadata *metadata) {
 	getOverhead(metadata->size, metadata->address, metadata->classSize, &(metadata->reused));
 
 	//Analyze address usage
+	/* NOTE(Stefen): We are switching into the address usage for the shadow memory */
 	getAddressUsage(metadata->size, metadata->address, metadata->cycles);
 
 	//Update mmap region info
@@ -1442,7 +1388,8 @@ thread_alloc_data* newTad(){
     tad->numReallocTlbReadMisses = 0;
     tad->numReallocTlbWriteMisses = 0;
 
-    tad->numFreeTlbMisses = 0;
+    tad->numFreeTlbReadMisses = 0;
+    tad->numFreeTlbWriteMisses = 0;
 
     tad->numMallocCacheMisses = 0;
     tad->numReallocCacheMisses = 0;
@@ -1623,6 +1570,8 @@ void globalizeThreadAllocData(){
             globalTAD->numMallocInstrsFFL += threadTAD->numMallocInstrsFFL;
             globalTAD->numReallocInstrsFFL += threadTAD->numReallocInstrsFFL;
             globalTAD->numCallocInstrsFFL += threadTAD->numCallocInstrsFFL;
+            globalTAD->numFreeTlbReadMisses += threadTAD->numFreeTlbReadMisses;
+            globalTAD->numFreeTlbWriteMisses += threadTAD->numFreeTlbWriteMisses;
 		}
 	}
 }
@@ -1967,6 +1916,13 @@ bool mappingEditor (void* addr, size_t len, int prot) {
 	return found;
 }
 
+void updateShadowMemory(size_t address, size_t size) {
+	ShadowMemory *memory = nullptr;
+	shadowtree.find(address, &memory);
+	if (memory != nullptr)
+		memory->update(address, size);
+}
+
 void doBefore (allocation_metadata *metadata) {
 	getPerfInfo(&(metadata->before));
 	metadata->tsc_before = rdtscp();
@@ -1975,6 +1931,7 @@ void doBefore (allocation_metadata *metadata) {
 void doAfter (allocation_metadata *metadata) {
 	getPerfInfo(&(metadata->after));
 	metadata->tsc_after = rdtscp();
+	updateShadowMemory(metadata->address, metadata->size);
 }
 
 void collectAllocMetaData(allocation_metadata *metadata) {
@@ -1986,7 +1943,6 @@ void collectAllocMetaData(allocation_metadata *metadata) {
 				metadata->tad->numMallocTlbReadMisses += metadata->after.tlb_read_misses - metadata->before.tlb_read_misses;
 				metadata->tad->numMallocTlbWriteMisses += metadata->after.tlb_write_misses - metadata->before.tlb_write_misses;
 				metadata->tad->numMallocCacheMisses += metadata->after.cache_misses - metadata->before.cache_misses;
-				metadata->tad->numMallocCacheRefs += metadata->after.cache_refs - metadata->before.cache_refs;
 				metadata->tad->numMallocInstrs += metadata->after.instructions - metadata->before.instructions;
 			}
 			else{
@@ -1995,7 +1951,6 @@ void collectAllocMetaData(allocation_metadata *metadata) {
 				metadata->tad->numMallocTlbReadMissesFFL += metadata->after.tlb_read_misses - metadata->before.tlb_read_misses;
 				metadata->tad->numMallocTlbWriteMissesFFL += metadata->after.tlb_write_misses - metadata->before.tlb_write_misses;
 				metadata->tad->numMallocCacheMissesFFL += metadata->after.cache_misses - metadata->before.cache_misses;
-				metadata->tad->numMallocCacheRefsFFL += metadata->after.cache_refs - metadata->before.cache_refs;
 				metadata->tad->numMallocInstrsFFL += metadata->after.instructions - metadata->before.instructions;
 			}
 			break;
@@ -2006,7 +1961,6 @@ void collectAllocMetaData(allocation_metadata *metadata) {
 				metadata->tad->numReallocTlbReadMisses += metadata->after.tlb_read_misses - metadata->before.tlb_read_misses;
 				metadata->tad->numReallocTlbWriteMisses += metadata->after.tlb_write_misses - metadata->before.tlb_write_misses;
 				metadata->tad->numReallocCacheMisses += metadata->after.cache_misses - metadata->before.cache_misses;
-				metadata->tad->numReallocCacheRefs += metadata->after.cache_refs - metadata->before.cache_refs;
 				metadata->tad->numReallocInstrs += metadata->after.instructions - metadata->before.instructions;
 			}
 			else{
@@ -2015,7 +1969,6 @@ void collectAllocMetaData(allocation_metadata *metadata) {
 				metadata->tad->numReallocTlbReadMissesFFL += metadata->after.tlb_read_misses - metadata->before.tlb_read_misses;
 				metadata->tad->numReallocTlbWriteMissesFFL += metadata->after.tlb_write_misses - metadata->before.tlb_write_misses;
 				metadata->tad->numReallocCacheMissesFFL += metadata->after.cache_misses - metadata->before.cache_misses;
-				metadata->tad->numReallocCacheRefsFFL += metadata->after.cache_refs - metadata->before.cache_refs;
 				metadata->tad->numReallocInstrsFFL += metadata->after.instructions - metadata->before.instructions;
 			}
 			break;
@@ -2026,7 +1979,6 @@ void collectAllocMetaData(allocation_metadata *metadata) {
 				metadata->tad->numCallocTlbReadMisses += metadata->after.tlb_read_misses - metadata->before.tlb_read_misses;
 				metadata->tad->numCallocTlbWriteMisses += metadata->after.tlb_write_misses - metadata->before.tlb_write_misses;
 				metadata->tad->numCallocCacheMisses += metadata->after.cache_misses - metadata->before.cache_misses;
-				metadata->tad->numCallocCacheRefs += metadata->after.cache_refs - metadata->before.cache_refs;
 				metadata->tad->numCallocInstrs += metadata->after.instructions - metadata->before.instructions;
 			}
 			else{
@@ -2035,7 +1987,6 @@ void collectAllocMetaData(allocation_metadata *metadata) {
 				metadata->tad->numCallocTlbReadMissesFFL += metadata->after.tlb_read_misses - metadata->before.tlb_read_misses;
 				metadata->tad->numCallocTlbWriteMissesFFL += metadata->after.tlb_write_misses - metadata->before.tlb_write_misses;
 				metadata->tad->numCallocCacheMissesFFL += metadata->after.cache_misses - metadata->before.cache_misses;
-				metadata->tad->numCallocCacheRefsFFL += metadata->after.cache_refs - metadata->before.cache_refs;
 				metadata->tad->numCallocInstrsFFL += metadata->after.instructions - metadata->before.instructions;
 			}
 			break;
@@ -2088,14 +2039,12 @@ void analyzePerfInfo(allocation_metadata *metadata) {
 						"Num TLB read misses:     %ld\n"
 						"Num TLB write misses:    %ld\n"
 						"Num cache misses:        %ld\n"
-						"Num cache refs:          %ld\n"
 						"Num instructions:        %ld\n\n",
 				metadata->tid, metadata->reused ? "true" : "false",
 				metadata->after.faults - metadata->before.faults,
 				metadata->after.tlb_read_misses - metadata->before.tlb_read_misses,
 				metadata->after.tlb_write_misses - metadata->before.tlb_write_misses,
 				metadata->after.cache_misses - metadata->before.cache_misses,
-				metadata->after.cache_refs - metadata->before.cache_refs,
 				metadata->after.instructions - metadata->before.instructions);
 	}
 }
@@ -2119,7 +2068,7 @@ void readAllocatorFile() {
 
 		token = strtok(buffer, " ");
 		if (d_readFile) printf ("token= %s\n", token);
-		
+
 		if ((strcmp(token, "style")) == 0) {
 			if (d_readFile) printf ("token matched style\n");
 

@@ -1,6 +1,7 @@
 SRCS =   	libmallocprof.cpp	\
 			real.cpp			\
 			selfmap.cpp			\
+			shadowmemory.cpp	\
 			memsample.c
 
 INCS =		xthreadx.hh		\
@@ -10,8 +11,10 @@ INCS =		xthreadx.hh		\
 			list.hh			\
 			hashfuncs.hh	\
 			interval.hh		\
+			rangetree.hh	\
 			selfmap.hh		\
 			spinlock.hh		\
+			shadowmemory.hh	\
 			libmallocprof.h
 
 DEPS = $(SRCS) $(INCS)
@@ -167,7 +170,6 @@ clean:
 runThreads:
 	/usr/bin/time ./test/test-xlibc-thread $(NUM_THREADS) $(NUM_MALLOCS)
 	/usr/bin/time ./test/test-dieharder-thread $(NUM_THREADS) $(NUM_MALLOCS)
-	/usr/bin/time ./test/test-freeguard-thread  $(NUM_THREADS) $(NUM_MALLOCS)
 	/usr/bin/time ./test/test-obsd-thread $(NUM_THREADS) $(NUM_MALLOCS)
 
 .PHONY: runTC

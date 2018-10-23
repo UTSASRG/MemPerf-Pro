@@ -27,6 +27,7 @@ extern "C" {
 extern __thread thread_data thrData;
 
 thread_local perf_info perfInfo;
+thread_local bool isSamplingInit = false;
 
 struct read_format {
 	uint64_t nr;
@@ -51,27 +52,24 @@ void getPerfInfo (PerfReadInfo * i) {
 	return;
 	#endif
 
-	struct read_format buffer1, buffer2;
+	struct read_format buffer;
 
-	read(perfInfo.perf_fd_fault, &buffer1, sizeof(struct read_format));
-	read(perfInfo.perf_fd_instr, &buffer2, sizeof(struct read_format));
+	read(perfInfo.perf_fd_fault, &buffer, sizeof(struct read_format));
 
-	i->faults = buffer1.values[0].value;
-	i->tlb_read_misses = buffer1.values[1].value;
-	i->tlb_write_misses = buffer1.values[2].value;
-	i->cache_misses = buffer1.values[3].value;
-	i->cache_refs = buffer1.values[4].value;
-	i->instructions = buffer2.values[0].value;
+	i->faults = buffer.values[0].value;
+	i->tlb_read_misses = buffer.values[1].value;
+	i->tlb_write_misses = buffer.values[2].value;
+	i->cache_misses = buffer.values[3].value;
+	i->instructions = buffer.values[4].value;
 
 	/*
 	// DEBUG OUTPUT
-	fprintf(stderr, "nr1 = %ld, nr2 = %ld\n", buffer1.nr, buffer2.nr);
-	fprintf(stderr, "  faults           = %ld\n", buffer1.values[0].value);
-	fprintf(stderr, "  tlb read misses  = %ld\n", buffer1.values[1].value);
-	fprintf(stderr, "  tlb write misses = %ld\n", buffer1.values[2].value);
-	fprintf(stderr, "  cache misses     = %ld\n", buffer1.values[3].value);
-	fprintf(stderr, "  cache refs       = %ld\n", buffer1.values[4].value);
-	fprintf(stderr, "  instructions     = %ld\n", buffer2.values[0].value);
+	fprintf(stderr, "nr = %ld\n", buffer.nr);
+	fprintf(stderr, "  faults           = %ld\n", buffer.values[0].value);
+	fprintf(stderr, "  tlb read misses  = %ld\n", buffer.values[1].value);
+	fprintf(stderr, "  tlb write misses = %ld\n", buffer.values[2].value);
+	fprintf(stderr, "  cache misses     = %ld\n", buffer.values[3].value);
+	fprintf(stderr, "  instructions     = %ld\n", buffer.values[4].value);
 	*/
 }
 
@@ -86,7 +84,6 @@ void doPerfRead() {
 	ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_DISABLE, 0);
 	ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_DISABLE, 0);
 	ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_DISABLE, 0);
-	ioctl(perfInfo.perf_fd_cache_ref, PERF_EVENT_IOC_DISABLE, 0);
 	ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_DISABLE, 0);
 
 	if(thrData.output) {
@@ -95,8 +92,6 @@ void doPerfRead() {
 			fprintf(thrData.output, ">>> tot TLB read misses  %ld\n", perf.tlb_read_misses);
 			fprintf(thrData.output, ">>> tot TLB write misses %ld\n", perf.tlb_write_misses);
 			fprintf(thrData.output, ">>> tot cache misses     %ld\n", perf.cache_misses);
-			fprintf(thrData.output, ">>> tot cache refs       %ld\n", perf.cache_refs);
-			fprintf(thrData.output, ">>> tot miss rate        %f%%\n", (float)perf.cache_misses/(float)perf.cache_refs * 100 );
 			fprintf(thrData.output, ">>> tot instructions     %ld\n", perf.instructions);
 	}
 }
@@ -106,7 +101,12 @@ void setupSampling(void) {
 	return;
 	#endif
 
-	struct perf_event_attr pe_fault, pe_tlb_reads, pe_tlb_writes, pe_cache_miss, pe_cache_ref, pe_instr;
+	if(isSamplingInit) {
+			return;
+	}
+	isSamplingInit = true;
+
+	struct perf_event_attr pe_fault, pe_tlb_reads, pe_tlb_writes, pe_cache_miss, pe_instr;
 	memset(&pe_fault, 0, sizeof(struct perf_event_attr));
 
 	pe_fault.type = PERF_TYPE_SOFTWARE;
@@ -163,7 +163,6 @@ void setupSampling(void) {
 	memcpy(&pe_tlb_reads, &pe_fault, sizeof(struct perf_event_attr));
 	memcpy(&pe_tlb_writes, &pe_fault, sizeof(struct perf_event_attr));
 	memcpy(&pe_cache_miss, &pe_fault, sizeof(struct perf_event_attr));
-	memcpy(&pe_cache_ref, &pe_fault, sizeof(struct perf_event_attr));
 	memcpy(&pe_instr, &pe_fault, sizeof(struct perf_event_attr));
 
 	pe_tlb_reads.type = PERF_TYPE_HW_CACHE;
@@ -182,10 +181,6 @@ void setupSampling(void) {
 	pe_cache_miss.config = PERF_COUNT_HW_CACHE_MISSES;
 	pe_cache_miss.disabled = 0;
 
-	pe_cache_ref.type = PERF_TYPE_HARDWARE;
-	pe_cache_ref.config = PERF_COUNT_HW_CACHE_REFERENCES;
-	pe_cache_ref.disabled = 0;
-
 	pe_instr.type = PERF_TYPE_HARDWARE;
 	pe_instr.config = PERF_COUNT_HW_INSTRUCTIONS;
 	pe_instr.disabled = 0;
@@ -200,23 +195,23 @@ void setupSampling(void) {
 	// leader's FD, which occurs elsewhere, and will thus be incorrect unless
 	// similarly reordered.
 	// *** *** *** ***
+
 	perfInfo.perf_fd_fault = create_perf_event(&pe_fault, -1);
 	perfInfo.perf_fd_tlb_reads = create_perf_event(&pe_tlb_reads, perfInfo.perf_fd_fault);
 	perfInfo.perf_fd_tlb_writes = create_perf_event(&pe_tlb_writes, perfInfo.perf_fd_fault);
 	perfInfo.perf_fd_cache_miss = create_perf_event(&pe_cache_miss, perfInfo.perf_fd_fault);
-	perfInfo.perf_fd_cache_ref = create_perf_event(&pe_cache_ref, perfInfo.perf_fd_fault);
-	perfInfo.perf_fd_instr = create_perf_event(&pe_instr, -1);
+	perfInfo.perf_fd_instr = create_perf_event(&pe_instr, perfInfo.perf_fd_fault);
 
 	ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_RESET, 0);
 	ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_RESET, 0);
+	ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_RESET, 0);
 	ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_RESET, 0);
-	ioctl(perfInfo.perf_fd_cache_ref, PERF_EVENT_IOC_RESET, 0);
 	ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_RESET, 0);
 
 	ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_ENABLE, 0);
 	ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_ENABLE, 0);
+	ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_ENABLE, 0);
 	ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_ENABLE, 0);
-	ioctl(perfInfo.perf_fd_cache_ref, PERF_EVENT_IOC_ENABLE, 0);
 	ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_ENABLE, 0);
 }
 
