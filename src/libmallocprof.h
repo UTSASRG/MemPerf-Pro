@@ -9,6 +9,7 @@
 //For libc, bump pointer
 #define LARGE_OBJECT 512
 #define SMALL_OBJECT 0
+#define BUMP_POINTER_KEY 0
 
 //Bump-pointer key to overhead hashmap
 #define BP_OVERHEAD 0
@@ -169,3 +170,4 @@ void initMyLocalMem();
 void* myLocalMalloc(size_t);
 void myLocalFree(void*);
 void printMyMemUtilization();
+void initGlobalCSM();
