@@ -1081,7 +1081,6 @@ extern "C" {
 		}
 
 		uint64_t address = (uint64_t)retval;
-		fprintf(stderr, "mmap addr = %#lx\n", address);
 
 		//If this thread currently doing an allocation
 		if (inAllocation) {
