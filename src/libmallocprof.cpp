@@ -61,7 +61,6 @@ const bool d_mprotect = false;
 const bool d_mmap = false;
 const bool d_class_sizes = false;
 const bool d_pmuData = false;
-const bool d_write_mappings = true;
 const bool d_write_tad = true;
 const bool d_readFile = false;
 const bool d_initLocal = false;
@@ -147,8 +146,10 @@ HashMap <uint64_t, ObjectTuple*, spinlock> addressUsage;
 //Hashmap of lock addr to LC
 HashMap <uint64_t, LC*, spinlock> lockUsage;
 
+#ifdef MAPPINGS
 //Hashmap of mmap addrs to tuple:
 HashMap <uint64_t, MmapTuple*, spinlock> mappings;
+#endif
 
 //Hashmap of Overhead objects
 HashMap <size_t, Overhead*, spinlock> overhead;
@@ -234,7 +235,9 @@ __attribute__((constructor)) initStatus initializer() {
 	lockUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 128);
 	overhead.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 	threadContention.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
+	#ifdef MAPPINGS
 	mappings.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
+	#endif
 	mapsInitialized = true;
 
 	void * program_break = RealX::sbrk(0);
@@ -1078,29 +1081,36 @@ extern "C" {
 		}
 
 		uint64_t address = (uint64_t)retval;
+		fprintf(stderr, "mmap addr = %#lx\n", address);
 
 		//If this thread currently doing an allocation
 		if (inAllocation) {
 			if (d_mmap) printf ("mmap direct from allocation function: length= %zu, prot= %d\n", length, prot);
 			malloc_mmaps.fetch_add (1, relaxed);
+			#ifdef MAPPINGS
 			mappings.insert(address, newMmapTuple(address, length, prot, 'a'));
+			#endif
 		}
 
 		//Need to check if selfmap.getInstance().getTextRegions() has
 		//ran. If it hasn't, we can't call isAllocatorInCallStack()
 		else if (selfmapInitialized && isAllocatorInCallStack()) {
 			if (d_mmap) printf ("mmap allocator in callstack: length= %zu, prot= %d\n", length, prot);
+			#ifdef MAPPINGS
 			mappings.insert(address, newMmapTuple(address, length, prot, 's'));
+			#endif
 		}
 		else {
 			if (d_mmap) printf ("mmap from unknown source: length= %zu, prot= %d\n", length, prot);
+			#ifdef MAPPINGS
 			mappings.insert(address, newMmapTuple(address, length, prot, 'u'));
+			#endif
 		}
 
-		ShadowMemory *memory = nullptr;
-		memory = (ShadowMemory *)myMalloc(sizeof(ShadowMemory));
-		memory->initialize(address, length);
-		shadowtree.insert(address, address + length, memory);
+//		ShadowMemory *memory = nullptr;
+//		memory = (ShadowMemory *)myMalloc(sizeof(ShadowMemory));
+//		memory->initialize(address, length);
+//		shadowtree.insert(address, address + length, memory);
 
 		total_mmaps++;
 
@@ -1204,6 +1214,7 @@ void getAddressUsage(size_t size, uint64_t address, uint64_t cycles) {
 	}
 }
 
+#ifdef MAPPINGS
 void getMappingsUsage(size_t size, uint64_t address, size_t classSize) {
 
 	for (auto entry : mappings) {
@@ -1214,6 +1225,7 @@ void getMappingsUsage(size_t size, uint64_t address, size_t classSize) {
 		}
 	}
 }
+#endif
 
 void getOverhead (size_t size, uint64_t address, size_t classSize, bool* reused) {
 
@@ -1528,7 +1540,6 @@ void globalizeThreadAllocData(){
             globalTAD->numReallocTlbWriteMisses += threadTAD->numReallocTlbWriteMisses;
             globalTAD->numCallocTlbReadMisses += threadTAD->numCallocTlbReadMisses;
             globalTAD->numCallocTlbWriteMisses += threadTAD->numCallocTlbWriteMisses;
-            globalTAD->numFreeTlbMisses += threadTAD->numFreeTlbMisses;
 
             globalTAD->numMallocCacheMisses += threadTAD->numMallocCacheMisses;
             globalTAD->numReallocCacheMisses += threadTAD->numReallocCacheMisses;
@@ -1570,6 +1581,7 @@ void globalizeThreadAllocData(){
             globalTAD->numMallocInstrsFFL += threadTAD->numMallocInstrsFFL;
             globalTAD->numReallocInstrsFFL += threadTAD->numReallocInstrsFFL;
             globalTAD->numCallocInstrsFFL += threadTAD->numCallocInstrsFFL;
+
             globalTAD->numFreeTlbReadMisses += threadTAD->numFreeTlbReadMisses;
             globalTAD->numFreeTlbWriteMisses += threadTAD->numFreeTlbWriteMisses;
 		}
@@ -1633,7 +1645,11 @@ void writeAllocData () {
 	fprintf(thrData.output, ">>> memEfficiency            %.2f%%\n", memEfficiency);
 
 	writeOverhead();
-	if (d_write_mappings) writeMappings();
+
+	#ifdef MAPPINGS
+	writeMappings();
+	#endif
+
 	if (d_write_tad) writeThreadMaps();
 	writeThreadContention();
 
@@ -1686,7 +1702,6 @@ void writeThreadMaps () {
         fprintf (thrData.output, "realloc tlb write misses    %lu\n", data->numReallocTlbWriteMisses);
         fprintf (thrData.output, "calloc tlb read misses      %lu\n", data->numCallocTlbReadMisses);
         fprintf (thrData.output, "calloc tlb write misses     %lu\n", data->numCallocTlbWriteMisses);
-        fprintf (thrData.output, "free tlb misses             %lu\n", data->numFreeTlbMisses);
 
         fprintf (thrData.output, "malloc cache misses         %lu\n", data->numMallocCacheMisses);
         fprintf (thrData.output, "realloc cache misses        %lu\n", data->numReallocCacheMisses);
@@ -1769,6 +1784,7 @@ void writeContention () {
 	fflush(thrData.output);
 }
 
+#ifdef MAPPINGS
 void writeMappings () {
 
 	int i = 0;
@@ -1783,6 +1799,7 @@ void writeMappings () {
 		i++;
 	}
 }
+#endif
 
 void calculateMemOverhead () {
 
@@ -1897,6 +1914,7 @@ inline bool isAllocatorInCallStack() {
 	return false;
 }
 
+#ifdef MAPPINGS
 bool mappingEditor (void* addr, size_t len, int prot) {
 
 	bool found = false;
@@ -1915,6 +1933,7 @@ bool mappingEditor (void* addr, size_t len, int prot) {
 	}
 	return found;
 }
+#endif
 
 void updateShadowMemory(size_t address, size_t size) {
 	ShadowMemory *memory = nullptr;
@@ -1931,7 +1950,7 @@ void doBefore (allocation_metadata *metadata) {
 void doAfter (allocation_metadata *metadata) {
 	getPerfInfo(&(metadata->after));
 	metadata->tsc_after = rdtscp();
-	updateShadowMemory(metadata->address, metadata->size);
+//	updateShadowMemory(metadata->address, metadata->size);
 }
 
 void collectAllocMetaData(allocation_metadata *metadata) {

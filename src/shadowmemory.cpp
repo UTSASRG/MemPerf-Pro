@@ -7,6 +7,7 @@
 
 #include <stdio.h>
 #include <errno.h>
+#include <stdlib.h>
 
 ShadowMemory::ShadowMemory() {}
 
@@ -21,6 +22,11 @@ void ShadowMemory::initialize(size_t address, size_t size) {
 
     cacheline = (int *)RealX::mmap(NULL, size / 2, PROT_READ | PROT_WRITE,
                                            MAP_ANON | MAP_PRIVATE, -1, 0);
+
+	if (cacheline == MAP_FAILED) {
+		fprintf(stderr, "Unable to initialize shadowmem addr=%#lx size=%zu\n", address, size);
+		abort();
+	}
 }
 
 inline int ShadowMemory::key(size_t size) {
