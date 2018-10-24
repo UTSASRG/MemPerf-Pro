@@ -1,3 +1,6 @@
+#ifndef __LIBMALLOCPROF_H__
+#define __LIBMALLOCPROF_H__
+
 #include "memsample.h"
 
 #define relaxed std::memory_order_relaxed
@@ -9,6 +12,7 @@
 //For libc, bump pointer
 #define LARGE_OBJECT 512
 #define SMALL_OBJECT 0
+#define BUMP_POINTER_KEY 0
 
 //Bump-pointer key to overhead hashmap
 #define BP_OVERHEAD 0
@@ -16,6 +20,7 @@
 #define PAGE_BITS 12 
 #define TEMP_MEM_SIZE 1024 * 1024 * 1024 //1GB
 #define MAX_CLASS_SIZE 1050000
+#define LOCAL_BUF_SIZE 204800000
 
 //Structures
 typedef struct {
@@ -32,7 +37,7 @@ typedef struct {
 } ThreadContention;
 
 typedef struct {
-	size_t szUsed;
+	unsigned szUsed;
 } ObjectTuple;
 
 typedef struct {
@@ -76,7 +81,6 @@ typedef struct {
 	uint64_t tlb_read_misses = 0;
 	uint64_t tlb_write_misses = 0;
 	uint64_t cache_misses = 0;
-	uint64_t cache_refs = 0;
 	uint64_t instructions = 0;
 } PerfReadInfo;
 
@@ -161,6 +165,13 @@ ThreadContention* newThreadContention (uint64_t);
 thread_alloc_data* newTad();
 allocation_metadata init_allocation(size_t sz, enum memAllocType type);
 size_t updateFreeCounters(uint64_t address);
-short getSizeIndex(size_t size);
+short getClassSizeIndex(size_t size);
 void initGlobalFreeArray();
 void initLocalFreeArray();
+void initMyLocalMem();
+void* myLocalMalloc(size_t);
+void myLocalFree(void*);
+void printMyMemUtilization();
+void initGlobalCSM();
+
+#endif /* end of include guard: __LIBMALLOCPROF_H__ */
