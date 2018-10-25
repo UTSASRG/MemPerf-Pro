@@ -21,12 +21,22 @@ The lack of a general profiler typically makes  allocator developers design thei
 
 This paper, \MP{}, designs the \textbf{first} general profiler to evaluate the allocation/deallocation behavior of allocators. \MP{} focuses multiple aspects of the allocator, such as performance overhead, memory overhead, scalability, and applications friendliness. The first three aspects focus on the allocator itself. The application friendliness evaluates the impact on the performance of applications, e.g. whether an allocator could reduce cache misses, TLB misses, or unnecessary remote NUMA accesses. These aspects are combined together to evaluate an allocator quantitatively. 
 
-For performance overhead, \MP{} not only evaluates the time spent in each allocation and deallocation, but also collects the hardware events of each allocation and deallocation, e.g. the number of instructions, cache misses, and TLB misses. Presenting the information based on each allocation and deallocation, instead of report a sum of these events, helps identify some particular issue inside the OS intuitively. For instance, \MP{} identifies that DieHarder causes excessive number of cache and TLB misses upon each deallocation, e.g. \todo{5 times} on average,  which clearly indicates an significant performance issue inside~\cite{DieHarder, Guarder}. \MP{} divides the memory overhead of an allocator into separate parts, such as metadata overhead, alignment overhead (internal fragmentation), and memory blowup, which allows programmers to further analyze the issues of their allocators. For instance, memory blowup is defined as the unnecessary increase of memory consumption when an multithreaded allocator reclaims the memory but fails to use these freed objects to satisfy future memory requests, typically from another thread~\cite{Hoard}. Most existing allocators utilizing the ``per-thread'' heap to reduce the lock contention, but will increase the memory blowup significantly. For the scalability, \MP{} focuses on the quantification of both user space contention and kernel space contention. Note that an allocator may invoke different system calls, such as \texttt{mmap}, \texttt{brk}, \texttt{madvise}, and \textbf{munmap}, which may cause unnecessary kernel contention inside the OS (and limit its scalability). As described before, \MP{} further evaluates the application friendliness of each allocator. For application friendliness, we propose multiple metrics like cache utilization ratio, page utilization ratio, and the number of ownership changes to evaluate the cache friendliness, TLB friendliness and NUMA friendliness.     
+For performance overhead, \MP{} not only evaluates the time spent in each allocation and deallocation, but also collects the hardware events of each allocation and deallocation, e.g. the number of instructions, cache misses, and TLB misses. Presenting the information based on each allocation and deallocation, instead of report a sum of these events, helps identify some particular issue inside the OS intuitively. For instance, \MP{} identifies that DieHarder causes excessive number of cache and TLB misses upon each deallocation, e.g. \todo{5 times} on average,  which clearly indicates an significant performance issue inside~\cite{DieHarder}. \MP{} divides the memory overhead into separate parts based on their origin, such as metadata overhead, alignment overhead (internal fragmentation), and memory blowup, which allows programmers to further analyze the particular issue inside. For instance, memory blowup is defined as the unnecessary increase of memory consumption when an multithreaded allocator reclaims the memory but fails to use these freed objects to satisfy future memory requests, typically from another thread~\cite{Hoard}. Most existing allocators utilizing the ``per-thread'' heap to reduce the lock contention, but will increase the memory blowup significantly. For the scalability, \MP{} focuses on the quantification of both user space contention and kernel space contention. Note that an allocator may invoke different system calls, such as \texttt{mmap}, \texttt{brk}, \texttt{madvise}, and \textbf{munmap}, which may cause unnecessary kernel contention inside the OS (and limit its scalability). As described before, \MP{} further evaluates the application friendliness of each allocator. For application friendliness, we propose multiple metrics like cache utilization ratio, page utilization ratio, and the number of ownership changes to evaluate the cache friendliness, TLB friendliness and NUMA friendliness.     
+
+\MP{} has some novelties in its implementation. \MP{} is designed and implemented carefully to avoid the pollution of the profiling procedure. For instance, \MP{} separates its internal memory usage from particular a. 
+
+\MP{} minimizes the performance impact by utilizing the per-thread data, avoiding the slow hash table. 
 
 
-The implementation of \MP{} faces multiple challenges.
 
- 
+
+\MP{} utilizes the combination of Performance Monitor Units (PMU), RDTSC timestamp, and the simple counting together to do the perform. 
+
+\MP{} can be designed to . It employs a simple programs to understand the details of different allocators. For instance, typically there are two types of allocators, pump-pointer based or BIBOP-style allocators. BIBOP style, named as ``a Big Bag of Pages'', is typically. Further than that, \MP{} .
+
+
+\begin{comment}
+
 Challenge 1: How to know the specific details of different allocators? We utilized a small program to get the allocator's specific feature. For instance, whether they are BIBOP style or Bump-pointer based, the size class information and the metadata information. 
 
 Challenge 2: how to perform the profiling? Similar to existing work, we majorly use the time (supported by RTDSC), the number (instrumentation-based counting), and some hardware events (PMU events) to perform the sampling. The sampling approach will be similar to existing work, but we attribute those events to the memory management events, such as allocations and deallocations. 
@@ -77,7 +87,7 @@ We may choose two general-purpose allocators and two secure allocators. Then we 
 
 The general idea is to understand performance, memory, and scalability of different allocators, while providing some evidence of allocator. During the design of allocator, we usually need to understand the inherent reason. The difficulty is how to collect the information without changing the specific allocator. That is, how to design a general allocator profiler, which can help assist the analysis of different allocators. 
 
-We will work on the allocator profiling to understanding the performance, memory and scalability of memory allocator. We may  memory related those system calls. How long it spent on the memory allocation and deallocation, using rtdsc, which can be caused by long memory allocation time? How much of objects has been re-utilized? How is the memory blowup, what is the memory consumption and how much has been allocated? Can we know lock contention of memory allocation, maybe we could monitor the lock usage, just as SyncPerf, and identify that lock acquisitions are  waiting during allocation? Can we identify is there inter-objects cache contention on these objects? If yes, that is the possible example of these allocators.  
+We will work on the allocator profiling to understanding the performance, memory and scalability of memory allocator. We may  memory related those system calls. How long it spent on the memory allocation and deallocation, using RDTSC, which can be caused by long memory allocation time? How much of objects has been re-utilized? How is the memory blowup, what is the memory consumption and how much has been allocated? Can we know lock contention of memory allocation, maybe we could monitor the lock usage, just as SyncPerf, and identify that lock acquisitions are  waiting during allocation? Can we identify is there inter-objects cache contention on these objects? If yes, that is the possible example of these allocators.  
 
 What are the design goals of \MP{}? 
 
@@ -86,6 +96,8 @@ What are the design goals of \MP{}?
 Second, \MP{} should be able to identify the issues of different allocators. 
 
 
+	
+\end{comment}
 
 
 \begin{comment}
