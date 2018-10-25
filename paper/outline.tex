@@ -1,0 +1,39 @@
+\section*{Outline}
+
+Introduction: 
+
+we start with the performance data of different applications. Then we get a conclusion that allocators plays an important role in the performance of applications. 
+
+However, there is no allocator profiler. Most existing ones are profiling the behavior of applications, but not allocator themselves. General profilers are not suitable for explaining the behavior of allocations and deallocations. For instance, perf could report the total number of cache misses, but it could not tell whether there are excessive number of cache misses on each deallocation (a significant problem of DieHarder's allocator).
+
+\MP{} is the first general allocator profiler that focuses on multiple aspects of the allocator: performance overhead, memory overhead, scalability, and application friendliness. 
+
+Performance overhead of each allocation and deallocation on average:
+Time spent: RTDSC timestamp
+Instructions inside on average: PMU
+Cache misses: PMU
+TLB misses: PMU
+
+For memory overhead, \MP{} not only reports the total memory overhead, but also reports the percentage of overhead from each part, such as metadata, alignment, or memory blowup caused by using different allocators. 
+
+For the scalability, \MP{} focuses on the scalability issues caused by software contention, typically caused by user space and kernel space contention. For user space contention,  \MP{} will report the number of locks are explicitly utilized, the number of lock acquisitions, and how much percentage of time are spending on the lock waiting inside the allocations. In addition to that, \MP{} will report the corresponding kernel contention inside the memory management: the number of times and percentage of time invoking system call, such as mmap, munmap, madvise, brk? How much time spending on kernel-space contention? 
+
+
+Challenge 1: How to know the specific details of different allocators? We utilized a small program to get the allocator's specific feature. For instance, whether they are BIBOP style or Bump-pointer based, the size class information and the metadata information. 
+
+Challenge 2: how to perform the profiling? Similar to existing work, we majorly use the time (supported by RTDSC), the number (instrumentation-based counting), and some hardware events (PMU events) to perform the sampling. The sampling approach will be similar to existing work, but we attribute those events to the memory management events, such as allocations and deallocations. 
+
+Challenge 3: how to reduce the performance overhead? In order to reduce the number of cache contention, we re-design our data structure to avoid false sharing and true sharing as much as possible. Also, we 
+
+Challenge 4: we propose a novel method to evaluate the application friendliness. We evaluate the cache friendliness, or TLB friendliness. 
+
+Challenge 5: we employs an internal allocator to avoid the interfering with allocations and deallocations of applications.  
+
+
+Overview:
+\MP{} is an drop-in library that should be linked before any runtime library. Similar to existing profilers, \MP{} also collects  hardware events, time information and the number of invocations. However, \MP{} attribute these events or data to each invocation of memory allocation and deallocation, which can present users  intuitive information about the possible issue of each allocator. As a profiler, \MP{} further summarizes the performance overhead, memory overhead, scalability, and application friendliness of each allocator. 
+
+  
+
+
+  
