@@ -11,3 +11,15 @@ Can we use the same allocator on different applications, achieving different all
 \MP{} utilizes the combination of Performance Monitor Units (PMU), RDTSC timestamp, and the simple counting together to do the perform. 
 
 \MP{} can be designed to . It employs a simple program to understand the details of different allocators. For instance, typically there are two types of allocators, pump-pointer based or BIBOP-style allocators. BIBOP style, named as ``a Big Bag of Pages'', is typically. Further than that, \MP{} .
+
+
+performance overhead: 
+1. Using the hash maps to identify the size of each object or 
+2. Turning multiple reads into one read around 2 or three times. 
+3. Using the new mapping mechanism. 
+
+How we can do that for glibc. We migrate the glibc as separate library, allowing us to intercept system or libraries. 
+
+How to figure out the metadata information?
+ 
+

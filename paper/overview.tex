@@ -1,18 +1,21 @@
 \section{Overview of mmprof}
 
+As described before, \MP{} focuses on two aspects of the allocator, the allocator itself and its potential impact on applications (application friendliness). 
+
+Every deallocation, we should search the tree to find the size of deallocation. 
 \subsection{Performance Overhead}
 
-We may use the fire-flame figure to show the difference. 
+For performance overhead, \MP{} focuses on the overhead of each allocation and deallocation, which is more intuitive than the value of summary. 
 
-\paragraph{Per-allocation Time:}
-Whether the memory allocator is too slow in allocations and deallocations? 
-Basically, we could collect the cycles spending on each cycle. If the number of cycles is too big, then the allocator is too slow. 
+First, \MP{} collects the time spending on each allocation and deallocation. To achieve this, \MP{} intercepts allocations and deallocations of allocations, and then collects the RDTSC timestamp before and after each operation, where RDTSC is further discussed in Section~\ref{}. Therefore, the difference between these values is the actual time spending on each allocation or deallocation.
 
-Then we would like to identify the root cause inside each allocator. 
+%TLB read misses/TLB write misses/page faults/cache misses/instructions. They are PMU-based. 
 
-\paragraph{Per-deallocation Time:} 
-How much cycles for each deallocation? 
+% 
 
+Second, \MP{} collects some hardware events within each allocation and deallocation, relies on the hardware Performance Monitoring Units (as described in Section~\ref{sec:pmu}). Based on our understanding, the hardware events, such as retired instructions, cache misses or TLB misses, will help reveal some implementation issues of an allocator. For instance, \MP{} detects that the DieHarder allocator has an excessive number of cache misses and TLB misses upon each deallocation, around 5 times of each deallocation, which is significantly larger than that of other allocators. By examining the code, we found out a serious implementation issue of the DieHarder allocator, which traverses all mini-heaps to identify the placement of each object. Obviously, this implementation is extremely slow, considering that every deallocation has to perform such expensive lookup. By fixing such issues, the DieHarder's performance improves around \todo{20\%}.     
+
+\begin{comment}
 Can we integrate the cache misses or page faults for each allocation and deallocation, so that we could identify the issue of DieHarder that invokes many unnecessary cache misses?
 
 If we could correlate cache misses to each thread, then we could do this. 
@@ -22,11 +25,12 @@ If allocation and deallocation takes too much time, it could be caused by multip
 (1) First, it just takes a lot of instructions (could we find out the lapsed instructions for each thread?)
 (2) It may be caused by not good algorithm? 
 (3) It can be caused by lock contention?
-(4) It can be caused by system call related contention? 
+(4) It can be caused by system call related contention?
+\end{comment} 
 
 \subsection{Memory Overhead}
 
-How much memory are caused due to the alignment of size classes?
+Based on our understanding, the memory overhead of each allocator comes from three aspects: the metadata overhead, the alignment (or internal fragmentation), and the memory blowup. 
 How much memory are due to memory re-utilization rate? For instance, we may not fully utilize the memory due to the randomization mechanism. We only care about physical memory waste. Then we should also investigate how much memory has been explicitly returned back to the OS. 
 
 How much memory are due to the metadata itself? 
@@ -44,5 +48,13 @@ That is, we may have to integrate with SyncPerf for doing this. We will borrow t
 \subsection{Application Friendliness} 
 How many page faults and cache misses that are caused by applications? 
 
-\subsubsection{NUMA Friendliness} 
 How many remote accesses? How many interconnect messages? We may employ the PMU mechanism to identify the information.
+
+
+\subsection{Background of Performance Monitoring Units}
+\label{sec:pmu}
+
+\subsection{Background of RDTSC}
+
+\label{sec:rdtsc}
+
