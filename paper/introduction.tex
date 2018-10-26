@@ -23,17 +23,7 @@ This paper, \MP{}, designs the \textbf{first} general profiler to evaluate the a
 
 For performance overhead, \MP{} not only evaluates the time spent in each allocation and deallocation, but also collects the hardware events of each allocation and deallocation, e.g. the number of instructions, cache misses, and TLB misses. Presenting the information based on each allocation and deallocation, instead of report a sum of these events, helps identify some particular issue inside the OS intuitively. For instance, \MP{} identifies that DieHarder causes excessive number of cache and TLB misses upon each deallocation, e.g. \todo{5 times} on average,  which clearly indicates an significant performance issue inside~\cite{DieHarder}. \MP{} divides the memory overhead into separate parts based on their origin, such as metadata overhead, alignment overhead (internal fragmentation), and memory blowup, which allows programmers to further analyze the particular issue inside. For instance, memory blowup is defined as the unnecessary increase of memory consumption when an multithreaded allocator reclaims the memory but fails to use these freed objects to satisfy future memory requests, typically from another thread~\cite{Hoard}. Most existing allocators utilizing the ``per-thread'' heap to reduce the lock contention, but will increase the memory blowup significantly. For the scalability, \MP{} focuses on the quantification of both user space contention and kernel space contention. Note that an allocator may invoke different system calls, such as \texttt{mmap}, \texttt{brk}, \texttt{madvise}, and \textbf{munmap}, which may cause unnecessary kernel contention inside the OS (and limit its scalability). As described before, \MP{} further evaluates the application friendliness of each allocator. For application friendliness, we propose multiple metrics like cache utilization ratio, page utilization ratio, and the number of ownership changes to evaluate the cache friendliness, TLB friendliness and NUMA friendliness.     
 
-\MP{} has some novelties in its implementation. \MP{} is designed and implemented carefully to avoid the pollution of the profiling procedure. For instance, \MP{} separates its internal memory usage from particular a. 
-
-\MP{} minimizes the performance impact by utilizing the per-thread data, avoiding the slow hash table. 
-
-
-
-
-\MP{} utilizes the combination of Performance Monitor Units (PMU), RDTSC timestamp, and the simple counting together to do the perform. 
-
-\MP{} can be designed to . It employs a simple programs to understand the details of different allocators. For instance, typically there are two types of allocators, pump-pointer based or BIBOP-style allocators. BIBOP style, named as ``a Big Bag of Pages'', is typically. Further than that, \MP{} .
-
+\input{challenges.tex}
 
 \begin{comment}
 

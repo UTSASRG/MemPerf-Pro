@@ -1,0 +1,13 @@
+\MP{} has some novelties in its implementation. \MP{} is designed and implemented carefully to avoid the pollution of the profiling procedure. For instance, \MP{} separates its internal memory usage from particular a. 
+
+\MP{} minimizes the performance impact by utilizing the per-thread data, avoiding the slow hash table. 
+
+
+
+\todo{allocator: can we use some different configurations of the same allocator?
+Can we use the same allocator on different applications, achieving different allocators?  
+}
+
+\MP{} utilizes the combination of Performance Monitor Units (PMU), RDTSC timestamp, and the simple counting together to do the perform. 
+
+\MP{} can be designed to . It employs a simple program to understand the details of different allocators. For instance, typically there are two types of allocators, pump-pointer based or BIBOP-style allocators. BIBOP style, named as ``a Big Bag of Pages'', is typically. Further than that, \MP{} .
