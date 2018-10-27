@@ -173,5 +173,8 @@ void* myLocalMalloc(size_t);
 void myLocalFree(void*);
 void printMyMemUtilization();
 void initGlobalCSM();
+void * myTreeMalloc(struct libavl_allocator * allocator, size_t size);
+void myTreeFree(struct libavl_allocator * allocator, void * block);
+int compare_ptr(const void *rb_a, const void *rb_b, void *rb_param);
 
 #endif /* end of include guard: __LIBMALLOCPROF_H__ */

@@ -1,21 +1,23 @@
-SRCS =   	libmallocprof.cpp	\
-			real.cpp			\
-			selfmap.cpp			\
-			shadowmemory.cpp	\
-			memsample.c
+SRCS =	libmallocprof.cpp	\
+				real.cpp					\
+				selfmap.cpp				\
+				shadowmemory.cpp	\
+				memsample.c				\
+				rb.c
 
-INCS =		xthreadx.hh		\
-			memsample.h		\
-			real.hh			\
-			hashmap.hh		\
-			list.hh			\
-			hashfuncs.hh	\
-			interval.hh		\
-			rangetree.hh	\
-			selfmap.hh		\
-			spinlock.hh		\
-			shadowmemory.hh	\
-			libmallocprof.h
+INCS =	xthreadx.hh			\
+				memsample.h			\
+				real.hh					\
+				hashmap.hh			\
+				list.hh					\
+				hashfuncs.hh		\
+				interval.hh			\
+				rangetree.hh		\
+				selfmap.hh			\
+				spinlock.hh			\
+				shadowmemory.hh	\
+				libmallocprof.h	\
+				rb.h
 
 DEPS = $(SRCS) $(INCS)
 
@@ -27,17 +29,15 @@ CXX = g++
 CFLAGS += -O2 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-frame-pointer
 CFLAGS2 += -O0 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-frame-pointer -Wl,--no-as-needed
 
-#PROFILER_FLAGS += 
-PROFILER_FLAGS += -D USE_THREAD_LOCAL 
-#PROFILER_FLAGS += -D MAPPINGS 
+PROFILER_FLAGS += -D USE_THREAD_LOCAL
+#PROFILER_FLAGS += -D MAPPINGS
 
 #THREADTEST_FILE = threadTest.cpp
 THREADTEST_FILE = malloc-and-free.cpp
+
 #No Blowup, all new addresses
-#THREADTEST_FILE = malloc-then-free.cpp
 NUM_THREADS = 20
 NUM_MALLOCS = 80000
-
 
 #CFLAGS += -DNO_PMU
 #CFLAGS2 += -DNO_PMU
