@@ -6,6 +6,9 @@
 
 \subsection{Understanding Different Allocators}
 
+Generally there are two types of allocators, e.g. pump-pointer based and BIBOP-style allocator. For BIBOP-style (``Big Bag of Pages'') allocators~\cite{hanson1980}, one or multiple continuous pages are treated as a ``bag'' that holds objects with the same size class.  The bump-pointer allocators typically utilize a pointer pointing to the starting of never-allocated objects, which will update the pointer to next position after each allocation.   
+
+
 How to identify the type of allocators? Typically, most allocators only utilize BUMP pointer based allocators or BIBOP-style allocators. 
 
 \subsubsection{Types of Allocators}

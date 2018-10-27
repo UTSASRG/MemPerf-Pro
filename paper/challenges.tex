@@ -1,25 +1,34 @@
-\MP{} has some novelties in its implementation. \MP{} is designed and implemented carefully to avoid the pollution of the profiling procedure. For instance, \MP{} separates its internal memory usage from particular a. 
+\MP{} utilizes the hardware Performance Monitor Units (PMU), RDTSC timestamp, and simple counters together to perform the profiling. For instance, it utilizes the PMU to collect different hardware events upon each allocation and deallocation, and sample memory accesses to collect application friendliness. It utilizes RDTSC timestamp to collect the time spending, and utilize simple counters to obtain some statistics information.  
 
-\MP{} minimizes the performance impact by utilizing the per-thread data, avoiding the slow hash table. 
+ 
+\MP{} utilizes multiple methods to minimize the performance overhead of the profiling. First, \MP{} designs a lookup mechanism that enables the fast checkup on the size information upon each allocation and deallocation, and also checks the cache line usage and page usage upon each sampled access quickly. Based on our experience of development, the checkup mechanism may  create significant difference on the performance, up to an order of magnitude. Second, \MP{} minimizes the cache contention by utilizing thread-local recording.  
 
 
+During its implementation, \MP{} also avoids the pollution on the profiling data by separating its internal memory usage from that of applications. \MP{} is also adapted to different allocators, which employs a  test program to obtain the details of different allocators, such as the type of the allocator, size class information, and the metadata overhead of each object. 
 
-\todo{allocator: can we use some different configurations of the same allocator?
+
+\begin{comment}
+
+1. Maybe we should detect the contention rate. If the last write is from a different thread, we will detect one contention. 
+ 
+allocator: can we use some different configurations of the same allocator?
 Can we use the same allocator on different applications, achieving different allocators?  
 }
 
-\MP{} utilizes the combination of Performance Monitor Units (PMU), RDTSC timestamp, and the simple counting together to do the perform. 
 
-\MP{} can be designed to . It employs a simple program to understand the details of different allocators. For instance, typically there are two types of allocators, pump-pointer based or BIBOP-style allocators. BIBOP style, named as ``a Big Bag of Pages'', is typically. Further than that, \MP{} .
+
 
 
 performance overhead: 
-1. Using the hash maps to identify the size of each object or 
+1. Using the hash maps to identify the size of each object is very slow. 
 2. Turning multiple reads into one read around 2 or three times. 
 3. Using the new mapping mechanism. 
 
 How we can do that for glibc. We migrate the glibc as separate library, allowing us to intercept system or libraries. 
 
 How to figure out the metadata information?
+	
+\end{comment}
+
  
 
