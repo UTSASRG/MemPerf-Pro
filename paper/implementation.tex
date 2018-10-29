@@ -34,3 +34,11 @@ We differentiate the big objects and small objects.
 \subsection{Profiling Scalability}
 
 \subsection{Application Friendliness}
+
+\subsection{Optimizations}
+
+\subsubsection{Designing the Fast Lookup}
+
+\label{sec:fastlookup}
+
+\MP{} is designed to adapt to different allocators, which may have different mechanisms to obtain the memory from the OS, such as via \texttt{brk} or \texttt{mmap} system calls separately. Therefore, memory address spaces are scattered along the whole address space of a process, which makes difficult to utilize virtual memory to provide a fast lookup. Based on our observation, \texttt{mmap} system calls always allocate the space starting from 130 TB space (even with ASLR mechanism enabled). Therefore, \MP{} reserved the last 1TB space for the shadow memory of this.   

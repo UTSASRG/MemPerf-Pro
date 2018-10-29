@@ -1,8 +1,22 @@
-\MP{} utilizes the hardware Performance Monitor Units (PMU), RDTSC timestamp, and simple counters together to perform the profiling. For instance, it utilizes the PMU to collect different hardware events upon each allocation and deallocation, and sample memory accesses to collect application friendliness. It utilizes RDTSC timestamp to collect the time spending, and utilize simple counters to obtain some statistics information.  
+Basically, \MP{} utilizes the hardware Performance Monitor Units (PMU), RDTSC timestamp, and simple counters together to perform the profiling, similar to existing profilers~\cite{Perf}. For instance, it utilizes the RDTSC timestamps to collect the execution time upon each allocation and deallocation, and utilize simple counters to obtain some statistics information, e.g. the number of allocations and deallocations, and so on. It also employs PMUs to collect some hardware events of each allocation and deallocation, such as TLB read/write misses, retired instructions, and page faults. Different from existing work, \MP{} proposes the novel usage of PMUs to evaluate application friendliness, such as cache utilization (and contention) ratio and page utilization ratio, which may indirectly affect cache misses and TLB misses. Basically, \MP{} samples memory accesses, and then obtains the cache utilization ratio and page utilization ratio of each sampled access, and utilizes the sampled ratio to represent the total ratio.    
+
+However, there exists multiple implementation challenges. The most important challenge is the \textbf{overhead challenge}, where one careless design may impose up to 100 $\times$ overhead (which is the fact of our naive implementation). For instance, \MP{} requires to check the cache utilization and page utilization upon each sampled access. That is, the huge overhead could be unaffordable even for development or evaluation phases. More importantly, significant overhead may skew the evaluation results unnecessarily. \MP{} takes multiple approaches to reduce the overhead. First, \MP{} designs a lookup mechanism that enables the fast checkup on the size information of each object, and on the cache line usage and page usage upon each sampled access quickly, as further discussed in Section~\ref{sec:fastlookup}.  Second, \MP{} minimizes the cache contention by utilizing thread-local recording, and only summarizing the data together in the end of execution. Third, \MP{} also reduces the allocation overhead by preallocating the space for internal memory usage, which employs the vast address space of 64bit machines (and then the virtual memory is infinite). 
+
+Other challenges include the adaption to different allocations. Some specific questions includes the following ones: (1) How to know the specific details of different allocators? We utilized a small program to get the allocator's specific feature. For instance, whether they are BIBOP style or Bump-pointer based, the size class information and the metadata information. 
+
+\begin{comment}
+Challenge 2: how to perform the profiling? Similar to existing work, we majorly use the time (supported by RTDSC), the number (instrumentation-based counting), and some hardware events (PMU events) to perform the sampling. The sampling approach will be similar to existing work, but we attribute those events to the memory management events, such as allocations and deallocations. 
+
+Challenge 3: how to reduce the performance overhead? In order to reduce the number of cache contention, we re-design our data structure to avoid false sharing and true sharing as much as possible. Also, we 
+
+Challenge 4: we propose a novel method to evaluate the application friendliness. We evaluate the cache friendliness, or TLB friendliness. 
+
+Challenge 5: we employs an internal allocator to avoid the interfering with allocations and deallocations of applications.  
 
  
-\MP{} utilizes multiple methods to minimize the performance overhead of the profiling. First, \MP{} designs a lookup mechanism that enables the fast checkup on the size information upon each allocation and deallocation, and also checks the cache line usage and page usage upon each sampled access quickly. Based on our experience of development, the checkup mechanism may  create significant difference on the performance, up to an order of magnitude. Second, \MP{} minimizes the cache contention by utilizing thread-local recording.  
+\MP{} utilizes multiple methods to minimize the performance overhead of the profiling.  
 
+\end{comment}
 
 During its implementation, \MP{} also avoids the pollution on the profiling data by separating its internal memory usage from that of applications. \MP{} is also adapted to different allocators, which employs a  test program to obtain the details of different allocators, such as the type of the allocator, size class information, and the metadata overhead of each object. 
 
