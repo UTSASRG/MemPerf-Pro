@@ -3,6 +3,9 @@
 As described before, \MP{} focuses on two aspects of the allocator, the allocator itself and its potential impact on applications (application friendliness). 
 
 Every deallocation, we should search the tree to find the size of deallocation. 
+
+ 
+We utilized a small program to get the allocator's specific feature. For instance, whether they are BIBOP style or Bump-pointer based, the size class information and the metadata information. 
 \subsection{Performance Overhead}
 
 For performance overhead, \MP{} focuses on the overhead of each allocation and deallocation, which is more intuitive than the value of summary. 
@@ -57,4 +60,5 @@ How many remote accesses? How many interconnect messages? We may employ the PMU 
 \subsection{Background of RDTSC}
 
 \label{sec:rdtsc}
+
 
