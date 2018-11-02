@@ -28,6 +28,8 @@ For a performant allocator, what's the common things within the average allocato
 For evaluating purpose, we could provide two information, one is the average with all evaluated allocators, another one is to omit one allocator with the lowest scores. 
 
 
+It seems that BIBOP style allocators are the trend of allocators, which not only has a better performance overhead on average, but also has better safety by separating the metedata from the actual heap. 
+
 \subsection{Issues Identified in Different Allocators}
 
 \paragraph{Glibc-2.XXX:}
@@ -37,3 +39,4 @@ For evaluating purpose, we could provide two information, one is the average wit
 \paragraph{jemalloc:}
 
 \paragraph{TCMalloc:}
+
