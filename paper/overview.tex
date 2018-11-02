@@ -1,22 +1,24 @@
 \section{Overview of mmprof}
 
-As described before, \MP{} focuses on two aspects of the allocator, the allocator itself and its potential impact on applications (application friendliness). 
-
-Every deallocation, we should search the tree to find the size of deallocation. 
-
+\MP{} is designed as a drop-in library that can be simply linked to applications (and allocators), without the requirement of changing the code or even re-compilation. Although \MP{} could employ the binary-instrumentation to perform a more detailed profiling, such as identifying the instructions within each allocation or deallocation, the binary instrumentation may impose prohibitive performance overhead. With a high overhead, the profiling results may be significantly skewed, such as the waiting time of each lock acquisition inside the allocation. Instead, \MP{} employs the PMU hardware, RDTSC timestamp hardware, and simple counters together to perform the profiling.  
  
-We utilized a small program to get the allocator's specific feature. For instance, whether they are BIBOP style or Bump-pointer based, the size class information and the metadata information. 
+As described above, \MP{} focuses on two aspects of the allocator, the allocator itself and its potential impact on applications (application friendliness). In order to adapt to different allocators, a small program is designed to collect the allocator's specific feature, such as the type of allocators, the size class information, or others. 
+
+In the remainder of this section, we describe the profiled items for each category, and the basic idea of profiling. 
+
 \subsection{Performance Overhead}
 
-For performance overhead, \MP{} focuses on the overhead of each allocation and deallocation, which is more intuitive than the value of summary. 
+For performance overhead, \MP{} profiles the average data of each allocation and deallocation, instead of the summarized values over the whole execution. Per allocation/deallocation data helps identify internal issues inside, if the data is counterintuitive. For instance, \texttt{DieHarder} is identified to have a very high number (\todo{up to X}) of cache misses upon each deallocation, which clearly a deficiency. 
 
-First, \MP{} collects the time spending on each allocation and deallocation. To achieve this, \MP{} intercepts allocations and deallocations of allocations, and then collects the RDTSC timestamp before and after each operation, where RDTSC is further discussed in Section~\ref{}. Therefore, the difference between these values is the actual time spending on each allocation or deallocation.
+First, \MP{} collects the time spending on each allocation and deallocation. It intercepts allocations and deallocations of allocations, and then computes the RDTSC timestamp difference of before and after each operation as the execution time. The allocation and deallocation time is a very important metrics on the efficiency of an allocator.  
 
 %TLB read misses/TLB write misses/page faults/cache misses/instructions. They are PMU-based. 
-
 % 
 
-Second, \MP{} collects some hardware events within each allocation and deallocation, relies on the hardware Performance Monitoring Units (as described in Section~\ref{sec:pmu}). Based on our understanding, the hardware events, such as retired instructions, cache misses or TLB misses, will help reveal some implementation issues of an allocator. For instance, \MP{} detects that the DieHarder allocator has an excessive number of cache misses and TLB misses upon each deallocation, around 5 times of each deallocation, which is significantly larger than that of other allocators. By examining the code, we found out a serious implementation issue of the DieHarder allocator, which traverses all mini-heaps to identify the placement of each object. Obviously, this implementation is extremely slow, considering that every deallocation has to perform such expensive lookup. By fixing such issues, the DieHarder's performance improves around \todo{20\%}.     
+Second, \MP{} further collects hardware PMU events for each allocation and deallocation, where the introduction of PMU is described in Section~\ref{sec:pmu}. The PMU events allow \MP{} discover the specific information of allocations/deallocations without the instrumentation, such as retired instructions, cache misses, and TLB read/write misses. 
+
+%Based on our understanding, the hardware events, such as retired instructions, cache misses or TLB misses, will help reveal some implementation issues of an allocator. For instance, \MP{} detects that the DieHarder allocator has an excessive number of cache misses and TLB misses upon each deallocation, around 5 times of each deallocation, which is significantly larger than that of other allocators. By examining the code, we found out a serious implementation issue of the DieHarder allocator, which traverses all mini-heaps to identify the placement of each object. Obviously, this implementation is extremely slow, considering that every deallocation has to perform such expensive lookup. By fixing such issues, the DieHarder's performance improves around \todo{20\%}.     
+
 
 \begin{comment}
 Can we integrate the cache misses or page faults for each allocation and deallocation, so that we could identify the issue of DieHarder that invokes many unnecessary cache misses?
