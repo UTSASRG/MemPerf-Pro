@@ -19,7 +19,6 @@
 #include "shadowmemory.hh"
 #include "spinlock.hh"
 #include "xthreadx.hh"
-#include "rb.h"
 
 //Globals
 bool bibop = false;
@@ -110,7 +109,6 @@ std::atomic<unsigned>* globalFreeArray = nullptr;
 __thread thread_data thrData;
 thread_local bool waiting;
 thread_local bool inAllocation;
-thread_local bool inDeallocation;
 thread_local bool inMmap;
 thread_local bool samplingInit = false;
 thread_local uint64_t timeAttempted;
@@ -190,7 +188,6 @@ extern "C" {
 	void * valloc(size_t) __attribute__ ((weak, alias("yyvalloc")));
 	void * mmap(void *addr, size_t length, int prot, int flags,
                   int fd, off_t offset) __attribute__ ((weak, alias("yymmap")));
-	int munmap(void *addr, size_t length) __attribute__ ((weak, alias("yymunmap")));
 	void * aligned_alloc(size_t, size_t) __attribute__ ((weak,
 				alias("yyaligned_alloc")));
 	void * memalign(size_t, size_t) __attribute__ ((weak, alias("yymemalign")));
@@ -199,12 +196,12 @@ extern "C" {
 				alias("yyposix_memalign")));
 }
 
-//Constructor
+// Constructor
 __attribute__((constructor)) initStatus initializer() {
 
 	if(profilerInitialized == INITIALIZED){
-            return profilerInitialized;
-    }
+			return profilerInitialized;
+	}
 	
 	profilerInitialized = IN_PROGRESS;
 
@@ -221,6 +218,9 @@ __attribute__((constructor)) initStatus initializer() {
 		abort();
 	}
 
+	// Allocate and initialize all shadow memory-related mappings
+	ShadowMemory::initialize();
+
 	RealX::initializer();
 
 	myMemEnd = (void*) (myMem + TEMP_MEM_SIZE);
@@ -232,10 +232,6 @@ __attribute__((constructor)) initStatus initializer() {
 	// resulting in eight bytes which resemble: 0x<lowWord><lowWord>
 	uint64_t btext = (uint64_t)&__executable_start & 0xFFFFFFFF;
 	min_pos_callsite_id = (btext << 32) | btext;
-
-	struct libavl_allocator * tree_allocator = (struct libavl_allocator *)myMalloc(sizeof(struct libavl_allocator));
-	*tree_allocator = {.libavl_malloc = myTreeMalloc, .libavl_free = myTreeFree};
-	rb_tree = rb_create((rb_comparison_func *)compare_ptr, NULL, tree_allocator);
 
 	threadToCSM.initialize(HashFuncs::hashInt, HashFuncs::compareInt, 128);
 	addressUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
@@ -252,7 +248,7 @@ __attribute__((constructor)) initStatus initializer() {
 	thrData.stackStart = (char *)__builtin_frame_address(0);
 	thrData.stackEnd = (char *)__libc_stack_end;
 
-    allocator_name = (char*) myMalloc(100);
+	allocator_name = (char*) myMalloc(100);
 	selfmap::getInstance().getTextRegions();
 	selfmapInitialized = true;
 
@@ -581,9 +577,6 @@ extern "C" {
 		allocation_metadata allocData = init_allocation(0, FREE);
 		allocData.address = reinterpret_cast <uint64_t> (ptr);
 
-		// thread_local
-		inDeallocation = true;
-
 		//Do before free
 		doBefore(&allocData);
 
@@ -592,9 +585,6 @@ extern "C" {
 
 		//Do after free
 		doAfter(&allocData);
-
-		// thread_local
-		inDeallocation = false;
 
 		//Update free counters
 		allocData.classSize = updateFreeCounters(allocData.address);
@@ -1100,67 +1090,30 @@ extern "C" {
 			if (inAllocation) {
 					if (d_mmap) printf ("mmap direct from allocation function: length= %zu, prot= %d\n", length, prot);
 					malloc_mmaps.fetch_add (1, relaxed);
+					#ifdef MAPPINGS
 					mappings.insert(address, newMmapTuple(address, length, prot, 'a'));
+					#endif
 			}
 
 			//Need to check if selfmap.getInstance().getTextRegions() has
 			//ran. If it hasn't, we can't call isAllocatorInCallStack()
 			else if (selfmapInitialized && isAllocatorInCallStack()) {
 					if (d_mmap) printf ("mmap allocator in callstack: length= %zu, prot= %d\n", length, prot);
+					#ifdef MAPPINGS
 					mappings.insert(address, newMmapTuple(address, length, prot, 's'));
+					#endif
 			}
 			else {
 					if (d_mmap) printf ("mmap from unknown source: length= %zu, prot= %d\n", length, prot);
+					#ifdef MAPPINGS
 					mappings.insert(address, newMmapTuple(address, length, prot, 'u'));
+					#endif
 			}
-
-			if (!inRealMain || (inDeallocation || inAllocation ||
-								(selfmapInitialized && isAllocatorInCallStack()))) {
-				// Create a new shadow memory region associated with the new mapping
-				ShadowMemory * sm_node = (ShadowMemory *)myMalloc(sizeof(ShadowMemory));
-				sm_node->initialize((void *)address, length);
-				fprintf(stderr, "> created sm obj %p for mmap mapping at 0x%lx (length = %zu)\n", sm_node, address, length);
-				if(rb_insert(rb_tree, sm_node)) {
-						fprintf(stderr, "ERROR: mapping at address 0x%lx already in RB tree\n", address);
-						raise(SIGUSR2);
-				}
-		}
 
 		total_mmaps++;
 
 		inMmap = false;
 		return retval;
-	}
-
-	// MUNMAP
-	// TODO if they only unmap a portion of the mapping then we are in trouble;
-	//                      hopefully this should not occur
-	int yymunmap(void *addr, size_t length) {
-			int retval;
-
-			if (!realInitialized) RealX::initializer();
-
-			if (!mapsInitialized) return RealX::munmap (addr, length);
-
-			if((retval = RealX::munmap(addr, length)) == -1) {
-					perror("munmap failed");
-			}
-
-			fprintf(stderr, "> munmap(%p, %zu)\n", addr, length);
-			// If this thread currently doing an allocation
-			if (!inRealMain || (inDeallocation || inAllocation ||
-									(selfmapInitialized && isAllocatorInCallStack()))) {
-					fprintf(stderr, "> MUNMAP(%p, %zu)\n", addr, length);
-					if (d_mmap) printf ("munmap from allocator: addr= %p, length= %zu\n", addr, length);
-					char buf[sizeof(ShadowMemory)];
-					ShadowMemory * anon_sm = new (buf) ShadowMemory(addr);
-					if(rb_delete(rb_tree, anon_sm) == NULL) {
-							fprintf(stderr, "> attempt to delete mapping %p from RB tree failed\n", addr);
-							abort();
-					}
-			}
-
-			return retval;
 	}
 }//End of extern "C"
 
@@ -1983,6 +1936,8 @@ bool mappingEditor (void* addr, size_t len, int prot) {
 #endif
 
 void updateShadowMemory(void * address, size_t size) {
+		ShadowMemory::updateObject(address, size);
+		/*
 		char buf[sizeof(ShadowMemory)];
 		ShadowMemory * anon_sm = new (buf) ShadowMemory(address);
 		ShadowMemory * sm = (ShadowMemory *)rb_find(rb_tree, anon_sm);
@@ -1994,6 +1949,7 @@ void updateShadowMemory(void * address, size_t size) {
 				//fprintf(stderr, "WARNING: no shadow memory associated with object at address %p\n", address);
 				//raise(SIGUSR2);
 		}
+		*/
 }
 
 void doBefore (allocation_metadata *metadata) {
@@ -2004,7 +1960,7 @@ void doBefore (allocation_metadata *metadata) {
 void doAfter (allocation_metadata *metadata) {
 	getPerfInfo(&(metadata->after));
 	metadata->tsc_after = rdtscp();
-	updateShadowMemory((void *)metadata->address, metadata->size);
+	ShadowMemory::updateObject((void *)metadata->address, metadata->size);
 }
 
 void collectAllocMetaData(allocation_metadata *metadata) {
@@ -2278,11 +2234,15 @@ void initGlobalCSM() {
 
 // Comparison function used by red-black tree (rb_param unused)
 int compare_ptr(const void *rb_a, const void *rb_b, void *rb_param) {
+		return -1;
+
+		/*
     ShadowMemory * node_a = (ShadowMemory *)rb_a;
     ShadowMemory * node_b = (ShadowMemory *)rb_b;
 
     //return node_b->compare(node_a);
     return node_a->compare(node_b);
+		*/
 }
 
 void * myTreeMalloc(struct libavl_allocator * allocator, size_t size) {

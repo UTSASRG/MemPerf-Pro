@@ -54,7 +54,9 @@ void getPerfInfo (PerfReadInfo * i) {
 
 	struct read_format buffer;
 
-	read(perfInfo.perf_fd_fault, &buffer, sizeof(struct read_format));
+	if(read(perfInfo.perf_fd_fault, &buffer, sizeof(struct read_format)) == -1) {
+				perror("perf read failed");
+	}
 
 	i->faults = buffer.values[0].value;
 	i->tlb_read_misses = buffer.values[1].value;
