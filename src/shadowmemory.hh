@@ -80,12 +80,13 @@ class ShadowMemory {
 				static uintptr_t * obj_size_map_begin;
 				static PageMapEntry * page_map_bump_ptr;
 				static uintptr_t * obj_size_map_bump_ptr;
-				static uintptr_t * cache_map_begin;
-				static uintptr_t * cache_map_bump_ptr;
+				static CacheMapEntry * cache_map_begin;
+				static CacheMapEntry * cache_map_bump_ptr;
 				static eMapInitStatus isInitialized;
 
 		public:
 				static bool initialize();
+				static CacheMapEntry * doBumpPointer();
 				static void updateObject(void * address, size_t size);
 				//unsigned getObjectSize(void * object);
 				//unsigned getCacheUsage(void * address);

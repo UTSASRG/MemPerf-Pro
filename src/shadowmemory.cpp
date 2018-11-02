@@ -12,8 +12,8 @@ PageMapEntry * ShadowMemory::page_map_begin = nullptr;
 uintptr_t * ShadowMemory::obj_size_map_begin = nullptr;
 PageMapEntry * ShadowMemory::page_map_bump_ptr = nullptr;
 uintptr_t * ShadowMemory::obj_size_map_bump_ptr = nullptr;
-uintptr_t * ShadowMemory::cache_map_begin = nullptr;
-uintptr_t * ShadowMemory::cache_map_bump_ptr = nullptr;
+CacheMapEntry * ShadowMemory::cache_map_begin = nullptr;
+CacheMapEntry * ShadowMemory::cache_map_bump_ptr = nullptr;
 eMapInitStatus ShadowMemory::isInitialized = E_MAP_INIT_NOT;
 
 bool ShadowMemory::initialize() {
@@ -40,7 +40,7 @@ bool ShadowMemory::initialize() {
 	page_map_bump_ptr = page_map_begin;
 
 	// Allocate cacheline map region
-	if((void *)(cache_map_begin = (uintptr_t *)mmap((void *)CACHE_MAP_START, CACHE_MAP_SIZE,
+	if((void *)(cache_map_begin = (CacheMapEntry *)mmap((void *)CACHE_MAP_START, CACHE_MAP_SIZE,
 									PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0)) == MAP_FAILED) {
 			perror("mmap of cache map region failed");
 			//return false;
@@ -129,6 +129,10 @@ void ShadowMemory::updateObject(void * address, size_t size) {
 		 */
 }
 
+CacheMapEntry * ShadowMemory::doBumpPointer() {
+		cache_map_bump_ptr += NUM_CACHELINES_PER_PAGE;
+		return cache_map_bump_ptr;
+}
 
 
 void PageMapEntry::initialize() { }
@@ -137,8 +141,8 @@ CacheMapEntry * PageMapEntry::getCacheMapEntry(unsigned cache_idx) {
 		unsigned rel_page_index = cache_idx >> LOG2_NUM_CACHELINES_PER_PAGE;
 		PageMapEntry * targetPage = this + rel_page_index;
 
-		fprintf(stderr, "> getCacheMapEntry(%u) -> rel_page_index=%u, targetPage=%p\n",
-					cache_idx, rel_page_index, targetPage);
+		fprintf(stderr, "> getCacheMapEntry(%u) -> this=%p, rel_page_index=%u, targetPage=%p\n",
+					cache_idx, this, rel_page_index, targetPage);
 		return targetPage->getCacheMapEntry_helper();
 }
 
@@ -176,29 +180,58 @@ void PageMapEntry::setPageMonoObject(bool status) {
 
 bool PageMapEntry::updateCacheLines(uintptr_t uintaddr, unsigned size) {
 		unsigned firstCacheLineIdx = ((uintaddr & PAGESIZE_MASK) >> LOG2_CACHELINE_SIZE);
-		//unsigned numCacheLines = alignup(size, CACHELINE_SIZE) >> LOG2_CACHELINE_SIZE;
+		unsigned curCacheLineIdx;
+		unsigned firstCacheLineOffset = (uintaddr & CACHELINE_SIZE_MASK);
 		unsigned numCacheLines = size >> LOG2_CACHELINE_SIZE;
-		unsigned objSizeCacheRem = size & CACHELINE_SIZE_MASK;
-		unsigned i;
+		unsigned curCacheLineBytes;
+		int size_remain = size;
 		CacheMapEntry * current;
 
-		fprintf(stderr, "> obj 0x%lx sz %u : updating %u cachelines starting at current page's cacheline %d...\n",
-						uintaddr, size, numCacheLines, firstCacheLineIdx);
-		for(i = firstCacheLineIdx; i < firstCacheLineIdx + numCacheLines; i++) {
-				current = getCacheMapEntry(i);
-				current->setUsedBytes(CACHELINE_SIZE);
+		fprintf(stderr, "> obj 0x%lx sz %u : numCacheLines >= %u, firstCacheLineIdx = %d, firstCacheLineOffset = %u\n",
+						uintaddr, size, numCacheLines, firstCacheLineIdx, firstCacheLineOffset);
+
+		curCacheLineIdx = firstCacheLineIdx;
+		if(firstCacheLineOffset) {
+				current = getCacheMapEntry(curCacheLineIdx);
+				curCacheLineBytes = CACHELINE_SIZE - firstCacheLineOffset;
+				fprintf(stderr, "> obj 0x%lx sz %u : current = %p, updating cache line %u, contrib size = %u\n",
+								uintaddr, size, current, curCacheLineIdx, curCacheLineBytes);
+				current->addUsedBytes(curCacheLineBytes);
+				size_remain -= curCacheLineBytes;
+				curCacheLineIdx++;
 		}
-		if(objSizeCacheRem) {
-				fprintf(stderr, "> obj 0x%lx sz %u : updating final remainder (%u) cacheline at CL offset %u within current page...\n",
-								uintaddr, size, objSizeCacheRem, firstCacheLineIdx + numCacheLines);
-				current = getCacheMapEntry(firstCacheLineIdx + numCacheLines);
-				current->addUsedBytes(objSizeCacheRem);
+		while(size_remain > 0) {
+				current = getCacheMapEntry(curCacheLineIdx);
+				if(size_remain >= CACHELINE_SIZE) {
+						curCacheLineBytes = CACHELINE_SIZE;
+						fprintf(stderr, "> obj 0x%lx sz %u : current = %p, updating cache line %u, contrib size = %u\n",
+										uintaddr, size, current, curCacheLineIdx, curCacheLineBytes);
+						current->setUsedBytes(curCacheLineBytes);
+				} else {
+						curCacheLineBytes = size_remain;
+						fprintf(stderr, "> obj 0x%lx sz %u : current = %p, updating cache line %u, contrib size = %u\n",
+										uintaddr, size, current, curCacheLineIdx, curCacheLineBytes);
+						current->addUsedBytes(curCacheLineBytes);
+				}
+				size_remain -= curCacheLineBytes;
+				curCacheLineIdx++;
 		}
 
 		return true;
 }
 
 CacheMapEntry * PageMapEntry::getCacheMapEntry_helper() {
+		if(cache_map_entry == NULL) {
+				// Create a new entries
+				//ShadowMemory::cache_map_bump_ptr += NUM_CACHELINES_PER_PAGE;
+				//cache_map_entry = ShadowMemory::cache_map_bump_ptr;
+				cache_map_entry = ShadowMemory::doBumpPointer();
+				fprintf(stderr, "> cur page cache map entry is empty: cache map bump ptr is now = %p\n", cache_map_entry);
+		} else {
+				// Update the existing entries
+				fprintf(stderr, "> cur page cache map entry is found! cache_map_entry = %p\n", cache_map_entry);
+		}
+
 		return cache_map_entry;
 }
 
