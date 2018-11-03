@@ -1,4 +1,4 @@
-\section{Overview of mmprof}
+\section{Overview}
 
 \MP{} is designed as a drop-in library that can be simply linked to applications (and allocators), without the requirement of changing the code or even re-compilation. Although \MP{} could employ the binary-instrumentation to perform a more detailed profiling, such as identifying the instructions within each allocation or deallocation, the binary instrumentation may impose prohibitive performance overhead. With a high overhead, the profiling results may be significantly skewed, such as the waiting time of each lock acquisition inside the allocation. Instead, \MP{} employs the PMU hardware, RDTSC timestamp hardware, and simple counters together to perform the profiling.  
  
@@ -6,7 +6,28 @@ As described above, \MP{} focuses on two aspects of the allocator, the allocator
 
 In the remainder of this section, we describe the profiled items for each category, and the basic idea of profiling. 
 
-\subsection{Performance Overhead}
+\subsection{Background of Allocators}
+
+\label{sec:allocator}
+
+Based on our understanding, there exists multiple types of allocators, such as bump-pointer, BIBOP, and region-based allocators. However, region-based allocators are only suitable for special situations that all allocated objects within the same region can be efficiently deallocated at once~\cite{Gay:1998:MME:277650.277748}, which is not the common type for popular allocators. 
+
+Bump-pointer allocators typically utilize a  arithmetic operation to bump a pointer when the block is first allocated~\cite{Cling}, in which objects with different sizes can be allocated adjacently. Freed objects are typically placed into different free lists, based on their size classes.  Therefore, they typically have to get the size information of each object upon deallocations. Since objects with different size classes are placed continuously, it will be slow to look up the size information if placed in other placements (no way to compute). Therefore, the size information is typically placed on the header of objects to support the fast look up.  Two examples of this type are the Glibc allocator, the default allocator in Linux that originates from dlmalloc~\cite{}, and Hoard~\cite{Hoard}.  
+
+The BIBOP---``A Big Bag of Pages''~\cite{hanson1980}--allocators are another common type of allocators. For these allocators, one or multiple continuous pages are treated as a ``bag'', holding objects with the same size class. The metadata of heap objects, such as its size and availability information, is typically stored in a separate area. Thus, BIBOP-style allocators improve the security and reliability, by avoiding metadata corruption caused by buffer overflows. Many performance-oriented allocators, such as TCMalloc~\cite{TCMalloc}, \texttt{jemalloc}~\cite{jemalloc}, and most secure allocators, such as OpenBSD~\cite{OpenBSD} and DieHarder~\cite{DieHarder}, belong to this type. BIOBP allocators may utilize two methods of managing the availability of objects, such as free lists or bitmaps. 
+
+
+Note that almost all allocators manage objects by  size classes, but not the exact size of objects. This mechanisms enables the reuse of objects, and potentially .   
+
+
+(2)~They all distinguish between the management of ``small'' and ``large'' objects, but with different size thresholds. (3)~These secure allocators manage small objects using power-of-two size classes. Further, they do not perform object splitting or coalescing, which is different from general purpose allocators, such as the default Linux allocator.
+
+
+
+\subsection{Basic Idea of maprof}
+\MP{} profiles different types of data, and the basic idea is further discussed as follows. 
+  
+\subsubsection{Performance Overhead}
 
 For performance overhead, \MP{} profiles the average data of each allocation and deallocation, instead of the summarized values over the whole execution. Per allocation/deallocation data helps identify internal issues inside, if the data is counterintuitive. For instance, \texttt{DieHarder} is identified to have a very high number (\todo{up to X}) of cache misses upon each deallocation, which clearly a deficiency. 
 
@@ -33,14 +54,14 @@ If allocation and deallocation takes too much time, it could be caused by multip
 (4) It can be caused by system call related contention?
 \end{comment} 
 
-\subsection{Memory Overhead}
+\subsubsection{Memory Overhead}
 
 Based on our understanding, the memory overhead of each allocator comes from three aspects: the metadata overhead, the alignment (or internal fragmentation), and the memory blowup. 
 How much memory are due to memory re-utilization rate? For instance, we may not fully utilize the memory due to the randomization mechanism. We only care about physical memory waste. Then we should also investigate how much memory has been explicitly returned back to the OS. 
 
 How much memory are due to the metadata itself? 
 
-\subsection{Scalability Analysis} 
+\subsubsection{Scalability Analysis} 
 
 User space contention:
 How many separate locks are explicitly utilized? 
@@ -50,10 +71,26 @@ How much time spending on kernel-space contention? For instance, we could infer 
 
 That is, we may have to integrate with SyncPerf for doing this. We will borrow their implementation in order to do this. 
 
-\subsection{Application Friendliness} 
+\subsubsection{Application Friendliness} 
 How many page faults and cache misses that are caused by applications? 
 
 How many remote accesses? How many interconnect messages? We may employ the PMU mechanism to identify the information.
+
+\subsection{Technical Challenges}
+
+As described above, \MP{} employs hardware PMU, RDTSC, and simple counters together to perform the profiling. Also, as described above, there are some challenges. 
+ 
+
+How to support the default Linux allocator, since it actually utilizes some internal function calls, which cannot be intercepted by \MP{} normally. Therefore, we actually migrated its allocator as a separate library, as other allocators. This allows \MP{} to intercept all lock acquisitions, system calls as usual. 
+
+How to track the size information of objects for both bump-pointer allocators and BIBOP allocators? We observe that it is difficult to track the range of objects. In fact, we also utilize the ?
+
+How to know the metadata overhead of each allocator? It is very difficult to identify which region is used to save the allocator information, without changing the source code of the allocator. Also, it is even difficult to know. We observe that the allocator overhead comes from multiple aspects: metadata overhead, alignment overhead (or internal fragmentation introduced by size classes), and then memory blowup. 
+As far as we know the total memory overhead, then the metadata overhead = total heap size - alignment overhead - memory blowup overhead - memory usage.
+
+However, if the allocator itself utilizes the global variable or an pre-allocated block as the metadata, which can be omitted by \MP{}. 
+
+ 
 
 
 \subsection{Background of Performance Monitoring Units}
@@ -63,15 +100,7 @@ How many remote accesses? How many interconnect messages? We may employ the PMU 
 
 \label{sec:rdtsc}
 
-\subsection{Background of Allocators}
 
-\label{sec:allcoator}
-
-Bibop style
-
-Bump-pointer style
-
-Size classes.
 
 
 
