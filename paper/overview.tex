@@ -22,18 +22,18 @@ Almost all existing allocators manage objects by  size classes, instead of the e
 In order to support multithreaded applications, most allocators typically support per-processor heap design, one idea introduced by Hoard~\cite{Hoard}. For instance, Hoard maintains per-processor heaps and a global heap concurrently. Allocation requests from different threads typically will be satisfied from different per-processor heaps, avoiding false sharing and reducing the lock contention at the same time. Thus, this design actually augments the scalability of allocators. However, it may introduce the \textit{memory blowup}, one typical issue existing in multithreaded allocators. Based on our understanding and experiments, the memory blowup is the one major reason why different allocators may impose different physical memory consumption. 
 
 \subsection{Basic Idea of maprof}
-\MP{} profiles different types of data as discussed in the following. 
+\MP{} profiles different types of data as discussed in the following. Among them,  performance overhead, memory overhead, and scalability belong to internal mechanisms of allocators themselves, while the application friendliness focus on the potential performance impact on applications.  
   
 \subsubsection{Performance Overhead}
 
-For performance overhead, \MP{} profiles the average data of each allocation and deallocation, instead of the summarized values over the whole execution. Per allocation/deallocation data helps identify internal issues inside, if the data is counterintuitive. For instance, \texttt{DieHarder} is identified to have a very high number (\todo{up to X}) of cache misses upon each deallocation, which clearly a deficiency. 
+For performance overhead, \MP{} profiles the average data of each allocation and deallocation, instead of the summarized values over the whole execution. Per allocation/deallocation data helps identify internal issues inside, if the data is counterintuitive. For instance, \texttt{DieHarder} is identified to have a very high number (\todo{up to X on average}) of cache misses upon each deallocation, which clearly a deficiency inside. 
 
-First, \MP{} collects the time spending on each allocation and deallocation. It intercepts allocations and deallocations of allocations, and then computes the RDTSC timestamp difference of before and after each operation as the execution time. The allocation and deallocation time is a very important metrics on the efficiency of an allocator.  
+First, \MP{} collects the time spending on each allocation and deallocation. It intercepts allocations and deallocations of allocations, and then computes the RDTSC timestamp difference before and after each operation as the execution time. The allocation and deallocation time is a very important metrics on the efficiency of an allocator.  
 
 %TLB read misses/TLB write misses/page faults/cache misses/instructions. They are PMU-based. 
 % 
 
-Second, \MP{} further collects hardware PMU events for each allocation and deallocation, where the introduction of PMU is described in Section~\ref{sec:pmu}. The PMU events allow \MP{} discover the specific information of allocations/deallocations without the instrumentation, such as retired instructions, cache misses, and TLB read/write misses. 
+Second, \MP{} further collects hardware PMU events for each allocation and deallocation, where the introduction of PMU is described in Section~\ref{sec:pmu}. The PMU events allow \MP{} discover the specific information of allocations/deallocations without using the instrumentation, such as retired instructions, cache misses, and TLB read/write misses. 
 
 %Based on our understanding, the hardware events, such as retired instructions, cache misses or TLB misses, will help reveal some implementation issues of an allocator. For instance, \MP{} detects that the DieHarder allocator has an excessive number of cache misses and TLB misses upon each deallocation, around 5 times of each deallocation, which is significantly larger than that of other allocators. By examining the code, we found out a serious implementation issue of the DieHarder allocator, which traverses all mini-heaps to identify the placement of each object. Obviously, this implementation is extremely slow, considering that every deallocation has to perform such expensive lookup. By fixing such issues, the DieHarder's performance improves around \todo{20\%}.     
 
@@ -53,10 +53,31 @@ If allocation and deallocation takes too much time, it could be caused by multip
 
 \subsubsection{Memory Overhead}
 
-Based on our understanding, the memory overhead of each allocator comes from three aspects: the metadata overhead, the alignment (or internal fragmentation), and the memory blowup. 
-How much memory are due to memory re-utilization rate? For instance, we may not fully utilize the memory due to the randomization mechanism. We only care about physical memory waste. Then we should also investigate how much memory has been explicitly returned back to the OS. 
+Based on our understanding, the memory overhead comes from three aspects: the metadata overhead, the alignment (or internal fragmentation), and the memory blowup. The metadata overhead indicates the physical space used for tracking objects or others. As described in Section~\ref{sec:allocator}, the alignment overhead is introduced due to the difference between the requested size and size class (or mapped pages). The memory blowup can be caused due to two reasons. First, a concurrent allocator does not satisfy the request immediately with freed objects. Second, some allocators, especially secure allocators, typically skip some objects. For the memory overhead, \MP{} aims to determine the ratio of each portion, so that it could guide allocator developers to further reduce the memory overhead based on the profiling results. 
 
-How much memory are due to the metadata itself? 
+
+It is relatively easy to compute the alignment overhead, as far as the information of size classes is known, which \MP{} utilizes a pre-run program to obtain (as described in Section~\ref{sec:understandingallocators}). \MP{} tracks each memory allocation, and then computes the alignment overhead for each allocation request. \todo{Of course, upon the deallocation, the corresponding alignment overhead will be extracted from the current overhead. But how we could know the actual alignment overhead for each object? It seems that we should store the information of such objects, or we could recompute due to the last object. }
+
+For the memory blowup overhead, \MP{} profiles two types of blowup overhead. One type is simply based on the size of freed objects. If the total size of freed objects is larger than the requested size, but an allocation is satisfied from never-allocated objects, which is consider to be a memory blowup. Another type is based on the total size of freed objects with the same size.  
+
+However, it is extremely challenging to compute  the metadata overhead, since it is difficult to identify the location of the metadata, without knowing (or changing) the detailed design of an allocator. \MP{} proposes a novel way to get the metadata overhead, based on the equation~\ref{eq:memoryoverhead}. That is, the metadata overhead can be computed if the total memory overhead ($Total\_{OH}$), alignment overhead ($Align\_{OH}$), or memory blowup ($Blowup$) is known.   
+
+\begin{equation}
+%\vspace{-0.1in}
+\label{eq:memoryoverhead}
+Total\_{OH}=Metadata\_{OH}+Align\_{OH}+Blowup
+\end{equation} 
+
+That is, we could compute the metadata overhead if we could know the total overhead of the heap, given that $Blowup$ and $Align\_{OH}$ can be computed as described above. The total memory overhead is the difference between the total memory consumption of heap objects and the total requested size of heap objects. For the latter one,  \MP{} could increment the size of every allocation, and then decrement the corresponding size of each deallocation.  That is, the question attributes to the determination of the memory consumption of the heap. We noticed that the \texttt{/proc/PID/smaps} file actually contains the size of physical memory for each virtual memory region (in its \texttt{Referenced} field). That is, we could compute the total physical memory consumption by summing up all physical memory of virtual memory regions that are related to the heap. In order to identify all virtual memory regions belonging to the heap, \MP{} intercepts all memory related system calls, and only includes those ones invoked during allocations and deallocations. 
+
+ 
+
+
+%How we could know the total memory consumption? As described in Section~\ref{}, \MP{} intercepts all memory allocations and deallocations. Also,  all memory-related system calls, such as \texttt{mmap}, \texttt{munmap}, \texttt{madvise}, \texttt{mremap}, and \texttt{sbrk}. occurring inside memory allocations and deallocations will be tracked, where the allocator may utilize the  
+
+For memory overhead, programmers only care about the time with the maximum overhead. To achieve this, \MP{} periodically gets the data about the memory overhead, but only shows the data with the maximum overhead to programmers.  
+ 
+%How much memory are due to memory re-utilization rate? For instance, we may not fully utilize the memory due to the randomization mechanism. We only care about physical memory waste. Then we should also investigate how much memory has been explicitly returned back to the OS. How much memory are due to the metadata itself? 
 
 \subsubsection{Scalability Analysis} 
 

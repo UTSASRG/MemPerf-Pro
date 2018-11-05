@@ -173,7 +173,7 @@ Overall, this paper makes the following contributions.
 \begin{itemize}
 \item It designs and implements \textbf{the first general profiler}--\MP{}--to profile different aspects of different memory allocators, without changing allocators themselves.  
 
-\item \MP{} employs advanced hardware, such as Performance Monitoring Units (PMU) or Read Time-Stamp Counter (RDTSC), and the simple counting together to profile allocators quantitatively. 
+\item \MP{} employs advanced hardware, such as Performance Monitoring Units (PMU) or Read Time-Stamp Counter (RDTSC), and simple counters together to profile allocators quantitatively. \MP{} attributes the data to each allocation and deallocation, helps discover some issues that cannot be discovered with general profilers.  
 %Overall, it can not only pinpoint the major issues inside the implementation of memory allocators, such as performance, memory, and scalability issues, but also could quantitively pinpoint cache or page utilization issues of allocators.  
 
 \item \MP{} first proposes multiple metrics to evaluate application friendliness. Further, it proposes the employment of hardware PMUs to evaluate these metrics efficiently and effectively. 
