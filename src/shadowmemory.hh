@@ -3,25 +3,31 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include <cstddef>
+#include "libmallocprof.h"
 
 #define PAGESIZE 4096
 #define CACHELINE_SIZE 64
 #define NUM_CACHELINES_PER_PAGE 64
+#define NUM_PAGES_PER_MEGABYTE 256
+#define CACHELINES_PER_PAGE_MASK (NUM_CACHELINES_PER_PAGE - 1)
 #define CACHELINE_SIZE_MASK (CACHELINE_SIZE - 1)
 #define PAGESIZE_MASK (PAGESIZE - 1)
 #define MEGABYTE_MASK (ONE_MEGABYTE - 1)
+#define NUM_PAGES_PER_MEGABYTE_MASK (NUM_PAGES_PER_MEGABYTE - 1)
 #define NUM_MEGABYTE_MAP_ENTRIES (1 << 27)
 #define LOG2_NUM_CACHELINES_PER_PAGE 6
+#define LOG2_NUM_PAGES_PER_MEGABYTE 8
 #define LOG2_MEGABYTE_SIZE 20
 #define LOG2_PAGESIZE 12
 #define LOG2_CACHELINE_SIZE 6
-#define LOG2_PTR_SIZE 3
+#define LOG2_DWORD_SIZE 4
+#define LOG2_WORD_SIZE 3
 #define ONE_MEGABYTE 0x100000l
 #define ONE_GIGABYTE 0x40000000l
 #define ONE_TERABYTE 0x10000000000l
-#define NUM_PAGE_MAP_ENTRIES_PER_MB 256
-//#define MEGABYTE_MAP_START ((uintptr_t *)(1l << 47))		// this doesn't work, not addressable by userspace
+//#define MEGABYTE_MAP_START ((uintptr_t *)(1l << 47))		// this addr doesn't work, not addressable by userspace
 #define MEGABYTE_MAP_START ((uintptr_t)0x100000000)
 #define MEGABYTE_MAP_SIZE ONE_GIGABYTE
 #define PAGE_MAP_START (MEGABYTE_MAP_START + MEGABYTE_MAP_SIZE)
@@ -30,6 +36,17 @@
 #define PAGE_MAP_SIZE (256 * ONE_GIGABYTE)
 #define CACHE_MAP_SIZE (256 * ONE_GIGABYTE)
 #define OBJ_SIZE_MAP_SIZE (256 * ONE_GIGABYTE)
+#define LIBC_MIN_OBJECT_SIZE 24
+#define LIBC_METADATA_SIZE 8
+#define OBJECT_SIZE_SENTINEL_SIZE 4
+#define OBJECT_SIZE_SENTINEL 0xaaa80000				// 0x1555 << 19
+#define OBJECT_SIZE_SENTINEL_MASK 0xfff80000	// 0x1fff << 19
+#define OBJECT_SIZE_MASK 0x7fff
+#define MAX_OBJECT_SIZE 524287								// 2^19 - 1
+
+// Located in libmallocprof.cpp globals
+extern bool bibop;
+extern __thread thread_data thrData;
 
 typedef enum {
     E_MAP_INIT_NOT = 0,
@@ -37,12 +54,19 @@ typedef enum {
     E_MAP_INIT_DONE,
 } eMapInitStatus;
 
+inline const char * boolToStr(bool p);
+inline size_t alignup(size_t size, size_t alignto) {
+		return (size % alignto == 0) ? size : ((size + (alignto - 1)) & ~(alignto - 1));
+}
 
 class CacheMapEntry {
 		private:
 				unsigned char num_used_bytes;
+				unsigned owner;
 
 		public:
+				unsigned getOwner();
+				void setOwner(unsigned new_owner);
 				unsigned char getUsedBytes();
 				unsigned char setUsedBytes(unsigned num_bytes);
 				unsigned char addUsedBytes(unsigned num_bytes);
@@ -51,44 +75,49 @@ class CacheMapEntry {
 
 class PageMapEntry {
 		private:
-				bool isPageMonoObj;
+				CacheMapEntry * getCacheMapEntry_helper();
+				bool touched;
+				unsigned classSize;
 				unsigned short num_used_bytes;
 				CacheMapEntry * cache_map_entry;
-				unsigned obj_size_index;
-				CacheMapEntry * getCacheMapEntry_helper();
 
 		public:
-				void initialize();
-				CacheMapEntry * getCacheMapEntry(unsigned cache_idx);
-				unsigned getSizeMapIndex();
+				static bool updateCacheLines(uintptr_t uintaddr, unsigned long mega_index, unsigned page_index, unsigned size);
+				static CacheMapEntry * getCacheMapEntry(unsigned long mega_idx, unsigned page_idx, unsigned cache_idx);
+				void clear();
+				bool isTouched();
+				void setTouched();
+				void clearTouched();
 				bool setUsedBytes(unsigned num_bytes);
 				bool addUsedBytes(unsigned num_bytes);
 				bool subUsedBytes(unsigned num_bytes);
-				bool isPageMonoObject();
-				void setPageMonoObject(bool status);
-				bool updateCacheLines(uintptr_t address, unsigned size);
+				unsigned getClassSize();
+				void setClassSize(unsigned size);
 };
 
 class ShadowMemory {
 		private:
-				inline static size_t alignup(size_t size, size_t alignto) {
-						return (size % alignto == 0) ? size : ((size + (alignto - 1)) & ~(alignto - 1));
-				}
+				static unsigned updatePages(uintptr_t uintaddr, unsigned long mega_index, unsigned page_index, unsigned size);
+				static bool updateObjectSize(uintptr_t uintaddr, unsigned size);
+				static unsigned getPageClassSize(unsigned long mega_index, unsigned page_index);
+				inline static unsigned libc_malloc_usable_size(unsigned size);
 
 				static PageMapEntry ** mega_map_begin;
 				static PageMapEntry * page_map_begin;
-				static uintptr_t * obj_size_map_begin;
 				static PageMapEntry * page_map_bump_ptr;
-				static uintptr_t * obj_size_map_bump_ptr;
 				static CacheMapEntry * cache_map_begin;
 				static CacheMapEntry * cache_map_bump_ptr;
 				static eMapInitStatus isInitialized;
 
 		public:
 				static bool initialize();
-				static CacheMapEntry * doBumpPointer();
-				static void updateObject(void * address, size_t size);
-				//unsigned getObjectSize(void * object);
+				static inline PageMapEntry ** getMegaMapEntry(unsigned long mega_index);
+				static bool cleanupPages(uintptr_t uintaddr, size_t length);
+				static CacheMapEntry * doCacheMapBumpPointer();
+				static PageMapEntry * doPageMapBumpPointer();
+				static PageMapEntry * getPageMapEntry(unsigned long mega_idx, unsigned page_idx);
+				static unsigned getObjectSize(uintptr_t uintaddr, unsigned long mega_index, unsigned page_index);
+				static unsigned updateObject(void * address, size_t size);
 				//unsigned getCacheUsage(void * address);
 				//unsigned getPageUsage(void * address);
 };

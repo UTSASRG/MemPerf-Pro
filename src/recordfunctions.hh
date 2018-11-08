@@ -147,8 +147,8 @@ void * yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offs
 #ifdef MAPPINGS
     mappings.insert(address, newMmapTuple(address, length, prot, 'a'));
 #endif
+		ShadowMemory::cleanupPages(address, length);
   }
-
   //Need to check if selfmap.getInstance().getTextRegions() has
   //ran. If it hasn't, we can't call isAllocatorInCallStack()
   else if (selfmapInitialized && isAllocatorInCallStack()) {
@@ -156,15 +156,8 @@ void * yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offs
 #ifdef MAPPINGS
     mappings.insert(address, newMmapTuple(address, length, prot, 's'));
 #endif
+		ShadowMemory::cleanupPages(address, length);
   }
-  else {
-    if (d_mmap) printf ("mmap from unknown source: length= %zu, prot= %d\n", length, prot);
-#ifdef MAPPINGS
-    mappings.insert(address, newMmapTuple(address, length, prot, 'u'));
-#endif
-  }
-
-  total_mmaps++;
 
   inMmap = false;
   return retval;
@@ -178,8 +171,10 @@ int madvise(void *addr, size_t length, int advice){
     return RealX::madvise(addr, length, advice);
   }
 
-  if (advice == MADV_DONTNEED)
+  if (advice == MADV_DONTNEED) {
     num_dontneed.fetch_add(1, relaxed);
+		ShadowMemory::cleanupPages((uintptr_t)addr, length);
+	}
 
   uint64_t timeStart = rdtscp();
   int result = RealX::madvise(addr, length, advice);

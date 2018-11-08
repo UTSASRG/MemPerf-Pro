@@ -18,7 +18,7 @@
 #define DATA_MAPSIZE (DATA_MMAP_PAGES * getpagesize())
 #define OVERFLOW_INTERVAL 100
 #define SHADOW_MEM_SIZE (16 * ONE_GB)
-#define WORD_SIZE (sizeof(long))
+#define WORD_SIZE (sizeof(void *))
 
 // This value is chosen to ensure that all callsite ID's generated are
 // greater than LOWEST_POS_CALLSITE_ID, and using a more obvious choice,

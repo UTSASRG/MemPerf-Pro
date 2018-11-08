@@ -61,7 +61,7 @@ class xthreadx {
 		thread_t * current = (thread_t *) arg;
 
 		pid_t tid = gettid();
-		current->tid = tid;
+		thrData.tid = tid;
 
 		#ifdef THREAD_OUTPUT
 		pid_t pid = getpid();

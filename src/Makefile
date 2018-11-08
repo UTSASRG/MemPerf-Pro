@@ -24,10 +24,10 @@ CXX = g++
 #CXX = clang++ 
 
 CFLAGS += -O2 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-frame-pointer
-CFLAGS2 += -DMAPPINGS -O0 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-frame-pointer -Wl,--no-as-needed
+CFLAGS2 += -O0 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-frame-pointer -Wl,--no-as-needed
 
 PROFILER_FLAGS += -D USE_THREAD_LOCAL
-#PROFILER_FLAGS += -D MAPPINGS
+PROFILER_FLAGS += -D MAPPINGS
 
 #THREADTEST_FILE = threadTest.cpp
 THREADTEST_FILE = malloc-and-free.cpp
