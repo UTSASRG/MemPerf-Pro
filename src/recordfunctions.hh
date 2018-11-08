@@ -132,6 +132,7 @@ void * yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offs
   void* retval = RealX::mmap(addr, length, prot, flags, fd, offset);
   uint64_t timeStop = rdtscp();
 
+  uint64_t address = (uint64_t)retval;
 
   //If this thread currently doing an allocation
   if (inAllocation) {
@@ -141,19 +142,19 @@ void * yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offs
     current_tc->mmap_waits++;
     current_tc->mmap_wait_cycles += (timeStop - timeStart);
 
-#ifdef MAPPINGS
-    uint64_t address = (uint64_t)retval;
+    #ifdef MAPPINGS
     mappings.insert(address, newMmapTuple(address, length, prot, 'a'));
-#endif
+    #endif
+    ShadowMemory::cleanupPages(address, length);
   }
-
   //Need to check if selfmap.getInstance().getTextRegions() has
   //ran. If it hasn't, we can't call isAllocatorInCallStack()
   else if (selfmapInitialized && isAllocatorInCallStack()) {
     if (d_mmap) printf ("mmap allocator in callstack: length= %zu, prot= %d\n", length, prot);
-#ifdef MAPPINGS
+    #ifdef MAPPINGS
     mappings.insert(address, newMmapTuple(address, length, prot, 's'));
-#endif
+    #endif
+    ShadowMemory::cleanupPages(address, length);
   }
   else {
     if (d_mmap) printf ("mmap from unknown source: length= %zu, prot= %d\n", length, prot);

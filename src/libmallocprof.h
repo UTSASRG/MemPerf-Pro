@@ -141,7 +141,7 @@ typedef struct  {
 bool mappingEditor (void* addr, size_t len, int prot);
 #endif
 inline bool isAllocatorInCallStack();
-inline size_t getClassSizeFor(size_t size);
+size_t getClassSizeFor(size_t size);
 int num_used_pages(uintptr_t vstart, uintptr_t vend);
 void analyzePerfInfo(allocation_metadata *metadata);
 void analyzeAllocation(allocation_metadata *metadata);

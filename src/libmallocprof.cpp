@@ -19,7 +19,6 @@
 #include "shadowmemory.hh"
 #include "spinlock.hh"
 #include "xthreadx.hh"
-
 #include "recordfunctions.hh"
 
 //Globals
@@ -561,6 +560,9 @@ extern "C" {
 			samplingInit = true;
 		}
 
+		//thread_local
+		inAllocation = true;
+
 		if (!localFreeArrayInitialized) {
 			initLocalFreeArray();
 		}
@@ -754,7 +756,7 @@ extern "C" {
 		return usableSize;
 	}
 
-  // PTHREAD_CREATE
+	// PTHREAD_CREATE
 	int pthread_create(pthread_t * tid, const pthread_attr_t * attr,
 			void *(*start_routine)(void *), void * arg) {
 		if (!realInitialized) RealX::initializer();
@@ -1379,23 +1381,6 @@ bool mappingEditor (void* addr, size_t len, int prot) {
 }
 #endif
 
-void updateShadowMemory(void * address, size_t size) {
-		ShadowMemory::updateObject(address, size);
-		/*
-		char buf[sizeof(ShadowMemory)];
-		ShadowMemory * anon_sm = new (buf) ShadowMemory(address);
-		ShadowMemory * sm = (ShadowMemory *)rb_find(rb_tree, anon_sm);
-		//fprintf(stderr, "address=%p, size=%zu : buf = %p, anon_sm = %p, SM = %p\n",
-		//				address, size, &buf, anon_sm, sm);
-		if(sm && sm->contains(address)) {
-				sm->updateObject(address, size);
-		} else {
-				//fprintf(stderr, "WARNING: no shadow memory associated with object at address %p\n", address);
-				//raise(SIGUSR2);
-		}
-		*/
-}
-
 void doBefore (allocation_metadata *metadata) {
 	getPerfInfo(&(metadata->before));
 	metadata->tsc_before = rdtscp();
@@ -1404,6 +1389,7 @@ void doBefore (allocation_metadata *metadata) {
 void doAfter (allocation_metadata *metadata) {
 	getPerfInfo(&(metadata->after));
 	metadata->tsc_after = rdtscp();
+	#warning TODO: use the return value of updateObject to increment totalMemoryUsage
 	ShadowMemory::updateObject((void *)metadata->address, metadata->size);
 }
 
