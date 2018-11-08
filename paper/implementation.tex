@@ -1,28 +1,14 @@
 \section{Detailed Implementation}
 
+\label{sec:implement}
+
 \input{implement-Richard}
 \input{implement-stefen}
 \input{implement-sam}
 
 \subsection{Understanding Different Allocators}
 
-Generally there are two types of allocators, e.g. pump-pointer based and BIBOP-style allocator. For BIBOP-style (``Big Bag of Pages'') allocators~\cite{hanson1980}, one or multiple continuous pages are treated as a ``bag'' that holds objects with the same size class.  The bump-pointer allocators typically utilize a pointer pointing to the starting of never-allocated objects, which will update the pointer to next position after each allocation.   
-
-
-How to identify the type of allocators? Typically, most allocators only utilize BUMP pointer based allocators or BIBOP-style allocators. 
-
-\subsubsection{Types of Allocators}
-BIBOP style is the abbreviation of ``Big Bag of Pages''~\cite{hanson1980}.
-For BIBOP-style allocators, one or multiple continuous pages are treated as a ``bag'' that holds objects of the same size class. The metadata of each heap object, such as its size and availability information, is typically stored in a separate area.
-
-Bump pointer
-How to collect the size class information?
-How to solve the issue when connecting to some allocators, such as Guarder, since Guarder interposes the thread execution. 
-
-How to intercept the memory allocations and deallocations? 
-
-Region-based allocators: 
-it is not selected in this study, since we can't find many existing allocators with a high performance. 
+\label{sec:understandingallocators}
 
 
 \subsection{Profiling Performance Overhead}
@@ -34,3 +20,11 @@ We differentiate the big objects and small objects.
 \subsection{Profiling Scalability}
 
 \subsection{Application Friendliness}
+
+\subsection{Optimizations}
+
+\subsubsection{Designing the Fast Lookup}
+
+\label{sec:fastlookup}
+
+\MP{} is designed to adapt to different allocators, which may have different mechanisms to obtain the memory from the OS, such as via \texttt{brk} or \texttt{mmap} system calls separately. Therefore, memory address spaces are scattered along the whole address space of a process, which makes difficult to utilize virtual memory to provide a fast lookup. Based on our observation, \texttt{mmap} system calls always allocate the space starting from 130 TB space (even with ASLR mechanism enabled). Therefore, \MP{} reserved the last 1TB space for the shadow memory of this.   

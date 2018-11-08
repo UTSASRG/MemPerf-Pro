@@ -34,7 +34,13 @@ typedef struct {
 	uint64_t sbrk_wait_cycles = 0;
 	uint64_t madvise_waits = 0;
 	uint64_t madvise_wait_cycles = 0;
-} ThreadContention;
+	uint64_t munmap_waits = 0;
+	uint64_t munmap_wait_cycles = 0;
+	uint64_t mremap_waits = 0;
+	uint64_t mremap_wait_cycles = 0;
+	uint64_t mprotect_waits = 0;
+	uint64_t mprotect_wait_cycles = 0;
+} __attribute__((__aligned__(64))) ThreadContention;
 
 typedef struct {
 	unsigned szUsed;
@@ -131,7 +137,9 @@ typedef struct  {
 } allocation_metadata;
 
 // Functions 
+#ifdef MAPPINGS
 bool mappingEditor (void* addr, size_t len, int prot);
+#endif
 inline bool isAllocatorInCallStack();
 inline size_t getClassSizeFor(size_t size);
 int num_used_pages(uintptr_t vstart, uintptr_t vend);

@@ -1,19 +1,42 @@
-\section{Overview of mmprof}
+\section{Overview}
 
-As described before, \MP{} focuses on two aspects of the allocator, the allocator itself and its potential impact on applications (application friendliness). 
+\MP{} is designed as a drop-in library that can be simply linked to applications (and allocators), without the requirement of changing the code or even re-compilation. Although \MP{} could employ the binary-instrumentation to perform a more detailed profiling, such as identifying the instructions within each allocation or deallocation, the binary instrumentation may impose prohibitive performance overhead. With a high overhead, the profiling results may be significantly skewed, such as the waiting time of each lock acquisition inside the allocation. Instead, \MP{} employs the PMU hardware, RDTSC timestamp hardware, and simple counters together to perform the profiling.  
+ 
+As described above, \MP{} focuses on two aspects of the allocator, the allocator itself and its potential impact on applications (application friendliness). In order to adapt to different allocators, a small program is designed to collect the allocator's specific feature, such as the type of allocators, the size class information, or others. 
 
-Every deallocation, we should search the tree to find the size of deallocation. 
-\subsection{Performance Overhead}
+In the remainder of this section, we describe the profiled items for each category, and the basic idea of profiling. 
 
-For performance overhead, \MP{} focuses on the overhead of each allocation and deallocation, which is more intuitive than the value of summary. 
+\subsection{Background of Allocators}
 
-First, \MP{} collects the time spending on each allocation and deallocation. To achieve this, \MP{} intercepts allocations and deallocations of allocations, and then collects the RDTSC timestamp before and after each operation, where RDTSC is further discussed in Section~\ref{}. Therefore, the difference between these values is the actual time spending on each allocation or deallocation.
+\label{sec:allocator}
+
+There exists multiple types of allocators, such as bump-pointer, BIBOP, and region-based allocators. However, region-based allocators are only suitable for special situations that all allocated objects within the same region can be efficiently deallocated at once~\cite{Gay:1998:MME:277650.277748}, which is not the common type for popular allocators. Based on the common knowledge,  the number of requests for small objects is significantly much larger than the number of big objects. Thus, most allocators utilize different mechanisms to manage ``small'' and ``big'' objects, where the bump-pointer and BIBOP style typically indicates their mechanisms to manage small objects. For big objects, allocators may map a block of memory from the OS directly during an allocation, and then return it to the OS via \texttt{munmap}~\cite{Hoard}.   
+
+\textbf{Bump-pointer} allocators typically utilize a  arithmetic operation to bump a pointer when the block is first allocated~\cite{Cling}, in which objects with different sizes can be allocated adjacently. Freed objects are typically placed into different free lists, based on their size classes.  Therefore, they typically have to get the size information of each object upon deallocations. Since objects with different size classes are placed continuously, it will be slow to look up the size information if placed in other placements (no way to compute). Therefore, the size information is typically placed on the header of objects to support the fast look up.  Two examples of this type are the Glibc allocator, the default allocator in Linux that originates from dlmalloc~\cite{dlmalloc}, and Hoard~\cite{Hoard}.  
+
+The \textbf{BIBOP} allocators belong to another common type of allocators, where the BIBOP stands for '' Big Bag of Pages''~\cite{hanson1980}. For these allocators, one or multiple continuous pages are treated as a ``bag'', holding objects with the same size class. The metadata of heap objects, such as its size and availability information, is typically stored in a separate area. Thus, BIBOP-style allocators improve the security and reliability, by avoiding metadata corruption caused by buffer overflows. Many performance-oriented allocators, such as TCMalloc~\cite{TCMalloc}, \texttt{jemalloc}~\cite{jemalloc}, and most secure allocators, such as OpenBSD~\cite{OpenBSD} and DieHarder~\cite{DieHarder}, belong to this type. BIOBP allocators may utilize free lists or bitmaps to manage the availability of objects. When using the bitmap, only one bit metadata is sufficient to track the availability of an object, which may impose less memory overhead for the metadata but with possibly higher performance overhead.  
+
+
+Almost all existing allocators manage objects by  size classes, instead of the exact size of objects. But different allocators support  different size classes: some only support power-of-2 sizes, such as DieHarder~\cite{DieHarder} or the OpenBSD allocator~\cite{OpenBSD}, while some utilize more fine-grained size classes, such as the Glibc allocator and jemalloc~\cite{jemalloc}. For each allocation request, the allocator will round up the requested size to the nearest size class. Upon each deallocation, the deallocated object will be threaded into the corresponding free list (for the freelist design) or the corresponded bit will be cleared (for the bitmap design). Therefore, the idea of size class enables the re-use of heap objects. However, it may introduce \textit{internal fragmentation}, wasting the space between the actual allocated size and the size class. 
+
+In order to support multithreaded applications, most allocators typically support per-processor heap design, one idea introduced by Hoard~\cite{Hoard}. For instance, Hoard maintains per-processor heaps and a global heap concurrently. Allocation requests from different threads typically will be satisfied from different per-processor heaps, avoiding false sharing and reducing the lock contention at the same time. Thus, this design actually augments the scalability of allocators. However, it may introduce the \textit{memory blowup}, one typical issue existing in multithreaded allocators. Based on our understanding and experiments, the memory blowup is the one major reason why different allocators may impose different physical memory consumption. 
+
+\subsection{Basic Idea of maprof}
+\MP{} profiles different types of data as discussed in the following. Among them,  performance overhead, memory overhead, and scalability belong to internal mechanisms of allocators themselves, while the application friendliness focus on the potential performance impact on applications.  
+  
+\subsubsection{Performance Overhead}
+
+For performance overhead, \MP{} profiles the average data of each allocation and deallocation, instead of the summarized values over the whole execution. Per allocation/deallocation data helps identify internal issues inside, if the data is counterintuitive. For instance, \texttt{DieHarder} is identified to have a very high number (\todo{up to X on average}) of cache misses upon each deallocation, which clearly a deficiency inside. 
+
+First, \MP{} collects the time spending on each allocation and deallocation. It intercepts allocations and deallocations of allocations, and then computes the RDTSC timestamp difference before and after each operation as the execution time. The allocation and deallocation time is a very important metrics on the efficiency of an allocator.  
 
 %TLB read misses/TLB write misses/page faults/cache misses/instructions. They are PMU-based. 
-
 % 
 
-Second, \MP{} collects some hardware events within each allocation and deallocation, relies on the hardware Performance Monitoring Units (as described in Section~\ref{sec:pmu}). Based on our understanding, the hardware events, such as retired instructions, cache misses or TLB misses, will help reveal some implementation issues of an allocator. For instance, \MP{} detects that the DieHarder allocator has an excessive number of cache misses and TLB misses upon each deallocation, around 5 times of each deallocation, which is significantly larger than that of other allocators. By examining the code, we found out a serious implementation issue of the DieHarder allocator, which traverses all mini-heaps to identify the placement of each object. Obviously, this implementation is extremely slow, considering that every deallocation has to perform such expensive lookup. By fixing such issues, the DieHarder's performance improves around \todo{20\%}.     
+Second, \MP{} further collects hardware PMU events for each allocation and deallocation, where the introduction of PMU is described in Section~\ref{sec:pmu}. The PMU events allow \MP{} discover the specific information of allocations/deallocations without using the instrumentation, such as retired instructions, cache misses, and TLB read/write misses. 
+
+%Based on our understanding, the hardware events, such as retired instructions, cache misses or TLB misses, will help reveal some implementation issues of an allocator. For instance, \MP{} detects that the DieHarder allocator has an excessive number of cache misses and TLB misses upon each deallocation, around 5 times of each deallocation, which is significantly larger than that of other allocators. By examining the code, we found out a serious implementation issue of the DieHarder allocator, which traverses all mini-heaps to identify the placement of each object. Obviously, this implementation is extremely slow, considering that every deallocation has to perform such expensive lookup. By fixing such issues, the DieHarder's performance improves around \todo{20\%}.     
+
 
 \begin{comment}
 Can we integrate the cache misses or page faults for each allocation and deallocation, so that we could identify the issue of DieHarder that invokes many unnecessary cache misses?
@@ -28,15 +51,55 @@ If allocation and deallocation takes too much time, it could be caused by multip
 (4) It can be caused by system call related contention?
 \end{comment} 
 
-\subsection{Memory Overhead}
+\subsubsection{Memory Overhead}
 
-Based on our understanding, the memory overhead of each allocator comes from three aspects: the metadata overhead, the alignment (or internal fragmentation), and the memory blowup. 
-How much memory are due to memory re-utilization rate? For instance, we may not fully utilize the memory due to the randomization mechanism. We only care about physical memory waste. Then we should also investigate how much memory has been explicitly returned back to the OS. 
+Based on our understanding, the memory overhead comes from two aspects: the metadata overhead, and the memory inflation. The metadata overhead indicates the physical space used for tracking objects or others. Memory inflation indicates that the actual memory consumption is increased unnecessarily due to some inherent design of a memory allocator. 
 
-How much memory are due to the metadata itself? 
+Based on our understanding, multiple reasons may contribute to the memory inflation.  Firstly, internal fragmentation, or the alignment overhead, may contribute this. As described before, typically allocators manage heap objects using size classes, in order to enable  memory re-utilization without coalescing or splitting. The difference between the requested size and size class (or mapped pages) is called as alignment overhead or internal fragmentation. Secondly, the memory blowup can contribute this issue as well, where an allocator does not satisfy the request immediately with freed objects. As described in , different per-processor heap will maintain their to reduce the conflict.   
 
-\subsection{Scalability Analysis} 
+Third, some allocators, especially secure allocators, typically skip some objects. For the memory overhead, \MP{} aims to determine the ratio of each portion, so that it could guide allocator developers to further reduce the memory overhead based on the profiling results. 
 
+
+It is relatively easy to compute the alignment overhead, as far as the information of size classes is known, which \MP{} utilizes a pre-run program to obtain (as described in Section~\ref{sec:understandingallocators}). \MP{} tracks each memory allocation, and then computes the alignment overhead for each allocation request. \todo{Of course, upon the deallocation, the corresponding alignment overhead will be extracted from the current overhead. But how we could know the actual alignment overhead for each object? It seems that we should store the information of such objects, or we could recompute due to the last object. }
+
+For the memory blowup overhead, \MP{} profiles two types of blowup overhead. One type is simply based on the size of freed objects. If the total size of freed objects is larger than the requested size, but an allocation is satisfied from never-allocated objects, which is consider to be a memory blowup. Another type is based on the total size of freed objects with the same size.  
+
+However, it is extremely challenging to compute  the metadata overhead, since it is difficult to identify the location of the metadata, without knowing (or changing) the detailed design of an allocator. \MP{} proposes a novel way to get the metadata overhead, based on the equation~\ref{eq:memoryoverhead}. That is, the metadata overhead can be computed if the total memory overhead ($Total\_{OH}$), alignment overhead ($Align\_{OH}$), or memory blowup ($Blowup$) is known.   
+
+\begin{equation}
+%\vspace{-0.1in}
+\label{eq:memoryoverhead}
+Total\_{OH}=Metadata\_{OH}+Align\_{OH}+Blowup
+\end{equation} 
+
+That is, we could compute the metadata overhead if we could know the total overhead of the heap, given that $Blowup$ and $Align\_{OH}$ can be computed as described above. The total memory overhead is the difference between the total memory consumption of heap objects and the total requested size of heap objects. For the latter one,  \MP{} could increment the size of every allocation, and then decrement the corresponding size of each deallocation.  That is, the question attributes to the determination of the memory consumption of the heap. We noticed that the \texttt{/proc/PID/smaps} file actually contains the size of physical memory for each virtual memory region (in its \texttt{Referenced} field). That is, we could compute the total physical memory consumption by summing up all physical memory of virtual memory regions that are related to the heap. In order to identify all virtual memory regions belonging to the heap, \MP{} intercepts all memory related system calls, and only includes those ones invoked during allocations and deallocations. 
+
+ 
+
+
+%How we could know the total memory consumption? As described in Section~\ref{}, \MP{} intercepts all memory allocations and deallocations. Also,  all memory-related system calls, such as \texttt{mmap}, \texttt{munmap}, \texttt{madvise}, \texttt{mremap}, and \texttt{sbrk}. occurring inside memory allocations and deallocations will be tracked, where the allocator may utilize the  
+
+For memory overhead, programmers only care about the time with the maximum overhead. To achieve this, \MP{} periodically gets the data about the memory overhead, but only shows the data with the maximum overhead to programmers.  
+ 
+%How much memory are due to memory re-utilization rate? For instance, we may not fully utilize the memory due to the randomization mechanism. We only care about physical memory waste. Then we should also investigate how much memory has been explicitly returned back to the OS. How much memory are due to the metadata itself? 
+
+\subsubsection{Scalability Analysis} 
+
+\MP{} profiles the scalability issues of allocators as well. Since the contention is the major reason that could significantly affect the scalability of applications, \MP{} focuses on both user-space contention and kernel-space contention. 
+
+\subsubsection{User Space Contention}
+For user-space contention, \MP{} obtains the number of lock acquisitions, the average time for each lock acquisition, and the average time spending under the protection of locks. After that, \MP{} could divide the number of the lock acquisitions by the number of allocations, in order to find out whether the allocator substantially acquires the lock or not. Based on our knowledge, some allocators prevents the lock as much as possible, which possibly achieves better scalability. 
+
+The average time for each lock acquisition can be employed to confirm the lock contention inside. \MP{} obtains the average acquisition time for locks without the contention at first. Then it could show whether the lock contention of an allocator is significant high or not.
+
+At the same time, \MP{} also acquires the time within the critical section. This could help expose whether the lock contention is due to the heavy workload inside the critical section or not. This may require the programmers to take two different actions. For instance, if the contention is high, but the average time inside the critical section is low, then this allocator should possibly distribute its management to multiple threads. In contrast, if the average time inside the critical section is high, then the allocator should possibly move some computation out of the critical section. 
+
+\subsubsection{Kernel Contention}
+\MP{} plans to evaluate the kernel contention caused by the allocators. \MP{} does not require to change the kernel directly achieve this target. Instead, \MP{} monitors the duration time of memory-related system calls, such as \texttt{mmap}, \texttt{munmap}, \texttt{madvise}, \texttt{sbrk}, \texttt{madvise}, or \texttt{mremap}. By examining the source code of the Linux kernel, they will acquire a process-based lock (e.g. ) upon the entry of these system calls, causing the kernel-level contention.   
+
+  
+   the information can be utilized to tell whether an allocator has significant  
+As we all know, memory allocators may invoke multiple system calls inside allocation and deallocation. 
 User space contention:
 How many separate locks are explicitly utilized? 
 How many lock acquisitions? How much time are spending on lock waiting for each thread, and in total?
@@ -45,10 +108,26 @@ How much time spending on kernel-space contention? For instance, we could infer 
 
 That is, we may have to integrate with SyncPerf for doing this. We will borrow their implementation in order to do this. 
 
-\subsection{Application Friendliness} 
+\subsubsection{Application Friendliness} 
 How many page faults and cache misses that are caused by applications? 
 
 How many remote accesses? How many interconnect messages? We may employ the PMU mechanism to identify the information.
+
+\subsection{Technical Challenges}
+
+As described above, \MP{} employs hardware PMU, RDTSC, and simple counters together to perform the profiling. Also, as described above, there are some challenges. 
+ 
+
+How to support the default Linux allocator, since it actually utilizes some internal function calls, which cannot be intercepted by \MP{} normally. Therefore, we actually migrated its allocator as a separate library, as other allocators. This allows \MP{} to intercept all lock acquisitions, system calls as usual. 
+
+How to track the size information of objects for both bump-pointer allocators and BIBOP allocators? We observe that it is difficult to track the range of objects. In fact, we also utilize the ?
+
+How to know the metadata overhead of each allocator? It is very difficult to identify which region is used to save the allocator information, without changing the source code of the allocator. Also, it is even difficult to know. We observe that the allocator overhead comes from multiple aspects: metadata overhead, alignment overhead (or internal fragmentation introduced by size classes), and then memory blowup. 
+As far as we know the total memory overhead, then the metadata overhead = total heap size - alignment overhead - memory blowup overhead - memory usage.
+
+However, if the allocator itself utilizes the global variable or an pre-allocated block as the metadata, which can be omitted by \MP{}. 
+
+ 
 
 
 \subsection{Background of Performance Monitoring Units}
@@ -57,4 +136,9 @@ How many remote accesses? How many interconnect messages? We may employ the PMU 
 \subsection{Background of RDTSC}
 
 \label{sec:rdtsc}
+
+
+
+
+
 

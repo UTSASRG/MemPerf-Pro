@@ -19,7 +19,8 @@
 #include "shadowmemory.hh"
 #include "spinlock.hh"
 #include "xthreadx.hh"
-#include "rb.h"
+
+#include "recordfunctions.hh"
 
 //Globals
 bool bibop = false;
@@ -44,7 +45,7 @@ pid_t pid;
 size_t alignment = 0;
 size_t malloc_mmap_threshold = 0;
 size_t metadata_object = 0;
-// size_t metadata_overhead = 0;
+size_t metadata_overhead = 0;
 size_t total_blowup = 0;
 size_t totalSizeAlloc = 0;
 size_t totalSizeFree = 0;
@@ -79,54 +80,21 @@ const bool d_trace = false;
 std::atomic_bool mmap_active(false);
 std::atomic_bool sbrk_active(false);
 std::atomic_bool madvise_active(false);
-
-// NOTE(STEFEN): Dont really care about
-
-//--> COUNTERS
-	// std::atomic_uint num_free (0);
-	// std::atomic_uint num_malloc (0);
-	// std::atomic_uint num_calloc (0);
-	// std::atomic_uint num_realloc (0);
-	// std::atomic_uint num_dontneed (0);
-	// std::atomic_uint num_mprotect (0);
-	// std::atomic_uint num_actual_malloc (0);
-	// std::atomic<std::size_t> totalMemAllocated (0);
-
-//--> metadata
-	// std::atomic_uint new_address (0);
-	// std::atomic_uint reused_address (0);
 std::atomic<std::size_t> freed_bytes (0);
 
-// NOTE(STEFEN): Not sure?
-	thread_local uint threads =  0;
-	thread_local uint num_pthread_mutex_locks = 0;
-	thread_local uint num_trylock = 0;
-	thread_local uint64_t total_time_wait = 0;
-	thread_local size_t blowup_bytes = 0;
+thread_local uint64_t total_time_wait = 0;
+thread_local size_t blowup_bytes = 0;
 
-// NOTE(STEFEN): Really care about!
+thread_local uint num_sbrk = 0;
+thread_local uint num_madvise = 0;
+thread_local uint malloc_mmaps = 0;
+// thread_local uint total_mmaps = 0;
 
-//--> COUNTERS
-	// std::atomic_uint num_sbrk (0);
-	// std::atomic_uint num_madvise (0);
-	// std::atomic_uint malloc_mmaps (0);
-	// std::atomic_uint total_mmaps (0);
-	thread_local uint num_sbrk = 0;
-	thread_local uint num_madvise = 0;
-	thread_local uint malloc_mmaps = 0;
-	thread_local uint total_mmaps = 0;
-
-//--> metadata
-	// std::atomic_uint size_sbrk (0);
-	// std::atomic_uint blowup_allocations (0);
-	// std::atomic<std::uint64_t> cycles_free (0);
-	// std::atomic<std::uint64_t> cycles_new (0);
-	// std::atomic<std::uint64_t> cycles_reused (0);
-	thread_local uint size_sbrk = 0;
-	thread_local uint blowup_allocations = 0;
-	thread_local uint64_t cycles_free = 0;
-	thread_local uint64_t cycles_new = 0;
-	thread_local uint64_t cycles_reused = 0;
+thread_local uint size_sbrk = 0;
+thread_local uint blowup_allocations = 0;
+thread_local uint64_t cycles_free = 0;
+thread_local uint64_t cycles_new = 0;
+thread_local uint64_t cycles_reused = 0;
 
 
 /// REQUIRED!
@@ -189,7 +157,7 @@ HashMap <uint64_t, MmapTuple*, spinlock> mappings;
 HashMap <size_t, Overhead*, spinlock> overhead;
 
 //Hashmap of tid to ThreadContention*
-HashMap <uint64_t, ThreadContention*, spinlock> threadContention;
+//HashMap <uint64_t, ThreadContention*, spinlock> threadContention;
 
 struct rb_table * rb_tree;
 
@@ -221,8 +189,7 @@ extern "C" {
 	void * realloc(void *, size_t) __attribute__ ((weak, alias("yyrealloc")));
 	void * valloc(size_t) __attribute__ ((weak, alias("yyvalloc")));
 	void * mmap(void *addr, size_t length, int prot, int flags,
-			int fd, off_t offset) __attribute__ ((weak, alias("yymmap")));
-	int munmap(void *addr, size_t length) __attribute__ ((weak, alias("yymunmap")));
+                  int fd, off_t offset) __attribute__ ((weak, alias("yymmap")));
 	void * aligned_alloc(size_t, size_t) __attribute__ ((weak,
 				alias("yyaligned_alloc")));
 	void * memalign(size_t, size_t) __attribute__ ((weak, alias("yymemalign")));
@@ -231,13 +198,13 @@ extern "C" {
 				alias("yyposix_memalign")));
 }
 
-//Constructor
+// Constructor
 __attribute__((constructor)) initStatus initializer() {
 
 	if(profilerInitialized == INITIALIZED){
-		return profilerInitialized;
+			return profilerInitialized;
 	}
-
+	
 	profilerInitialized = IN_PROGRESS;
 
 	if (d_myMemUsage) fprintf(stderr, "Entering constructor..\n");
@@ -253,6 +220,9 @@ __attribute__((constructor)) initStatus initializer() {
 		abort();
 	}
 
+	// Allocate and initialize all shadow memory-related mappings
+	ShadowMemory::initialize();
+
 	RealX::initializer();
 
 	myMemEnd = (void*) (myMem + TEMP_MEM_SIZE);
@@ -266,23 +236,21 @@ __attribute__((constructor)) initStatus initializer() {
 	uint64_t btext = (uint64_t)&__executable_start & 0xFFFFFFFF;
 	min_pos_callsite_id = (btext << 32) | btext;
 
-	struct libavl_allocator * tree_allocator = (struct libavl_allocator *)myMalloc(sizeof(struct libavl_allocator));
-	*tree_allocator = {.libavl_malloc = myTreeMalloc, .libavl_free = myTreeFree};
-	rb_tree = rb_create((rb_comparison_func *)compare_ptr, NULL, tree_allocator);
-
 	addressUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 	lockUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 128);
 	overhead.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
-	threadContention.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
-#ifdef MAPPINGS
+	//threadContention.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
+    #ifdef MAPPINGS
 	mappings.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
-#endif
+    #endif
 	mapsInitialized = true;
 
 	void * program_break = RealX::sbrk(0);
 	thrData.tid = syscall(__NR_gettid);
 	thrData.stackStart = (char *)__builtin_frame_address(0);
 	thrData.stackEnd = (char *)__libc_stack_end;
+
+	setThreadContention();
 
 	allocator_name = (char*) myMalloc(100);
 	selfmap::getInstance().getTextRegions();
@@ -381,8 +349,8 @@ void dumpHashmaps() {
 	fprintf(stderr, "lockUsage.printUtilization():\n");
 	lockUsage.printUtilization();
 
-	fprintf(stderr, "threadContention.printUtilization():\n");
-	threadContention.printUtilization();
+	//fprintf(stderr, "threadContention.printUtilization():\n");
+	//threadContention.printUtilization();
 
 	// fprintf(stderr, "threadToCSM.printUtilization():\n");
 	// threadToCSM.printUtilization();
@@ -401,14 +369,13 @@ void exitHandler() {
 	if (d_myMemUsage) fprintf(stderr, "\nEntering exitHandler\n");
 
 	inRealMain = false;
-#ifndef NO_PMU
+	#ifndef NO_PMU
 	doPerfRead();
-#endif
+	#endif
 	calculateMemOverhead();
 	if(thrData.output) {
 		fflush(thrData.output);
 	}
-	// globalizeThreadAllocData();
 	writeAllocData();
 	writeContention();
 	if(thrData.output) {
@@ -429,13 +396,13 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
 	// Register our cleanup routine as an on-exit handler.
 	atexit(exitHandler);
 
-#ifndef NO_PMU
+	#ifndef NO_PMU
 	// If the PMU sampler has not yet been set up for this thread, set it up now
 	if(!samplingInit){
 		initSampling();
 		samplingInit = true;
 	}
-#endif
+	#endif
 
 	inRealMain = true;
 	return real_main_mallocprof (argc, argv, envp);
@@ -485,13 +452,13 @@ extern "C" {
 		//thread_local
 		inAllocation = true;
 
-#ifndef NO_PMU
+		#ifndef NO_PMU
 		// If the PMU sampler has not yet been set up for this thread, set it up now
 		if(!samplingInit){
 			initSampling();
 			samplingInit = true;
 		}
-#endif
+		#endif
 
 		if (!localFreeArrayInitialized) initLocalFreeArray();
 
@@ -602,9 +569,6 @@ extern "C" {
 		allocation_metadata allocData = init_allocation(0, FREE);
 		allocData.address = reinterpret_cast <uint64_t> (ptr);
 
-		// thread_local
-		inDeallocation = true;
-
 		//Do before free
 		doBefore(&allocData);
 
@@ -613,9 +577,6 @@ extern "C" {
 
 		//Do after free
 		doAfter(&allocData);
-
-		// thread_local
-		inDeallocation = false;
 
 		//Update free counters
 		allocData.classSize = updateFreeCounters(allocData.address);
@@ -663,8 +624,6 @@ extern "C" {
 			samplingInit = true;
 		}
 
-		// num_realloc.fetch_add(1, relaxed);
-
 		//Data we need for each allocation
 		allocation_metadata allocData = init_allocation(sz, REALLOC);
 
@@ -688,7 +647,7 @@ extern "C" {
 
 		//Do after
 		// doAfter(&after, &tsc_after);
-#warning must implement realloc-specific behavior for shadow memory updating
+		#warning must implement realloc-specific behavior for shadow memory updating
 		doAfter(&allocData);
 
 		// cyclesForRealloc = tsc_after - tsc_before;
@@ -700,8 +659,6 @@ extern "C" {
 
 		//Get perf info
 		//analyzePerfInfo(&before, &after, classSize, &reused, tid);
-
-		// totalMemAllocated.fetch_add(sz, relaxed);
 
 		//thread_local
 		inAllocation = false;
@@ -797,369 +754,24 @@ extern "C" {
 		return usableSize;
 	}
 
-	// PTHREAD_CREATE
+  // PTHREAD_CREATE
 	int pthread_create(pthread_t * tid, const pthread_attr_t * attr,
 			void *(*start_routine)(void *), void * arg) {
 		if (!realInitialized) RealX::initializer();
 
 		int result = xthreadx::thread_create(tid, attr, start_routine, arg);
-		threads += 1;
 		return result;
 	}
 
 	// PTHREAD_JOIN
 	int pthread_join(pthread_t thread, void **retval) {
 		if (!realInitialized) RealX::initializer();
+
 		int result = RealX::pthread_join (thread, retval);
+        //fprintf(stderr, "Thread: %lX\n", thread);
 		return result;
 	}
 
-	// PTHREAD_MUTEX_LOCK
-	int pthread_mutex_lock(pthread_mutex_t *mutex) {
-		if (!realInitialized) RealX::initializer();
-
-		uint64_t tid = pthread_self();
-		uint64_t lockAddr = reinterpret_cast <uint64_t> (mutex);
-
-		ThreadContention* tc;
-
-		//Is this thread doing allocation
-		if (inAllocation) {
-
-			//Have we encountered this lock before?
-			LC* thisLock;
-			if (lockUsage.find (lockAddr, &thisLock)) {
-				thisLock->contention++;
-
-				if (thisLock->contention > thisLock->maxContention)
-					thisLock->maxContention = thisLock->contention;
-
-				if (thisLock->contention > 1) {
-					waiting = true;
-					timeAttempted = rdtscp();
-				}
-			}
-
-			//Add lock to lockUsage hashmap
-			else {
-				num_pthread_mutex_locks += 1;
-				lockUsage.insert(lockAddr, newLC());
-			}
-		}
-
-		//Aquire the lock
-		int result = RealX::pthread_mutex_lock (mutex);
-		if (waiting) {
-			timeWaiting += ((rdtscp()) - timeAttempted);
-			waiting = false;
-			if (threadContention.find(tid, &tc)) {
-				tc->mutex_waits++;
-				tc->mutex_wait_cycles += timeWaiting;
-			}
-			else {
-				threadContention.insert(tid, newThreadContention(tid));
-				if (threadContention.find(tid, &tc)) {
-					tc->mutex_waits++;
-					tc->mutex_wait_cycles += timeWaiting;
-				}
-				else {
-					fprintf(stderr, "failed to insert tid into threadContention, mutex\n");
-					abort();
-				}
-			}
-		}
-		return result;
-	}
-
-	// PTHREAD_MUTEX_TRYLOCK
-	int pthread_mutex_trylock (pthread_mutex_t *mutex) {
-		if (!realInitialized) RealX::initializer();
-
-		if (!mapsInitialized)
-			return RealX::pthread_mutex_trylock (mutex);
-
-		uint64_t lockAddr = reinterpret_cast <uint64_t> (mutex);
-		uint64_t tid = pthread_self();
-		ThreadContention* tc;
-
-		//Is this thread doing allocation
-		if (inAllocation) {
-
-			//Have we encountered this lock before?
-			LC* thisLock;
-			if (lockUsage.find (lockAddr, &thisLock)) {
-				thisLock->contention++;
-				if (thisLock->contention > thisLock->maxContention)
-					thisLock->maxContention = thisLock->contention;
-			}
-
-			//Add lock to lockUsage hashmap
-			else {
-				num_pthread_mutex_locks += 1;
-				LC* lc = newLC();
-				lockUsage.insert (lockAddr, lc);
-			}
-		}
-
-		//Try to aquire the lock
-		int result = RealX::pthread_mutex_trylock (mutex);
-		if (result != 0) {
-			num_trylock += 1;
-			if (threadContention.find(tid, &tc)) {
-				tc->mutex_trylock_fails++;
-			}
-			else {
-				threadContention.insert(tid, newThreadContention(tid));
-				if (threadContention.find(tid, &tc)) {
-					tc->mutex_trylock_fails++;
-				}
-				else {
-					fprintf(stderr, "failed to insert tid into threadContention, mutex_trylock\n");
-					abort();
-				}
-			}
-		}
-		return result;
-	}
-
-	// PTHREAD_MUTEX_UNLOCK
-	int pthread_mutex_unlock(pthread_mutex_t *mutex) {
-		if (!realInitialized) RealX::initializer();
-
-		if (!mapsInitialized)
-			return RealX::pthread_mutex_unlock (mutex);
-
-		if (inAllocation) {
-			uint64_t lockAddr = reinterpret_cast <uint64_t> (mutex);
-
-			//Decrement contention on this LC if this lock is
-			//in our map
-			LC* thisLock;
-			if (lockUsage.find (lockAddr, &thisLock)) {
-				thisLock->contention--;
-			}
-		}
-
-		return RealX::pthread_mutex_unlock (mutex);
-	}
-
-	// MADVISE
-	int madvise(void *addr, size_t length, int advice){
-		if (!realInitialized) RealX::initializer();
-
-		uint64_t timeStart = 0;
-		uint64_t timeStop = 0;
-		bool madvise_wait = false;
-		ThreadContention* tc;
-		uint64_t tid = pthread_self();
-
-		if (madvise_active.load()) {
-			madvise_wait = true;
-			timeStart = rdtscp();
-		}
-
-		madvise_active = true;
-		int result = RealX::madvise(addr, length, advice);
-		madvise_active = false;
-
-		if (madvise_wait) {
-			timeStop = rdtscp();
-
-			if (threadContention.find(tid, &tc)) {
-				tc->madvise_waits++;
-				tc->madvise_wait_cycles += (timeStop - timeStart);
-			}
-			else {
-				threadContention.insert(tid, newThreadContention(tid));
-				if (threadContention.find(tid, &tc)) {
-					tc->madvise_waits++;
-					tc->madvise_wait_cycles += (timeStop - timeStart);
-				}
-				else {
-					fprintf(stderr, "failed to insert tid into threadContention, mmap\n");
-					abort();
-				}
-			}
-		}
-		return result;
-	}
-
-	// SBRK
-	void *sbrk(intptr_t increment){
-		if (!realInitialized) RealX::initializer();
-		if(profilerInitialized != INITIALIZED) return RealX::sbrk(increment);
-
-		uint64_t timeStart = 0;
-		uint64_t timeStop = 0;
-		bool sbrk_wait = false;
-		ThreadContention* tc;
-		uint64_t tid = pthread_self();
-
-		if (sbrk_active.load()) {
-			sbrk_wait = true;
-			timeStart = rdtscp();
-		}
-
-		sbrk_active = true;
-		void *retptr = RealX::sbrk(increment);
-		sbrk_active = false;
-
-		if (sbrk_wait) {
-			timeStop = rdtscp();
-
-			if (threadContention.find(tid, &tc)) {
-				tc->sbrk_waits++;
-				tc->sbrk_wait_cycles += (timeStop - timeStart);
-			}
-			else {
-				threadContention.insert(tid, newThreadContention(tid));
-				if (threadContention.find(tid, &tc)) {
-					tc->sbrk_waits++;
-					tc->sbrk_wait_cycles += (timeStop - timeStart);
-				}
-				else {
-					fprintf(stderr, "failed to insert tid into threadContention, mmap\n");
-					abort();
-				}
-			}
-		}
-
-		uint64_t newProgramBreak = (uint64_t) RealX::sbrk(0);
-		uint64_t oldProgramBreak = (uint64_t) retptr;
-		uint64_t sizeChange = newProgramBreak - oldProgramBreak;
-
-		size_sbrk += sizeChange;
-		num_sbrk += 1;
-
-		return retptr;
-	}
-
-	// MPROTECT
-	int mprotect (void* addr, size_t len, int prot) {
-		if (!realInitialized) RealX::initializer();
-
-		if (d_mprotect)
-			printf ("mprotect/found= %s, addr= %p, len= %zu, prot= %d\n",
-					mappingEditor(addr, len, prot) ? "true" : "false", addr, len, prot);
-
-		return RealX::mprotect (addr, len, prot);
-	}
-
-	// MMAP
-	void * yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset) {
-
-		if (!realInitialized) RealX::initializer();
-
-		if (!mapsInitialized) return RealX::mmap (addr, length, prot, flags, fd, offset);
-
-		if (inMmap) return RealX::mmap (addr, length, prot, flags, fd, offset);
-
-		uint64_t timeStart = 0;
-		uint64_t timeStop = 0;
-		bool mmap_wait = false;
-
-		if (mmap_active.load()) {
-			timeStart = rdtscp();
-			mmap_wait = true;
-		}
-
-		ThreadContention* tc;
-		uint64_t tid = pthread_self();
-
-		//thread_local
-		inMmap = true;
-
-		//global atomic
-		mmap_active = true;
-		void* retval = RealX::mmap(addr, length, prot, flags, fd, offset);
-		mmap_active = false;
-
-		if (mmap_wait) {
-			timeStop = rdtscp();
-			if (threadContention.find(tid, &tc)) {
-				tc->mmap_waits++;
-				tc->mmap_wait_cycles += (timeStop - timeStart);
-			}
-			else {
-				threadContention.insert(tid, newThreadContention(tid));
-				if (threadContention.find(tid, &tc)) {
-					tc->mmap_waits++;
-					tc->mmap_wait_cycles += (timeStop - timeStart);
-				}
-				else {
-					fprintf(stderr, "failed to insert tid into threadContention, mmap\n");
-					abort();
-				}
-			}
-		}
-
-		uint64_t address = (uint64_t)retval;
-
-		//If this thread currently doing an allocation
-		if (inAllocation) {
-			if (d_mmap) printf ("mmap direct from allocation function: length= %zu, prot= %d\n", length, prot);
-			malloc_mmaps += 1;
-#ifdef MAPPINGS
-			mappings.insert(address, newMmapTuple(address, length, prot, 'a'));
-#endif
-		}
-
-		//Need to check if selfmap.getInstance().getTextRegions() has
-		//ran. If it hasn't, we can't call isAllocatorInCallStack()
-		else if (selfmapInitialized && isAllocatorInCallStack()) {
-			if (d_mmap) printf ("mmap allocator in callstack: length= %zu, prot= %d\n", length, prot);
-#ifdef MAPPINGS
-			mappings.insert(address, newMmapTuple(address, length, prot, 's'));
-#endif
-		}
-		else {
-#ifdef MAPPINGS
-			mappings.insert(address, newMmapTuple(address, length, prot, 'u'));
-#endif
-		}
-
-		if (!inRealMain || (inDeallocation || inAllocation ||
-					(selfmapInitialized && isAllocatorInCallStack()))) {
-			// Create a new shadow memory region associated with the new mapping
-			ShadowMemory * sm_node = (ShadowMemory *)myMalloc(sizeof(ShadowMemory));
-			sm_node->initialize((void *)address, length);
-			if(rb_insert(rb_tree, sm_node)) {
-				fprintf(stderr, "ERROR: mapping at address 0x%lx already in RB tree\n", address);
-				raise(SIGUSR2);
-			}
-		}
-
-		total_mmaps++;
-
-		inMmap = false;
-		return retval;
-	}
-
-	int yymunmap(void *addr, size_t length) {
-		int retval;
-
-		if (!realInitialized) RealX::initializer();
-
-		if (!mapsInitialized) return RealX::munmap (addr, length);
-
-		if((retval = RealX::munmap(addr, length)) == -1) {
-			perror("munmap failed");
-		}
-
-		// If this thread currently doing an allocation
-		if (!inRealMain || (inDeallocation || inAllocation ||
-					(selfmapInitialized && isAllocatorInCallStack()))) {
-			if (d_mmap) printf ("munmap from allocator: addr= %p, length= %zu\n", addr, length);
-			char buf[sizeof(ShadowMemory)];
-			ShadowMemory * anon_sm = new (buf) ShadowMemory(addr);
-			if(rb_delete(rb_tree, anon_sm) == NULL) {
-				fprintf(stderr, "> attempt to delete mapping %p from RB tree failed\n", addr);
-				abort();
-			}
-		}
-
-		return retval;
-	}
 }//End of extern "C"
 
 void * operator new (size_t sz) {
@@ -1184,15 +796,14 @@ void analyzeAllocation(allocation_metadata *metadata) {
 	getOverhead(metadata->size, metadata->address, metadata->classSize, &(metadata->reused));
 
 	//Analyze address usage
-	/* NOTE(Stefen): We are switching into the address usage for the shadow memory */
-#warning disabled call to getAddressUsage
+	#warning disabled call to getAddressUsage
 	//getAddressUsage(metadata->size, metadata->address, metadata->cycles);
 
 	//Update mmap region info
-#ifdef MAPPINGS
-#warning disabled call to getMappingsUsage
+	#ifdef MAPPINGS
+	#warning disabled call to getMappingsUsage
 	//getMappingsUsage(metadata->size, metadata->address, metadata->classSize);
-#endif
+	#endif
 
 	// Analyze perfinfo
 	analyzePerfInfo(metadata);
@@ -1218,9 +829,9 @@ size_t updateFreeCounters(uint64_t address) {
 			globalFreeArray[class_size_index]++;
 			if (d_updateCounters) printf ("globalFreeArray[%d]++\n", class_size_index);
 		}
-#ifdef BLOWUP_BY_BYTES
+		#ifdef BLOWUP_BY_BYTES
 		freed_bytes += size;
-#endif
+		#endif
 	}
 
 	else {freed_bytes += size;}
@@ -1313,9 +924,9 @@ void getBlowup (size_t size, size_t classSize, bool* reused) {
 			localFreeArray[class_size_index]--;
 			globalFreeArray[class_size_index]--;
 			if (d_getBlowup) printf ("I have free. globalFreeArray[%d]--\n", class_size_index);
-#ifdef BLOWUP_BY_BYTES
+			#ifdef BLOWUP_BY_BYTES
 			freed_bytes -= size;
-#endif
+			#endif
 			return;
 		}
 
@@ -1430,29 +1041,29 @@ Overhead* newOverhead () {
 allocation_metadata init_allocation(size_t sz, enum memAllocType type) {
 	PerfReadInfo empty;
 	allocation_metadata new_metadata = {
-reused : false,
-		 tid : gettid(),
-		 before : empty,
-		 after : empty,
-		 size : sz,
-		 classSize : getClassSizeFor(sz),
-		 cycles : 0,
-		 address : 0,
-		 tsc_before : 0,
-		 tsc_after : 0,
-		 type : type,
-		 tad : NULL
+		reused : false,
+		tid : gettid(),
+		before : empty,
+		after : empty,
+		size : sz,
+		classSize : getClassSizeFor(sz),
+		cycles : 0,
+		address : 0,
+		tsc_before : 0,
+		tsc_after : 0,
+		type : type,
+		tad : NULL
 	};
 	return new_metadata;
 }
 
 void* myMalloc (size_t size) {
 
-#ifdef USE_THREAD_LOCAL
+	#ifdef USE_THREAD_LOCAL
 	if (myLocalMemInitialized) {
 		return myLocalMalloc(size);
 	}
-#endif
+	#endif
 
 	myMemLock.lock ();
 	void* p;
@@ -1476,12 +1087,12 @@ void myFree (void* ptr) {
 
 	if (ptr == NULL) return;
 
-#ifdef USE_THREAD_LOCAL
+	#ifdef USE_THREAD_LOCAL
 	if (ptr >= myLocalMem && ptr <= myLocalMemEnd) {
 		myLocalFree(ptr);
 		return;
 	}
-#endif
+	#endif
 
 	myMemLock.lock();
 	if (ptr >= (void*)myMem && ptr <= myMemEnd) {
@@ -1514,16 +1125,12 @@ void globalizeTAD() {
 	globalTAD.numDeallocationTlbReadMisses += localTAD.numDeallocationTlbReadMisses;
 	globalTAD.numDeallocationTlbWriteMisses += localTAD.numDeallocationTlbWriteMisses;
 
-	globalTAD.threads += localTAD.threads;
-	globalTAD.num_pthread_mutex_locks += localTAD.num_pthread_mutex_locks;
-	globalTAD.num_trylock += localTAD.num_trylock;
 	globalTAD.total_time_wait += localTAD.total_time_wait;
 	globalTAD.blowup_bytes += localTAD.blowup_bytes;
 
 	globalTAD.num_sbrk += localTAD.num_sbrk;
 	globalTAD.num_madvise += localTAD.num_madvise;
 	globalTAD.malloc_mmaps += localTAD.malloc_mmaps;
-	globalTAD.total_mmaps += localTAD.total_mmaps;
 
 	globalTAD.size_sbrk += localTAD.size_sbrk;
 	globalTAD.blowup_allocations += localTAD.blowup_allocations;
@@ -1537,56 +1144,37 @@ void writeAllocData () {
 	if (d_trace) fprintf(stderr, "Entering writeAllocData()\n");
 
 	fprintf(thrData.output, ">>> malloc_mmaps             %u\n", malloc_mmaps);
-	fprintf(thrData.output, ">>> total_mmaps              %u\n", total_mmaps);
+	// fprintf(thrData.output, ">>> total_mmaps              %u\n", total_mmaps);
 	fprintf(thrData.output, ">>> malloc_mmap_threshold    %zu\n", malloc_mmap_threshold);
-	fprintf(thrData.output, ">>> threads                  %u\n", threads);
+	// fprintf(thrData.output, ">>> threads                  %u\n", threads);
 
-	fprintf(thrData.output, ">>> pthread_mutex_lock       %u\n", num_pthread_mutex_locks);
-	fprintf(thrData.output, ">>> num_trylock              %u\n", num_trylock);
+	// fprintf(thrData.output, ">>> pthread_mutex_lock       %u\n", num_pthread_mutex_locks);
+	// fprintf(thrData.output, ">>> num_trylock              %u\n", num_trylock);
 	fprintf(thrData.output, ">>> num_madvise              %u\n", num_madvise);
 	fprintf(thrData.output, ">>> num_sbrk                 %u\n", num_sbrk);
 	fprintf(thrData.output, ">>> size_sbrk                %u\n", size_sbrk);
 	fprintf(thrData.output, ">>> blowup_allocations       %u\n", blowup_allocations);
 	fprintf(thrData.output, ">>> total_blowup             %zu\n", total_blowup);
-#ifdef BLOWUP_BY_BYTES
-	fprintf(thrData.output, ">>> blowup_bytes             %zu\n", blowup_bytes);
-#endif
+	#ifdef BLOWUP_BY_BYTES
+	fprintf(thrData.output, ">>> blowup_bytes             %zu\n", blowup_bytes.load());
+	#endif
 	fprintf(thrData.output, ">>> alignment                %zu\n", alignment);
 	fprintf(thrData.output, ">>> metadata_object          %zu\n", metadata_object);
+	fprintf(thrData.output, ">>> metadata_overhead        %zu\n", metadata_overhead);
 	fprintf(thrData.output, ">>> totalSizeAlloc           %zu\n", totalSizeAlloc);
 	fprintf(thrData.output, ">>> totalMemOverhead         %zu\n", totalMemOverhead);
 	fprintf(thrData.output, ">>> memEfficiency            %.2f%%\n", memEfficiency);
 
 	writeOverhead();
 
-#ifdef MAPPINGS
+	#ifdef MAPPINGS
 	writeMappings();
-#endif
+	#endif
 
 	if (d_write_tad) writeThreadMaps();
 	writeThreadContention();
 
 	fflush (thrData.output);
-}
-
-void writeThreadContention() {
-
-	fprintf (thrData.output, "\n--------------------ThreadContention--------------------\n\n");
-
-	for (auto tc : threadContention) {
-		auto data = tc.getData();
-
-		fprintf (thrData.output, ">>> tid                  %lu\n", data->tid);
-		fprintf (thrData.output, ">>> mutex_waits          %lu\n", data->mutex_waits);
-		fprintf (thrData.output, ">>> mutex_wait_cycles    %lu\n", data->mutex_wait_cycles);
-		fprintf (thrData.output, ">>> mutex_trylock_fails  %lu\n", data->mutex_trylock_fails);
-		fprintf (thrData.output, ">>> mmap_waits           %lu\n", data->mmap_waits);
-		fprintf (thrData.output, ">>> mmap_wait_cycles     %lu\n", data->mmap_wait_cycles);
-		fprintf (thrData.output, ">>> sbrk_waits           %lu\n", data->sbrk_waits);
-		fprintf (thrData.output, ">>> sbrk_wait_cycles     %lu\n", data->sbrk_wait_cycles);
-		fprintf (thrData.output, ">>> madvise_waits        %lu\n", data->madvise_waits);
-		fprintf (thrData.output, ">>> madvise_wait_cycles  %lu\n\n", data->madvise_wait_cycles);
-	}
 }
 
 void writeThreadMaps () {
@@ -1730,39 +1318,39 @@ int num_used_pages(uintptr_t vstart, uintptr_t vend) {
 }
 
 inline bool isAllocatorInCallStack() {
-	// Fetch the frame address of the topmost stack frame
-	struct stack_frame * current_frame =
-		(struct stack_frame *)(__builtin_frame_address(0));
+        // Fetch the frame address of the topmost stack frame
+        struct stack_frame * current_frame =
+            (struct stack_frame *)(__builtin_frame_address(0));
 
-	// Initialize the prev_frame pointer to equal the current_frame. This
-	// simply ensures that the while loop below will be entered and
-	// executed and least once
-	struct stack_frame * prev_frame = current_frame;
+        // Initialize the prev_frame pointer to equal the current_frame. This
+        // simply ensures that the while loop below will be entered and
+        // executed and least once
+        struct stack_frame * prev_frame = current_frame;
 
-	void * stackEnd = thrData.stackEnd;
-	int allocatorLevel = -1;
-	int cur_depth = 0;
+        void * stackEnd = thrData.stackEnd;
+		int allocatorLevel = -1;
+        int cur_depth = 0;
 
-	while(((void *)prev_frame <= stackEnd) && (prev_frame >= current_frame) &&
-			(cur_depth < CALLSITE_MAXIMUM_LENGTH)) {
+        while(((void *)prev_frame <= stackEnd) && (prev_frame >= current_frame) &&
+				(cur_depth < CALLSITE_MAXIMUM_LENGTH)) {
 
-		void * caller_address = prev_frame->caller_address;
+			void * caller_address = prev_frame->caller_address;
 
-		if(selfmap::getInstance().isAllocator(caller_address))
-			allocatorLevel = cur_depth;
+			if(selfmap::getInstance().isAllocator(caller_address))
+				allocatorLevel = cur_depth;
 
-		//in some case, "prev" address is the same as current address
-		//or there is recursion
-		if(prev_frame == prev_frame->prev) {
-			cur_depth++;
-			break;
+            //in some case, "prev" address is the same as current address
+            //or there is recursion
+            if(prev_frame == prev_frame->prev) {
+				cur_depth++;
+                break;
+            }
+
+            // Walk the prev_frame pointer backward in preparation for the
+            // next iteration of the loop
+            prev_frame = prev_frame->prev;
+            cur_depth++;
 		}
-
-		// Walk the prev_frame pointer backward in preparation for the
-		// next iteration of the loop
-		prev_frame = prev_frame->prev;
-		cur_depth++;
-	}
 
 	if(allocatorLevel > 0)
 		return true;
@@ -1792,17 +1380,20 @@ bool mappingEditor (void* addr, size_t len, int prot) {
 #endif
 
 void updateShadowMemory(void * address, size_t size) {
-	char buf[sizeof(ShadowMemory)];
-	ShadowMemory * anon_sm = new (buf) ShadowMemory(address);
-	ShadowMemory * sm = (ShadowMemory *)rb_find(rb_tree, anon_sm);
-	//fprintf(stderr, "address=%p, size=%zu : buf = %p, anon_sm = %p, SM = %p\n",
-	//				address, size, &buf, anon_sm, sm);
-	if(sm && sm->contains(address)) {
-		sm->updateObject(address, size);
-	} else {
-		//fprintf(stderr, "WARNING: no shadow memory associated with object at address %p\n", address);
-		//raise(SIGUSR2);
-	}
+		ShadowMemory::updateObject(address, size);
+		/*
+		char buf[sizeof(ShadowMemory)];
+		ShadowMemory * anon_sm = new (buf) ShadowMemory(address);
+		ShadowMemory * sm = (ShadowMemory *)rb_find(rb_tree, anon_sm);
+		//fprintf(stderr, "address=%p, size=%zu : buf = %p, anon_sm = %p, SM = %p\n",
+		//				address, size, &buf, anon_sm, sm);
+		if(sm && sm->contains(address)) {
+				sm->updateObject(address, size);
+		} else {
+				//fprintf(stderr, "WARNING: no shadow memory associated with object at address %p\n", address);
+				//raise(SIGUSR2);
+		}
+		*/
 }
 
 void doBefore (allocation_metadata *metadata) {
@@ -1813,7 +1404,7 @@ void doBefore (allocation_metadata *metadata) {
 void doAfter (allocation_metadata *metadata) {
 	getPerfInfo(&(metadata->after));
 	metadata->tsc_after = rdtscp();
-	updateShadowMemory((void *)metadata->address, metadata->size);
+	ShadowMemory::updateObject((void *)metadata->address, metadata->size);
 }
 
 void collectAllocMetaData(allocation_metadata *metadata) {
@@ -1994,11 +1585,15 @@ void initMyLocalMem() {
 
 // Comparison function used by red-black tree (rb_param unused)
 int compare_ptr(const void *rb_a, const void *rb_b, void *rb_param) {
-	ShadowMemory * node_a = (ShadowMemory *)rb_a;
-	ShadowMemory * node_b = (ShadowMemory *)rb_b;
+		return -1;
 
-	//return node_b->compare(node_a);
-	return node_a->compare(node_b);
+		/*
+    ShadowMemory * node_a = (ShadowMemory *)rb_a;
+    ShadowMemory * node_b = (ShadowMemory *)rb_b;
+
+    //return node_b->compare(node_a);
+    return node_a->compare(node_b);
+		*/
 }
 
 void * myTreeMalloc(struct libavl_allocator * allocator, size_t size) {

@@ -52,6 +52,7 @@
 \setlength{\paperheight}{\pprh}
 \setlength{\pdfpagewidth}{\pprw}
 \setlength{\pdfpageheight}{\pprh}
+\def \theequation {\arabic{equation}}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Useful reviewing/feedback annotations
@@ -96,9 +97,9 @@
 
 \newcommand{\punt}[1]{}
 
-\newcommand{\MallocProfiler}{{\texttt{mmprof}}}
-\newcommand{\MP}{{\texttt{mmprof}}}
-\newcommand{\Heapperf}{{\texttt{mmprof}}}
+\newcommand{\MallocProfiler}{{\texttt{maprof}}}
+\newcommand{\MP}{{\texttt{maprof}}}
+\newcommand{\Heapperf}{{\texttt{maprof}}}
 \newcommand{\pthread}{\texttt{pthread}}
 \newcommand{\pthreads}{\texttt{pthreads}}
 \newcommand{\specialcell}[2][c]{%
@@ -124,7 +125,7 @@
 \setlength{\pdfpageheight}{\paperheight}
 \setlength{\pdfpagewidth}{\paperwidth}
 
-\title{mmprof: A General Profiler for Different Memory Allocators}
+\title{maprof: A General Profiler for Different Memory Allocators}
 
 \authorinfo{}
 %\date{}
