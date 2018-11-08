@@ -20,6 +20,8 @@
 #include "spinlock.hh"
 #include "xthreadx.hh"
 
+#include "recordfunctions.hh"
+
 //Globals
 bool bibop = false;
 bool bumpPointer = false;
@@ -155,7 +157,7 @@ HashMap <uint64_t, MmapTuple*, spinlock> mappings;
 HashMap <size_t, Overhead*, spinlock> overhead;
 
 //Hashmap of tid to ThreadContention*
-HashMap <uint64_t, ThreadContention*, spinlock> threadContention;
+//HashMap <uint64_t, ThreadContention*, spinlock> threadContention;
 
 struct rb_table * rb_tree;
 
@@ -237,7 +239,7 @@ __attribute__((constructor)) initStatus initializer() {
 	addressUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 	lockUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 128);
 	overhead.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
-	threadContention.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
+	//threadContention.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 	#ifdef MAPPINGS
 	mappings.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 	#endif
@@ -247,6 +249,8 @@ __attribute__((constructor)) initStatus initializer() {
 	thrData.tid = syscall(__NR_gettid);
 	thrData.stackStart = (char *)__builtin_frame_address(0);
 	thrData.stackEnd = (char *)__libc_stack_end;
+  
+  setThreadContention(); 
 
 	allocator_name = (char*) myMalloc(100);
 	selfmap::getInstance().getTextRegions();
@@ -347,8 +351,8 @@ void dumpHashmaps() {
 	fprintf(stderr, "lockUsage.printUtilization():\n");
 	lockUsage.printUtilization();
 
-	fprintf(stderr, "threadContention.printUtilization():\n");
-	threadContention.printUtilization();
+	//fprintf(stderr, "threadContention.printUtilization():\n");
+	//threadContention.printUtilization();
 
 	fprintf(stderr, "threadToCSM.printUtilization():\n");
 	threadToCSM.printUtilization();
@@ -782,7 +786,7 @@ extern "C" {
 		return usableSize;
 	}
 
-	// PTHREAD_CREATE
+  // PTHREAD_CREATE
 	int pthread_create(pthread_t * tid, const pthread_attr_t * attr,
 							 void *(*start_routine)(void *), void * arg) {
 		if (!realInitialized) RealX::initializer();
@@ -801,320 +805,6 @@ extern "C" {
 		return result;
 	}
 
-	// PTHREAD_MUTEX_LOCK
-	int pthread_mutex_lock(pthread_mutex_t *mutex) {
-		if (!realInitialized) RealX::initializer();
-
-		uint64_t tid = pthread_self();
-		uint64_t lockAddr = reinterpret_cast <uint64_t> (mutex);
-
-		ThreadContention* tc;
-
-		//Is this thread doing allocation
-		if (inAllocation) {
-
-			//Have we encountered this lock before?
-			LC* thisLock;
-			if (lockUsage.find (lockAddr, &thisLock)) {
-				thisLock->contention++;
-
-				if (thisLock->contention > thisLock->maxContention)
-					thisLock->maxContention = thisLock->contention;
-
-				if (thisLock->contention > 1) {
-					waiting = true;
-					timeAttempted = rdtscp();
-				}
-			}
-
-			//Add lock to lockUsage hashmap
-			else {
-				num_pthread_mutex_locks.fetch_add(1, relaxed);
-				lockUsage.insert(lockAddr, newLC());
-			}
-		}
-
-		//Aquire the lock
-		int result = RealX::pthread_mutex_lock (mutex);
-		if (waiting) {
-			timeWaiting += ((rdtscp()) - timeAttempted);
-			waiting = false;
-			if (threadContention.find(tid, &tc)) {
-				tc->mutex_waits++;
-				tc->mutex_wait_cycles += timeWaiting;
-			}
-			else {
-				threadContention.insert(tid, newThreadContention(tid));
-				if (threadContention.find(tid, &tc)) {
-					tc->mutex_waits++;
-					tc->mutex_wait_cycles += timeWaiting;
-				}
-				else {
-					fprintf(stderr, "failed to insert tid into threadContention, mutex\n");
-					abort();
-				}
-			}
-		}
-		return result;
-	}
-
-	// PTHREAD_MUTEX_TRYLOCK
-	int pthread_mutex_trylock (pthread_mutex_t *mutex) {
-		if (!realInitialized) RealX::initializer();
-
-		if (!mapsInitialized)
-			return RealX::pthread_mutex_trylock (mutex);
-
-		uint64_t lockAddr = reinterpret_cast <uint64_t> (mutex);
-		uint64_t tid = pthread_self();
-		ThreadContention* tc;
-
-		//Is this thread doing allocation
-		if (inAllocation) {
-
-			//Have we encountered this lock before?
-			LC* thisLock;
-			if (lockUsage.find (lockAddr, &thisLock)) {
-				thisLock->contention++;
-				if (thisLock->contention > thisLock->maxContention)
-					thisLock->maxContention = thisLock->contention;
-			}
-
-			//Add lock to lockUsage hashmap
-			else {
-				num_pthread_mutex_locks.fetch_add(1, relaxed);
-				LC* lc = newLC();
-				lockUsage.insert (lockAddr, lc);
-			}
-		}
-
-		//Try to aquire the lock
-		int result = RealX::pthread_mutex_trylock (mutex);
-		if (result != 0) {
-			num_trylock.fetch_add(1, relaxed);
-			if (threadContention.find(tid, &tc)) {
-				tc->mutex_trylock_fails++;
-			}
-			else {
-				threadContention.insert(tid, newThreadContention(tid));
-				if (threadContention.find(tid, &tc)) {
-					tc->mutex_trylock_fails++;
-				}
-				else {
-					fprintf(stderr, "failed to insert tid into threadContention, mutex_trylock\n");
-					abort();
-				}
-			}
-		}
-		return result;
-	}
-
-	// PTHREAD_MUTEX_UNLOCK
-	int pthread_mutex_unlock(pthread_mutex_t *mutex) {
-		if (!realInitialized) RealX::initializer();
-
-		if (!mapsInitialized)
-			return RealX::pthread_mutex_unlock (mutex);
-
-		if (inAllocation) {
-				uint64_t lockAddr = reinterpret_cast <uint64_t> (mutex);
-
-				//Decrement contention on this LC if this lock is
-				//in our map
-				LC* thisLock;
-				if (lockUsage.find (lockAddr, &thisLock)) {
-						thisLock->contention--;
-				}
-		}
-
-		return RealX::pthread_mutex_unlock (mutex);
-	}
-
-	// MADVISE
-	int madvise(void *addr, size_t length, int advice){
-		if (!realInitialized) RealX::initializer();
-
-		if (advice == MADV_DONTNEED)
-			num_dontneed.fetch_add(1, relaxed);
-
-		uint64_t timeStart = 0;
-		uint64_t timeStop = 0;
-		bool madvise_wait = false;
-		ThreadContention* tc;
-		uint64_t tid = pthread_self();
-
-		if (madvise_active.load()) {
-			madvise_wait = true;
-			timeStart = rdtscp();
-		}
-
-		madvise_active = true;
-		int result = RealX::madvise(addr, length, advice);
-		madvise_active = false;
-
-		if (madvise_wait) {
-			timeStop = rdtscp();
-
-			if (threadContention.find(tid, &tc)) {
-				tc->madvise_waits++;
-				tc->madvise_wait_cycles += (timeStop - timeStart);
-			}
-			else {
-				threadContention.insert(tid, newThreadContention(tid));
-				if (threadContention.find(tid, &tc)) {
-					tc->madvise_waits++;
-					tc->madvise_wait_cycles += (timeStop - timeStart);
-				}
-				else {
-					fprintf(stderr, "failed to insert tid into threadContention, mmap\n");
-					abort();
-				}
-			}
-		}
-		return result;
-	}
-
-	// SBRK
-    void *sbrk(intptr_t increment){
-		if (!realInitialized) RealX::initializer();
-        if(profilerInitialized != INITIALIZED) return RealX::sbrk(increment);
-
-		uint64_t timeStart = 0;
-		uint64_t timeStop = 0;
-		bool sbrk_wait = false;
-		ThreadContention* tc;
-		uint64_t tid = pthread_self();
-
-		if (sbrk_active.load()) {
-			sbrk_wait = true;
-			timeStart = rdtscp();
-		}
-
-		sbrk_active = true;
-        void *retptr = RealX::sbrk(increment);
-		sbrk_active = false;
-
-		if (sbrk_wait) {
-			timeStop = rdtscp();
-
-			if (threadContention.find(tid, &tc)) {
-				tc->sbrk_waits++;
-				tc->sbrk_wait_cycles += (timeStop - timeStart);
-			}
-			else {
-				threadContention.insert(tid, newThreadContention(tid));
-				if (threadContention.find(tid, &tc)) {
-					tc->sbrk_waits++;
-					tc->sbrk_wait_cycles += (timeStop - timeStart);
-				}
-				else {
-					fprintf(stderr, "failed to insert tid into threadContention, mmap\n");
-					abort();
-				}
-			}
-		}
-
-        uint64_t newProgramBreak = (uint64_t) RealX::sbrk(0);
-        uint64_t oldProgramBreak = (uint64_t) retptr;
-        uint64_t sizeChange = newProgramBreak - oldProgramBreak;
-
-        size_sbrk.fetch_add(sizeChange, relaxed);
-        num_sbrk.fetch_add(1, relaxed);
-
-        return retptr;
-    }
-
-	// MPROTECT
-	int mprotect (void* addr, size_t len, int prot) {
-		if (!realInitialized) RealX::initializer();
-
-		num_mprotect.fetch_add(1, relaxed);
-		if (d_mprotect)
-			printf ("mprotect/found= %s, addr= %p, len= %zu, prot= %d\n",
-		mappingEditor(addr, len, prot) ? "true" : "false", addr, len, prot);
-
-		return RealX::mprotect (addr, len, prot);
-	}
-
-	// MMAP
-	void * yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset) {
-
-			if (!realInitialized) RealX::initializer();
-
-			if (!mapsInitialized) return RealX::mmap (addr, length, prot, flags, fd, offset);
-
-			if (inMmap) return RealX::mmap (addr, length, prot, flags, fd, offset);
-
-			uint64_t timeStart = 0;
-			uint64_t timeStop = 0;
-			bool mmap_wait = false;
-
-			if (mmap_active.load()) {
-					timeStart = rdtscp();
-					mmap_wait = true;
-			}
-
-			ThreadContention* tc;
-			uint64_t tid = pthread_self();
-
-			//thread_local
-			inMmap = true;
-
-			//global atomic
-			mmap_active = true;
-			void* retval = RealX::mmap(addr, length, prot, flags, fd, offset);
-			mmap_active = false;
-
-			if (mmap_wait) {
-					timeStop = rdtscp();
-					if (threadContention.find(tid, &tc)) {
-							tc->mmap_waits++;
-							tc->mmap_wait_cycles += (timeStop - timeStart);
-					}
-					else {
-							threadContention.insert(tid, newThreadContention(tid));
-							if (threadContention.find(tid, &tc)) {
-									tc->mmap_waits++;
-									tc->mmap_wait_cycles += (timeStop - timeStart);
-							}
-							else {
-									fprintf(stderr, "failed to insert tid into threadContention, mmap\n");
-									abort();
-							}
-					}
-			}
-
-			uint64_t address = (uint64_t)retval;
-
-			//If this thread currently doing an allocation
-			if (inAllocation) {
-					if (d_mmap) printf ("mmap direct from allocation function: length= %zu, prot= %d\n", length, prot);
-					malloc_mmaps.fetch_add (1, relaxed);
-					#ifdef MAPPINGS
-					mappings.insert(address, newMmapTuple(address, length, prot, 'a'));
-					#endif
-			}
-
-			//Need to check if selfmap.getInstance().getTextRegions() has
-			//ran. If it hasn't, we can't call isAllocatorInCallStack()
-			else if (selfmapInitialized && isAllocatorInCallStack()) {
-					if (d_mmap) printf ("mmap allocator in callstack: length= %zu, prot= %d\n", length, prot);
-					#ifdef MAPPINGS
-					mappings.insert(address, newMmapTuple(address, length, prot, 's'));
-					#endif
-			}
-			else {
-					if (d_mmap) printf ("mmap from unknown source: length= %zu, prot= %d\n", length, prot);
-					#ifdef MAPPINGS
-					mappings.insert(address, newMmapTuple(address, length, prot, 'u'));
-					#endif
-			}
-
-		total_mmaps++;
-
-		inMmap = false;
-		return retval;
-	}
 }//End of extern "C"
 
 void * operator new (size_t sz) {
@@ -1654,26 +1344,6 @@ void writeAllocData () {
 	writeThreadContention();
 
 	fflush (thrData.output);
-}
-
-void writeThreadContention() {
-
-	fprintf (thrData.output, "\n--------------------ThreadContention--------------------\n\n");
-
-	for (auto tc : threadContention) {
-		auto data = tc.getData();
-
-		fprintf (thrData.output, ">>> tid                  %lu\n", data->tid);
-		fprintf (thrData.output, ">>> mutex_waits          %lu\n", data->mutex_waits);
-		fprintf (thrData.output, ">>> mutex_wait_cycles    %lu\n", data->mutex_wait_cycles);
-		fprintf (thrData.output, ">>> mutex_trylock_fails  %lu\n", data->mutex_trylock_fails);
-		fprintf (thrData.output, ">>> mmap_waits           %lu\n", data->mmap_waits);
-		fprintf (thrData.output, ">>> mmap_wait_cycles     %lu\n", data->mmap_wait_cycles);
-		fprintf (thrData.output, ">>> sbrk_waits           %lu\n", data->sbrk_waits);
-		fprintf (thrData.output, ">>> sbrk_wait_cycles     %lu\n", data->sbrk_wait_cycles);
-		fprintf (thrData.output, ">>> madvise_waits        %lu\n", data->madvise_waits);
-		fprintf (thrData.output, ">>> madvise_wait_cycles  %lu\n\n", data->madvise_wait_cycles);
-	}
 }
 
 void writeThreadMaps () {
