@@ -53,7 +53,11 @@ If allocation and deallocation takes too much time, it could be caused by multip
 
 \subsubsection{Memory Overhead}
 
-Based on our understanding, the memory overhead comes from three aspects: the metadata overhead, the alignment (or internal fragmentation), and the memory blowup. The metadata overhead indicates the physical space used for tracking objects or others. As described in Section~\ref{sec:allocator}, the alignment overhead is introduced due to the difference between the requested size and size class (or mapped pages). The memory blowup can be caused due to two reasons. First, a concurrent allocator does not satisfy the request immediately with freed objects. Second, some allocators, especially secure allocators, typically skip some objects. For the memory overhead, \MP{} aims to determine the ratio of each portion, so that it could guide allocator developers to further reduce the memory overhead based on the profiling results. 
+Based on our understanding, the memory overhead comes from two aspects: the metadata overhead, and the memory inflation. The metadata overhead indicates the physical space used for tracking objects or others. Memory inflation indicates that the actual memory consumption is increased unnecessarily due to some inherent design of a memory allocator. 
+
+Based on our understanding, multiple reasons may contribute to the memory inflation.  Firstly, internal fragmentation, or the alignment overhead, may contribute this. As described before, typically allocators manage heap objects using size classes, in order to enable  memory re-utilization without coalescing or splitting. The difference between the requested size and size class (or mapped pages) is called as alignment overhead or internal fragmentation. Secondly, the memory blowup can contribute this issue as well, where an allocator does not satisfy the request immediately with freed objects. As described in , different per-processor heap will maintain their to reduce the conflict.   
+
+Third, some allocators, especially secure allocators, typically skip some objects. For the memory overhead, \MP{} aims to determine the ratio of each portion, so that it could guide allocator developers to further reduce the memory overhead based on the profiling results. 
 
 
 It is relatively easy to compute the alignment overhead, as far as the information of size classes is known, which \MP{} utilizes a pre-run program to obtain (as described in Section~\ref{sec:understandingallocators}). \MP{} tracks each memory allocation, and then computes the alignment overhead for each allocation request. \todo{Of course, upon the deallocation, the corresponding alignment overhead will be extracted from the current overhead. But how we could know the actual alignment overhead for each object? It seems that we should store the information of such objects, or we could recompute due to the last object. }
@@ -81,6 +85,9 @@ For memory overhead, programmers only care about the time with the maximum overh
 
 \subsubsection{Scalability Analysis} 
 
+\MP{} profiles the scalability issues of allocators as well. Since the contention is the major reason that could significantly affect the scalability of applications, \MP{} focuses on both user-space contention and kernel-space contention. 
+
+As we all know, memory allocators may invoke multiple system calls inside allocation and deallocation. 
 User space contention:
 How many separate locks are explicitly utilized? 
 How many lock acquisitions? How much time are spending on lock waiting for each thread, and in total?
