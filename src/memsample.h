@@ -85,55 +85,52 @@ typedef struct {
 } perf_info;
 
 typedef struct {            //struct for holding data about allocations
-    uint64_t numMallocs;     //includes data from PMU and counts for types of alloc calls
-    uint64_t numReallocs;    //FFL = from free list, data for allocations that came from freed objects
-    uint64_t numCallocs;
-    uint64_t numFrees;
-    uint64_t numMallocsFFL;
-    uint64_t numReallocsFFL;
-    uint64_t numCallocsFFL;
-    uint64_t numMallocFaults;
-    uint64_t numReallocFaults;
-    uint64_t numCallocFaults;
-    uint64_t numFreeFaults;
-    uint64_t numMallocTlbReadMisses;
-    uint64_t numMallocTlbWriteMisses;
-    uint64_t numReallocTlbReadMisses;
-    uint64_t numReallocTlbWriteMisses;
-    uint64_t numCallocTlbReadMisses;
-    uint64_t numCallocTlbWriteMisses;
-    uint64_t numFreeTlbReadMisses;
-    uint64_t numFreeTlbWriteMisses;
-    uint64_t numMallocCacheMisses;
-    uint64_t numReallocCacheMisses;
-    uint64_t numCallocCacheMisses;
-    uint64_t numFreeCacheMisses;
-    uint64_t numMallocCacheRefs;
-    uint64_t numReallocCacheRefs;
-    uint64_t numCallocCacheRefs;
-    uint64_t numFreeCacheRefs;
-    uint64_t numMallocInstrs;
-    uint64_t numReallocInstrs;
-    uint64_t numCallocInstrs;
-    uint64_t numFreeInstrs;
-    uint64_t numMallocFaultsFFL;
-    uint64_t numReallocFaultsFFL;
-    uint64_t numCallocFaultsFFL;
-    uint64_t numMallocTlbReadMissesFFL;
-    uint64_t numMallocTlbWriteMissesFFL;
-    uint64_t numReallocTlbReadMissesFFL;
-    uint64_t numReallocTlbWriteMissesFFL;
-    uint64_t numCallocTlbReadMissesFFL;
-    uint64_t numCallocTlbWriteMissesFFL;
-    uint64_t numMallocCacheMissesFFL;
-    uint64_t numReallocCacheMissesFFL;
-    uint64_t numCallocCacheMissesFFL;
-    uint64_t numMallocCacheRefsFFL;
-    uint64_t numReallocCacheRefsFFL;
-    uint64_t numCallocCacheRefsFFL;
-    uint64_t numMallocInstrsFFL;
-    uint64_t numReallocInstrsFFL;
-    uint64_t numCallocInstrsFFL;
+
+    uint64_t numAllocationFaults;
+    uint64_t numDeallocationFaults;
+
+    uint64_t numAllocationTlbReadMisses;
+    uint64_t numAllocationTlbWriteMisses;
+
+    uint64_t numDeallocationTlbReadMisses;
+    uint64_t numDeallocationTlbWriteMisses;
+
+    uint64_t numAllocationCacheMisses;
+    uint64_t numDeallocationCacheMisses;
+
+    uint64_t numAllocationCacheRefs;
+    uint64_t numDeallocationCacheRefs;
+
+    uint64_t numAllocationInstrs;
+    uint64_t numDeallocationInstrs;
+
+    uint64_t numAllocationFaultsFFL;
+
+    uint64_t numAllocationTlbReadMissesFFL;
+    uint64_t numAllocationTlbWriteMissesFFL;
+
+    uint64_t numAllocationCacheMissesFFL;
+    uint64_t numAllocationCacheRefsFFL;
+    uint64_t numAllocationInstrsFFL;
+
+	uint threads;
+	uint num_pthread_mutex_locks;
+	uint num_trylock;
+	uint64_t total_time_wait;
+	size_t blowup_bytes;
+
+	uint num_sbrk;
+	uint num_madvise;
+	uint malloc_mmaps;
+	uint total_mmaps;
+
+	uint size_sbrk;
+	uint blowup_allocations;
+
+	uint64_t cycles_free;
+	uint64_t cycles_new;
+	uint64_t cycles_reused;
+
 } thread_alloc_data;
 
 int initSampling(void);

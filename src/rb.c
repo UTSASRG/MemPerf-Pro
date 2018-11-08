@@ -24,10 +24,13 @@
 */
 
 #include <assert.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "rb.h"
+
+pthread_rwlock_t rwlock = PTHREAD_RWLOCK_INITIALIZER;
 
 /* Creates and returns a new table
    with comparison function |compare| using parameter |param|
@@ -55,6 +58,8 @@ rb_create (rb_comparison_func *compare, void *param,
   tree->rb_count = 0;
   tree->rb_generation = 0;
 
+  pthread_rwlock_init(&rwlock, NULL);
+
   return tree;
 }
 
@@ -63,6 +68,7 @@ rb_create (rb_comparison_func *compare, void *param,
 void *
 rb_find (const struct rb_table *tree, const void *item)
 {
+  pthread_rwlock_rdlock(&rwlock);
   const struct rb_node *p;
   const struct rb_node *prev = NULL;
 
@@ -80,17 +86,20 @@ rb_find (const struct rb_table *tree, const void *item)
 				//fprintf(stderr, "%s %d : saving closest match so far prev = %p (sm = %p)\n", __FUNCTION__, __LINE__, prev, prev->rb_data);
       } else /* |cmp == 0| */ {
 				//fprintf(stderr, "%s %d : returning exact match %p\n", __FUNCTION__, __LINE__, p->rb_data);
+        pthread_rwlock_unlock(&rwlock);
         return p->rb_data;
-			}
+      }
     }
 
 	// Modification to work as a poor man's interval tree for use in MallocProf -- SAS 10/23/18
 	if(!p && prev) {
 		//fprintf(stderr, "%s %d : returning closest match %p\n", __FUNCTION__, __LINE__, prev->rb_data);
+        pthread_rwlock_unlock(&rwlock);
 		return prev->rb_data;
 	}
 
 	//fprintf(stderr, "%s %d : returning NULL\n", __FUNCTION__, __LINE__);
+  pthread_rwlock_unlock(&rwlock);
   return NULL;
 }
 
@@ -218,7 +227,9 @@ rb_probe (struct rb_table *tree, void *item)
 void *
 rb_insert (struct rb_table *table, void *item)
 {
+  pthread_rwlock_wrlock(&rwlock);
   void **p = rb_probe (table, item);
+  pthread_rwlock_unlock(&rwlock);
   return p == NULL || *p == item ? NULL : *p;
 }
 
@@ -245,6 +256,7 @@ rb_replace (struct rb_table *table, void *item)
 void *
 rb_delete (struct rb_table *tree, const void *item)
 {
+  pthread_rwlock_wrlock(&rwlock);
   struct rb_node *pa[RB_MAX_HEIGHT]; /* Nodes on stack. */
   unsigned char da[RB_MAX_HEIGHT];   /* Directions moved from stack nodes. */
   int k;                             /* Stack height. */
@@ -265,8 +277,10 @@ rb_delete (struct rb_table *tree, const void *item)
       da[k++] = dir;
 
       p = p->rb_link[dir];
-      if (p == NULL)
+      if (p == NULL) {
+        pthread_rwlock_unlock(&rwlock);
         return NULL;
+      }
     }
   item = p->rb_data;
 
@@ -437,6 +451,7 @@ rb_delete (struct rb_table *tree, const void *item)
   tree->rb_alloc->libavl_free (tree->rb_alloc, p);
   tree->rb_count--;
   tree->rb_generation++;
+  pthread_rwlock_unlock(&rwlock);
   return (void *) item;
 }
 

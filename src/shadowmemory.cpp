@@ -136,7 +136,6 @@ int ShadowMemory::compare(ShadowMemory * other) {
 		uintptr_t other_begin = (uintptr_t)other->getMappingBegin();
 
 		//fprintf(stderr, "%s %d : my_begin = 0x%lx, other_begin = 0x%lx\n", __FUNCTION__, __LINE__, my_begin, other_begin);
-
 		if(my_begin == other_begin) {
 				return 0;
 		} else if(my_begin < other_begin) {

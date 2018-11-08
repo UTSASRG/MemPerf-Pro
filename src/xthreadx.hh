@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 
+#include "libmallocprof.h"
 #include "memsample.h"
 #include "real.hh"
 
@@ -107,6 +108,8 @@ class xthreadx {
 		if(thrData.output) {
 			fclose(thrData.output);
 		}
+
+		globalizeTAD();
 
 		close(perfInfo.perf_fd_fault);
 		close(perfInfo.perf_fd_tlb_reads);

@@ -147,7 +147,7 @@ void getMappingsUsage(size_t size, uint64_t address, size_t classSize);
 void getMetadata(size_t classSize);
 void getOverhead(size_t size, uint64_t address, size_t classSize, bool*);
 void getPerfInfo(PerfReadInfo*);
-void globalizeThreadAllocData();
+void globalizeTAD();
 void myFree (void* ptr);
 void* myMalloc (size_t size);
 void readAllocatorFile();
