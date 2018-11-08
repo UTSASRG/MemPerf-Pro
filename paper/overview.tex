@@ -87,6 +87,18 @@ For memory overhead, programmers only care about the time with the maximum overh
 
 \MP{} profiles the scalability issues of allocators as well. Since the contention is the major reason that could significantly affect the scalability of applications, \MP{} focuses on both user-space contention and kernel-space contention. 
 
+\subsubsection{User Space Contention}
+For user-space contention, \MP{} obtains the number of lock acquisitions, the average time for each lock acquisition, and the average time spending under the protection of locks. After that, \MP{} could divide the number of the lock acquisitions by the number of allocations, in order to find out whether the allocator substantially acquires the lock or not. Based on our knowledge, some allocators prevents the lock as much as possible, which possibly achieves better scalability. 
+
+The average time for each lock acquisition can be employed to confirm the lock contention inside. \MP{} obtains the average acquisition time for locks without the contention at first. Then it could show whether the lock contention of an allocator is significant high or not.
+
+At the same time, \MP{} also acquires the time within the critical section. This could help expose whether the lock contention is due to the heavy workload inside the critical section or not. This may require the programmers to take two different actions. For instance, if the contention is high, but the average time inside the critical section is low, then this allocator should possibly distribute its management to multiple threads. In contrast, if the average time inside the critical section is high, then the allocator should possibly move some computation out of the critical section. 
+
+\subsubsection{Kernel Contention}
+\MP{} plans to evaluate the kernel contention caused by the allocators. \MP{} does not require to change the kernel directly achieve this target. Instead, \MP{} monitors the duration time of memory-related system calls, such as \texttt{mmap}, \texttt{munmap}, \texttt{madvise}, \texttt{sbrk}, \texttt{madvise}, or \texttt{mremap}. By examining the source code of the Linux kernel, they will acquire a process-based lock (e.g. ) upon the entry of these system calls, causing the kernel-level contention.   
+
+  
+   the information can be utilized to tell whether an allocator has significant  
 As we all know, memory allocators may invoke multiple system calls inside allocation and deallocation. 
 User space contention:
 How many separate locks are explicitly utilized? 
