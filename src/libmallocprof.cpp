@@ -1004,6 +1004,10 @@ void getBlowup (size_t size, size_t classSize, bool* reused) {
 //Return the appropriate class size that this object should be in
 size_t getClassSizeFor (size_t size) {
 
+	if(size > malloc_mmap_threshold) {
+			return size;
+	}
+
 	size_t sizeToReturn = 0;
 	if (bibop) {
 		if (num_class_sizes == 0) {
