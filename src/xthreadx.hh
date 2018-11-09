@@ -100,10 +100,6 @@ class xthreadx {
 		doPerfRead();
 		#endif
 
-		#ifdef USE_THREAD_LOCAL
-		fprintf (stderr, "Thread %lu myLocalPosition= %zu\n", myThreadID, myLocalPosition);
-		#endif
-
 		if(thrData.output) {
 			fclose(thrData.output);
 		}

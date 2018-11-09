@@ -48,7 +48,7 @@ prerun-freeguard: libmallochelp.so $(RUNFILE)
 	$(CXX) $(CFLAGS) -rdynamic $(LIBRARY) -rdynamic $(FREEGUARD) $(RUNFILE) -o prerun-freeguard
 
 prerun-tcmalloc: libmallochelp.so $(RUNFILE)
-	$(CXX) $(CFLAGS) -rdynamic $(LIBRARY) -ltcmalloc $(RUNFILE) -o prerun-tcmalloc
+	$(CXX) $(CFLAGS) -rdynamic $(LIBRARY) -ltcmalloc $(RUNFILE) -o prerun-tcmalloc -lpthread
 
 prerun-jemalloc: libmallochelp.so $(RUNFILE)
 	$(CXX) $(CFLAGS) -rdynamic $(LIBRARY) -ljemalloc $(RUNFILE) -o prerun-jemalloc

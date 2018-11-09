@@ -9,6 +9,7 @@
 void* thread_start (void*);
 int numThreads = 0;
 int numMallocs = 0;
+int totalJoins = 0;
 
 int main(int argc, char* argv[]) {
 
@@ -41,13 +42,14 @@ int main(int argc, char* argv[]) {
 	for (int i = 0; i < numThreads; i++) {
 
 		join = pthread_join (threads[i], &result);
+		totalJoins++;
 
-		if (join != 0) {
-
+		if (join != 0) { 
 			fprintf (stderr, "Error joining thread.\n");
 			abort ();
 		}
-		fprintf(stderr, "Thread %d has joined\n", i);
+//		fprintf(stderr, "Thread %d has joined\n", i);
+//		fprintf(stderr, "totalJoins = %d\n", totalJoins);
 	}
 
 	return EXIT_SUCCESS;
@@ -55,7 +57,6 @@ int main(int argc, char* argv[]) {
 
 void* thread_start (void* arg) {
 
-	int myThreadID = *((int*)arg);
 	size_t size;
 	void* pointer[numMallocs];
 	
@@ -68,6 +69,6 @@ void* thread_start (void* arg) {
 		free (pointer[i]);
 	}
 
-	fprintf(stderr, "Thread %d: I have finished my routine!\n", myThreadID);
+//	fprintf(stderr, "Thread %d: I have finished my routine!\n", *((int*)arg));
 	return nullptr;
 }

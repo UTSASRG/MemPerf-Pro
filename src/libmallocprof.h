@@ -130,6 +130,19 @@ typedef struct  {
 	thread_alloc_data *tad;
 } allocation_metadata;
 
+typedef struct {
+	void* start;
+	void* end;
+	unsigned kb;
+} SMapEntry;
+
+typedef struct {
+	uint64_t kb;
+	uint64_t alignment;
+	uint64_t blowup;
+	float efficiency;
+} OverheadSample;
+
 // Functions 
 bool mappingEditor (void* addr, size_t len, int prot);
 inline bool isAllocatorInCallStack();
@@ -141,7 +154,7 @@ void calculateMemOverhead ();
 void doBefore(allocation_metadata *metadata);
 void doAfter(allocation_metadata *metadata);
 void getAddressUsage(size_t size, uint64_t address, uint64_t cycles);
-void getAlignment(size_t size, size_t classSize);
+void getAlignment(size_t, size_t);
 void getBlowup(size_t size, size_t classSize, bool*);
 void getMappingsUsage(size_t size, uint64_t address, size_t classSize);
 void getMetadata(size_t classSize);
@@ -176,5 +189,8 @@ void initGlobalCSM();
 void * myTreeMalloc(struct libavl_allocator * allocator, size_t size);
 void myTreeFree(struct libavl_allocator * allocator, void * block);
 int compare_ptr(const void *rb_a, const void *rb_b, void *rb_param);
+SMapEntry* newSMapEntry();
+void start_smaps();
+void sampleMemoryOverhead(int, siginfo_t*, void*);
 
 #endif /* end of include guard: __LIBMALLOCPROF_H__ */

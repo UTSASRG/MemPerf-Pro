@@ -11,6 +11,7 @@
 #include <fcntl.h> //fopen flags
 #include <stdio.h> //print, getline
 #include <signal.h>
+#include <time.h>
 #include "hashmap.hh"
 #include "hashfuncs.hh"
 #include "libmallocprof.h"
@@ -33,6 +34,7 @@ std::atomic<bool> creatingThread (false);
 bool inConstructor = false;
 char* allocator_name;
 char* allocatorFileName;
+char smaps_fileName[30];
 extern char data_start;
 extern char _etext;
 extern char * program_invocation_name;
@@ -51,6 +53,26 @@ size_t totalSizeFree = 0;
 size_t totalSizeDiff = 0;
 size_t totalMemOverhead = 0;
 uint64_t min_pos_callsite_id;
+
+//Smaps Sampling-------------//
+void setupSignalHandler();
+void startSignalTimer();
+size_t smaps_bufferSize = 1024;
+FILE* smaps_infile = nullptr;
+char* smaps_buffer;
+OverheadSample worstCaseOverhead;
+OverheadSample currentCaseOverhead;
+SMapEntry* smapsDontCheck[100];
+short smapsDontCheckIndex = 0;
+short smapsDontCheckNumEntries = 0;
+timer_t smap_timer;
+uint64_t samples = 0;
+uint64_t sampleCycles = 0;
+struct itimerspec stopTimer;
+struct itimerspec resumeTimer;
+unsigned timer_nsec = 200000000;
+unsigned timer_sec = 0;
+//Smaps Sampling-------------//
 
 //Array of class sizes
 int num_class_sizes;
@@ -93,8 +115,6 @@ std::atomic_uint num_sbrk (0);
 std::atomic_uint size_sbrk (0);
 std::atomic_uint malloc_mmaps (0);
 std::atomic_uint total_mmaps (0);
-std::atomic_uint threads (0);
-std::atomic_uint blowup_allocations (0);
 std::atomic_uint num_mprotect (0);
 std::atomic_uint num_actual_malloc (0);
 std::atomic<std::uint64_t> cycles_free (0);
@@ -104,6 +124,7 @@ std::atomic<std::uint64_t> total_time_wait (0);
 std::atomic<std::size_t> totalMemAllocated (0);
 std::atomic<std::size_t> freed_bytes (0);
 std::atomic<std::size_t> blowup_bytes (0);
+std::atomic<std::size_t> alignment_bytes (0);
 std::atomic<unsigned>* globalFreeArray = nullptr;
 
 //Thread local variables THREAD_LOCAL
@@ -119,13 +140,11 @@ thread_local unsigned* localFreeArray = nullptr;
 thread_local bool localFreeArrayInitialized = false;
 thread_local uint64_t myThreadID;
 
-#ifdef USE_THREAD_LOCAL
 thread_local void* myLocalMem;
 thread_local void* myLocalMemEnd;
 thread_local uint64_t myLocalPosition;
 thread_local uint64_t myLocalAllocations;
 thread_local bool myLocalMemInitialized = false;
-#endif
 
 // Pre-init private allocator memory
 char myMem[TEMP_MEM_SIZE];
@@ -148,10 +167,8 @@ HashMap <uint64_t, ObjectTuple*, spinlock> addressUsage;
 //Hashmap of lock addr to LC
 HashMap <uint64_t, LC*, spinlock> lockUsage;
 
-#ifdef MAPPINGS
 //Hashmap of mmap addrs to tuple:
 HashMap <uint64_t, MmapTuple*, spinlock> mappings;
-#endif
 
 //Hashmap of Overhead objects
 HashMap <size_t, Overhead*, spinlock> overhead;
@@ -163,13 +180,6 @@ struct rb_table * rb_tree;
 
 //Spinlocks
 spinlock temp_mem_lock;
-
-//Functions
-//Freelist* getFreelist (size_t size);
-size_t updateFreeCounters(uint64_t address);
-short getSizeIndex(size_t size);
-void initGlobalFreeArray();
-void initLocalFreeArray();
 
 // pre-init private allocator memory
 char myBuffer[TEMP_MEM_SIZE];
@@ -242,9 +252,7 @@ __attribute__((constructor)) initStatus initializer() {
 	lockUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 128);
 	overhead.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 	threadContention.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
-	#ifdef MAPPINGS
 	mappings.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
-	#endif
 	mapsInitialized = true;
 
 	void * program_break = RealX::sbrk(0);
@@ -271,6 +279,7 @@ __attribute__((constructor)) initStatus initializer() {
 	readAllocatorFile();
 
 	initGlobalFreeArray();
+	initLocalFreeArray();
 
 	// Generate the name of our output file, then open it for writing.
 	char outputFile[MAX_FILENAME_LEN];
@@ -312,28 +321,29 @@ __attribute__((constructor)) initStatus initializer() {
 		overhead.insert(BP_OVERHEAD, newOverhead());
 	}
 
-	if (d_checkSizes) {
-		size_t sizeOT = sizeof(ObjectTuple);
-		size_t sizeMT = sizeof(MmapTuple);
-		size_t sizeTC = sizeof(ThreadContention);
-		size_t sizeLC = sizeof(LC);
-		size_t sizeOH = sizeof(Overhead);
-		size_t sizeTAD = sizeof(thread_alloc_data);
-		size_t sizeCSM = sizeof(Class_Size_TAD);
-		fprintf (stderr, "sizeof(ObjectTuple) is %zu\n", sizeOT);
-		fprintf (stderr, "sizeof(MmapTuple) is %zu\n", sizeMT);
-		fprintf (stderr, "sizeof(ThreadContention) is %zu\n", sizeTC);
-		fprintf (stderr, "sizeof(LC) is %zu\n", sizeLC);
-		fprintf (stderr, "sizeof(Overhead) is %zu\n", sizeOH);
-		fprintf (stderr, "sizeof(thread_alloc_data) is %zu\n", sizeTAD);
-		fprintf (stderr, "sizeof(Class_Size_TAD) is %zu\n", sizeCSM);
-	}
-
 	profilerInitialized = INITIALIZED;
 	if (d_myMemUsage) {
 		printMyMemUtilization();
 		fprintf(stderr, "Leaving constructor..\n\n");
 	}
+
+	smaps_buffer = (char*) myMalloc(smaps_bufferSize);
+	sprintf(smaps_fileName, "/proc/%d/smaps", pid);
+	start_smaps();
+
+	resumeTimer.it_value.tv_sec = timer_sec;
+	resumeTimer.it_value.tv_nsec = timer_nsec;
+	resumeTimer.it_interval.tv_sec = timer_sec;
+	resumeTimer.it_interval.tv_nsec = timer_nsec;
+
+	stopTimer.it_value.tv_sec = 0;
+	stopTimer.it_value.tv_nsec = 0;
+	stopTimer.it_interval.tv_sec = 0;
+	stopTimer.it_interval.tv_nsec = 0;
+	
+	setupSignalHandler();
+	startSignalTimer();
+
 	inConstructor = false;
 	return profilerInitialized;
 }
@@ -368,13 +378,28 @@ void printMyMemUtilization () {
 }
 
 void exitHandler() {
-	if (d_myMemUsage) fprintf(stderr, "\nEntering exitHandler\n");
+	fprintf(stderr, "\nEntering exitHandler\n");
 
+	getchar();
 	inRealMain = false;
 	#ifndef NO_PMU
 	doPerfRead();
 	#endif
-	calculateMemOverhead();
+
+	struct itimerspec its;
+	its.it_value.tv_sec = 0;
+	its.it_value.tv_nsec = 0;
+	its.it_interval.tv_sec = 0;
+	its.it_interval.tv_nsec = 0;
+	if (timer_settime(smap_timer, 0, &its, NULL) == -1) {
+		perror("timer_settime failed");
+		abort();
+	}
+	if (timer_delete(smap_timer) == -1) {
+		perror("timer_delete failed");
+	}
+
+//	calculateMemOverhead();
 	if(thrData.output) {
 		fflush(thrData.output);
 	}
@@ -383,6 +408,14 @@ void exitHandler() {
 	writeContention();
 	if(thrData.output) {
 		fclose(thrData.output);
+	}
+
+	if (samples != 0) {
+		uint64_t avg = (sampleCycles / samples);
+		fprintf(stderr, "samples: %lu, avg cycles: %lu\n", samples, avg);
+	}
+	else {
+		fprintf(stderr, "samples was 0\n");
 	}
 
 	if (d_myMemUsage) {
@@ -408,7 +441,9 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
 	#endif
 
 	inRealMain = true;
-	return real_main_mallocprof (argc, argv, envp);
+	int result = real_main_mallocprof (argc, argv, envp);
+	fprintf(stderr, "real main has returned");
+	return result;
 }
 
 extern "C" int __libc_start_main(main_fn_t, int, char **, void (*)(),
@@ -474,13 +509,14 @@ extern "C" {
 
 		//Do allocation
 		object = RealX::malloc(sz);
-		allocData.address = reinterpret_cast <uint64_t> (object);
+		allocData.address = (uint64_t)object;
 
 		//Do after
 		doAfter(&allocData);
 
         allocData.cycles = allocData.tsc_after - allocData.tsc_before;
 
+		addressUsage.insertIfAbsent(allocData.address, newObjectTuple(allocData.address, sz));
 		// Gets overhead, address usage, mmap usage, memHWM, and prefInfo
 		analyzeAllocation(&allocData);
 
@@ -798,14 +834,14 @@ extern "C" {
 		if (!realInitialized) RealX::initializer();
 
 		int result = xthreadx::thread_create(tid, attr, start_routine, arg);
-		threads.fetch_add(1, relaxed);
 		return result;
 	}
 
 	// PTHREAD_JOIN
 	int pthread_join(pthread_t thread, void **retval) {
 		if (!realInitialized) RealX::initializer();
-
+		
+//		sleep(10);
 		int result = RealX::pthread_join (thread, retval);
         //fprintf(stderr, "Thread: %lX\n", thread);
 		return result;
@@ -1049,85 +1085,80 @@ extern "C" {
 	// MMAP
 	void * yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset) {
 
-			if (!realInitialized) RealX::initializer();
+		if (!realInitialized) RealX::initializer();
 
-			if (!mapsInitialized) return RealX::mmap (addr, length, prot, flags, fd, offset);
+//		if (!mapsInitialized) return RealX::mmap (addr, length, prot, flags, fd, offset);
 
-			if (inMmap) return RealX::mmap (addr, length, prot, flags, fd, offset);
+		if (inMmap) return RealX::mmap (addr, length, prot, flags, fd, offset);
 
-			uint64_t timeStart = 0;
-			uint64_t timeStop = 0;
-			bool mmap_wait = false;
+		uint64_t timeStart = 0;
+		uint64_t timeStop = 0;
+		bool mmap_wait = false;
 
-			if (mmap_active.load()) {
-					timeStart = rdtscp();
-					mmap_wait = true;
-			}
-
-			ThreadContention* tc;
-			uint64_t tid = pthread_self();
-
-			//thread_local
-			inMmap = true;
-
-			//global atomic
-			mmap_active = true;
-			void* retval = RealX::mmap(addr, length, prot, flags, fd, offset);
-			mmap_active = false;
-
-			if (mmap_wait) {
-					timeStop = rdtscp();
-					if (threadContention.find(tid, &tc)) {
-							tc->mmap_waits++;
-							tc->mmap_wait_cycles += (timeStop - timeStart);
-					}
-					else {
-							threadContention.insert(tid, newThreadContention(tid));
-							if (threadContention.find(tid, &tc)) {
-									tc->mmap_waits++;
-									tc->mmap_wait_cycles += (timeStop - timeStart);
-							}
-							else {
-									fprintf(stderr, "failed to insert tid into threadContention, mmap\n");
-									abort();
-							}
-					}
-			}
-
-			uint64_t address = (uint64_t)retval;
-
-			//If this thread currently doing an allocation
-			if (inAllocation) {
-					if (d_mmap) printf ("mmap direct from allocation function: length= %zu, prot= %d\n", length, prot);
-					malloc_mmaps.fetch_add (1, relaxed);
-					mappings.insert(address, newMmapTuple(address, length, prot, 'a'));
-			}
-
-			//Need to check if selfmap.getInstance().getTextRegions() has
-			//ran. If it hasn't, we can't call isAllocatorInCallStack()
-			else if (selfmapInitialized && isAllocatorInCallStack()) {
-					if (d_mmap) printf ("mmap allocator in callstack: length= %zu, prot= %d\n", length, prot);
-					mappings.insert(address, newMmapTuple(address, length, prot, 's'));
-			}
-			else {
-					if (d_mmap) printf ("mmap from unknown source: length= %zu, prot= %d\n", length, prot);
-					mappings.insert(address, newMmapTuple(address, length, prot, 'u'));
-			}
-
-			if (!inRealMain || (inDeallocation || inAllocation ||
-								(selfmapInitialized && isAllocatorInCallStack()))) {
-				// Create a new shadow memory region associated with the new mapping
-				ShadowMemory * sm_node = (ShadowMemory *)myMalloc(sizeof(ShadowMemory));
-				sm_node->initialize((void *)address, length);
-				fprintf(stderr, "> created sm obj %p for mmap mapping at 0x%lx (length = %zu)\n", sm_node, address, length);
-				if(rb_insert(rb_tree, sm_node)) {
-						fprintf(stderr, "ERROR: mapping at address 0x%lx already in RB tree\n", address);
-						raise(SIGUSR2);
-				}
+		if (mmap_active.load()) {
+				timeStart = rdtscp();
+				mmap_wait = true;
 		}
 
-		total_mmaps++;
+		ThreadContention* tc;
+		uint64_t tid = pthread_self();
 
+		//thread_local
+		inMmap = true;
+
+		//global atomic
+		mmap_active = true;
+		void* retval = RealX::mmap(addr, length, prot, flags, fd, offset);
+		mmap_active = false;
+
+		if (mmap_wait) {
+			timeStop = rdtscp();
+			if (threadContention.find(tid, &tc)) {
+				tc->mmap_waits++;
+				tc->mmap_wait_cycles += (timeStop - timeStart);
+			}
+			else {
+				threadContention.insert(tid, newThreadContention(tid));
+				if (threadContention.find(tid, &tc)) {
+					tc->mmap_waits++;
+					tc->mmap_wait_cycles += (timeStop - timeStart);
+				}
+				else {
+					fprintf(stderr, "failed to insert tid into threadContention, mmap\n");
+					abort();
+				}
+			}
+		}
+
+		uint64_t address = (uint64_t)retval;
+
+		//If this thread currently doing an allocation
+		if (inAllocation) {
+			mappings.insert(address, newMmapTuple(address, length, prot, 'a'));
+		}
+
+		//Need to check if selfmap.getInstance().getTextRegions() has
+		//ran. If it hasn't, we can't call isAllocatorInCallStack()
+		else if (selfmapInitialized && isAllocatorInCallStack()) {
+			mappings.insert(address, newMmapTuple(address, length, prot, 's'));
+		}
+		else {
+			mappings.insert(address, newMmapTuple(address, length, prot, 'u'));
+		}
+
+		if (!inRealMain || (inDeallocation || inAllocation ||
+			(selfmapInitialized && isAllocatorInCallStack()))) {
+			// Create a new shadow memory region associated with the new mapping
+			ShadowMemory * sm_node = (ShadowMemory *)myMalloc(sizeof(ShadowMemory));
+			sm_node->initialize((void *)address, length);
+//			fprintf(stderr, "> created sm obj %p for mmap mapping at 0x%lx (length = %zu)\n", sm_node, address, length);
+			if(rb_insert(rb_tree, sm_node)) {
+				fprintf(stderr, "ERROR: mapping at address 0x%lx already in RB tree\n", address);
+				raise(SIGUSR2);
+			}
+		}
+	
+//		total_mmaps++;
 		inMmap = false;
 		return retval;
 	}
@@ -1146,11 +1177,11 @@ extern "C" {
 					perror("munmap failed");
 			}
 
-			fprintf(stderr, "> munmap(%p, %zu)\n", addr, length);
+//			fprintf(stderr, "> munmap(%p, %zu)\n", addr, length);
 			// If this thread currently doing an allocation
 			if (!inRealMain || (inDeallocation || inAllocation ||
 									(selfmapInitialized && isAllocatorInCallStack()))) {
-					fprintf(stderr, "> MUNMAP(%p, %zu)\n", addr, length);
+//					fprintf(stderr, "> MUNMAP(%p, %zu)\n", addr, length);
 					if (d_mmap) printf ("munmap from allocator: addr= %p, length= %zu\n", addr, length);
 					char buf[sizeof(ShadowMemory)];
 					ShadowMemory * anon_sm = new (buf) ShadowMemory(addr);
@@ -1191,10 +1222,8 @@ void analyzeAllocation(allocation_metadata *metadata) {
 	//getAddressUsage(metadata->size, metadata->address, metadata->cycles);
 
 	//Update mmap region info
-	#ifdef MAPPINGS
 	#warning disabled call to getMappingsUsage
-	//getMappingsUsage(metadata->size, metadata->address, metadata->classSize);
-	#endif
+//	getMappingsUsage(metadata->size, metadata->address, metadata->classSize);
 
 	// Analyze perfinfo
 	analyzePerfInfo(metadata);
@@ -1220,9 +1249,6 @@ size_t updateFreeCounters(uint64_t address) {
 			globalFreeArray[class_size_index]++;
 			if (d_updateCounters) printf ("globalFreeArray[%d]++\n", class_size_index);
 		}
-		#ifdef BLOWUP_BY_BYTES
-		freed_bytes += size;
-		#endif
 	}
 
 	else {freed_bytes += size;}
@@ -1261,7 +1287,6 @@ void getAddressUsage(size_t size, uint64_t address, uint64_t cycles) {
 	}
 }
 
-#ifdef MAPPINGS
 void getMappingsUsage(size_t size, uint64_t address, size_t classSize) {
 
 	for (auto entry : mappings) {
@@ -1272,23 +1297,15 @@ void getMappingsUsage(size_t size, uint64_t address, size_t classSize) {
 		}
 	}
 }
-#endif
 
 void getOverhead (size_t size, uint64_t address, size_t classSize, bool* reused) {
 
-	//If size is greater than malloc_mmap_threshold
-	//Then it will be mmap'd. So no need to check
-	if (size <= malloc_mmap_threshold) {
-
 		//Check for classSize alignment bytes
-		if (bibop) getAlignment(size, classSize);
+//		if (bibop) getAlignment(size, classSize);
+		getAlignment(size, classSize);
 
 		//Check for memory blowup
 		getBlowup(size, classSize, reused);
-
-		//Add metadata for this overhead object
-		getMetadata(classSize);
-	}
 }
 
 void getMetadata (size_t classSize) {
@@ -1304,7 +1321,19 @@ void getAlignment (size_t size, size_t classSize) {
 	Overhead* o;
 	short alignmentBytes = classSize - size;
 	if (overhead.find(classSize, &o)) {
-		o->addAlignment(alignmentBytes);
+		if (bibop) {
+			o->addAlignment(alignmentBytes);
+			alignment_bytes += alignmentBytes;
+		}
+		else {
+			unsigned y = size + (~(size & 0xf) & 0xf) + 1;
+			unsigned alignment;
+			if ((y - size) >= 8) alignment = (y - size - 8);
+			else alignment = (y - size + 8);
+
+			o->addAlignment(alignment);
+			alignment_bytes += alignment;
+		}
 	}
 }
 
@@ -1314,15 +1343,13 @@ void getBlowup (size_t size, size_t classSize, bool* reused) {
 	size_t blowup = 0;
 
 	if (bibop) {
+//		fprintf(stderr, "checking for bibop  blowup\n");
 		//If I have free objects on my local list
 		if (localFreeArray[class_size_index] > 0) {
 			*reused = true;
 			localFreeArray[class_size_index]--;
-			globalFreeArray[class_size_index]--;
+			if (globalFreeArray[class_size_index] > 0) globalFreeArray[class_size_index]--;
 			if (d_getBlowup) printf ("I have free. globalFreeArray[%d]--\n", class_size_index);
-			#ifdef BLOWUP_BY_BYTES
-			freed_bytes -= size;
-			#endif
 			return;
 		}
 
@@ -1343,7 +1370,10 @@ void getBlowup (size_t size, size_t classSize, bool* reused) {
 
 		//If I don't have enough freed bytes to satisfy this size
 		//set blowup
-		if (size > freed_bytes) blowup = size - freed_bytes;
+		if (size > freed_bytes) {
+			blowup = size - freed_bytes;
+			freed_bytes = 0;
+		}
 
 		//I do have enough bytes
 		//Decrement my free bytes, and return
@@ -1358,10 +1388,15 @@ void getBlowup (size_t size, size_t classSize, bool* reused) {
 	//Increment the blowup for this class size
 	Overhead* o;
 	if (overhead.find(classSize, &o)) {
-		if (bibop) o->addBlowup(classSize);
-		else o->addBlowup(blowup);
+		if (bibop) {
+			o->addBlowup(classSize);
+			blowup_bytes += classSize;
+		}
+		else {
+			o->addBlowup(blowup);
+			blowup_bytes += blowup;
+		}
 	}
-	blowup_allocations.fetch_add(1, relaxed);
 }
 
 //Return the appropriate class size that this object should be in
@@ -1650,9 +1685,8 @@ void writeAllocData () {
 	fprintf(thrData.output, ">>> reused_address           %u\n", print_reused_address);
 	fprintf(thrData.output, ">>> num_free                 %u\n", print_num_free);
 	fprintf(thrData.output, ">>> malloc_mmaps             %u\n", malloc_mmaps.load(relaxed));
-	fprintf(thrData.output, ">>> total_mmaps              %u\n", total_mmaps.load(relaxed));
+//	fprintf(thrData.output, ">>> total_mmaps              %u\n", total_mmaps.load(relaxed));
 	fprintf(thrData.output, ">>> malloc_mmap_threshold    %zu\n", malloc_mmap_threshold);
-	fprintf(thrData.output, ">>> threads                  %u\n", threads.load(relaxed));
 
 	if (print_new_address)
 	fprintf(thrData.output, ">>> cycles_new               %lu\n",
@@ -1679,23 +1713,17 @@ void writeAllocData () {
 	fprintf(thrData.output, ">>> num_sbrk                 %u\n", num_sbrk.load(relaxed));
 	fprintf(thrData.output, ">>> size_sbrk                %u\n", size_sbrk.load(relaxed));
 	fprintf(thrData.output, ">>> num_mprotect             %u\n", num_mprotect.load(relaxed));
-	fprintf(thrData.output, ">>> blowup_allocations       %u\n", blowup_allocations.load(relaxed));
-	fprintf(thrData.output, ">>> total_blowup             %zu\n", total_blowup);
-	#ifdef BLOWUP_BY_BYTES
-	fprintf(thrData.output, ">>> blowup_bytes             %zu\n", blowup_bytes.load());
-	#endif
-	fprintf(thrData.output, ">>> alignment                %zu\n", alignment);
+//	fprintf(thrData.output, ">>> total_blowup             %zu\n", total_blowup);
+//	fprintf(thrData.output, ">>> alignment                %zu\n", alignment);
 	fprintf(thrData.output, ">>> metadata_object          %zu\n", metadata_object);
 	fprintf(thrData.output, ">>> metadata_overhead        %zu\n", metadata_overhead);
-	fprintf(thrData.output, ">>> totalSizeAlloc           %zu\n", totalSizeAlloc);
-	fprintf(thrData.output, ">>> totalMemOverhead         %zu\n", totalMemOverhead);
-	fprintf(thrData.output, ">>> memEfficiency            %.2f%%\n", memEfficiency);
+//	fprintf(thrData.output, ">>> totalSizeAlloc           %zu\n", totalSizeAlloc);
+//	fprintf(thrData.output, ">>> totalMemOverhead         %zu\n", totalMemOverhead);
+//	fprintf(thrData.output, ">>> memEfficiency            %.2f%%\n", memEfficiency);
 
 	writeOverhead();
 
-	#ifdef MAPPINGS
-	writeMappings();
-	#endif
+//	writeMappings();
 
 	if (d_write_tad) writeThreadMaps();
 	writeThreadContention();
@@ -1831,7 +1859,6 @@ void writeContention () {
 	fflush(thrData.output);
 }
 
-#ifdef MAPPINGS
 void writeMappings () {
 
 	int i = 0;
@@ -1846,7 +1873,6 @@ void writeMappings () {
 		i++;
 	}
 }
-#endif
 
 void calculateMemOverhead () {
 
@@ -1961,7 +1987,6 @@ inline bool isAllocatorInCallStack() {
 	return false;
 }
 
-#ifdef MAPPINGS
 bool mappingEditor (void* addr, size_t len, int prot) {
 
 	bool found = false;
@@ -1980,7 +2005,6 @@ bool mappingEditor (void* addr, size_t len, int prot) {
 	}
 	return found;
 }
-#endif
 
 void updateShadowMemory(void * address, size_t size) {
 		char buf[sizeof(ShadowMemory)];
@@ -2222,7 +2246,6 @@ void initGlobalFreeArray () {
 	if (d_initGlobal) printf ("initGlobalFreeArray\n");
 }
 
-#ifdef USE_THREAD_LOCAL
 void* myLocalMalloc(size_t size) {
 
 	void* p;
@@ -2260,7 +2283,6 @@ void initMyLocalMem() {
 	myLocalPosition = 0;
 	myLocalMemInitialized = true;
 }
-#endif
 
 void initGlobalCSM() {
 
@@ -2291,4 +2313,225 @@ void * myTreeMalloc(struct libavl_allocator * allocator, size_t size) {
 
 void myTreeFree(struct libavl_allocator * allocator, void * block) {
   myFree(block);
+}
+
+inline static size_t alignup(size_t size, size_t alignto) {
+	return (size % alignto == 0) ? size : ((size + (alignto - 1)) & ~(alignto - 1));
+}
+
+void sampleMemoryOverhead(int i, siginfo_t* s, void* p) {
+
+	size_t alignBytes = alignment_bytes.load();
+	size_t blowupBytes = blowup_bytes.load();
+
+	if (timer_settime(smap_timer, 0, &stopTimer, NULL) == -1) {
+		perror("timer_settime failed");
+		abort();
+	}
+	
+	uint64_t startTime = rdtscp();
+	samples++;
+	int numSmapEntries = 0;
+	int numSkips = 0;
+	int numHeapMatches = 0;
+	bool dontCheck = false;
+	void* start;
+	void* end;
+	unsigned kb = 0;
+	smapsDontCheckIndex = 0;
+
+	currentCaseOverhead.kb = 0;
+	currentCaseOverhead.efficiency = 0;
+
+	if ((smaps_infile = fopen (smaps_fileName, "r")) == NULL) {
+		fprintf(stderr, "failed to open smaps\n");
+		return;
+	}
+
+	while ((getline(&smaps_buffer, &smaps_bufferSize, smaps_infile)) > 0) {
+
+		dontCheck = false;
+		numSmapEntries++;
+
+		//Get addresses
+		sscanf(smaps_buffer, "%p-%p", &start, &end);
+
+		SMapEntry* entry;
+		short index = smapsDontCheckIndex;
+
+		//Compare against smapsDontCheck
+		while (index < smapsDontCheckNumEntries) {
+
+			entry = smapsDontCheck[index];
+
+			//If it's in smapsDontCheck, skip to next entry in smaps
+			if (start == entry->start) {
+				dontCheck = true;
+				numSkips++;
+				smapsDontCheckIndex++;
+				for (int j = 0; j < 15; j++)
+					getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
+				break;
+			}
+			index++;
+		}
+
+		if (dontCheck) continue;
+
+		bool match = false;
+		//Compare against known heaps
+		for (auto entry : mappings) {
+			auto data = entry.getData();
+			if ((data->start >= (uint64_t)start) && (data->start <= (uint64_t)end)) {
+				//Skip two lines
+				for (int j = 0; j < 2; j++)
+					getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
+
+				//Grab RSS
+				sscanf(smaps_buffer, "Rss:%u", &kb);
+	
+				//This is a heap segment
+				currentCaseOverhead.kb += kb;
+				numHeapMatches++;
+				match = true;
+			}
+			else continue;
+		}
+		if (match) {
+			for (int j = 0; j < 13; j++)
+				getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
+			continue;
+		}
+		else {
+			//This is an unknown entry, skip it
+			for (int j = 0; j < 15; j++)
+				getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
+		}
+	}
+
+	//Get current efficiency
+	uint64_t bytes = currentCaseOverhead.kb*1024;
+	double e = ((bytes - blowupBytes - alignBytes) / (float)bytes);
+
+	//Compare to current worst case
+	if (e < worstCaseOverhead.efficiency) {
+		worstCaseOverhead.kb = currentCaseOverhead.kb;
+		worstCaseOverhead.alignment = alignBytes;
+		worstCaseOverhead.blowup = blowupBytes;
+		worstCaseOverhead.efficiency = e;
+	}
+	fclose(smaps_infile);
+	uint64_t endTime = rdtscp();
+
+	sampleCycles += (endTime - startTime);
+	fprintf(stderr, "leaving sample, %d smap entries\n"
+					"bytes= %lu, blowup= %zu, alignment= %zu\n"
+					"skips= %d, hits= %d, cycles: %lu\nefficiency= %.5f\n",
+					numSmapEntries, bytes, blowupBytes, alignBytes,
+					numSkips, numHeapMatches, (endTime-startTime), e);
+
+	if (timer_settime(smap_timer, 0, &resumeTimer, NULL) == -1) {
+		perror("timer_settime failed");
+		abort();
+	}
+//	getchar();
+}
+
+void start_smaps() {
+	
+	bool debug = false;
+	if (debug) fprintf(stderr, "Reading smaps on startup, pid %d\n", pid);
+	void* start;
+	void* end;
+	unsigned kb;
+	char heap[] = "heap";
+	bool keep = false;
+
+	if ((smaps_infile = fopen (smaps_fileName, "r")) == NULL) {
+		fprintf(stderr, "failed to open smaps\n");
+		return;
+	}
+
+	while ((getline(&smaps_buffer, &smaps_bufferSize, smaps_infile)) > 0) {
+
+		keep = false;
+		if (strstr(smaps_buffer, (const char*)&heap) != NULL) {
+			keep = true;
+		}
+		sscanf(smaps_buffer, "%p-%p", &start, &end);
+		if (keep) mappings.insert((uint64_t)start, (newMmapTuple((uint64_t)start, 0, PROT_READ | PROT_WRITE, 'a')));
+		 
+		//Skip next line
+		getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
+
+		getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
+		sscanf(smaps_buffer, "%*s%u", &kb);
+
+		//Skip next 13 Lines
+		for (int i = 0; i < 13; i++)
+			getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
+
+		SMapEntry* entry = newSMapEntry();
+		entry->start = start;
+		entry->end = end;
+		entry->kb = kb;
+		if (!keep) {
+			smapsDontCheck[smapsDontCheckIndex] = entry;
+			smapsDontCheckIndex++;
+		}
+//		getchar();
+	}
+
+	smapsDontCheckNumEntries = smapsDontCheckIndex;
+	smapsDontCheckIndex = 0;
+	
+	if (debug) for (int i = 0; i < smapsDontCheckNumEntries; i++) {
+		fprintf(stderr, "\nSMAP ENTRIES\n");
+		fprintf(stderr, "[%d]->start   %p\n", i, smapsDontCheck[i]->start);
+		fprintf(stderr, "[%d]->end     %p\n", i, smapsDontCheck[i]->end);
+		fprintf(stderr, "[%d]->kb      %u\n", i, smapsDontCheck[i]->kb);
+	}
+	fclose(smaps_infile);
+	fprintf(stderr, "numDontCheck %d\n", smapsDontCheckNumEntries);
+
+//	getchar();
+}
+
+SMapEntry* newSMapEntry() {
+	SMapEntry* chaka;
+	chaka = (SMapEntry*)myMalloc(sizeof(SMapEntry));
+	chaka->start = 0;
+	chaka->end = 0;
+	chaka->kb = 0;
+	return chaka;
+}
+
+void setupSignalHandler() {
+	struct sigaction sa;
+	sa.sa_flags = SA_SIGINFO;
+	sigemptyset(&sa.sa_mask);
+	sigaddset(&sa.sa_mask, SIGIO);
+	sa.sa_sigaction = sampleMemoryOverhead;
+	if (sigaction(SIGRTMIN, &sa, NULL) == -1) {
+		perror("sigaction(SIGRTMIN, &sa, NULL) failed.");
+		abort();
+	}
+}
+
+void startSignalTimer() {
+	struct sigevent event;
+
+	event.sigev_notify = SIGEV_THREAD_ID;
+	event._sigev_un._tid = gettid();
+	event.sigev_signo = SIGRTMIN;
+
+	if (timer_create(CLOCK_MONOTONIC, &event, &smap_timer) == -1) {
+		perror("timer_create failed");
+		abort();
+	}
+
+	if (timer_settime(smap_timer, 0, &resumeTimer, NULL) == -1) {
+		perror("timer_settime failed");
+		abort();
+	}
 }
