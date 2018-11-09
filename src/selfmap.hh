@@ -24,11 +24,14 @@
 #include "real.hh"
 #include "memsample.h"
 
+#define LIBC_LIBRARY_NAME "libmalloc.so" 
+
 // From heaplayers
 //#include "wrappers/stlallocator.h"
 
 using namespace std;
 
+extern bool isLibc;
 extern char *allocator_name;
 extern __thread thread_data thrData;
 extern bool opening_maps_file;
@@ -191,6 +194,7 @@ class selfmap {
 					if((libTextStart <= mallocSymbol) && (mallocSymbol <= libTextEnd)) {
 						_allocTextStart = (void *)libTextStart;
 						_allocTextEnd = (void *)libTextEnd;
+						isLibc = (strcasestr(_allocLibrary.c_str(), LIBC_LIBRARY_NAME) != NULL);
 						strcpy (allocator_name, _allocLibrary.c_str());
 //						fprintf(thrData.output, ">>> allocator @ %p ~ %p, file = %s\n", _allocTextStart, _allocTextEnd, _allocLibrary.c_str());
 					} else {

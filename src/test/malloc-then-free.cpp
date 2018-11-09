@@ -18,7 +18,7 @@ int main(int argc, char* argv[]) {
 		abort();
 	}
 
-	numThreads = atoi(argv[1];)
+	numThreads = atoi(argv[1]);
 	numMallocs = atoi(argv[2]);
 
 	pthread_t threads[numThreads];

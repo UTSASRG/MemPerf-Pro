@@ -54,7 +54,9 @@ void getPerfInfo (PerfReadInfo * i) {
 
 	struct read_format buffer;
 
-	read(perfInfo.perf_fd_fault, &buffer, sizeof(struct read_format));
+	if(read(perfInfo.perf_fd_fault, &buffer, sizeof(struct read_format)) == -1) {
+				perror("perf read failed");
+	}
 
 	i->faults = buffer.values[0].value;
 	i->tlb_read_misses = buffer.values[1].value;
@@ -88,11 +90,11 @@ void doPerfRead() {
 
 	if(thrData.output) {
 			fprintf(thrData.output, "\n");
-			fprintf(thrData.output, ">>> tot page faults      %ld\n", perf.faults);
-			fprintf(thrData.output, ">>> tot TLB read misses  %ld\n", perf.tlb_read_misses);
-			fprintf(thrData.output, ">>> tot TLB write misses %ld\n", perf.tlb_write_misses);
-			fprintf(thrData.output, ">>> tot cache misses     %ld\n", perf.cache_misses);
-			fprintf(thrData.output, ">>> tot instructions     %ld\n", perf.instructions);
+			fprintf(thrData.output, ">>> total page faults        %ld\n", perf.faults);
+			fprintf(thrData.output, ">>> total TLB read misses    %ld\n", perf.tlb_read_misses);
+			fprintf(thrData.output, ">>> total TLB write misses   %ld\n", perf.tlb_write_misses);
+			fprintf(thrData.output, ">>> total cache misses       %ld\n", perf.cache_misses);
+			fprintf(thrData.output, ">>> total instructions       %ld\n", perf.instructions);
 	}
 }
 

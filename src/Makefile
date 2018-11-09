@@ -2,8 +2,7 @@ SRCS =	libmallocprof.cpp	\
 				real.cpp					\
 				selfmap.cpp				\
 				shadowmemory.cpp	\
-				memsample.c				\
-				rb.c
+				memsample.c
 
 INCS =	xthreadx.hh			\
 				memsample.h			\
@@ -12,12 +11,10 @@ INCS =	xthreadx.hh			\
 				list.hh					\
 				hashfuncs.hh		\
 				interval.hh			\
-				rangetree.hh		\
 				selfmap.hh			\
 				spinlock.hh			\
 				shadowmemory.hh	\
-				libmallocprof.h	\
-				rb.h
+				libmallocprof.h
 
 DEPS = $(SRCS) $(INCS)
 
@@ -30,10 +27,14 @@ CFLAGS += -O2 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-fr
 CFLAGS2 += -O0 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-frame-pointer -Wl,--no-as-needed -lrt
 
 PROFILER_FLAGS += -D USE_THREAD_LOCAL
-#PROFILER_FLAGS += -D MAPPINGS
+# PROFILER_FLAGS += -D MAPPINGS
 
 #THREADTEST_FILE = threadTest.cpp
-THREADTEST_FILE = malloc-and-free.cpp
+# THREADTEST_FILE = malloc-and-free.cpp
+# TEST_FILE = malloc-and-free.cpp
+
+THREADTEST_FILE = malloc-then-free.cpp
+TEST_FILE = malloc-then-free.cpp
 
 #No Blowup, all new addresses
 NUM_THREADS = 20

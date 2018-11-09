@@ -228,9 +228,10 @@ def group_files(files):
             if args.debug is True:
                 title, allocator = filename.split('-')[0:2]
             else:
-                title = filename.split('-')[0]
-                formatted = filename.replace(title, '')
-                allocator = formatted.replace('_', '-').split('-')[2].lower()
+                title, allocator = filename.replace('_', '-').split('-')[0:2]
+                # title = filename.split('-')[0]
+                # formatted = filename.replace(title, '')
+                # allocator = formatted.replace('_', '-').split('-')[2].lower()
             title = title.split('/')[-1]
         except Exception as e:
             print('Invalid test file passed: {}'.format(filename))

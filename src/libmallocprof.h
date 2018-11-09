@@ -34,7 +34,20 @@ typedef struct {
 	uint64_t sbrk_wait_cycles = 0;
 	uint64_t madvise_waits = 0;
 	uint64_t madvise_wait_cycles = 0;
-} ThreadContention;
+	uint64_t munmap_waits = 0;
+	uint64_t munmap_wait_cycles = 0;
+	uint64_t mremap_waits = 0;
+	uint64_t mremap_wait_cycles = 0;
+	uint64_t mprotect_waits = 0;
+	uint64_t mprotect_wait_cycles = 0;
+
+  uint64_t realMemoryUsage = 0;
+  uint64_t totalMemoryUsage = 0;
+  
+  uint64_t lock_counter = 0;
+  uint64_t critical_section_start = 0;
+  uint64_t critical_section_duration = 0;
+} __attribute__((__aligned__(64))) ThreadContention;
 
 typedef struct {
 	unsigned szUsed;
@@ -144,15 +157,19 @@ typedef struct {
 } OverheadSample;
 
 // Functions 
+#ifdef MAPPINGS
 bool mappingEditor (void* addr, size_t len, int prot);
+#endif
 inline bool isAllocatorInCallStack();
-inline size_t getClassSizeFor(size_t size);
+size_t getClassSizeFor(size_t size);
 int num_used_pages(uintptr_t vstart, uintptr_t vend);
 void analyzePerfInfo(allocation_metadata *metadata);
 void analyzeAllocation(allocation_metadata *metadata);
 void calculateMemOverhead ();
 void doBefore(allocation_metadata *metadata);
 void doAfter(allocation_metadata *metadata);
+void incrementMemoryUsage(size_t size);
+void decrementMemoryUsage(void* addr);
 void getAddressUsage(size_t size, uint64_t address, uint64_t cycles);
 void getAlignment(size_t, size_t);
 void getBlowup(size_t size, size_t classSize, bool*);
@@ -160,7 +177,7 @@ void getMappingsUsage(size_t size, uint64_t address, size_t classSize);
 void getMetadata(size_t classSize);
 void getOverhead(size_t size, uint64_t address, size_t classSize, bool*);
 void getPerfInfo(PerfReadInfo*);
-void globalizeThreadAllocData();
+void globalizeTAD();
 void myFree (void* ptr);
 void* myMalloc (size_t size);
 void readAllocatorFile();
