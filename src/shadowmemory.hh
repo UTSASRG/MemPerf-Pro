@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <cstddef>
+#include <malloc.h>
 #include "libmallocprof.h"
 
 #define PAGESIZE 4096
@@ -46,6 +47,8 @@
 
 // Located in libmallocprof.cpp globals
 extern bool bibop;
+extern bool isLibc;
+extern char * allocator_name;
 extern __thread thread_data thrData;
 
 typedef enum {
@@ -62,11 +65,11 @@ inline size_t alignup(size_t size, size_t alignto) {
 class CacheMapEntry {
 		private:
 				unsigned char num_used_bytes;
-				unsigned owner;
+				pid_t owner;
 
 		public:
-				unsigned getOwner();
-				void setOwner(unsigned new_owner);
+				pid_t getOwner();
+				void setOwner(pid_t new_owner);
 				unsigned char getUsedBytes();
 				unsigned char setUsedBytes(unsigned num_bytes);
 				unsigned char addUsedBytes(unsigned num_bytes);
@@ -100,7 +103,6 @@ class ShadowMemory {
 				static unsigned updatePages(uintptr_t uintaddr, unsigned long mega_index, unsigned page_index, unsigned size);
 				static bool updateObjectSize(uintptr_t uintaddr, unsigned size);
 				static unsigned getPageClassSize(unsigned long mega_index, unsigned page_index);
-				inline static unsigned libc_malloc_usable_size(unsigned size);
 
 				static PageMapEntry ** mega_map_begin;
 				static PageMapEntry * page_map_begin;
@@ -110,6 +112,8 @@ class ShadowMemory {
 				static eMapInitStatus isInitialized;
 
 		public:
+				static unsigned libc_malloc_usable_size(unsigned size);
+				static unsigned getPageClassSize(void * address);
 				static bool initialize();
 				static inline PageMapEntry ** getMegaMapEntry(unsigned long mega_index);
 				static bool cleanupPages(uintptr_t uintaddr, size_t length);
@@ -117,6 +121,7 @@ class ShadowMemory {
 				static PageMapEntry * doPageMapBumpPointer();
 				static PageMapEntry * getPageMapEntry(unsigned long mega_idx, unsigned page_idx);
 				static unsigned getObjectSize(uintptr_t uintaddr, unsigned long mega_index, unsigned page_index);
+				static unsigned getObjectSize(void * address);
 				static unsigned updateObject(void * address, size_t size);
 				//unsigned getCacheUsage(void * address);
 				//unsigned getPageUsage(void * address);

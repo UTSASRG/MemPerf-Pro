@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <malloc.h>
 #include <sys/mman.h>
 #include <errno.h>
 #include <assert.h>
@@ -55,14 +54,14 @@ bool ShadowMemory::initialize() {
 }
 
 unsigned ShadowMemory::updateObject(void * address, size_t size) {
-		if(!address) {
+		if(address == NULL) {
 				fprintf(stderr, "ERROR: passed a NULL pointer into %s in %s:%d\n",
 								__FUNCTION__, __FILE__, __LINE__);
 				abort();
 		}
 
 		uintptr_t uintaddr = (uintptr_t)address;
-
+		
 		// First compute the megabyte number of the given address.
 		unsigned long mega_index = (uintaddr >> LOG2_MEGABYTE_SIZE);
 		if(mega_index > NUM_MEGABYTE_MAP_ENTRIES) {
@@ -182,17 +181,31 @@ unsigned ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_index,
 		return numNewPagesTouched;
 }
 
+unsigned ShadowMemory::getPageClassSize(void * address) {
+		uintptr_t uintaddr = (uintptr_t)address;
+
+		unsigned long mega_index = (uintaddr >> LOG2_MEGABYTE_SIZE);
+		if(mega_index > NUM_MEGABYTE_MAP_ENTRIES) {
+				fprintf(stderr, "ERROR: mega index of 0x%lx too large: %lu > %u\n",
+								uintaddr, mega_index, NUM_MEGABYTE_MAP_ENTRIES);
+				abort();
+		}
+
+		unsigned page_index = ((uintaddr & MEGABYTE_MASK) >> LOG2_PAGESIZE);
+
+		return getPageClassSize(mega_index, page_index);
+}
+
 unsigned ShadowMemory::getPageClassSize(unsigned long mega_index, unsigned page_index) {
 		PageMapEntry * current = getPageMapEntry(mega_index, page_index);
 		return current->getClassSize();
 }
 
 unsigned ShadowMemory::getObjectSize(uintptr_t uintaddr, unsigned long mega_index, unsigned page_index) {
-		#warning THIS DOES NOT WORK FOR LIBC!
 		unsigned classSize = getPageClassSize(mega_index, page_index);
 
 		uint32_t * ptrToSentinel = (uint32_t *)(uintaddr + classSize - OBJECT_SIZE_SENTINEL_SIZE);
-		fprintf(stderr, "getObjectSize(%#lx, %lu, %u) : bibop ?= %s, classSize = %u, sentinel @ %p, sentinel bytes = 0x%x\n",
+		fprintf(stderr, "getObjectSize(%#lx, %lu, %u) : bibop ?= %s, page's classSize = %u, sentinel @ %p, sentinel bytes = 0x%x\n",
 						uintaddr, mega_index, page_index, boolToStr(bibop), classSize, ptrToSentinel, *ptrToSentinel);
 
 		if(((*ptrToSentinel) & OBJECT_SIZE_SENTINEL_MASK) == OBJECT_SIZE_SENTINEL) {
@@ -201,10 +214,30 @@ unsigned ShadowMemory::getObjectSize(uintptr_t uintaddr, unsigned long mega_inde
 								ptrToSentinel, objSize);
 				return objSize;
 		} else {
-				fprintf(stderr, "> sentinel not found, assuming class size of %u\n", classSize);
+				if(isLibc) {
+						classSize = malloc_usable_size((void *)uintaddr);
+				}
+				fprintf(stderr, "> sentinel not found, using class size of %u\n", classSize);
 				return classSize;
 		}
 }
+
+unsigned ShadowMemory::getObjectSize(void * address) {
+		uintptr_t uintaddr = (uintptr_t)address;
+
+		// First compute the megabyte number of the given address.
+		unsigned long mega_index = (uintaddr >> LOG2_MEGABYTE_SIZE);
+		if(mega_index > NUM_MEGABYTE_MAP_ENTRIES) {
+				fprintf(stderr, "ERROR: mega index of 0x%lx too large: %lu > %u\n",
+								uintaddr, mega_index, NUM_MEGABYTE_MAP_ENTRIES);
+				abort();
+		}
+
+		unsigned page_index = ((uintaddr & MEGABYTE_MASK) >> LOG2_PAGESIZE);
+
+		return getObjectSize(uintaddr, mega_index, page_index);
+}
+
 
 bool ShadowMemory::updateObjectSize(uintptr_t uintaddr, unsigned size) {
 		unsigned classSize;
@@ -213,57 +246,31 @@ bool ShadowMemory::updateObjectSize(uintptr_t uintaddr, unsigned size) {
 		} else {
 				classSize = libc_malloc_usable_size(size);
 		}
-		uint32_t * ptrToSentinel = (uint32_t *)(uintaddr + classSize - OBJECT_SIZE_SENTINEL_SIZE);
-		fprintf(stderr, "updateObjectSize(%#lx, %u) : bibop ?= %s, classSize = %u, sentinel @ %p, sentinel bytes = 0x%x\n",
-						uintaddr, size, boolToStr(bibop), classSize, ptrToSentinel, *ptrToSentinel);
 
-		if(size > MAX_OBJECT_SIZE) {
-				fprintf(stderr, "updateObjectSize(%#lx, %u) : size > MAX_OBJECT_SIZE (%u)!\n",
-						uintaddr, size, MAX_OBJECT_SIZE);
-				abort();
-		}
+		// We cannot (nor should we need to) write a size of zero in the last bytes of a freed object;
+		// this is critical because libc uses this area to store its own object sizes after the object
+		// has been freed.
+		if((size > 0) && (size <= MAX_OBJECT_SIZE) && (classSize - size >= OBJECT_SIZE_SENTINEL_SIZE)) {
+				uint32_t * ptrToSentinel = (uint32_t *)(uintaddr + classSize - OBJECT_SIZE_SENTINEL_SIZE);
+				fprintf(stderr, "updateObjectSize(%#lx, %u) : bibop ?= %s, classSize = %u, sentinel @ %p, sentinel bytes = 0x%x\n",
+								uintaddr, size, boolToStr(bibop), classSize, ptrToSentinel, *ptrToSentinel);
 
-		if(((*ptrToSentinel) & OBJECT_SIZE_SENTINEL_MASK) == OBJECT_SIZE_SENTINEL) {
-				uint32_t objSize = (*ptrToSentinel) & OBJECT_SIZE_MASK;
-				fprintf(stderr, "> sentinel found @ %p, current object size is %u, updating to %u\n",
-								ptrToSentinel, objSize, size);
+				if(((*ptrToSentinel) & OBJECT_SIZE_SENTINEL_MASK) == OBJECT_SIZE_SENTINEL) {
+						uint32_t objSize = (*ptrToSentinel) & OBJECT_SIZE_MASK;
+						fprintf(stderr, "> sentinel found @ %p, current object size is %u, updating to %u\n",
+										ptrToSentinel, objSize, size);
+				} else {
+						fprintf(stderr, "> previous sentinel not found, updating object size to %u\n", size);
+				}
 				*ptrToSentinel = OBJECT_SIZE_SENTINEL | size;
 		} else {
-				fprintf(stderr, "> sentinel not found, will assume object size of %u in the future\n", classSize);
+				fprintf(stderr, "> object too large to store size in sentinel area -- will use page's classSize value later\n");
 		}
 
 		return true;
 }
 
-/*
-bool ShadowMemory::updateObjectSize(uintptr_t uintaddr, unsigned size) {
-		// Calculate the index of the first dword, relative to the start of the page.
-		unsigned firstWordIdx = ((uintaddr & PAGESIZE_MASK) >> LOG2_WORD_SIZE);
-		unsigned numWords = size >> LOG2_WORD_SIZE;
-		unsigned curWordIdx;
-		unsigned curWordBytes;
-		int size_remain = size;
-		SizeMapEntry * current;
-
-		fprintf(stderr, "> obj 0x%lx sz %u : numWords >= %u, firstWordIdx = %d\n",
-						uintaddr, size, numWords, firstWordIdx);
-
-		curWordIdx = firstWordIdx;
-		while(size_remain > 0) {
-				current = getSizeMapEntry(mega_index, page_index, curWordIdx);
-				fprintf(stderr, "> obj 0x%lx sz %u : current = %p, updating size entry %u, object size = %u\n",
-								uintaddr, size, current, curWordIdx, size);
-				current->setSize(size);
-				size_remain -= WORD_SIZE;
-				curWordIdx++;
-		}
-
-		return true;
-
-}
-*/
-
-unsigned ShadowMemory::libc_malloc_usable_size(unsigned size) {
+inline unsigned ShadowMemory::libc_malloc_usable_size(unsigned size) {
 		if(size <= LIBC_MIN_OBJECT_SIZE) {
 				return LIBC_MIN_OBJECT_SIZE;
 		}
@@ -406,31 +413,6 @@ CacheMapEntry * PageMapEntry::getCacheMapEntry(unsigned long mega_idx, unsigned 
 		return targetCache;
 }
 
-/*
-unsigned PageMapEntry::getSizeMapIndex() {
-		return obj_size_index;
-}
-*/
-
-/*
-SizeMapEntry * PageMapEntry::getSizeMapEntry(unsigned long mega_idx, unsigned page_idx, unsigned size_idx) {
-		#error this is a cut-and-paste from getCacheMapEntry, it must be updated for the size map in order to work
-		unsigned target_size_idx = size_idx & SIZE_ENTRIES_PER_PAGE_MASK;
-		unsigned rel_page_idx = size_idx >> LOG2_NUM_SIZE_ENTRIES_PER_PAGE;
-		unsigned target_page_idx = page_idx + rel_page_idx;
-		unsigned target_mega_idx = target_page_idx >> LOG2_NUM_PAGES_PER_MEGABYTE;
-
-		PageMapEntry * targetPage = ShadowMemory::getPageMapEntry(target_mega_idx, target_page_idx);
-		SizeMapEntry * targetSize = targetPage->getSizeMapEntry_helper() + target_size_idx;
-
-		fprintf(stderr, "> getSizeMapEntry(%lu, %u, %u) -> rel_page_idx=%u, target_mega_idx=%u, target_page_idx=%u, target_size_idx=%u\n"
-										"-> targetPage=%p, targetCache=%p\n", mega_idx, page_idx, cache_idx, rel_page_idx, target_mega_idx, target_page_idx,
-										target_cache_idx, targetPage, targetCache);
-
-		return targetCache;
-}
-*/
-
 bool PageMapEntry::setUsedBytes(unsigned num_bytes) {
 		assert(num_bytes <= PAGESIZE);
 		num_used_bytes = num_bytes;
@@ -523,11 +505,11 @@ bool PageMapEntry::updateCacheLines(uintptr_t uintaddr, unsigned long mega_index
 		return true;
 }
 
-unsigned CacheMapEntry::getOwner() {
+pid_t CacheMapEntry::getOwner() {
 		return owner;
 }
 
-void CacheMapEntry::setOwner(unsigned new_owner) {
+void CacheMapEntry::setOwner(pid_t new_owner) {
 		owner = new_owner;
 }
 

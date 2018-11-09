@@ -24,6 +24,7 @@
 //Globals
 bool bibop = false;
 bool bumpPointer = false;
+bool isLibc = false;
 bool inRealMain = false;
 bool mapsInitialized = false;
 bool opening_maps_file = false;
@@ -264,7 +265,7 @@ __attribute__((constructor)) initStatus initializer() {
 	allocatorFileName = (char*) myMalloc (bytes+extensionBytes);
 	memcpy (allocatorFileName, allocator_name, bytes);
 	snprintf (allocatorFileName+bytes, extensionBytes, ".info");
-	myFree(allocator_name);
+	//myFree(allocator_name);
 
 	// Load info from allocatorInfoFile
 	readAllocatorFile();
@@ -466,13 +467,21 @@ extern "C" {
 		void* object;
 
 		//Do before
+		fprintf(stderr, "malloc(%zu) -> ??, before doBefore, allocData.address = %#lx\n", sz, allocData.address);
 		doBefore(&allocData);
 
 		//Do allocation
 		object = RealX::malloc(sz);
 		allocData.address = reinterpret_cast <uint64_t> (object);
 
+		#warning REMOVE ME
+		if(object == (void *)0x77a810) {
+				fprintf(stderr, "returning object now, size requested = %zu\n", sz);
+				raise(SIGUSR2);
+		}
+
 		//Do after
+		fprintf(stderr, "malloc(%zu) -> %p, allocData.address = %#lx\n", sz, object, allocData.address);
 		doAfter(&allocData);
 
 		allocData.cycles = allocData.tsc_after - allocData.tsc_before;
@@ -575,13 +584,23 @@ extern "C" {
 		allocation_metadata allocData = init_allocation(0, FREE);
 		allocData.address = reinterpret_cast <uint64_t> (ptr);
 
+		fprintf(stderr, "free(%p), before doBefore, allocData.address = %#lx\n", ptr, allocData.address);
 		//Do before free
 		doBefore(&allocData);
 
 		//Do free
 		RealX::free(ptr);
 
+		#warning REMOVE ME
+		if(ptr == (void *)0x77a810) {
+				unsigned sizerec = ShadowMemory::getObjectSize(ptr);
+				fprintf(stderr, "freeing object now, size on record = %u\n", sizerec);
+				raise(SIGUSR2);
+		}
+
+
 		//Do after free
+		fprintf(stderr, "free(%p), allocData.address = %#lx\n", ptr, allocData.address);
 		doAfter(&allocData);
 
 		//Update free counters
@@ -1400,9 +1419,11 @@ void doBefore (allocation_metadata *metadata) {
 
 void doAfter (allocation_metadata *metadata) {
 	getPerfInfo(&(metadata->after));
+	fprintf(stderr, "malloc(?) -> ?, before update tsc_after, allocData.address = %#lx\n", metadata->address);
 	metadata->tsc_after = rdtscp();
-	#warning TODO: use the return value of updateObject to increment totalMemoryUsage
-	ShadowMemory::updateObject((void *)metadata->address, metadata->size);
+	fprintf(stderr, "malloc(?) -> ?, after update tsc_after, allocData.address = %#lx\n", metadata->address);
+	fprintf(stderr, "malloc(?) -> ?, after update tsc_after, (uintptr_t)allocData.address = %#lx\n", (uintptr_t)metadata->address);
+  //current_tc->totalMemoryUsage += PAGESIZE * ShadowMemory::updateObject((uintptr_t)metadata->address, metadata->size);
   current_tc->totalMemoryUsage += PAGESIZE * ShadowMemory::updateObject((void *)metadata->address, metadata->size);
 }
 
