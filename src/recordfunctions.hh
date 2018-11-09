@@ -180,9 +180,9 @@ int madvise(void *addr, size_t length, int advice){
   }
 
   if (advice == MADV_DONTNEED) {
-    ShadowMemory::cleanupPages((uintptr_t)addr, length);
-    if(current_tc->totalMemoryUsage > length) {
-      current_tc->totalMemoryUsage -= length;
+    uint64_t returned = PAGESIZE * ShadowMemory::cleanupPages((uintptr_t)addr, length);
+    if(current_tc->totalMemoryUsage > returned) {
+      current_tc->totalMemoryUsage -= returned;
     }
   }
 
@@ -251,9 +251,9 @@ int munmap(void *addr, size_t length) {
   current_tc->munmap_waits++;
   current_tc->munmap_wait_cycles += (timeStop - timeStart);
 
-  if(current_tc->totalMemoryUsage > length) {
-			ShadowMemory::cleanupPages(address, length);
-			current_tc->totalMemoryUsage -= length;
+  uint64_t returned = PAGESIZE * ShadowMemory::cleanupPages((intptr_t)addr, length);
+  if(current_tc->totalMemoryUsage > returned) {
+			current_tc->totalMemoryUsage -= returned;
   }
 
 #ifdef MAPPINGS
@@ -327,6 +327,7 @@ void writeThreadContention() {
     fprintf (thrData.output, ">>> mprotect_waits       %lu\n", data->mprotect_waits);
     fprintf (thrData.output, ">>> mprotect_wait_cycle  %lu\n\n", data->mprotect_wait_cycles);
     fprintf (thrData.output, ">>> realMemoryUsage      %lu\n", data->realMemoryUsage);
+    fprintf (thrData.output, ">>> realAllocatedMemoryUsage      %lu\n", data->realAllocatedMemoryUsage);
     fprintf (thrData.output, ">>> totalMemoryUsage     %lu\n", data->totalMemoryUsage);
     fprintf (thrData.output, ">>> critical_section_duration  %lu\n\n", data->critical_section_duration);
   }

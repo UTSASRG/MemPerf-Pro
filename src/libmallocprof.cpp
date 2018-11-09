@@ -1421,7 +1421,8 @@ void incrementMemoryUsage(size_t size) {
     classSize = ShadowMemory::libc_malloc_usable_size(size);
   }
 
-  current_tc->realMemoryUsage += classSize;
+  current_tc->realAllocatedMemoryUsage += classSize;
+  current_tc->realMemoryUsage += size;
 }
 
 void decrementMemoryUsage(void* addr) {
@@ -1430,8 +1431,10 @@ void decrementMemoryUsage(void* addr) {
   unsigned classSize = ShadowMemory::getPageClassSize(addr);
   if(isLibc) {
     classSize = malloc_usable_size(addr);
-  }
-  current_tc->realMemoryUsage -= classSize;
+  } 
+
+  current_tc->realAllocatedMemoryUsage -= classSize;
+  current_tc->realMemoryUsage -= ShadowMemory::getObjectSize(addr);
 }
 
 void collectAllocMetaData(allocation_metadata *metadata) {
