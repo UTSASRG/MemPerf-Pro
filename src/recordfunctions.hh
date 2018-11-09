@@ -113,10 +113,13 @@ int pthread_mutex_trylock (pthread_mutex_t *mutex) {
 int pthread_mutex_unlock(pthread_mutex_t *mutex) {
   if (!realInitialized) RealX::initializer();
 
-  current_tc->lock_counter--;
-  if(current_tc->lock_counter == 0) {
-    uint64_t duration = rdtscp() - current_tc->critical_section_start;
-    current_tc->critical_section_duration += duration;
+  // if it is  used by allocation
+  if (inAllocation) {
+    current_tc->lock_counter--;
+    if(current_tc->lock_counter == 0) {
+      uint64_t duration = rdtscp() - current_tc->critical_section_start;
+      current_tc->critical_section_duration += duration;
+    }
   }
 
   return RealX::pthread_mutex_unlock (mutex);
