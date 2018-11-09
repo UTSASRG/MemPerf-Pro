@@ -6,7 +6,9 @@ As described above, \MP{} focuses on two aspects of the allocator, the allocator
 
 In the remainder of this section, we describe the profiled items for each category, and the basic idea of profiling. 
 
-\subsection{Background of Allocators}
+\subsection{Background}
+
+\subsubsection{Allocators}
 
 \label{sec:allocator}
 
@@ -20,6 +22,17 @@ The \textbf{BIBOP} allocators belong to another common type of allocators, where
 Almost all existing allocators manage objects by  size classes, instead of the exact size of objects. But different allocators support  different size classes: some only support power-of-2 sizes, such as DieHarder~\cite{DieHarder} or the OpenBSD allocator~\cite{OpenBSD}, while some utilize more fine-grained size classes, such as the Glibc allocator and jemalloc~\cite{jemalloc}. For each allocation request, the allocator will round up the requested size to the nearest size class. Upon each deallocation, the deallocated object will be threaded into the corresponding free list (for the freelist design) or the corresponded bit will be cleared (for the bitmap design). Therefore, the idea of size class enables the re-use of heap objects. However, it may introduce \textit{internal fragmentation}, wasting the space between the actual allocated size and the size class. 
 
 In order to support multithreaded applications, most allocators typically support per-processor heap design, one idea introduced by Hoard~\cite{Hoard}. For instance, Hoard maintains per-processor heaps and a global heap concurrently. Allocation requests from different threads typically will be satisfied from different per-processor heaps, avoiding false sharing and reducing the lock contention at the same time. Thus, this design actually augments the scalability of allocators. However, it may introduce the \textit{memory blowup}, one typical issue existing in multithreaded allocators. Based on our understanding and experiments, the memory blowup is the one major reason why different allocators may impose different physical memory consumption. 
+
+\subsubsection{Performance Monitoring Units}
+\label{sec:pmu}
+
+Hardware performance monitor units (PMU), ubiquitous in modern architectures~\cite{AMDIBS:07, IntelArch:PEBS:Sept09, armpmu}, can be employed to sample memory accesses or hardware-related activities~\cite{DBLP:conf/sc/ItzkowitzWAK03, ibs-sc, ibs-pact, Sheng:2011:RLN:1985793.1985848, LASER, Cheetah}. For hardware-related events, it could collect the number of events, such as the number of retired instructions, page faults, TLB load/store misses. Also, it could sample the detailed information about memory loads and stores, such as IP, timestamps, and memory addresses. Currently, the Linux kernel has supported PMUs starting from 2009 (Linux-2.6.31)~\cite{pmulinuxsupport}, where users could set up performance monitoring via  the \texttt{perf\_event\_open} system call. After collecting events, the user program could fetch these events. 
+
+\subsubsection{Time-Stamp Counter}
+
+\label{sec:rdtsc}
+
+Time-Stamp Counter is a register in all x86 computer that saves the number of cycles since reset. This hardware enables the collection of the time duration accurately with a RDTSC instruction~\cite{coorporation1997using, weaver2013linux}. Comparing to the method of utilizing system calls, such as \texttt{gettimeofday()}, the RDTSC instruction has two advantages. First, the overhead is much lower than issuing a system call, typically around 25-35 cycles~\cite{rdtscoverhead}. Second, it provides a high-resolution timer, with the granularity of cycles, which is much finer than traditional system calls~\cite{pitfallsrdtsc}. For instance, the system call \texttt{gettimeofday} could only provide the microsecond granularity, which is too coarse for measuring the performance of system calls or synchronization overhead.    
 
 \subsection{Basic Idea of maprof}
 \MP{} profiles different types of data as discussed in the following. Among them,  performance overhead, memory overhead, and scalability belong to internal mechanisms of allocators themselves, while the application friendliness focus on the potential performance impact on applications.  
@@ -126,27 +139,13 @@ Also, if memory allocators cannot quickly re-utilize the freed objects, due to c
 
 \subsection{Technical Challenges}
 
-As described above, \MP{} employs hardware PMU, RDTSC, and simple counters together to perform the profiling. But there are some technical 
- 
+As described above, \MP{} employs hardware PMUs, RDTSC, and simple counters together to perform the profiling. However, there exists some technical challenges. 
 
-How to support the default Linux allocator, since it actually utilizes some internal function calls, which cannot be intercepted by \MP{} normally. Therefore, we actually migrated its allocator as a separate library, as other allocators. This allows \MP{} to intercept all lock acquisitions, system calls as usual. 
+The first and the most important challenge is the \textbf{overhead challenge}, where one careless design may impose up to 100 $\times$ overhead, based on our experience of the development. The huge overhead could be unaffordable even for development phases. More importantly, the significant overhead may also skew the evaluation results unnecessarily.
 
-How to track the size information of objects for both bump-pointer allocators and BIBOP allocators? We observe that it is difficult to track the range of objects. In fact, we also utilize the ?
-
-How to know the metadata overhead of each allocator? It is very difficult to identify which region is used to save the allocator information, without changing the source code of the allocator. Also, it is even difficult to know. We observe that the allocator overhead comes from multiple aspects: metadata overhead, alignment overhead (or internal fragmentation introduced by size classes), and then memory blowup. 
-As far as we know the total memory overhead, then the metadata overhead = total heap size - alignment overhead - memory blowup overhead - memory usage.
-
-However, if the allocator itself utilizes the global variable or an pre-allocated block as the metadata, which can be omitted by \MP{}. 
-
- 
+Other challenges come from the adaption to different allocators. Specific issues include the following ones: (1) How to obtain the specific details of different allocators, such as size class information, type of allocator, metadata size information? (Section~\ref{}) (2) How to design a general but fast lookup mechanism for different allocators (Section~\ref{})? (3) How to profile the user-space contention and kernel-contention for the Glibc's allocator (Section~\ref{}), since it invokes system calls and synchronizations without invoking APIs explicitly?
 
 
-\subsection{Background of Performance Monitoring Units}
-\label{sec:pmu}
-
-\subsection{Background of RDTSC}
-
-\label{sec:rdtsc}
 
 
 
