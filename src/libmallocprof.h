@@ -2,6 +2,7 @@
 #define __LIBMALLOCPROF_H__
 
 #include "memsample.h"
+#include <signal.h>
 
 #define relaxed std::memory_order_relaxed
 #define acquire std::memory_order_acquire

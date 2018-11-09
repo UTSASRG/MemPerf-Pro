@@ -26,17 +26,13 @@ CXX = g++
 CFLAGS += -O2 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-frame-pointer
 CFLAGS2 += -O0 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-frame-pointer -Wl,--no-as-needed -lrt
 
-PROFILER_FLAGS += -D USE_THREAD_LOCAL
-# PROFILER_FLAGS += -D MAPPINGS
-
 #THREADTEST_FILE = threadTest.cpp
 # THREADTEST_FILE = malloc-and-free.cpp
 # TEST_FILE = malloc-and-free.cpp
 
-THREADTEST_FILE = malloc-then-free.cpp
-TEST_FILE = malloc-then-free.cpp
+THREADTEST_FILE = malloc-and-free.cpp
+TEST_FILE = malloc-and-free.cpp
 
-#No Blowup, all new addresses
 NUM_THREADS = 20
 NUM_MALLOCS = 80000
 

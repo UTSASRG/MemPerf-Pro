@@ -36,9 +36,7 @@ extern initStatus profilerInitialized;
 extern const bool d_mmap;
 extern const bool d_mprotect;
 
-#ifdef MAPPINGS
 extern HashMap <uint64_t, MmapTuple*, spinlock> mappings;
-#endif
 
 extern "C" {
 
@@ -152,18 +150,14 @@ void * yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offs
     current_tc->mmap_waits++;
     current_tc->mmap_wait_cycles += (timeStop - timeStart);
 
-    #ifdef MAPPINGS
     mappings.insert(address, newMmapTuple(address, length, prot, 'a'));
-    #endif
     ShadowMemory::cleanupPages(address, length);
   }
   //Need to check if selfmap.getInstance().getTextRegions() has
   //ran. If it hasn't, we can't call isAllocatorInCallStack()
   else if (selfmapInitialized && isAllocatorInCallStack()) {
     if (d_mmap) printf ("mmap allocator in callstack: length= %zu, prot= %d\n", length, prot);
-    #ifdef MAPPINGS
     mappings.insert(address, newMmapTuple(address, length, prot, 's'));
-    #endif
     ShadowMemory::cleanupPages(address, length);
   }
 
@@ -230,12 +224,6 @@ int mprotect(void* addr, size_t len, int prot) {
   current_tc->mprotect_waits++;
   current_tc->mprotect_wait_cycles += (timeStop - timeStart);
 
-  #ifdef MAPPINGS
-  if (d_mprotect)
-    printf ("mprotect/found= %s, addr= %p, len= %zu, prot= %d\n",
-        mappingEditor(addr, len, prot) ? "true" : "false", addr, len, prot);
-  #endif
-
   return ret;
 }
 
@@ -257,9 +245,7 @@ int munmap(void *addr, size_t length) {
     current_tc->totalMemoryUsage -= length;
   }
 
-#ifdef MAPPINGS
   mappings.erase((intptr_t)addr);
-#endif
   // total_mmaps--;
 
   return ret;
@@ -286,7 +272,6 @@ void *mremap(void *old_address, size_t old_size, size_t new_size,
   current_tc->mremap_waits++;
   current_tc->mremap_wait_cycles += (timeStop - timeStart);
 
-#ifdef MAPPINGS
   MmapTuple* t;
   if (mappings.find((intptr_t)old_address, &t)) {
     if(ret == old_address) {
@@ -296,7 +281,6 @@ void *mremap(void *old_address, size_t old_size, size_t new_size,
       mappings.insert((intptr_t)ret, newMmapTuple((intptr_t)ret, new_size, PROT_READ | PROT_WRITE, 'a'));
     }
   }
-#endif
 
   return ret;
 }

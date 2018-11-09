@@ -505,12 +505,6 @@ extern "C" {
 		object = RealX::malloc(sz);
 		allocData.address = (uint64_t)object;
 
-		#warning REMOVE ME
-		if(object == (void *)0x77a810) {
-				fprintf(stderr, "returning object now, size requested = %zu\n", sz);
-				raise(SIGUSR2);
-		}
-
 		//Do after
 		fprintf(stderr, "malloc(%zu) -> %p, allocData.address = %#lx\n", sz, object, allocData.address);
 		doAfter(&allocData);
@@ -622,13 +616,6 @@ extern "C" {
 
 		//Do free
 		RealX::free(ptr);
-
-		#warning REMOVE ME
-		if(ptr == (void *)0x77a810) {
-				unsigned sizerec = ShadowMemory::getObjectSize(ptr);
-				fprintf(stderr, "freeing object now, size on record = %u\n", sizerec);
-				raise(SIGUSR2);
-		}
 
 		//Do after free
 		fprintf(stderr, "free(%p), allocData.address = %#lx\n", ptr, allocData.address);
@@ -1446,11 +1433,7 @@ void doBefore (allocation_metadata *metadata) {
 
 void doAfter (allocation_metadata *metadata) {
 	getPerfInfo(&(metadata->after));
-	fprintf(stderr, "malloc(?) -> ?, before update tsc_after, allocData.address = %#lx\n", metadata->address);
 	metadata->tsc_after = rdtscp();
-	fprintf(stderr, "malloc(?) -> ?, after update tsc_after, allocData.address = %#lx\n", metadata->address);
-	fprintf(stderr, "malloc(?) -> ?, after update tsc_after, (uintptr_t)allocData.address = %#lx\n", (uintptr_t)metadata->address);
-  //current_tc->totalMemoryUsage += PAGESIZE * ShadowMemory::updateObject((uintptr_t)metadata->address, metadata->size);
   current_tc->totalMemoryUsage += PAGESIZE * ShadowMemory::updateObject((void *)metadata->address, metadata->size);
 }
 
