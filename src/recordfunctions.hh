@@ -155,7 +155,6 @@ void * yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offs
     #ifdef MAPPINGS
     mappings.insert(address, newMmapTuple(address, length, prot, 'a'));
     #endif
-    ShadowMemory::cleanupPages(address, length);
   }
   //Need to check if selfmap.getInstance().getTextRegions() has
   //ran. If it hasn't, we can't call isAllocatorInCallStack()
@@ -164,7 +163,6 @@ void * yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offs
     #ifdef MAPPINGS
     mappings.insert(address, newMmapTuple(address, length, prot, 's'));
     #endif
-    ShadowMemory::cleanupPages(address, length);
   }
 
   // total_mmaps++;
@@ -254,7 +252,8 @@ int munmap(void *addr, size_t length) {
   current_tc->munmap_wait_cycles += (timeStop - timeStart);
 
   if(current_tc->totalMemoryUsage > length) {
-    current_tc->totalMemoryUsage -= length;
+			ShadowMemory::cleanupPages(address, length);
+			current_tc->totalMemoryUsage -= length;
   }
 
 #ifdef MAPPINGS

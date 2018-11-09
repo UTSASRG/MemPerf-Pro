@@ -305,7 +305,9 @@ inline unsigned ShadowMemory::libc_malloc_usable_size(unsigned size) {
 		}
 }
 
-bool ShadowMemory::cleanupPages(uintptr_t uintaddr, size_t length) {
+unsigned ShadowMemory::cleanupPages(uintptr_t uintaddr, size_t length) {
+		unsigned numTouchedPages = 0;
+
 		// First compute the megabyte number of the given address.
 		unsigned long mega_index = (uintaddr >> LOG2_MEGABYTE_SIZE);
 		if(mega_index > NUM_MEGABYTE_MAP_ENTRIES) {
@@ -335,10 +337,13 @@ bool ShadowMemory::cleanupPages(uintptr_t uintaddr, size_t length) {
 				current = getPageMapEntry(mega_index, curPageIdx);
 				fprintf(stderr, "> obj %#lx len %zu : current = %p, updating page %u to size 0\n",
 								uintaddr, length, current, curPageIdx);
+				if(current->isTouched()) {
+						numTouchedPages++;
+				}
 				current->clear();
 		}
 
-		return true;
+		return numTouchedPages;
 }
 
 void PageMapEntry::clear() {
