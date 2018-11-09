@@ -585,14 +585,14 @@ extern "C" {
 		//Do free
 		RealX::free(ptr);
 
+    decrementMemoryUsage(ptr);
+
 		//Do after free
 		fprintf(stderr, "free(%p), allocData.address = %#lx\n", ptr, allocData.address);
 		doAfter(&allocData);
 
 		//Update free counters
 		allocData.classSize = updateFreeCounters(allocData.address);
-
-    decrementMemoryUsage(ptr);
 
     //thread_local
     inAllocation = false;
