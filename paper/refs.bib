@@ -8,6 +8,29 @@ keywords={benchmark testing;memory architecture;software performance evaluation;
 doi={10.1109/ISPASS.2004.1291361},
 month={},}
 
+
+@article{Nguyen:2018:UCM:3177744.3162626,
+ author = {Nguyen, Khanh and Wang, Kai and Bu, Yingyi and Fang, Lu and Xu, Guoqing},
+ title = {Understanding and Combating Memory Bloat in Managed Data-Intensive Systems},
+ journal = {ACM Trans. Softw. Eng. Methodol.},
+ issue_date = {February 2018},
+ volume = {26},
+ number = {4},
+ month = jan,
+ year = {2018},
+ issn = {1049-331X},
+ pages = {12:1--12:41},
+ articleno = {12},
+ numpages = {41},
+ url = {http://doi.acm.org/10.1145/3162626},
+ doi = {10.1145/3162626},
+ acmid = {3162626},
+ publisher = {ACM},
+ address = {New York, NY, USA},
+ keywords = {Big data, managed languages, memory management, performance optimization},
+} 
+
+
 @misc{hanson1980,
   author = {Hanson, David R.},
   title = {A portable storage management system for the icon programming language},
@@ -287,6 +310,78 @@ year={2009},
 howpublished={\url{https://www.openbsd.org/papers/eurobsdcon2009/otto-malloc.pdf}},
 }
 
+@misc{armpmu,
+author = {Paul J. Drongowski},
+title = {PERF tutorial: Counting hardware performance events},
+year = {2015},
+howpublished = {\url{https://sandsoftwaresound.net/perf/perf-tut-count-hw-events/}}
+}
+
+@inproceedings{DBLP:conf/sc/ItzkowitzWAK03,
+ author ={Marty Itzkowitz and Brian J.  N. Wylie  and Christopher Aoki and Nicolai Kosche},
+ title = {Memory Profiling using Hardware Counters},
+ booktitle = {SC '03: Proc. of the 2003 ACM/IEEE Conf. on Supercomputing},
+ year = {2003},
+ unusedisbn = {1-58113-695-1},
+ pages = {17},
+ publisher = {IEEE Computer Society},
+ address = {Washington, DC, USA},
+}
+
+@inproceedings{ibs-sc,
+  Author = {Xu Liu and John M. {Mellor-Crummey}},
+  Booktitle = {Proc. of the 2013 ACM/IEEE Conference on Supercomputing},
+  Date-Added = {2009-06-15 22:10:24 +0100},
+  Date-Modified = {2009-10-29 20:45:09 -0500},
+  Keywords = {perftool-hpctoolkit},
+  Title = {A Data-centric Profiler for Parallel Programs},
+  Year = {2013},
+  address = {Denver, CO, USA}}
+
+@inproceedings{ibs-pact,
+ author = {Liu, Xu and Sharma, Kamal and Mellor-Crummey, John},
+ title = {ArrayTool: A Lightweight Profiler to Guide Array Regrouping},
+ booktitle = {Proceedings of the 23rd International Conference on Parallel Architectures and Compilation},
+ series = {PACT '14},
+ year = {2014},
+ isbn = {978-1-4503-2809-8},
+ location = {Edmonton, AB, Canada},
+ pages = {405--416},
+ numpages = {12},
+ url = {http://doi.acm.org/10.1145/2628071.2628102},
+ doi = {10.1145/2628071.2628102},
+ acmid = {2628102},
+ publisher = {ACM},
+ address = {New York, NY, USA},
+ keywords = {array regrouping, array-centric profiling, data locality},
+}
+
+@inproceedings{Sheng:2011:RLN:1985793.1985848,
+ author = {Sheng, Tianwei and Vachharajani, Neil and Eranian, Stephane and Hundt, Robert and Chen, Wenguang and Zheng, Weimin},
+ title = {RACEZ: A Lightweight and Non-invasive Race Detection Tool for Production Applications},
+ booktitle = {Proceedings of the 33rd International Conference on Software Engineering},
+ series = {ICSE '11},
+ year = {2011},
+ isbn = {978-1-4503-0445-0},
+ location = {Waikiki, Honolulu, HI, USA},
+ pages = {401--410},
+ numpages = {10},
+ url = {http://doi.acm.org/10.1145/1985793.1985848},
+ doi = {10.1145/1985793.1985848},
+ acmid = {1985848},
+ publisher = {ACM},
+ address = {New York, NY, USA},
+ keywords = {data races, performance monitoring unit, probability analysis, sampling},
+} 
+
+@INPROCEEDINGS{LASER,
+author={L. Luo and A. Sriraman and B. Fugate and S. Hu and G. Pokam and C. J. Newburn and J. Devietti},
+booktitle={2016 IEEE International Symposium on High Performance Computer Architecture (HPCA)},
+title={LASER: Light, Accurate Sharing dEtection and Repair},
+year={2016},
+pages={261-273},
+month={March},}
+
 @inproceedings{Cling,
  author = {Akritidis, Periklis},
  title = {Cling: A Memory Allocator to Mitigate Dangling Pointers},
@@ -302,6 +397,55 @@ howpublished={\url{https://www.openbsd.org/papers/eurobsdcon2009/otto-malloc.pdf
  publisher = {USENIX Association},
  address = {Berkeley, CA, USA},
 } 
+
+@misc{IntelArch:PEBS:Sept09,
+author = {{Intel Corporation}},
+title ={{Intel 64 and IA-32} Architectures Software Developer's Manual,
+{Volume 3B}: System Programming Guide, {Part 2, Number 253669-032}},
+month={June},
+year={2010},
+howpublished2={\url{http://www.intel.com/Assets/PDF/manual/253669.pdf}},
+lastaccessed={Last accessed: Dec. 16, 2009.}}
+
+
+@misc{AMDIBS:07,
+author = {Paul J. Drongowski},
+title ={Instruction-Based Sampling: A New Performance Analysis Technique for {AMD} Family 10h Processors},
+month={November},
+year={2007},
+howpublished={\url{http://developer.amd.com/Assets/AMD\_IBS\_paper\_EN.pdf}},
+note={Last accessed: Dec. 13, 2013.}
+}
+
+@inproceedings{weaver2013linux,
+  title={Linux perf\_event features and overhead},
+  author={Weaver, Vincent M},
+  booktitle={The 2nd International Workshop on Performance Analysis of Workload Optimized Systems, FastPath},
+  volume={13},
+  year={2013}
+}
+
+@article{coorporation1997using,
+  title={Using the rdtsc instruction for performance monitoring},
+  author={Coorporation, Intel},
+  journal={Techn. Ber., Tech. Rep., Intel Coorporation},
+  pages={22},
+  year={1997}
+}
+
+@misc{rdtscoverhead,
+  title = {Instruction tables: Lists of instruction latencies, throughputs and micro-operation breakdowns for Intel, AMD and VIA CPUs}
+  author = {Agner Fog}
+  year = {2018}, 
+  howpublished={\url{https://www.agner.org/optimize/instruction_tables.pdf}},
+} 
+
+@misc{pitfallsrdtsc,
+  title = {Pitfalls of TSC usage}, 
+  author = {Oliver Yang},
+  year = {2015}, 
+  howpublished={\url{http://oliveryang.net/2015/09/pitfalls-of-TSC-usage/}},
+}
 
 @misc{OpenBSD,
 author = {Otto Moerbeek},

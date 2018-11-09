@@ -11,6 +11,8 @@
 \label{sec:understandingallocators}
 
 
+ First, different allocators may require different ranges of virtual memory from the underlying OS. For instance, the Linux allocator's main arena (expanding with \texttt{sbrk} system call) is far from other arenas obtained with \texttt{mmap} system calls. Second, the number of regions ranges from few to successive   
+There are multiple factors may affect the design: the default Linux allocator extends its heap differently with the \texttt{sbrk} system call, making one of its heap arena far from other arenas (making it difficult to design the virtual memory)? Secure allocators, such as OpenBSD and DieHarder, may invoke one \texttt{mmap} to obtain one page from the OS. That is, there are a large number of mappings inside the OS. This fact makes some general data structures not suitable to support the fast lookup, such as a hash map or the range tree.
 \subsection{Profiling Performance Overhead}
 
 We differentiate the big objects and small objects. 
