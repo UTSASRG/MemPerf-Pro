@@ -2,11 +2,13 @@
 
 #include <stdio.h>
 
+#include "libmallocprof.h"
 #include "memsample.h"
 #include "real.hh"
 
 extern __thread thread_data thrData;
 
+extern "C" void setThreadContention();
 extern "C" void printHashMap();
 extern "C" pid_t gettid();
 void* myMalloc(size_t);
@@ -47,6 +49,9 @@ class xthreadx {
 	static void * startThread(void * arg) {
 
 		myThreadID = pthread_self();
+  
+    // set thread local storeage
+    setThreadContention(); 
 
 		#ifdef USE_THREAD_LOCAL
 			initMyLocalMem();
@@ -57,7 +62,7 @@ class xthreadx {
 		thread_t * current = (thread_t *) arg;
 
 		pid_t tid = gettid();
-		current->tid = tid;
+		thrData.tid = tid;
 
 		#ifdef THREAD_OUTPUT
 		pid_t pid = getpid();
@@ -107,6 +112,8 @@ class xthreadx {
 		if(thrData.output) {
 			fclose(thrData.output);
 		}
+
+		globalizeTAD();
 
 		close(perfInfo.perf_fd_fault);
 		close(perfInfo.perf_fd_tlb_reads);

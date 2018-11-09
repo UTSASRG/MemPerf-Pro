@@ -90,11 +90,11 @@ void doPerfRead() {
 
 	if(thrData.output) {
 			fprintf(thrData.output, "\n");
-			fprintf(thrData.output, ">>> tot page faults      %ld\n", perf.faults);
-			fprintf(thrData.output, ">>> tot TLB read misses  %ld\n", perf.tlb_read_misses);
-			fprintf(thrData.output, ">>> tot TLB write misses %ld\n", perf.tlb_write_misses);
-			fprintf(thrData.output, ">>> tot cache misses     %ld\n", perf.cache_misses);
-			fprintf(thrData.output, ">>> tot instructions     %ld\n", perf.instructions);
+			fprintf(thrData.output, ">>> total page faults        %ld\n", perf.faults);
+			fprintf(thrData.output, ">>> total TLB read misses    %ld\n", perf.tlb_read_misses);
+			fprintf(thrData.output, ">>> total TLB write misses   %ld\n", perf.tlb_write_misses);
+			fprintf(thrData.output, ">>> total cache misses       %ld\n", perf.cache_misses);
+			fprintf(thrData.output, ">>> total instructions       %ld\n", perf.instructions);
 	}
 }
 

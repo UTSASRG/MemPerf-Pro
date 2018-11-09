@@ -12,12 +12,12 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <sys/types.h>
-#include <libmallocprof.h>
-#include <real.hh>
-#include <hashmap.hh>
-#include <hashfuncs.hh>
-#include <spinlock.hh>
-#include <selfmap.hh>
+#include "../libmallocprof.h"
+#include "../real.hh"
+#include "../hashmap.hh"
+#include "../hashfuncs.hh"
+#include "../spinlock.hh"
+#include "../selfmap.hh"
 
 #define BUFFER_SIZE 4096000 * 4
 #define PAGE_SIZE 4096
