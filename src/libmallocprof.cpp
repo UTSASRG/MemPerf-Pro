@@ -71,7 +71,7 @@ uint64_t smap_samples = 0;
 uint64_t smap_sample_cycles = 0;
 struct itimerspec stopTimer;
 struct itimerspec resumeTimer;
-unsigned timer_nsec = 200000000;
+unsigned timer_nsec = 333000000;
 unsigned timer_sec = 0;
 //Smaps Sampling-------------//
 
@@ -380,9 +380,8 @@ void printMyMemUtilization () {
 }
 
 void exitHandler() {
-	fprintf(stderr, "\nEntering exitHandler\n");
+//	fprintf(stderr, "\nEntering exitHandler\n");
 
-	getchar();
 	inRealMain = false;
 	#ifndef NO_PMU
 	doPerfRead();
@@ -406,13 +405,13 @@ void exitHandler() {
 		fclose(thrData.output);
 	}
 
-	if (smap_samples != 0) {
-		uint64_t avg = (smap_sample_cycles / smap_samples);
-		fprintf(stderr, "smap_samples: %lu, avg cycles: %lu\n", smap_samples, avg);
-	}
-	else {
-		fprintf(stderr, "smap_samples was 0\n");
-	}
+//	if (smap_samples != 0) {
+//		uint64_t avg = (smap_sample_cycles / smap_samples);
+//		fprintf(stderr, "smap_samples: %lu, avg cycles: %lu\n", smap_samples, avg);
+//	}
+//	else {
+//		fprintf(stderr, "smap_samples was 0\n");
+//	}
 	
 	fprintf(stderr, "---WorstCaseOverhead---\n"
 					"PhysicalMem:          %lu\n"
@@ -442,7 +441,7 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
 
 	inRealMain = true;
 	int result = real_main_mallocprof (argc, argv, envp);
-	fprintf(stderr, "real main has returned");
+//	fprintf(stderr, "real main has returned");
 	return result;
 }
 
@@ -1671,7 +1670,7 @@ void sampleMemoryOverhead(int i, siginfo_t* s, void* p) {
 		abort();
 	}
 	
-	uint64_t startTime = rdtscp();
+//	uint64_t startTime = rdtscp();
 	smap_samples++;
 	int numSmapEntries = 0;
 	int numSkips = 0;
@@ -1764,14 +1763,14 @@ void sampleMemoryOverhead(int i, siginfo_t* s, void* p) {
 		worstCaseOverhead.efficiency = e;
 	}
 	fclose(smaps_infile);
-	uint64_t endTime = rdtscp();
+//	uint64_t endTime = rdtscp();
 
-	smap_sample_cycles += (endTime - startTime);
-	fprintf(stderr, "leaving sample, %d smap entries\n"
-					"bytes= %lu, blowup= %zu, alignment= %zu\n"
-					"skips= %d, hits= %d, cycles: %lu\nefficiency= %.5f\n",
-					numSmapEntries, bytes, blowupBytes, alignBytes,
-					numSkips, numHeapMatches, (endTime-startTime), e);
+//	smap_sample_cycles += (endTime - startTime);
+//	fprintf(stderr, "leaving sample, %d smap entries\n"
+//					"bytes= %lu, blowup= %zu, alignment= %zu\n"
+//					"skips= %d, hits= %d, cycles: %lu\nefficiency= %.5f\n",
+//					numSmapEntries, bytes, blowupBytes, alignBytes,
+//					numSkips, numHeapMatches, (endTime-startTime), e);
 
 	if (timer_settime(smap_timer, 0, &resumeTimer, NULL) == -1) {
 		perror("timer_settime failed");
@@ -1835,7 +1834,7 @@ void start_smaps() {
 		fprintf(stderr, "[%d]->kb      %u\n", i, smapsDontCheck[i]->kb);
 	}
 	fclose(smaps_infile);
-	fprintf(stderr, "numDontCheck %d\n", smapsDontCheckNumEntries);
+//	fprintf(stderr, "numDontCheck %d\n", smapsDontCheckNumEntries);
 
 //	getchar();
 }
