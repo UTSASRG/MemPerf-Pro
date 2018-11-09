@@ -23,7 +23,6 @@ bool ShadowMemory::initialize() {
 	if((void *)(mega_map_begin = (PageMapEntry **)mmap((void *)MEGABYTE_MAP_START, MEGABYTE_MAP_SIZE,
 									PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0)) == MAP_FAILED) {
 			perror("mmap of global megabyte map failed");
-			//return false;
 			abort();			// temporary, remove and replace with return false after testing
 	}
 
@@ -31,7 +30,6 @@ bool ShadowMemory::initialize() {
 	if((void *)(page_map_begin = (PageMapEntry *)mmap((void *)PAGE_MAP_START, PAGE_MAP_SIZE,
 									PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0)) == MAP_FAILED) {
 			perror("mmap of global page map failed");
-			//return false;
 			abort();			// temporary, remove and replace with return false after testing
 	}
 	page_map_bump_ptr = page_map_begin;
@@ -40,7 +38,6 @@ bool ShadowMemory::initialize() {
 	if((void *)(cache_map_begin = (CacheMapEntry *)mmap((void *)CACHE_MAP_START, CACHE_MAP_SIZE,
 									PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0)) == MAP_FAILED) {
 			perror("mmap of cache map region failed");
-			//return false;
 			abort();			// temporary, remove and replace with return false after testing
 	}
 	cache_map_bump_ptr = cache_map_begin;
@@ -88,20 +85,24 @@ unsigned ShadowMemory::updateObject(void * address, size_t size) {
 
 unsigned ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_index, unsigned page_index, unsigned size) {
 		bool isFree = (size == 0);
-		size_t classSize;
-		//size_t classSize = getClassSizeFor(size);
-		//if(!classSize) {
-		if(bibop) {
-				classSize = getClassSizeFor(size);
-		} else {
-				classSize = libc_malloc_usable_size(size);
-		}
-		fprintf(stderr, "updatePages(%#lx, %u) : isFree ?= %s, bibop ?= %s, classSize = %zu\n",
-						uintaddr, size, boolToStr(isFree), boolToStr(bibop), classSize);
+		size_t classSize = 0;
 
 		if(isFree) {
+				// If this is a free operation, we will need the object's true size in order to calculate
+				// the proper number of pages and cachelines needed to be updated.
 				size = getObjectSize(uintaddr, mega_index, page_index);
+		} else {
+				// If this is an allocation request, we will also need the object's class size so that we may
+				// store it in each PageMapEntry associated with each page of this object.
+				if(bibop) {
+						classSize = getClassSizeFor(size);
+				} else {
+						classSize = libc_malloc_usable_size(size);
+				}
 		}
+
+		fprintf(stderr, "updatePages(%#lx, %u) : isFree ?= %s, bibop ?= %s, classSize = %zu, size = %u\n",
+						uintaddr, size, boolToStr(isFree), boolToStr(bibop), classSize, size);
 
 		unsigned curPageIdx;
 		unsigned firstPageOffset = (uintaddr & PAGESIZE_MASK);
@@ -113,7 +114,7 @@ unsigned ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_index,
 		int size_remain = size;
 		PageMapEntry * current;
 
-		fprintf(stderr, "> obj 0x%lx sz %u : numPages >= %u, page_index = %d, firstPageOffset = %u\n",
+		fprintf(stderr, ">   obj 0x%lx sz %u : numPages >= %u, page_index = %d, firstPageOffset = %u\n",
 						uintaddr, size, numPages, page_index, firstPageOffset);
 
 		curPageIdx = page_index;
@@ -123,7 +124,7 @@ unsigned ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_index,
 				// Fetch the page map entry for the page located in the specified megabyte.
 				current = getPageMapEntry(mega_index, curPageIdx);
 				curPageBytes = PAGESIZE - firstPageOffset;
-				fprintf(stderr, "> obj 0x%lx sz %u : current = %p, updating page %u, contrib size = %u\n",
+				fprintf(stderr, ">   obj 0x%lx sz %u : current = %p, updating page %u, contrib size = %u\n",
 								uintaddr, size, current, curPageIdx, curPageBytes);
 				if(isFree) {
 						current->subUsedBytes(curPageBytes);
@@ -135,7 +136,11 @@ unsigned ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_index,
 						}
 				}
 				size_remain -= curPageBytes;
-				current->setClassSize(classSize);
+				// Do not clear the page's class size on free -- this will be cleared
+				// when the pages are re-utilized for use by a new object or mapping.
+				if(!isFree) {
+						current->setClassSize(classSize);
+				}
 				curPageIdx++;
 		}
 		// Next, loop until we have accounted for all object bytes...
@@ -146,7 +151,7 @@ unsigned ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_index,
 				// there.
 				if(size_remain >= PAGESIZE) {
 						curPageBytes = PAGESIZE;
-						fprintf(stderr, "> obj 0x%lx sz %u : current = %p, updating page %u, contrib size = %u\n",
+						fprintf(stderr, ">   obj 0x%lx sz %u : current = %p, updating page %u, contrib size = %u\n",
 										uintaddr, size, current, curPageIdx, curPageBytes);
 						if(isFree) {
 								current->setUsedBytes(0);
@@ -161,7 +166,7 @@ unsigned ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_index,
 				// increment this final page by the amount remaining.
 				} else {
 						curPageBytes = size_remain;
-						fprintf(stderr, "> obj 0x%lx sz %u : current = %p, updating page %u, contrib size = %u\n",
+						fprintf(stderr, ">   obj 0x%lx sz %u : current = %p, updating page %u, contrib size = %u\n",
 										uintaddr, size, current, curPageIdx, curPageBytes);
 						if(isFree) {
 								current->subUsedBytes(curPageBytes);
@@ -174,7 +179,11 @@ unsigned ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_index,
 						}
 				}
 				size_remain -= curPageBytes;
-				current->setClassSize(classSize);
+				// Do not clear the page's class size on free -- this will be cleared
+				// when the pages are re-utilized for use by a new object or mapping.
+				if(!isFree) {
+						current->setClassSize(classSize);
+				}
 				curPageIdx++;
 		}
 
@@ -186,7 +195,7 @@ unsigned ShadowMemory::getPageClassSize(void * address) {
 
 		unsigned long mega_index = (uintaddr >> LOG2_MEGABYTE_SIZE);
 		if(mega_index > NUM_MEGABYTE_MAP_ENTRIES) {
-				fprintf(stderr, "ERROR: mega index of 0x%lx too large: %lu > %u\n",
+				fprintf(stderr, "ERROR: mega index of 0x%lx is too large: %lu > %u\n",
 								uintaddr, mega_index, NUM_MEGABYTE_MAP_ENTRIES);
 				abort();
 		}
@@ -204,7 +213,16 @@ unsigned ShadowMemory::getPageClassSize(unsigned long mega_index, unsigned page_
 unsigned ShadowMemory::getObjectSize(uintptr_t uintaddr, unsigned long mega_index, unsigned page_index) {
 		unsigned classSize = getPageClassSize(mega_index, page_index);
 
+		// Check to see if this is a large object -- we will have no size class info if it is.
+		if(getClassSizeFor(classSize) > malloc_mmap_threshold) {
+				return classSize;	
+		}
+		
 		uint32_t * ptrToSentinel = (uint32_t *)(uintaddr + classSize - OBJECT_SIZE_SENTINEL_SIZE);
+		fprintf(stderr, "getObjectSize(%#lx, %lu, %u) : bibop ?= %s, page's classSize = %u, sentinel @ %p\n",
+						uintaddr, mega_index, page_index, boolToStr(bibop), classSize, ptrToSentinel);
+
+		//uint32_t * ptrToSentinel = (uint32_t *)(uintaddr + classSize - OBJECT_SIZE_SENTINEL_SIZE);
 		fprintf(stderr, "getObjectSize(%#lx, %lu, %u) : bibop ?= %s, page's classSize = %u, sentinel @ %p, sentinel bytes = 0x%x\n",
 						uintaddr, mega_index, page_index, boolToStr(bibop), classSize, ptrToSentinel, *ptrToSentinel);
 
@@ -239,6 +257,7 @@ unsigned ShadowMemory::getObjectSize(void * address) {
 }
 
 
+// need to differentiate between size = 0 for a malloc(0) or a free() -- maybe use a sentinel value?
 bool ShadowMemory::updateObjectSize(uintptr_t uintaddr, unsigned size) {
 		unsigned classSize;
 		if(bibop) {
@@ -247,10 +266,14 @@ bool ShadowMemory::updateObjectSize(uintptr_t uintaddr, unsigned size) {
 				classSize = libc_malloc_usable_size(size);
 		}
 
+		if(classSize > malloc_mmap_threshold) {
+				classSize = getPageClassSize((void *)uintaddr);
+		}
+
 		// We cannot (nor should we need to) write a size of zero in the last bytes of a freed object;
 		// this is critical because libc uses this area to store its own object sizes after the object
 		// has been freed.
-		if((size > 0) && (size <= MAX_OBJECT_SIZE) && (classSize - size >= OBJECT_SIZE_SENTINEL_SIZE)) {
+		if((size > 0) && (size <= MAX_OBJECT_SIZE) && (size <= malloc_mmap_threshold) && (classSize - size >= OBJECT_SIZE_SENTINEL_SIZE)) {
 				uint32_t * ptrToSentinel = (uint32_t *)(uintaddr + classSize - OBJECT_SIZE_SENTINEL_SIZE);
 				fprintf(stderr, "updateObjectSize(%#lx, %u) : bibop ?= %s, classSize = %u, sentinel @ %p, sentinel bytes = 0x%x\n",
 								uintaddr, size, boolToStr(bibop), classSize, ptrToSentinel, *ptrToSentinel);
@@ -264,7 +287,7 @@ bool ShadowMemory::updateObjectSize(uintptr_t uintaddr, unsigned size) {
 				}
 				*ptrToSentinel = OBJECT_SIZE_SENTINEL | size;
 		} else {
-				fprintf(stderr, "> object too large to store size in sentinel area -- will use page's classSize value later\n");
+				fprintf(stderr, "> is free() or object too large to store size in sentinel area -- will use page's classSize value later\n");
 		}
 
 		return true;

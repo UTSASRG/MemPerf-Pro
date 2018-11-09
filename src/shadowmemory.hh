@@ -49,6 +49,7 @@
 extern bool bibop;
 extern bool isLibc;
 extern char * allocator_name;
+extern size_t malloc_mmap_threshold;
 extern __thread thread_data thrData;
 
 typedef enum {
