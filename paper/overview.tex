@@ -94,10 +94,17 @@ The average time for each lock acquisition can be employed to confirm the lock c
 
 At the same time, \MP{} also acquires the time within the critical section. This could help expose whether the lock contention is due to the heavy workload inside the critical section or not. This may require the programmers to take two different actions. For instance, if the contention is high, but the average time inside the critical section is low, then this allocator should possibly distribute its management to multiple threads. In contrast, if the average time inside the critical section is high, then the allocator should possibly move some computation out of the critical section. 
 
+%In order to reduce unnecessary contention, \MP{} avoids the cache-line based contention. In particular, it utilizes a thread-local pointer that saves the address of thread-local storage. 
+
 \subsubsection{Kernel Contention}
-\MP{} plans to evaluate the kernel contention caused by the allocators. \MP{} does not require to change the kernel directly achieve this target. Instead, \MP{} monitors the duration time of memory-related system calls, such as \texttt{mmap}, \texttt{munmap}, \texttt{madvise}, \texttt{sbrk}, \texttt{madvise}, or \texttt{mremap}. By examining the source code of the Linux kernel, they will acquire a process-based lock (e.g. ) upon the entry of these system calls, causing the kernel-level contention.   
+\MP{} evaluates the kernel contention caused by the allocators. \MP{} does not require to change the kernel directly to achieve this target. Instead, \MP{} monitors the duration time of memory-related system calls inside the user space, such as \texttt{mmap}, \texttt{munmap}, \texttt{madvise}, \texttt{sbrk}, \texttt{madvise}, or \texttt{mremap}. By examining the source code of the Linux kernel, they will acquire a process-based lock (e.g. \texttt{mmap\_sem}) upon the entry of these system calls, causing the kernel-level contention.   
+
+\MP{} intercepts the invocations of such system calls, utilizes the RDTSC timestamps to collect the duration time of each system calls, and saves the duration and the number of invocations to the thread-local storage. In the end, it can compute the average time and the number of invocations for each system call. Similarly, the average time can be compared with the time without the contention. Therefore, it is easy to know whether there exists kernel contention or not. Therefore, the allocator can be improved by avoiding such frequent system calls. This method helps to expose some issues of the Glibc allocators, which causes significant slowdown on one application. 
 
   
+%\MP{} also tracks the virtual memory regions by analyzing these system calls. 
+
+\begin{comment}
    the information can be utilized to tell whether an allocator has significant  
 As we all know, memory allocators may invoke multiple system calls inside allocation and deallocation. 
 User space contention:
@@ -107,11 +114,15 @@ How many lock acquisitions? How much time are spending on lock waiting for each 
 How much time spending on kernel-space contention? For instance, we could infer from memory-related system calls, such as mmap, munmap, madvise, brk, or something else? 
 
 That is, we may have to integrate with SyncPerf for doing this. We will borrow their implementation in order to do this. 
+\end{comment}
 
 \subsubsection{Application Friendliness} 
-How many page faults and cache misses that are caused by applications? 
+\MP{} further tracks the application friendliness of different allocators, which may explain the performance difference when using different allocators. For application friendliness, \MP{} currently focuses on cache and page level only. For cache, \MP{} focuses on the cache utilization and cache contention rate. For page, \MP{} aims to uncover the page utilization ratio. These factors could substantially affect the performance of applications. 
 
-How many remote accesses? How many interconnect messages? We may employ the PMU mechanism to identify the information.
+Cache utilization rate indicates the percentage of cache line are utilized for holding the actual heap data. Memory allocators may significantly affect this ratio. For instance, some allocators (e.g. Linux allocator) may collocate the metadata with the actual heap objects. This method, although improving the speed of memory management, will reduce the cache utilization rate and cause more cache misses unnecessarily. 
+Also, if memory allocators cannot quickly re-utilize the freed objects, due to concurrent memory management or using FIFO method to manage freed objects, they can also cause low cache utilization rate. Page utilization rate indicates the percentage of a page that are actively utilized for holding the actual heap data. Similarly, if per page utilization rate is low, it may cause high TLB misses and prohibitive memory consumption. \MP{} detects both cache utilization and page utilization rate, with hardware performance counters support. Basically, \MP{} will sample memory accesses, and check the corresponding cache utilization rate and page utilization rate of the corresponding cache line and page. Overall, \MP{} could report an average cache utilization rate and page utilization rate over all samples. 
+
+\MP{} further checks cache contention rate, which is another important metrics that may significantly affect the performance of applications, although it is not designed as a tool of cache contention detection. For cache contention rate, \MP{} reports the percentage of memory accesses that will cause a cache invalidation.  Similarly, \MP{} also utilizes the sampling mechanism provided by hardware performance counters. Upon each sampled event, \MP{} checks whether the current access causes a cache invalidation or not, and reports the percentage of sampled accesses that could cause the cache invalidation. Basically, \MP{} maintains the cache line ownership for sampled memory accesses, which thread is the last one to write on this cache line. The idea is similar to Cheetah~\cite{Cheetah}. But there are two differences from Cheetah: (1) Cheetah focuses on the identification of false sharing, while \MP{} tries to obtain the basic knowledge about cache contention, including both false sharing and true sharing. During the implementation, Cheetah collects both read/write information of each word, but \MP{} only focuses on the cache line level. (2)  Cheetah only focuses on the cache line with serious issues, which only performs the detection when the number of write accesses on a cache line is over a pre-defined threshold. \MP{} treats every cache line uniformly, and always tracks the cache invalidation information for each cache line. 
 
 \subsection{Technical Challenges}
 
