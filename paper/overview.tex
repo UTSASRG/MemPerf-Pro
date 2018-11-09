@@ -126,7 +126,7 @@ Also, if memory allocators cannot quickly re-utilize the freed objects, due to c
 
 \subsection{Technical Challenges}
 
-As described above, \MP{} employs hardware PMU, RDTSC, and simple counters together to perform the profiling. Also, as described above, there are some challenges. 
+As described above, \MP{} employs hardware PMU, RDTSC, and simple counters together to perform the profiling. But there are some technical 
  
 
 How to support the default Linux allocator, since it actually utilizes some internal function calls, which cannot be intercepted by \MP{} normally. Therefore, we actually migrated its allocator as a separate library, as other allocators. This allows \MP{} to intercept all lock acquisitions, system calls as usual. 
