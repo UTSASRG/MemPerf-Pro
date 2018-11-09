@@ -111,10 +111,13 @@ int pthread_mutex_trylock (pthread_mutex_t *mutex) {
 int pthread_mutex_unlock(pthread_mutex_t *mutex) {
   if (!realInitialized) RealX::initializer();
 
-  current_tc->lock_counter--;
-  if(current_tc->lock_counter == 0) {
-    uint64_t duration = rdtscp() - current_tc->critical_section_start;
-    current_tc->critical_section_duration += duration;
+  // if it is  used by allocation
+  if (inAllocation) {
+    current_tc->lock_counter--;
+    if(current_tc->lock_counter == 0) {
+      uint64_t duration = rdtscp() - current_tc->critical_section_start;
+      current_tc->critical_section_duration += duration;
+    }
   }
 
   return RealX::pthread_mutex_unlock (mutex);
@@ -176,9 +179,9 @@ int madvise(void *addr, size_t length, int advice){
   }
 
   if (advice == MADV_DONTNEED) {
-    ShadowMemory::cleanupPages((uintptr_t)addr, length);
-    if(current_tc->totalMemoryUsage > length) {
-      current_tc->totalMemoryUsage -= length;
+    uint64_t returned = PAGESIZE * ShadowMemory::cleanupPages((uintptr_t)addr, length);
+    if(current_tc->totalMemoryUsage > returned) {
+      current_tc->totalMemoryUsage -= returned;
     }
   }
 
@@ -241,8 +244,9 @@ int munmap(void *addr, size_t length) {
   current_tc->munmap_waits++;
   current_tc->munmap_wait_cycles += (timeStop - timeStart);
 
-  if(current_tc->totalMemoryUsage > length) {
-    current_tc->totalMemoryUsage -= length;
+  uint64_t returned = PAGESIZE * ShadowMemory::cleanupPages((intptr_t)addr, length);
+  if(current_tc->totalMemoryUsage > returned) {
+			current_tc->totalMemoryUsage -= returned;
   }
 
   mappings.erase((intptr_t)addr);
@@ -312,6 +316,7 @@ void writeThreadContention() {
     fprintf (thrData.output, ">>> mprotect_waits       %lu\n", data->mprotect_waits);
     fprintf (thrData.output, ">>> mprotect_wait_cycle  %lu\n\n", data->mprotect_wait_cycles);
     fprintf (thrData.output, ">>> realMemoryUsage      %lu\n", data->realMemoryUsage);
+    fprintf (thrData.output, ">>> realAllocatedMemoryUsage      %lu\n", data->realAllocatedMemoryUsage);
     fprintf (thrData.output, ">>> totalMemoryUsage     %lu\n", data->totalMemoryUsage);
     fprintf (thrData.output, ">>> critical_section_duration  %lu\n\n", data->critical_section_duration);
   }

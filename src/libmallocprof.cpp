@@ -342,6 +342,7 @@ __attribute__((constructor)) initStatus initializer() {
 	stopTimer.it_interval.tv_sec = 0;
 	stopTimer.it_interval.tv_nsec = 0;
 	
+	worstCaseOverhead.efficiency = 100.00;
 	setupSignalHandler();
 	startSignalTimer();
 
@@ -412,14 +413,18 @@ void exitHandler() {
 	else {
 		fprintf(stderr, "smap_samples was 0\n");
 	}
+	
+	fprintf(stderr, "---WorstCaseOverhead---\n"
+					"PhysicalMem:          %lu\n"
+					"Alignment:            %lu\n"
+					"Blowup:               %lu\n"
+					"Efficiency:           %.4f\n"
+					"-----------------------\n",
+					worstCaseOverhead.kb,
+					worstCaseOverhead.alignment,
+					worstCaseOverhead.blowup,
+					worstCaseOverhead.efficiency);
 
-	if (d_myMemUsage) {
-		printMyMemUtilization();
-		if (d_dumpHashmaps) {
-			dumpHashmaps();
-		}
-		fprintf(stderr, "Leaving exitHandler..\n\n");
-	}
 }
 
 // MallocProf's main function
@@ -498,7 +503,7 @@ extern "C" {
 		void* object;
 
 		//Do before
-		fprintf(stderr, "malloc(%zu) -> ??, before doBefore, allocData.address = %#lx\n", sz, allocData.address);
+//		fprintf(stderr, "malloc(%zu) -> ??, before doBefore, allocData.address = %#lx\n", sz, allocData.address);
 		doBefore(&allocData);
 
 		//Do allocation
@@ -506,7 +511,7 @@ extern "C" {
 		allocData.address = (uint64_t)object;
 
 		//Do after
-		fprintf(stderr, "malloc(%zu) -> %p, allocData.address = %#lx\n", sz, object, allocData.address);
+//		fprintf(stderr, "malloc(%zu) -> %p, allocData.address = %#lx\n", sz, object, allocData.address);
 		doAfter(&allocData);
 
 		allocData.cycles = allocData.tsc_after - allocData.tsc_before;
@@ -610,21 +615,21 @@ extern "C" {
 		allocation_metadata allocData = init_allocation(0, FREE);
 		allocData.address = reinterpret_cast <uint64_t> (ptr);
 
-		fprintf(stderr, "free(%p), before doBefore, allocData.address = %#lx\n", ptr, allocData.address);
+//		fprintf(stderr, "free(%p), before doBefore, allocData.address = %#lx\n", ptr, allocData.address);
 		//Do before free
 		doBefore(&allocData);
 
 		//Do free
 		RealX::free(ptr);
 
+    decrementMemoryUsage(ptr);
+
 		//Do after free
-		fprintf(stderr, "free(%p), allocData.address = %#lx\n", ptr, allocData.address);
+//		fprintf(stderr, "free(%p), allocData.address = %#lx\n", ptr, allocData.address);
 		doAfter(&allocData);
 
 		//Update free counters
 		allocData.classSize = updateFreeCounters(allocData.address);
-
-    decrementMemoryUsage(ptr);
 
     //thread_local
     inAllocation = false;
@@ -1445,7 +1450,8 @@ void incrementMemoryUsage(size_t size) {
     classSize = ShadowMemory::libc_malloc_usable_size(size);
   }
 
-  current_tc->realMemoryUsage += classSize;
+  current_tc->realAllocatedMemoryUsage += classSize;
+  current_tc->realMemoryUsage += size;
 }
 
 void decrementMemoryUsage(void* addr) {
@@ -1454,8 +1460,10 @@ void decrementMemoryUsage(void* addr) {
   unsigned classSize = ShadowMemory::getPageClassSize(addr);
   if(isLibc) {
     classSize = malloc_usable_size(addr);
-  }
-  current_tc->realMemoryUsage -= classSize;
+  } 
+
+  current_tc->realAllocatedMemoryUsage -= classSize;
+  current_tc->realMemoryUsage -= ShadowMemory::getObjectSize(addr);
 }
 
 void collectAllocMetaData(allocation_metadata *metadata) {
@@ -1728,6 +1736,7 @@ void sampleMemoryOverhead(int i, siginfo_t* s, void* p) {
 				currentCaseOverhead.kb += kb;
 				numHeapMatches++;
 				match = true;
+				break;
 			}
 			else continue;
 		}
@@ -1748,8 +1757,8 @@ void sampleMemoryOverhead(int i, siginfo_t* s, void* p) {
 	double e = ((bytes - blowupBytes - alignBytes) / (float)bytes);
 
 	//Compare to current worst case
-	if (e < worstCaseOverhead.efficiency) {
-		worstCaseOverhead.kb = currentCaseOverhead.kb;
+	if (!(e >= 1) && e < worstCaseOverhead.efficiency) {
+		worstCaseOverhead.kb = bytes;
 		worstCaseOverhead.alignment = alignBytes;
 		worstCaseOverhead.blowup = blowupBytes;
 		worstCaseOverhead.efficiency = e;

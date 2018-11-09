@@ -44,8 +44,8 @@ bool ShadowMemory::initialize() {
 
 	isInitialized = E_MAP_INIT_DONE; 
 
-	fprintf(stderr, "mega_map_begin = %p, page_map_begin = %p, cache_map_begin = %p\n",
-			mega_map_begin, page_map_begin, cache_map_begin);
+//	fprintf(stderr, "mega_map_begin = %p, page_map_begin = %p, cache_map_begin = %p\n",
+//			mega_map_begin, page_map_begin, cache_map_begin);
 
 	return true;
 }
@@ -74,7 +74,7 @@ unsigned ShadowMemory::updateObject(void * address, size_t size) {
 		// the megabyte map using the page map bump pointer if the entry is null. In other words,
 		// do not comment out or remove this line.
 		PageMapEntry ** mega_entry = getMegaMapEntry(mega_index);
-		fprintf(stderr, "> mega_entry = %p, *mega_entry = %p, mega_index = %lu\n", mega_entry, *mega_entry, mega_index);
+//		fprintf(stderr, "> mega_entry = %p, *mega_entry = %p, mega_index = %lu\n", mega_entry, *mega_entry, mega_index);
 
 		unsigned numNewPagesTouched = updatePages(uintaddr, mega_index, firstPageIdx, size);
 		PageMapEntry::updateCacheLines(uintaddr, mega_index, firstPageIdx, size);
@@ -101,8 +101,8 @@ unsigned ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_index,
 				}
 		}
 
-		fprintf(stderr, "updatePages(%#lx, %u) : isFree ?= %s, bibop ?= %s, classSize = %zu, size = %u\n",
-						uintaddr, size, boolToStr(isFree), boolToStr(bibop), classSize, size);
+//		fprintf(stderr, "updatePages(%#lx, %u) : isFree ?= %s, bibop ?= %s, classSize = %zu, size = %u\n",
+//						uintaddr, size, boolToStr(isFree), boolToStr(bibop), classSize, size);
 
 		unsigned curPageIdx;
 		unsigned firstPageOffset = (uintaddr & PAGESIZE_MASK);
@@ -114,8 +114,8 @@ unsigned ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_index,
 		int size_remain = size;
 		PageMapEntry * current;
 
-		fprintf(stderr, ">   obj 0x%lx sz %u : numPages >= %u, page_index = %d, firstPageOffset = %u\n",
-						uintaddr, size, numPages, page_index, firstPageOffset);
+//		fprintf(stderr, ">   obj 0x%lx sz %u : numPages >= %u, page_index = %d, firstPageOffset = %u\n",
+//						uintaddr, size, numPages, page_index, firstPageOffset);
 
 		curPageIdx = page_index;
 		// First test to determine whether this object begins on a page boundary. If not, then we must
@@ -124,8 +124,8 @@ unsigned ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_index,
 				// Fetch the page map entry for the page located in the specified megabyte.
 				current = getPageMapEntry(mega_index, curPageIdx);
 				curPageBytes = PAGESIZE - firstPageOffset;
-				fprintf(stderr, ">   obj 0x%lx sz %u : current = %p, updating page %u, contrib size = %u\n",
-								uintaddr, size, current, curPageIdx, curPageBytes);
+//				fprintf(stderr, ">   obj 0x%lx sz %u : current = %p, updating page %u, contrib size = %u\n",
+//								uintaddr, size, current, curPageIdx, curPageBytes);
 				if(isFree) {
 						current->subUsedBytes(curPageBytes);
 				} else {
@@ -151,8 +151,8 @@ unsigned ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_index,
 				// there.
 				if(size_remain >= PAGESIZE) {
 						curPageBytes = PAGESIZE;
-						fprintf(stderr, ">   obj 0x%lx sz %u : current = %p, updating page %u, contrib size = %u\n",
-										uintaddr, size, current, curPageIdx, curPageBytes);
+//						fprintf(stderr, ">   obj 0x%lx sz %u : current = %p, updating page %u, contrib size = %u\n",
+//										uintaddr, size, current, curPageIdx, curPageBytes);
 						if(isFree) {
 								current->setUsedBytes(0);
 						} else {
@@ -166,8 +166,8 @@ unsigned ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_index,
 				// increment this final page by the amount remaining.
 				} else {
 						curPageBytes = size_remain;
-						fprintf(stderr, ">   obj 0x%lx sz %u : current = %p, updating page %u, contrib size = %u\n",
-										uintaddr, size, current, curPageIdx, curPageBytes);
+//						fprintf(stderr, ">   obj 0x%lx sz %u : current = %p, updating page %u, contrib size = %u\n",
+//										uintaddr, size, current, curPageIdx, curPageBytes);
 						if(isFree) {
 								current->subUsedBytes(curPageBytes);
 						} else {
@@ -219,23 +219,23 @@ unsigned ShadowMemory::getObjectSize(uintptr_t uintaddr, unsigned long mega_inde
 		}
 		
 		uint32_t * ptrToSentinel = (uint32_t *)(uintaddr + classSize - OBJECT_SIZE_SENTINEL_SIZE);
-		fprintf(stderr, "getObjectSize(%#lx, %lu, %u) : bibop ?= %s, page's classSize = %u, sentinel @ %p\n",
-						uintaddr, mega_index, page_index, boolToStr(bibop), classSize, ptrToSentinel);
+//		fprintf(stderr, "getObjectSize(%#lx, %lu, %u) : bibop ?= %s, page's classSize = %u, sentinel @ %p\n",
+//						uintaddr, mega_index, page_index, boolToStr(bibop), classSize, ptrToSentinel);
 
 		//uint32_t * ptrToSentinel = (uint32_t *)(uintaddr + classSize - OBJECT_SIZE_SENTINEL_SIZE);
-		fprintf(stderr, "getObjectSize(%#lx, %lu, %u) : bibop ?= %s, page's classSize = %u, sentinel @ %p, sentinel bytes = 0x%x\n",
-						uintaddr, mega_index, page_index, boolToStr(bibop), classSize, ptrToSentinel, *ptrToSentinel);
+//		fprintf(stderr, "getObjectSize(%#lx, %lu, %u) : bibop ?= %s, page's classSize = %u, sentinel @ %p, sentinel bytes = 0x%x\n",
+//						uintaddr, mega_index, page_index, boolToStr(bibop), classSize, ptrToSentinel, *ptrToSentinel);
 
 		if(((*ptrToSentinel) & OBJECT_SIZE_SENTINEL_MASK) == OBJECT_SIZE_SENTINEL) {
 				uint32_t objSize = (*ptrToSentinel) & OBJECT_SIZE_MASK;
-				fprintf(stderr, "> sentinel found @ %p, object size = %u\n",
-								ptrToSentinel, objSize);
+//				fprintf(stderr, "> sentinel found @ %p, object size = %u\n",
+//								ptrToSentinel, objSize);
 				return objSize;
 		} else {
 				if(isLibc) {
 						classSize = malloc_usable_size((void *)uintaddr);
 				}
-				fprintf(stderr, "> sentinel not found, using class size of %u\n", classSize);
+//				fprintf(stderr, "> sentinel not found, using class size of %u\n", classSize);
 				return classSize;
 		}
 }
@@ -275,19 +275,19 @@ bool ShadowMemory::updateObjectSize(uintptr_t uintaddr, unsigned size) {
 		// has been freed.
 		if((size > 0) && (size <= MAX_OBJECT_SIZE) && (size <= malloc_mmap_threshold) && (classSize - size >= OBJECT_SIZE_SENTINEL_SIZE)) {
 				uint32_t * ptrToSentinel = (uint32_t *)(uintaddr + classSize - OBJECT_SIZE_SENTINEL_SIZE);
-				fprintf(stderr, "updateObjectSize(%#lx, %u) : bibop ?= %s, classSize = %u, sentinel @ %p, sentinel bytes = 0x%x\n",
-								uintaddr, size, boolToStr(bibop), classSize, ptrToSentinel, *ptrToSentinel);
+//				fprintf(stderr, "updateObjectSize(%#lx, %u) : bibop ?= %s, classSize = %u, sentinel @ %p, sentinel bytes = 0x%x\n",
+//								uintaddr, size, boolToStr(bibop), classSize, ptrToSentinel, *ptrToSentinel);
 
 				if(((*ptrToSentinel) & OBJECT_SIZE_SENTINEL_MASK) == OBJECT_SIZE_SENTINEL) {
 						uint32_t objSize = (*ptrToSentinel) & OBJECT_SIZE_MASK;
-						fprintf(stderr, "> sentinel found @ %p, current object size is %u, updating to %u\n",
-										ptrToSentinel, objSize, size);
+//						fprintf(stderr, "> sentinel found @ %p, current object size is %u, updating to %u\n",
+//										ptrToSentinel, objSize, size);
 				} else {
-						fprintf(stderr, "> previous sentinel not found, updating object size to %u\n", size);
+//						fprintf(stderr, "> previous sentinel not found, updating object size to %u\n", size);
 				}
 				*ptrToSentinel = OBJECT_SIZE_SENTINEL | size;
 		} else {
-				fprintf(stderr, "> is free() or object too large to store size in sentinel area -- will use page's classSize value later\n");
+//				fprintf(stderr, "> is free() or object too large to store size in sentinel area -- will use page's classSize value later\n");
 		}
 
 		return true;
@@ -305,7 +305,9 @@ inline unsigned ShadowMemory::libc_malloc_usable_size(unsigned size) {
 		}
 }
 
-bool ShadowMemory::cleanupPages(uintptr_t uintaddr, size_t length) {
+unsigned ShadowMemory::cleanupPages(uintptr_t uintaddr, size_t length) {
+		unsigned numTouchedPages = 0;
+
 		// First compute the megabyte number of the given address.
 		unsigned long mega_index = (uintaddr >> LOG2_MEGABYTE_SIZE);
 		if(mega_index > NUM_MEGABYTE_MAP_ENTRIES) {
@@ -317,28 +319,31 @@ bool ShadowMemory::cleanupPages(uintptr_t uintaddr, size_t length) {
 		unsigned firstPageIdx = ((uintaddr & MEGABYTE_MASK) >> LOG2_PAGESIZE);
 
 		PageMapEntry ** mega_entry = getMegaMapEntry(mega_index);
-		fprintf(stderr, "> mega_entry = %p, *mega_entry = %p, mega_index = %lu\n", mega_entry, *mega_entry, mega_index);
+//		fprintf(stderr, "> mega_entry = %p, *mega_entry = %p, mega_index = %lu\n", mega_entry, *mega_entry, mega_index);
 
 		length = alignup(length, PAGESIZE);
-		fprintf(stderr, "%s(%#lx, %zu)\n", __FUNCTION__, uintaddr, length);
+//		fprintf(stderr, "%s(%#lx, %zu)\n", __FUNCTION__, uintaddr, length);
 
 
 		unsigned curPageIdx;
 		unsigned numPages = length >> LOG2_PAGESIZE;
 		PageMapEntry * current;
 
-		fprintf(stderr, "> obj %#lx len %zu : numPages = %u, firstPageIdx = %u\n",
-						uintaddr, length, numPages, firstPageIdx);
+//		fprintf(stderr, "> obj %#lx len %zu : numPages = %u, firstPageIdx = %u\n",
+//						uintaddr, length, numPages, firstPageIdx);
 
 		// Next, loop until we have accounted for all mapping bytes...
 		for(curPageIdx = firstPageIdx; curPageIdx < firstPageIdx + numPages; curPageIdx++) {
 				current = getPageMapEntry(mega_index, curPageIdx);
-				fprintf(stderr, "> obj %#lx len %zu : current = %p, updating page %u to size 0\n",
-								uintaddr, length, current, curPageIdx);
+//				fprintf(stderr, "> obj %#lx len %zu : current = %p, updating page %u to size 0\n",
+//								uintaddr, length, current, curPageIdx);
+				if(current->isTouched()) {
+						numTouchedPages++;
+				}
 				current->clear();
 		}
 
-		return true;
+		return numTouchedPages;
 }
 
 void PageMapEntry::clear() {
@@ -384,8 +389,8 @@ PageMapEntry * ShadowMemory::getPageMapEntry(unsigned long mega_idx, unsigned pa
 		PageMapEntry ** mega_entry = getMegaMapEntry(rel_mega_index);
 		PageMapEntry * targetPage = (*mega_entry + rel_page_index);
 
-		fprintf(stderr, "> getPageMapEntry(%lu, %u) -> rel_mega_index=%u, rel_page_index=%u, targetPage=%p\n",
-					mega_idx, page_idx, rel_mega_index, rel_page_index, targetPage);
+//		fprintf(stderr, "> getPageMapEntry(%lu, %u) -> rel_mega_index=%u, rel_page_index=%u, targetPage=%p\n",
+//					mega_idx, page_idx, rel_mega_index, rel_page_index, targetPage);
 
 		return targetPage;
 		//return (*mega_entry + rel_page_index);
@@ -397,10 +402,10 @@ PageMapEntry ** ShadowMemory::getMegaMapEntry(unsigned long mega_index) {
 		if(__builtin_expect(*mega_entry == NULL, 0)) {
 				// Create a new page entries
 				*mega_entry = doPageMapBumpPointer();
-				fprintf(stderr, "> entry not found: page map bump ptr is now = %p\n", page_map_bump_ptr);
+//				fprintf(stderr, "> entry not found: page map bump ptr is now = %p\n", page_map_bump_ptr);
 		} else {
 				// Update the existing entries
-				fprintf(stderr, "> found! mega_entry = %p, *mega_entry = %p\n", mega_entry, *mega_entry);
+//				fprintf(stderr, "> found! mega_entry = %p, *mega_entry = %p\n", mega_entry, *mega_entry);
 		}
 
 		return mega_entry;
@@ -429,9 +434,9 @@ CacheMapEntry * PageMapEntry::getCacheMapEntry(unsigned long mega_idx, unsigned 
 		PageMapEntry * targetPage = ShadowMemory::getPageMapEntry(target_mega_idx, target_page_idx);
 		CacheMapEntry * targetCache = targetPage->getCacheMapEntry_helper() + target_cache_idx;
 
-		fprintf(stderr, "> getCacheMapEntry(%lu, %u, %u) -> rel_page_idx=%u, target_mega_idx=%u, target_page_idx=%u, target_cache_idx=%u\n"
-										"-> targetPage=%p, targetCache=%p\n", mega_idx, page_idx, cache_idx, rel_page_idx, target_mega_idx, target_page_idx,
-										target_cache_idx, targetPage, targetCache);
+//		fprintf(stderr, "> getCacheMapEntry(%lu, %u, %u) -> rel_page_idx=%u, target_mega_idx=%u, target_page_idx=%u, target_cache_idx=%u\n"
+//										"-> targetPage=%p, targetCache=%p\n", mega_idx, page_idx, cache_idx, rel_page_idx, target_mega_idx, target_page_idx,
+//										target_cache_idx, targetPage, targetCache);
 
 		return targetCache;
 }
@@ -454,12 +459,12 @@ bool PageMapEntry::subUsedBytes(unsigned num_bytes) {
 		assert(num_used_bytes - num_bytes >= 0);
 		num_used_bytes -= num_bytes;
 		if(num_used_bytes < 0) {
-				fprintf(stderr, "subUsedBytes(%u) : PageMapEntry=%p : WARNING: num_used_bytes == %u < 0\n",
-								num_bytes, this, num_used_bytes);
+//				fprintf(stderr, "subUsedBytes(%u) : PageMapEntry=%p : WARNING: num_used_bytes == %u < 0\n",
+//								num_bytes, this, num_used_bytes);
 				num_used_bytes = 0;
 		} else if(num_used_bytes > PAGESIZE) {
-				fprintf(stderr, "subUsedBytes(%u) : PageMapEntry=%p : WARNING: num_used_bytes == %u > %d\n",
-								num_bytes, this, num_used_bytes, PAGESIZE);
+//				fprintf(stderr, "subUsedBytes(%u) : PageMapEntry=%p : WARNING: num_used_bytes == %u > %d\n",
+//								num_bytes, this, num_used_bytes, PAGESIZE);
 				num_used_bytes = PAGESIZE;
 		}
 		return true;
@@ -481,15 +486,15 @@ bool PageMapEntry::updateCacheLines(uintptr_t uintaddr, unsigned long mega_index
 		int size_remain = size;
 		CacheMapEntry * current;
 
-		fprintf(stderr, "> obj 0x%lx sz %u : numCacheLines >= %u, firstCacheLineIdx = %d, firstCacheLineOffset = %u\n",
-						uintaddr, size, numCacheLines, firstCacheLineIdx, firstCacheLineOffset);
+//		fprintf(stderr, "> obj 0x%lx sz %u : numCacheLines >= %u, firstCacheLineIdx = %d, firstCacheLineOffset = %u\n",
+//						uintaddr, size, numCacheLines, firstCacheLineIdx, firstCacheLineOffset);
 
 		curCacheLineIdx = firstCacheLineIdx;
 		if(firstCacheLineOffset) {
 				current = getCacheMapEntry(mega_index, page_index, curCacheLineIdx);
 				curCacheLineBytes = CACHELINE_SIZE - firstCacheLineOffset;
-				fprintf(stderr, "> obj 0x%lx sz %u : current = %p, updating cache line %u, contrib size = %u\n",
-								uintaddr, size, current, curCacheLineIdx, curCacheLineBytes);
+//				fprintf(stderr, "> obj 0x%lx sz %u : current = %p, updating cache line %u, contrib size = %u\n",
+//								uintaddr, size, current, curCacheLineIdx, curCacheLineBytes);
 				if(isFree) {
 						current->subUsedBytes(curCacheLineBytes);
 				} else {
@@ -503,8 +508,8 @@ bool PageMapEntry::updateCacheLines(uintptr_t uintaddr, unsigned long mega_index
 				current = getCacheMapEntry(mega_index, page_index, curCacheLineIdx);
 				if(size_remain >= CACHELINE_SIZE) {
 						curCacheLineBytes = CACHELINE_SIZE;
-						fprintf(stderr, "> obj 0x%lx sz %u : current = %p, updating cache line %u, contrib size = %u\n",
-										uintaddr, size, current, curCacheLineIdx, curCacheLineBytes);
+//						fprintf(stderr, "> obj 0x%lx sz %u : current = %p, updating cache line %u, contrib size = %u\n",
+//										uintaddr, size, current, curCacheLineIdx, curCacheLineBytes);
 						if(isFree) {
 								current->setUsedBytes(0);
 						} else {
@@ -512,8 +517,8 @@ bool PageMapEntry::updateCacheLines(uintptr_t uintaddr, unsigned long mega_index
 						}
 				} else {
 						curCacheLineBytes = size_remain;
-						fprintf(stderr, "> obj 0x%lx sz %u : current = %p, updating cache line %u, contrib size = %u\n",
-										uintaddr, size, current, curCacheLineIdx, curCacheLineBytes);
+//						fprintf(stderr, "> obj 0x%lx sz %u : current = %p, updating cache line %u, contrib size = %u\n",
+//										uintaddr, size, current, curCacheLineIdx, curCacheLineBytes);
 						if(isFree) {
 								current->subUsedBytes(curCacheLineBytes);
 						} else {
@@ -542,10 +547,10 @@ CacheMapEntry * PageMapEntry::getCacheMapEntry_helper() {
 				//ShadowMemory::cache_map_bump_ptr += NUM_CACHELINES_PER_PAGE;
 				//cache_map_entry = ShadowMemory::cache_map_bump_ptr;
 				cache_map_entry = ShadowMemory::doCacheMapBumpPointer();
-				fprintf(stderr, "> cur page cache map entry is empty: cache map bump ptr is now = %p\n", cache_map_entry);
+//				fprintf(stderr, "> cur page cache map entry is empty: cache map bump ptr is now = %p\n", cache_map_entry);
 		} else {
 				// Update the existing entries
-				fprintf(stderr, "> cur page cache map entry is found! cache_map_entry = %p\n", cache_map_entry);
+//				fprintf(stderr, "> cur page cache map entry is found! cache_map_entry = %p\n", cache_map_entry);
 		}
 
 		return cache_map_entry;

@@ -43,6 +43,7 @@ typedef struct {
 	uint64_t mprotect_wait_cycles = 0;
 
   uint64_t realMemoryUsage = 0;
+  uint64_t realAllocatedMemoryUsage = 0;
   uint64_t totalMemoryUsage = 0;
   
   uint64_t lock_counter = 0;
