@@ -480,6 +480,8 @@ extern "C" {
 		// Gets overhead, address usage, mmap usage, memHWM, and prefInfo
 		analyzeAllocation(&allocData);
 
+    incrementMemoryUsage(sz);
+
 		// thread_local
 		inAllocation = false;
 
@@ -532,6 +534,8 @@ extern "C" {
 		// Gets overhead, address usage, mmap usage, memHWM, and perfInfo
 		analyzeAllocation(&allocData);
 
+    incrementMemoryUsage(nelem * elsize);
+
 		//thread_local
 		inAllocation = false;
 
@@ -582,6 +586,11 @@ extern "C" {
 
 		//Update free counters
 		allocData.classSize = updateFreeCounters(allocData.address);
+
+    decrementMemoryUsage(ptr);
+
+    //thread_local
+    inAllocation = false;
 
 		//Update atomics
 		cycles_free += (allocData.tsc_after - allocData.tsc_before);
@@ -658,6 +667,9 @@ extern "C" {
 		//Gets overhead, address usage, mmap usage
 		// analyzeAllocation(sz, address, cyclesForRealloc, classSize, &reused);
 		analyzeAllocation(&allocData);
+
+    if(object != ptr)
+      incrementMemoryUsage(sz);
 
 		//Get perf info
 		//analyzePerfInfo(&before, &after, classSize, &reused, tid);
@@ -1391,6 +1403,28 @@ void doAfter (allocation_metadata *metadata) {
 	metadata->tsc_after = rdtscp();
 	#warning TODO: use the return value of updateObject to increment totalMemoryUsage
 	ShadowMemory::updateObject((void *)metadata->address, metadata->size);
+  current_tc->totalMemoryUsage += PAGESIZE * ShadowMemory::updateObject((void *)metadata->address, metadata->size);
+}
+
+void incrementMemoryUsage(size_t size) {
+  size_t classSize = 0;
+  if(bibop) {
+    classSize = getClassSizeFor(size);
+  } else {
+    classSize = ShadowMemory::libc_malloc_usable_size(size);
+  }
+
+  current_tc->realMemoryUsage += classSize;
+}
+
+void decrementMemoryUsage(void* addr) {
+  if(addr == NULL) return;
+  
+  unsigned classSize = ShadowMemory::getPageClassSize(addr);
+  if(isLibc) {
+    classSize = malloc_usable_size(addr);
+  }
+  current_tc->realMemoryUsage -= classSize;
 }
 
 void collectAllocMetaData(allocation_metadata *metadata) {

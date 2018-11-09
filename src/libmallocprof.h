@@ -40,6 +40,13 @@ typedef struct {
 	uint64_t mremap_wait_cycles = 0;
 	uint64_t mprotect_waits = 0;
 	uint64_t mprotect_wait_cycles = 0;
+
+  uint64_t realMemoryUsage = 0;
+  uint64_t totalMemoryUsage = 0;
+  
+  uint64_t lock_counter = 0;
+  uint64_t critical_section_start = 0;
+  uint64_t critical_section_duration = 0;
 } __attribute__((__aligned__(64))) ThreadContention;
 
 typedef struct {
@@ -148,6 +155,8 @@ void analyzeAllocation(allocation_metadata *metadata);
 void calculateMemOverhead ();
 void doBefore(allocation_metadata *metadata);
 void doAfter(allocation_metadata *metadata);
+void incrementMemoryUsage(size_t size);
+void decrementMemoryUsage(void* addr);
 void getAddressUsage(size_t size, uint64_t address, uint64_t cycles);
 void getAlignment(size_t size, size_t classSize);
 void getBlowup(size_t size, size_t classSize, bool*);

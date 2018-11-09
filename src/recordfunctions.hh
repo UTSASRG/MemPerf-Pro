@@ -48,9 +48,8 @@ void setThreadContention() {
     fprintf(stderr, "Please increase thread number: MAX_THREAD_NUMBER, %d\n", MAX_THREAD_NUMBER);
     abort();
   }
-  fprintf(stderr, "current %d\n", current_index);
   current_tc = &all_threadcontention_array[current_index];  
-  current_tc->tid = pthread_self();
+  current_tc->tid = gettid();
 }
 
 /* ************************Synchronization******************************** */
@@ -73,6 +72,11 @@ int pthread_mutex_lock(pthread_mutex_t *mutex) {
   
   current_tc->mutex_waits++;
   current_tc->mutex_wait_cycles += (timeStop - timeStart);
+
+  if(current_tc->lock_counter == 0) {
+    current_tc->critical_section_start = timeStop;
+  }
+  current_tc->lock_counter++;
 
   return result;
 }
@@ -103,14 +107,20 @@ int pthread_mutex_trylock (pthread_mutex_t *mutex) {
 
   return result;
 }
+*/
 
 // PTHREAD_MUTEX_UNLOCK
 int pthread_mutex_unlock(pthread_mutex_t *mutex) {
   if (!realInitialized) RealX::initializer();
 
+  current_tc->lock_counter--;
+  if(current_tc->lock_counter == 0) {
+    uint64_t duration = rdtscp() - current_tc->critical_section_start;
+    current_tc->critical_section_duration += duration;
+  }
+
   return RealX::pthread_mutex_unlock (mutex);
 }
-*/
 
 /* ************************Synchronization End******************************** */
 
@@ -156,12 +166,6 @@ void * yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offs
     #endif
     ShadowMemory::cleanupPages(address, length);
   }
-  else {
-    if (d_mmap) printf ("mmap from unknown source: length= %zu, prot= %d\n", length, prot);
-#ifdef MAPPINGS
-    mappings.insert(address, newMmapTuple(address, length, prot, 'u'));
-#endif
-  }
 
   // total_mmaps++;
 
@@ -175,6 +179,13 @@ int madvise(void *addr, size_t length, int advice){
 
   if (!inAllocation) {
     return RealX::madvise(addr, length, advice);
+  }
+
+  if (advice == MADV_DONTNEED) {
+    ShadowMemory::cleanupPages((uintptr_t)addr, length);
+    if(current_tc->totalMemoryUsage > length) {
+      current_tc->totalMemoryUsage -= length;
+    }
   }
 
   uint64_t timeStart = rdtscp();
@@ -242,6 +253,10 @@ int munmap(void *addr, size_t length) {
   current_tc->munmap_waits++;
   current_tc->munmap_wait_cycles += (timeStop - timeStart);
 
+  if(current_tc->totalMemoryUsage > length) {
+    current_tc->totalMemoryUsage -= length;
+  }
+
 #ifdef MAPPINGS
   mappings.erase((intptr_t)addr);
 #endif
@@ -291,28 +306,31 @@ void *mremap(void *old_address, size_t old_size, size_t new_size,
 
 void writeThreadContention() {
 
-	fprintf (thrData.output, "\n--------------------ThreadContention--------------------\n\n");
+  fprintf (thrData.output, "\n--------------------ThreadContention--------------------\n\n");
 
-	for (int i=0; i<=threadcontention_index; i++) {
+  for (int i=0; i<=threadcontention_index; i++) {
     ThreadContention* data = &all_threadcontention_array[i];
 
-		fprintf (thrData.output, ">>> tid                  %lu\n", data->tid);
-		fprintf (thrData.output, ">>> mutex_waits          %lu\n", data->mutex_waits);
-		fprintf (thrData.output, ">>> mutex_wait_cycles    %lu\n", data->mutex_wait_cycles);
-		fprintf (thrData.output, ">>> mutex_trylock_fails  %lu\n", data->mutex_trylock_fails);
-		fprintf (thrData.output, ">>> mmap_waits           %lu\n", data->mmap_waits);
-		fprintf (thrData.output, ">>> mmap_wait_cycles     %lu\n", data->mmap_wait_cycles);
-		fprintf (thrData.output, ">>> sbrk_waits           %lu\n", data->sbrk_waits);
-		fprintf (thrData.output, ">>> sbrk_wait_cycles     %lu\n", data->sbrk_wait_cycles);
-		fprintf (thrData.output, ">>> madvise_waits        %lu\n", data->madvise_waits);
-		fprintf (thrData.output, ">>> madvise_wait_cycles  %lu\n", data->madvise_wait_cycles);
-		fprintf (thrData.output, ">>> munmap_waits         %lu\n", data->munmap_waits);
-		fprintf (thrData.output, ">>> munmap_wait_cycles   %lu\n", data->munmap_wait_cycles);
-		fprintf (thrData.output, ">>> mremap_waits         %lu\n", data->mremap_waits);
-		fprintf (thrData.output, ">>> mremap_wait_cycles   %lu\n", data->mremap_wait_cycles);
-		fprintf (thrData.output, ">>> mprotect_waits       %lu\n", data->mprotect_waits);
-		fprintf (thrData.output, ">>> mprotect_wait_cycle  %lu\n\n", data->mprotect_wait_cycles);
-	}
+    fprintf (thrData.output, ">>> tid                  %lu\n", data->tid);
+    fprintf (thrData.output, ">>> mutex_waits          %lu\n", data->mutex_waits);
+    fprintf (thrData.output, ">>> mutex_wait_cycles    %lu\n", data->mutex_wait_cycles);
+    fprintf (thrData.output, ">>> mutex_trylock_fails  %lu\n", data->mutex_trylock_fails);
+    fprintf (thrData.output, ">>> mmap_waits           %lu\n", data->mmap_waits);
+    fprintf (thrData.output, ">>> mmap_wait_cycles     %lu\n", data->mmap_wait_cycles);
+    fprintf (thrData.output, ">>> sbrk_waits           %lu\n", data->sbrk_waits);
+    fprintf (thrData.output, ">>> sbrk_wait_cycles     %lu\n", data->sbrk_wait_cycles);
+    fprintf (thrData.output, ">>> madvise_waits        %lu\n", data->madvise_waits);
+    fprintf (thrData.output, ">>> madvise_wait_cycles  %lu\n", data->madvise_wait_cycles);
+    fprintf (thrData.output, ">>> munmap_waits         %lu\n", data->munmap_waits);
+    fprintf (thrData.output, ">>> munmap_wait_cycles   %lu\n", data->munmap_wait_cycles);
+    fprintf (thrData.output, ">>> mremap_waits         %lu\n", data->mremap_waits);
+    fprintf (thrData.output, ">>> mremap_wait_cycles   %lu\n", data->mremap_wait_cycles);
+    fprintf (thrData.output, ">>> mprotect_waits       %lu\n", data->mprotect_waits);
+    fprintf (thrData.output, ">>> mprotect_wait_cycle  %lu\n\n", data->mprotect_wait_cycles);
+    fprintf (thrData.output, ">>> realMemoryUsage      %lu\n", data->realMemoryUsage);
+    fprintf (thrData.output, ">>> totalMemoryUsage     %lu\n", data->totalMemoryUsage);
+    fprintf (thrData.output, ">>> critical_section_duration  %lu\n\n", data->critical_section_duration);
+  }
 }
 
 #endif
