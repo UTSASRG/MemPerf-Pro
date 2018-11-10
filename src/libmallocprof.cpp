@@ -612,12 +612,12 @@ extern "C" {
 		allocation_metadata allocData = init_allocation(0, FREE);
 		allocData.address = reinterpret_cast <uint64_t> (ptr);
 
-		fprintf(stderr, "free(%p), before doBefore, allocData.address = %#lx\n", ptr, allocData.address);
+		//fprintf(stderr, "free(%p), before doBefore, allocData.address = %#lx\n", ptr, allocData.address);
 		//Do before free
 		doBefore(&allocData);
 
     decrementMemoryUsage(ptr);
-		#warning Note for Hongyu: we don't need this here in free, do we?
+		#warning Note for Hongyu: we dont need this here in free, do we? return value from updateObject should be 0?
 		//current_tc->totalMemoryUsage += PAGESIZE * ShadowMemory::updateObject((void *)allocData.address, allocData.size);
 		ShadowMemory::updateObject((void *)allocData.address, allocData.size, true);
 
@@ -1632,19 +1632,6 @@ void initMyLocalMem() {
 	myLocalMemEnd = (void*) ((char*)myLocalMem + LOCAL_BUF_SIZE);
 	myLocalPosition = 0;
 	myLocalMemInitialized = true;
-}
-
-// Comparison function used by red-black tree (rb_param unused)
-int compare_ptr(const void *rb_a, const void *rb_b, void *rb_param) {
-		return -1;
-
-		/*
-    ShadowMemory * node_a = (ShadowMemory *)rb_a;
-    ShadowMemory * node_b = (ShadowMemory *)rb_b;
-
-    //return node_b->compare(node_a);
-    return node_a->compare(node_b);
-		*/
 }
 
 void sampleMemoryOverhead(int i, siginfo_t* s, void* p) {
