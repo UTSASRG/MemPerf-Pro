@@ -249,7 +249,7 @@ __attribute__((constructor)) initStatus initializer() {
 
 //	addressUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 	lockUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 128);
-	overhead.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
+	overhead.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 256);
 //	threadContention.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 	mappings.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 	mapsInitialized = true;
@@ -399,7 +399,7 @@ void exitHandler() {
 	if(thrData.output) {
 		fflush(thrData.output);
 	}
-//	writeAllocData();
+	writeAllocData();
 //	writeContention();
 	if(thrData.output) {
 		fclose(thrData.output);
@@ -874,12 +874,10 @@ size_t updateFreeCounters(uint64_t address) {
 		//Increase the free object counter for this class size
 		//GetSizeIndex returns class size for bibop
 		//0 or 1 for bump pointer / 0 for small, 1 for large objects
-		if (size <= malloc_mmap_threshold) {
-			short class_size_index = getClassSizeIndex(size);
-			localFreeArray[class_size_index]++;
-			globalFreeArray[class_size_index]++;
-			if (d_updateCounters) printf ("globalFreeArray[%d]++\n", class_size_index);
-		}
+		short class_size_index = getClassSizeIndex(size);
+		localFreeArray[class_size_index]++;
+		globalFreeArray[class_size_index]++;
+		if (d_updateCounters) printf ("globalFreeArray[%d]++\n", class_size_index);
 	}
 
 	else {freed_bytes += size;}
@@ -963,6 +961,7 @@ void getAlignment (size_t size, size_t classSize) {
 			alignment_bytes += alignment;
 		}
 	}
+//	else fprintf(stderr, "Didn't find classSize in overhead\n");
 }
 
 void getBlowup (size_t size, size_t classSize, bool* reused) {
@@ -1203,26 +1202,13 @@ void writeAllocData () {
 	if (d_trace) fprintf(stderr, "Entering writeAllocData()\n");
 
 	fprintf(thrData.output, ">>> malloc_mmaps             %u\n", malloc_mmaps);
-	// fprintf(thrData.output, ">>> total_mmaps              %u\n", total_mmaps);
 	fprintf(thrData.output, ">>> malloc_mmap_threshold    %zu\n", malloc_mmap_threshold);
-	// fprintf(thrData.output, ">>> threads                  %u\n", threads);
-
-	// fprintf(thrData.output, ">>> pthread_mutex_lock       %u\n", num_pthread_mutex_locks);
-	// fprintf(thrData.output, ">>> num_trylock              %u\n", num_trylock);
 	fprintf(thrData.output, ">>> num_madvise              %u\n", num_madvise);
 	fprintf(thrData.output, ">>> num_sbrk                 %u\n", num_sbrk);
 	fprintf(thrData.output, ">>> size_sbrk                %u\n", size_sbrk);
-//	fprintf(thrData.output, ">>> blowup_allocations       %u\n", blowup_allocations);
-//	fprintf(thrData.output, ">>> total_blowup             %zu\n", total_blowup);
-//	fprintf(thrData.output, ">>> blowup_bytes             %zu\n", blowup_bytes.load());
 	fprintf(thrData.output, ">>> alignment                %zu\n", alignment);
-//	fprintf(thrData.output, ">>> metadata_object          %zu\n", metadata_object);
-//	fprintf(thrData.output, ">>> metadata_overhead        %zu\n", metadata_overhead);
-//	fprintf(thrData.output, ">>> totalSizeAlloc           %zu\n", totalSizeAlloc);
-//	fprintf(thrData.output, ">>> totalMemOverhead         %zu\n", totalMemOverhead);
-//	fprintf(thrData.output, ">>> memEfficiency            %.2f%%\n", memEfficiency);
 
-	writeOverhead();
+//	writeOverhead();
 
 //	writeMappings();
 

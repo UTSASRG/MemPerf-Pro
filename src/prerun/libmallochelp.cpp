@@ -22,7 +22,9 @@
 #define BUFFER_SIZE 4096000 * 4
 #define PAGE_SIZE 4096
 
+
 //Library Information Globals
+bool isLibc;
 bool inAllocation = false;
 bool inGetAllocStyle = false;
 bool lookingForLargeObject = false;
@@ -162,15 +164,15 @@ int helper_main (int argc, char ** argv, char ** envp) {
 	void* result;
 	int create, join;
 	create = pthread_create(&worker, NULL, &thread_start, nullptr);
-	if (create != 0) fprintf(stderr, "Error creating thread");
-	else fprintf(stderr, "Thread created");
+	if (create != 0) fprintf(stderr, "Error creating thread\n");
+	else fprintf(stderr, "Thread created\n");
 	join = pthread_join(worker, &result);
-	if (join != 0) fprintf(stderr, "Error joining thread");
-	else fprintf(stderr, "Worker joined");
+	if (join != 0) fprintf(stderr, "Error joining thread\n");
+	else fprintf(stderr, "Worker joined\n");
 
 	selfmap::getInstance().getTextRegions();
 	allocator_name = strrchr(allocator_name, '/') + 1;
-	char* period = strrchr(allocator_name, '.');
+	char* period = strchr(allocator_name, '.');
 	uint64_t bytes = (uint64_t)period - (uint64_t)allocator_name;
 	size_t extensionBytes = 6;
 	char filename[bytes+extensionBytes];
@@ -190,7 +192,7 @@ void exitHandler() {
 	fprintf (outputFile, "style %s\n", bibop ? "bibop" : "bump_pointer");
 	if (bibop) writeClassSizes();
 	fprintf (outputFile, "malloc_mmap_threshold %zu\n", malloc_mmap_threshold);
-	fprintf (outputFile, "sbrk_threshold %zu\n", sbrk_threshold);
+//	fprintf (outputFile, "sbrk_threshold %zu\n", sbrk_threshold);
 	fprintf (outputFile, "metadata_object %zu\n", metadata_object);
 
 	fflush(outputFile);
