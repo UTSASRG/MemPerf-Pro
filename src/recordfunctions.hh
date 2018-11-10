@@ -111,14 +111,14 @@ int pthread_mutex_trylock (pthread_mutex_t *mutex) {
 int pthread_mutex_unlock(pthread_mutex_t *mutex) {
   if (!realInitialized) RealX::initializer();
 
-  // if it is  used by allocation
-  if (inAllocation) {
-    current_tc->lock_counter--;
-    if(current_tc->lock_counter == 0) {
-      uint64_t duration = rdtscp() - current_tc->critical_section_start;
-      current_tc->critical_section_duration += duration;
-    }
-  }
+	// if it is  used by allocation
+	if (inAllocation) {
+			current_tc->lock_counter--;
+			if(current_tc->lock_counter == 0) {
+					uint64_t duration = rdtscp() - current_tc->critical_section_start;
+					current_tc->critical_section_duration += duration;
+			}
+	}
 
   return RealX::pthread_mutex_unlock (mutex);
 }
@@ -154,14 +154,12 @@ void * yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offs
     current_tc->mmap_wait_cycles += (timeStop - timeStart);
 
     mappings.insert(address, newMmapTuple(address, length, prot, 'a'));
-    ShadowMemory::cleanupPages(address, length);
   }
   //Need to check if selfmap.getInstance().getTextRegions() has
   //ran. If it hasn't, we can't call isAllocatorInCallStack()
   else if (selfmapInitialized && isAllocatorInCallStack()) {
     if (d_mmap) printf ("mmap allocator in callstack: length= %zu, prot= %d\n", length, prot);
     mappings.insert(address, newMmapTuple(address, length, prot, 's'));
-    ShadowMemory::cleanupPages(address, length);
   }
 
   // total_mmaps++;
@@ -179,9 +177,9 @@ int madvise(void *addr, size_t length, int advice){
   }
 
   if (advice == MADV_DONTNEED) {
-    uint64_t returned = PAGESIZE * ShadowMemory::cleanupPages((uintptr_t)addr, length);
-    if(current_tc->totalMemoryUsage > returned) {
-      current_tc->totalMemoryUsage -= returned;
+			uint64_t returned = PAGESIZE * ShadowMemory::cleanupPages((uintptr_t)addr, length);
+			if(current_tc->totalMemoryUsage > returned) {
+					current_tc->totalMemoryUsage -= returned;
     }
   }
 
@@ -244,8 +242,8 @@ int munmap(void *addr, size_t length) {
   current_tc->munmap_waits++;
   current_tc->munmap_wait_cycles += (timeStop - timeStart);
 
-  uint64_t returned = PAGESIZE * ShadowMemory::cleanupPages((intptr_t)addr, length);
-  if(current_tc->totalMemoryUsage > returned) {
+	uint64_t returned = PAGESIZE * ShadowMemory::cleanupPages((intptr_t)addr, length);
+	if(current_tc->totalMemoryUsage > returned) {
 			current_tc->totalMemoryUsage -= returned;
   }
 
@@ -316,7 +314,7 @@ void writeThreadContention() {
     fprintf (thrData.output, ">>> mprotect_waits       %lu\n", data->mprotect_waits);
     fprintf (thrData.output, ">>> mprotect_wait_cycle  %lu\n\n", data->mprotect_wait_cycles);
     fprintf (thrData.output, ">>> realMemoryUsage      %lu\n", data->realMemoryUsage);
-    fprintf (thrData.output, ">>> realAllocatedMemoryUsage      %lu\n", data->realAllocatedMemoryUsage);
+		fprintf (thrData.output, ">>> realAllocatedMemoryUsage      %lu\n", data->realAllocatedMemoryUsage);
     fprintf (thrData.output, ">>> totalMemoryUsage     %lu\n", data->totalMemoryUsage);
     fprintf (thrData.output, ">>> critical_section_duration  %lu\n\n", data->critical_section_duration);
   }

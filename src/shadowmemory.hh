@@ -37,6 +37,8 @@
 #define PAGE_MAP_SIZE (256 * ONE_GIGABYTE)
 #define CACHE_MAP_SIZE (256 * ONE_GIGABYTE)
 #define OBJ_SIZE_MAP_SIZE (256 * ONE_GIGABYTE)
+#define MAX_PAGE_MAP_ENTRIES (PAGE_MAP_SIZE / sizeof(PageMapEntry))
+#define MAX_CACHE_MAP_ENTRIES (CACHE_MAP_SIZE / sizeof(CacheMapEntry))
 #define LIBC_MIN_OBJECT_SIZE 24
 #define LIBC_METADATA_SIZE 8
 #define OBJECT_SIZE_SENTINEL_SIZE 4
@@ -86,7 +88,7 @@ class PageMapEntry {
 				CacheMapEntry * cache_map_entry;
 
 		public:
-				static bool updateCacheLines(uintptr_t uintaddr, unsigned long mega_index, unsigned page_index, unsigned size);
+				static bool updateCacheLines(uintptr_t uintaddr, unsigned long mega_index, unsigned page_index, unsigned size, bool isFree);
 				static CacheMapEntry * getCacheMapEntry(unsigned long mega_idx, unsigned page_idx, unsigned cache_idx);
 				void clear();
 				bool isTouched();
@@ -101,14 +103,16 @@ class PageMapEntry {
 
 class ShadowMemory {
 		private:
-				static unsigned updatePages(uintptr_t uintaddr, unsigned long mega_index, unsigned page_index, unsigned size);
+				static unsigned updatePages(uintptr_t uintaddr, unsigned long mega_index, unsigned page_index, unsigned size, bool isFree);
 				static bool updateObjectSize(uintptr_t uintaddr, unsigned size);
 				static unsigned getPageClassSize(unsigned long mega_index, unsigned page_index);
 
 				static PageMapEntry ** mega_map_begin;
 				static PageMapEntry * page_map_begin;
+				static PageMapEntry * page_map_end;
 				static PageMapEntry * page_map_bump_ptr;
 				static CacheMapEntry * cache_map_begin;
+				static CacheMapEntry * cache_map_end;
 				static CacheMapEntry * cache_map_bump_ptr;
 				static eMapInitStatus isInitialized;
 
@@ -123,7 +127,7 @@ class ShadowMemory {
 				static PageMapEntry * getPageMapEntry(unsigned long mega_idx, unsigned page_idx);
 				static unsigned getObjectSize(uintptr_t uintaddr, unsigned long mega_index, unsigned page_index);
 				static unsigned getObjectSize(void * address);
-				static unsigned updateObject(void * address, size_t size);
+				static unsigned updateObject(void * address, size_t size, bool isFree);
 				//unsigned getCacheUsage(void * address);
 				//unsigned getPageUsage(void * address);
 };
