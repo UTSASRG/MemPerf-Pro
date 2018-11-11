@@ -3,6 +3,7 @@
 
 #include "memsample.h"
 #include <signal.h>
+#include <limits.h>
 
 #define relaxed std::memory_order_relaxed
 #define acquire std::memory_order_acquire
@@ -42,9 +43,12 @@ typedef struct {
 	uint64_t mprotect_waits = 0;
 	uint64_t mprotect_wait_cycles = 0;
 
-  uint64_t realMemoryUsage = 0;
-  uint64_t realAllocatedMemoryUsage = 0;
-  uint64_t totalMemoryUsage = 0;
+  long realMemoryUsage = 0;
+  long maxRealMemoryUsage = LONG_MIN;
+  long realAllocatedMemoryUsage = 0;
+  long maxRealAllocatedMemoryUsage = LONG_MIN;
+  long totalMemoryUsage = 0;
+  long maxTotalMemoryUsage = LONG_MIN;
   
   uint64_t lock_counter = 0;
   uint64_t critical_section_start = 0;

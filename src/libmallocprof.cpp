@@ -508,6 +508,9 @@ extern "C" {
 
 		//Do after
 		current_tc->totalMemoryUsage += PAGESIZE * ShadowMemory::updateObject((void *)allocData.address, allocData.size, false);
+    if(current_tc->totalMemoryUsage > current_tc->maxTotalMemoryUsage) {
+      current_tc->maxTotalMemoryUsage = current_tc->totalMemoryUsage;
+    }
 		doAfter(&allocData);
 
 		allocData.cycles = allocData.tsc_after - allocData.tsc_before;
@@ -564,6 +567,9 @@ extern "C" {
 
 		// Do after
 		current_tc->totalMemoryUsage += PAGESIZE * ShadowMemory::updateObject((void *)allocData.address, allocData.size, false);
+    if(current_tc->totalMemoryUsage > current_tc->maxTotalMemoryUsage) {
+      current_tc->maxTotalMemoryUsage = current_tc->totalMemoryUsage;
+    }
 		doAfter(&allocData);
 
 		allocData.cycles = allocData.tsc_after - allocData.tsc_before;
@@ -700,6 +706,9 @@ extern "C" {
 		//Do after
 		#warning must implement realloc-specific behavior for shadow memory updating
 		current_tc->totalMemoryUsage += PAGESIZE * ShadowMemory::updateObject((void *)allocData.address, allocData.size, false);
+    if(current_tc->totalMemoryUsage > current_tc->maxTotalMemoryUsage) {
+      current_tc->maxTotalMemoryUsage = current_tc->totalMemoryUsage;
+    }
 		doAfter(&allocData);
 
 		// cyclesForRealloc = tsc_after - tsc_before;
@@ -1443,7 +1452,13 @@ void incrementMemoryUsage(size_t size) {
   }
 
 	current_tc->realAllocatedMemoryUsage += classSize;
+	if(current_tc->realAllocatedMemoryUsage > current_tc->maxRealAllocatedMemoryUsage) {
+    current_tc->maxRealAllocatedMemoryUsage = current_tc->realAllocatedMemoryUsage;
+  }
 	current_tc->realMemoryUsage += size;
+	if(current_tc->realMemoryUsage > current_tc->maxRealMemoryUsage) {
+    current_tc->maxRealMemoryUsage = current_tc->realMemoryUsage;
+  }
 }
 
 void decrementMemoryUsage(void* addr) {
