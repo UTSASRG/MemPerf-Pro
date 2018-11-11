@@ -24,19 +24,15 @@ CXX = g++
 #CXX = clang++ 
 
 CFLAGS += -O2 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-frame-pointer
-CFLAGS2 += -O0 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-frame-pointer -Wl,--no-as-needed
-
-PROFILER_FLAGS += -D USE_THREAD_LOCAL
-# PROFILER_FLAGS += -D MAPPINGS
+CFLAGS2 += -O0 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-frame-pointer -Wl,--no-as-needed -lrt
 
 #THREADTEST_FILE = threadTest.cpp
 # THREADTEST_FILE = malloc-and-free.cpp
 # TEST_FILE = malloc-and-free.cpp
 
-THREADTEST_FILE = malloc-then-free.cpp
-TEST_FILE = malloc-then-free.cpp
+THREADTEST_FILE = malloc-and-free.cpp
+TEST_FILE = malloc-and-free.cpp
 
-#No Blowup, all new addresses
 NUM_THREADS = 20
 NUM_MALLOCS = 80000
 
@@ -86,6 +82,7 @@ threads:	libmallocprof.so \
 			test/test-dieharder-thread \
 			test/test-freeguard-thread \
 			test/test-obsd-thread \
+			test/test-jemalloc-thread \
 			test/test-tcmalloc-thread
 
 pmu: test/pmu-libc-test test/pmu-obsd-test test/pmu-dieharder-test test/pmu-freeguard-test
@@ -131,6 +128,10 @@ test/test-xlibc: libmallocprof.so test/$(TEST_FILE)
 
 test/test-xlibc-thread: libmallocprof.so test/$(THREADTEST_FILE)
 	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/richard/Memoryallocators/libc-2.24/libmalloc.so -o test/test-xlibc-thread test/$(THREADTEST_FILE) -pthread
+
+# JeMalloc
+test/test-jemalloc-thread: libmallocprof.so test/$(THREADTEST_FILE)
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -o test/test-jemalloc-thread test/$(THREADTEST_FILE) -ljemalloc -pthread
 
 #Parsec Black-Scholes multithreaded
 test/bs-libc: libmallocprof.so test/blackscholes-pthread.cpp

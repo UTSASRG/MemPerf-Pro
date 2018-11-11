@@ -36,9 +36,7 @@ extern initStatus profilerInitialized;
 extern const bool d_mmap;
 extern const bool d_mprotect;
 
-#ifdef MAPPINGS
 extern HashMap <uint64_t, MmapTuple*, spinlock> mappings;
-#endif
 
 extern "C" {
 
@@ -113,11 +111,14 @@ int pthread_mutex_trylock (pthread_mutex_t *mutex) {
 int pthread_mutex_unlock(pthread_mutex_t *mutex) {
   if (!realInitialized) RealX::initializer();
 
-  current_tc->lock_counter--;
-  if(current_tc->lock_counter == 0) {
-    uint64_t duration = rdtscp() - current_tc->critical_section_start;
-    current_tc->critical_section_duration += duration;
-  }
+	// if it is  used by allocation
+	if (inAllocation) {
+			current_tc->lock_counter--;
+			if(current_tc->lock_counter == 0) {
+					uint64_t duration = rdtscp() - current_tc->critical_section_start;
+					current_tc->critical_section_duration += duration;
+			}
+	}
 
   return RealX::pthread_mutex_unlock (mutex);
 }
@@ -152,19 +153,13 @@ void * yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offs
     current_tc->mmap_waits++;
     current_tc->mmap_wait_cycles += (timeStop - timeStart);
 
-    #ifdef MAPPINGS
     mappings.insert(address, newMmapTuple(address, length, prot, 'a'));
-    #endif
-    ShadowMemory::cleanupPages(address, length);
   }
   //Need to check if selfmap.getInstance().getTextRegions() has
   //ran. If it hasn't, we can't call isAllocatorInCallStack()
   else if (selfmapInitialized && isAllocatorInCallStack()) {
     if (d_mmap) printf ("mmap allocator in callstack: length= %zu, prot= %d\n", length, prot);
-    #ifdef MAPPINGS
     mappings.insert(address, newMmapTuple(address, length, prot, 's'));
-    #endif
-    ShadowMemory::cleanupPages(address, length);
   }
 
   // total_mmaps++;
@@ -182,9 +177,9 @@ int madvise(void *addr, size_t length, int advice){
   }
 
   if (advice == MADV_DONTNEED) {
-    ShadowMemory::cleanupPages((uintptr_t)addr, length);
-    if(current_tc->totalMemoryUsage > length) {
-      current_tc->totalMemoryUsage -= length;
+			long returned = PAGESIZE * ShadowMemory::cleanupPages((uintptr_t)addr, length);
+			if(current_tc->totalMemoryUsage > returned) {
+					current_tc->totalMemoryUsage -= returned;
     }
   }
 
@@ -230,12 +225,6 @@ int mprotect(void* addr, size_t len, int prot) {
   current_tc->mprotect_waits++;
   current_tc->mprotect_wait_cycles += (timeStop - timeStart);
 
-  #ifdef MAPPINGS
-  if (d_mprotect)
-    printf ("mprotect/found= %s, addr= %p, len= %zu, prot= %d\n",
-        mappingEditor(addr, len, prot) ? "true" : "false", addr, len, prot);
-  #endif
-
   return ret;
 }
 
@@ -253,13 +242,12 @@ int munmap(void *addr, size_t length) {
   current_tc->munmap_waits++;
   current_tc->munmap_wait_cycles += (timeStop - timeStart);
 
-  if(current_tc->totalMemoryUsage > length) {
-    current_tc->totalMemoryUsage -= length;
+	long returned = PAGESIZE * ShadowMemory::cleanupPages((intptr_t)addr, length);
+	if(current_tc->totalMemoryUsage > returned) {
+			current_tc->totalMemoryUsage -= returned;
   }
 
-#ifdef MAPPINGS
   mappings.erase((intptr_t)addr);
-#endif
   // total_mmaps--;
 
   return ret;
@@ -286,7 +274,6 @@ void *mremap(void *old_address, size_t old_size, size_t new_size,
   current_tc->mremap_waits++;
   current_tc->mremap_wait_cycles += (timeStop - timeStart);
 
-#ifdef MAPPINGS
   MmapTuple* t;
   if (mappings.find((intptr_t)old_address, &t)) {
     if(ret == old_address) {
@@ -296,7 +283,6 @@ void *mremap(void *old_address, size_t old_size, size_t new_size,
       mappings.insert((intptr_t)ret, newMmapTuple((intptr_t)ret, new_size, PROT_READ | PROT_WRITE, 'a'));
     }
   }
-#endif
 
   return ret;
 }
@@ -327,8 +313,9 @@ void writeThreadContention() {
     fprintf (thrData.output, ">>> mremap_wait_cycles   %lu\n", data->mremap_wait_cycles);
     fprintf (thrData.output, ">>> mprotect_waits       %lu\n", data->mprotect_waits);
     fprintf (thrData.output, ">>> mprotect_wait_cycle  %lu\n\n", data->mprotect_wait_cycles);
-    fprintf (thrData.output, ">>> realMemoryUsage      %lu\n", data->realMemoryUsage);
-    fprintf (thrData.output, ">>> totalMemoryUsage     %lu\n", data->totalMemoryUsage);
+    fprintf (thrData.output, ">>> maxRealMemoryUsage      %lu\n", data->maxRealMemoryUsage);
+		fprintf (thrData.output, ">>> maxRealAllocatedMemoryUsage      %lu\n", data->maxRealAllocatedMemoryUsage);
+    fprintf (thrData.output, ">>> maxTotalMemoryUsage     %lu\n", data->maxTotalMemoryUsage);
     fprintf (thrData.output, ">>> critical_section_duration  %lu\n\n", data->critical_section_duration);
   }
 }

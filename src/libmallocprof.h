@@ -2,6 +2,8 @@
 #define __LIBMALLOCPROF_H__
 
 #include "memsample.h"
+#include <signal.h>
+#include <limits.h>
 
 #define relaxed std::memory_order_relaxed
 #define acquire std::memory_order_acquire
@@ -41,8 +43,12 @@ typedef struct {
 	uint64_t mprotect_waits = 0;
 	uint64_t mprotect_wait_cycles = 0;
 
-  uint64_t realMemoryUsage = 0;
-  uint64_t totalMemoryUsage = 0;
+  long realMemoryUsage = 0;
+  long maxRealMemoryUsage = LONG_MIN;
+  long realAllocatedMemoryUsage = 0;
+  long maxRealAllocatedMemoryUsage = LONG_MIN;
+  long totalMemoryUsage = 0;
+  long maxTotalMemoryUsage = LONG_MIN;
   
   uint64_t lock_counter = 0;
   uint64_t critical_section_start = 0;
@@ -143,6 +149,19 @@ typedef struct  {
 	thread_alloc_data *tad;
 } allocation_metadata;
 
+typedef struct {
+	void* start;
+	void* end;
+	unsigned kb;
+} SMapEntry;
+
+typedef struct {
+	uint64_t kb;
+	uint64_t alignment;
+	uint64_t blowup;
+	float efficiency;
+} OverheadSample;
+
 // Functions 
 #ifdef MAPPINGS
 bool mappingEditor (void* addr, size_t len, int prot);
@@ -158,7 +177,7 @@ void doAfter(allocation_metadata *metadata);
 void incrementMemoryUsage(size_t size);
 void decrementMemoryUsage(void* addr);
 void getAddressUsage(size_t size, uint64_t address, uint64_t cycles);
-void getAlignment(size_t size, size_t classSize);
+void getAlignment(size_t, size_t);
 void getBlowup(size_t size, size_t classSize, bool*);
 void getMappingsUsage(size_t size, uint64_t address, size_t classSize);
 void getMetadata(size_t classSize);
@@ -190,8 +209,8 @@ void* myLocalMalloc(size_t);
 void myLocalFree(void*);
 void printMyMemUtilization();
 void initGlobalCSM();
-void * myTreeMalloc(struct libavl_allocator * allocator, size_t size);
-void myTreeFree(struct libavl_allocator * allocator, void * block);
-int compare_ptr(const void *rb_a, const void *rb_b, void *rb_param);
+SMapEntry* newSMapEntry();
+void start_smaps();
+void sampleMemoryOverhead(int, siginfo_t*, void*);
 
 #endif /* end of include guard: __LIBMALLOCPROF_H__ */
