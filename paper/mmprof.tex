@@ -30,6 +30,7 @@
 \usepackage{comment} 
 \usepackage{listings}
 \usepackage{xspace}
+\usepackage{fourier}
 
 \usepackage{tikz}
 \usepackage{calc}
@@ -71,6 +72,9 @@
 % \newcommand\tabhead[1]{\small\textbf{#1}}
 
 \newcommand{\permitbreak}{\discretionary{}{}{}}
+\DeclareMathAlphabet{\mathcal}{OMS}{cmsy}{m}{n}
+\SetMathAlphabet{\mathcal}{bold}{OMS}{cmsy}{b}{n}
+\newcommand{\bigO}{\mathcal{O}}
 
 % Make sure hyperref comes last of your loaded packages, to give it a
 % fighting chance of not being over-written, since its job is to
@@ -97,9 +101,9 @@
 
 \newcommand{\punt}[1]{}
 
-\newcommand{\MallocProfiler}{{\texttt{maprof}}}
-\newcommand{\MP}{{\texttt{maprof}}}
-\newcommand{\Heapperf}{{\texttt{maprof}}}
+\newcommand{\MallocProfiler}{{\texttt{mmprof}}}
+\newcommand{\MP}{{\texttt{mmprof}}}
+\newcommand{\Heapperf}{{\texttt{mmprof}}}
 \newcommand{\pthread}{\texttt{pthread}}
 \newcommand{\pthreads}{\texttt{pthreads}}
 \newcommand{\specialcell}[2][c]{%
@@ -125,7 +129,7 @@
 \setlength{\pdfpageheight}{\paperheight}
 \setlength{\pdfpagewidth}{\paperwidth}
 
-\title{maprof: A General Profiler for Different Memory Allocators}
+\title{mmprof: A General Profiler for Different Memory Allocators}
 
 \authorinfo{}
 %\date{}

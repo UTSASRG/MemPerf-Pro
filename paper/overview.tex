@@ -34,7 +34,7 @@ Hardware performance monitor units (PMU), ubiquitous in modern architectures~\ci
 
 Time-Stamp Counter is a register in all x86 computer that saves the number of cycles since reset. This hardware enables the collection of the time duration accurately with a RDTSC instruction~\cite{coorporation1997using, weaver2013linux}. Comparing to the method of utilizing system calls, such as \texttt{gettimeofday()}, the RDTSC instruction has two advantages. First, the overhead is much lower than issuing a system call, typically around 25-35 cycles~\cite{rdtscoverhead}. Second, it provides a high-resolution timer, with the granularity of cycles, which is much finer than traditional system calls~\cite{pitfallsrdtsc}. For instance, the system call \texttt{gettimeofday} could only provide the microsecond granularity, which is too coarse for measuring the performance of system calls or synchronization overhead.    
 
-\subsection{Basic Idea of maprof}
+\subsection{Basic Idea of mmprof}
 \MP{} profiles different types of data as discussed in the following. Among them,  performance overhead, memory overhead, and scalability belong to internal mechanisms of allocators themselves, while the application friendliness focus on the potential performance impact on applications.  
   
 \subsubsection{Performance Overhead}
