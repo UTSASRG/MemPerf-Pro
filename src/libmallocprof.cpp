@@ -293,8 +293,7 @@ __attribute__((constructor)) initStatus initializer() {
 		return INIT_ERROR;
 	}
 
-	fprintf(thrData.output, ">>> stack start @ %p, stack end @ %p\n",
-			thrData.stackStart, thrData.stackEnd);
+	fprintf(thrData.output, ">>> stack start @ %p, stack end @ %p\n", thrData.stackStart, thrData.stackEnd);
 	fprintf(thrData.output, ">>> program break @ %p\n", program_break);
 	fflush(thrData.output);
 
@@ -514,7 +513,7 @@ extern "C" {
 		allocData.address = (uint64_t) object;
 
 		//Do after
-		fprintf(stderr, "*** malloc(%zu) -> %p\n", sz, object);
+		//fprintf(stderr, "*** malloc(%zu) -> %p\n", sz, object);
 		current_tc->totalMemoryUsage += PAGESIZE * ShadowMemory::updateObject((void *)allocData.address, allocData.size, false);
 		if(current_tc->totalMemoryUsage > current_tc->maxTotalMemoryUsage) {
 				current_tc->maxTotalMemoryUsage = current_tc->totalMemoryUsage;
@@ -628,7 +627,7 @@ extern "C" {
 		allocation_metadata allocData = init_allocation(0, FREE);
 		allocData.address = reinterpret_cast <uint64_t> (ptr);
 
-		fprintf(stderr, "*** free(%p)\n", ptr);
+		//fprintf(stderr, "*** free(%p)\n", ptr);
 		//Do before free
 		doBefore(&allocData);
 
@@ -712,7 +711,7 @@ extern "C" {
 		allocData.address = reinterpret_cast <uint64_t> (object);
 
 		//Do after
-		fprintf(stderr, "*** realloc(%p, %zu) -> %p\n", ptr, sz, object);
+		//fprintf(stderr, "*** realloc(%p, %zu) -> %p\n", ptr, sz, object);
 		#warning must implement realloc-specific behavior for shadow memory updating
 		// perhaps instead of a bool isFree, use an enum { free, malloc, realloc }
 		current_tc->totalMemoryUsage += PAGESIZE * ShadowMemory::updateObject((void *)allocData.address, allocData.size, false);
