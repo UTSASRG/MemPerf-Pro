@@ -39,7 +39,7 @@ extern char data_start;
 extern char _etext;
 extern char * program_invocation_name;
 extern void * __libc_stack_end;
-extern char __executable_start;
+//extern char __executable_start;
 float memEfficiency = 0;
 initStatus profilerInitialized = NOT_INITIALIZED;
 pid_t pid;
@@ -190,7 +190,7 @@ extern "C" {
 	// Function prototypes
 	size_t getTotalAllocSize(size_t sz);
 	void exitHandler();
-	inline void getCallsites(void **callsites);
+//	inline void getCallsites(void **callsites);
 
 	// Function aliases
 	void free(void *) __attribute__ ((weak, alias("yyfree")));
@@ -243,8 +243,8 @@ __attribute__((constructor)) initStatus initializer() {
 	// Calculate the minimum possible callsite ID by taking the low four bytes
 	// of the start of the program text and repeating them twice, back-to-back,
 	// resulting in eight bytes which resemble: 0x<lowWord><lowWord>
-	uint64_t btext = (uint64_t)&__executable_start & 0xFFFFFFFF;
-	min_pos_callsite_id = (btext << 32) | btext;
+	//uint64_t btext = (uint64_t)&__executable_start & 0xFFFFFFFF;
+	//min_pos_callsite_id = (btext << 32) | btext;
 
 	// addressUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 	lockUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 128);
@@ -766,6 +766,7 @@ extern "C" {
 		return NULL;
 	}
 
+/*
 	inline void getCallsites(void **callsites) {
 		int i = 0;
 		void * btext = &__executable_start;
@@ -801,7 +802,7 @@ extern "C" {
 			prev_frame = prev_frame->prev;
 		}
 	}
-
+*/
 	/*
 	 * This function returns the total usable size of an object allocated
 	 * using glibc malloc (and therefore it does not include the space occupied
