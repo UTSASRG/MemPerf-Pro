@@ -17,7 +17,7 @@
 
 int threadcontention_index = -1;
 ThreadContention all_threadcontention_array[MAX_THREAD_NUMBER];
-__thread ThreadContention* current_tc;
+thread_local ThreadContention* current_tc;
 
 // extern thread_local uint num_trylock;
 // extern thread_local uint num_pthread_mutex_locks;
@@ -313,9 +313,9 @@ void writeThreadContention() {
     fprintf (thrData.output, ">>> mremap_wait_cycles   %lu\n", data->mremap_wait_cycles);
     fprintf (thrData.output, ">>> mprotect_waits       %lu\n", data->mprotect_waits);
     fprintf (thrData.output, ">>> mprotect_wait_cycle  %lu\n\n", data->mprotect_wait_cycles);
-    fprintf (thrData.output, ">>> maxRealMemoryUsage      %lu\n", data->maxRealMemoryUsage);
+		fprintf (thrData.output, ">>> maxRealMemoryUsage      %lu\n", data->maxRealMemoryUsage);
 		fprintf (thrData.output, ">>> maxRealAllocatedMemoryUsage      %lu\n", data->maxRealAllocatedMemoryUsage);
-    fprintf (thrData.output, ">>> maxTotalMemoryUsage     %lu\n", data->maxTotalMemoryUsage);
+		fprintf (thrData.output, ">>> maxTotalMemoryUsage     %lu\n", data->maxTotalMemoryUsage);
     fprintf (thrData.output, ">>> critical_section_duration  %lu\n\n", data->critical_section_duration);
   }
 }

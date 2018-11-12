@@ -6,20 +6,17 @@
 #include "memsample.h"
 #include "real.hh"
 
-extern __thread thread_data thrData;
+extern thread_local thread_data thrData;
 
 extern "C" void setThreadContention();
 extern "C" void printHashMap();
-extern "C" pid_t gettid();
+//extern "C" pid_t gettid();
 void* myMalloc(size_t);
 void initMyLocalMem();
 
 thread_local extern uint64_t thread_stack_start;
 thread_local extern uint64_t myThreadID;
 thread_local extern perf_info perfInfo;
-#ifdef USE_THREAD_LOCAL
-thread_local extern uint64_t myLocalPosition;
-#endif
 
 class xthreadx {
 	typedef void * threadFunction(void *);
@@ -98,11 +95,11 @@ class xthreadx {
 		}
 
 		#ifndef NO_PMU
-		initSampling();
+		initPMU();
 		#endif
 		result = current->startRoutine(current->startArg);
 		#ifndef NO_PMU
-		doPerfRead();
+		doPerfCounterRead();
 		#endif
 
 		if(thrData.output) {

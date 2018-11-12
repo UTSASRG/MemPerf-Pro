@@ -44,7 +44,7 @@
 #define OBJECT_SIZE_SENTINEL_SIZE 4
 #define OBJECT_SIZE_SENTINEL 0xaaa80000				// 0x1555 << 19
 #define OBJECT_SIZE_SENTINEL_MASK 0xfff80000	// 0x1fff << 19
-#define OBJECT_SIZE_MASK 0x7fff
+#define OBJECT_SIZE_MASK 0x7ffff
 #define MAX_OBJECT_SIZE 524287								// 2^19 - 1
 
 // Located in libmallocprof.cpp globals
@@ -52,7 +52,8 @@ extern bool bibop;
 extern bool isLibc;
 extern char * allocator_name;
 extern size_t malloc_mmap_threshold;
-extern __thread thread_data thrData;
+extern thread_local thread_data thrData;
+extern thread_local PerfAppFriendly friendliness;
 
 typedef enum {
     E_MAP_INIT_NOT = 0,
@@ -94,6 +95,7 @@ class PageMapEntry {
 				bool isTouched();
 				void setTouched();
 				void clearTouched();
+				unsigned getUsedBytes();
 				bool setUsedBytes(unsigned num_bytes);
 				bool addUsedBytes(unsigned num_bytes);
 				bool subUsedBytes(unsigned num_bytes);
@@ -104,7 +106,7 @@ class PageMapEntry {
 class ShadowMemory {
 		private:
 				static unsigned updatePages(uintptr_t uintaddr, unsigned long mega_index, unsigned page_index, unsigned size, bool isFree);
-				static bool updateObjectSize(uintptr_t uintaddr, unsigned size);
+				static bool updateObjectSize(uintptr_t uintaddr, unsigned size, bool isFree);
 				static unsigned getPageClassSize(unsigned long mega_index, unsigned page_index);
 
 				static PageMapEntry ** mega_map_begin;
@@ -117,7 +119,10 @@ class ShadowMemory {
 				static eMapInitStatus isInitialized;
 
 		public:
-				static unsigned libc_malloc_usable_size(unsigned size);
+				static void doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType);
+				static unsigned getPageUsage(uintptr_t uintaddr);
+				static unsigned getCacheUsage(uintptr_t uintaddr);
+				static size_t libc_malloc_usable_size(size_t size);
 				static unsigned getPageClassSize(void * address);
 				static bool initialize();
 				static inline PageMapEntry ** getMegaMapEntry(unsigned long mega_index);
@@ -128,8 +133,6 @@ class ShadowMemory {
 				static unsigned getObjectSize(uintptr_t uintaddr, unsigned long mega_index, unsigned page_index);
 				static unsigned getObjectSize(void * address);
 				static unsigned updateObject(void * address, size_t size, bool isFree);
-				//unsigned getCacheUsage(void * address);
-				//unsigned getPageUsage(void * address);
 };
 
 #endif // __SHADOWMAP_H__

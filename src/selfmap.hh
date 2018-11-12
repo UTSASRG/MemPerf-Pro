@@ -33,7 +33,7 @@ using namespace std;
 
 extern bool isLibc;
 extern char *allocator_name;
-extern __thread thread_data thrData;
+//extern thread_local thread_data thrData;
 extern bool opening_maps_file;
 
 struct regioninfo {
@@ -203,7 +203,7 @@ class selfmap {
 				}
 			}
     	}
-		fflush(thrData.output);
+		//fflush(thrData.output);
 		haveTextRegions = true;
 	}
 

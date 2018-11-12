@@ -12,6 +12,8 @@
 #include <sys/mman.h>
 #include <atomic>
 
+#define PAGESIZE 4096
+#define SAMPLING_PERIOD 500
 #define MMAP_PAGES 33	// must be in the form of 2^N + 1
 #define DATA_MMAP_PAGES (MMAP_PAGES - 1)
 #define MAPSIZE (MMAP_PAGES * getpagesize())
@@ -28,6 +30,7 @@
 #define STORE_ACCESS 0x2cd
 //#define LOAD_ACCESS 0x81d0
 //#define STORE_ACCESS 0x82d0
+#define LAST_USER_ADDR 0x7fffffffffff
 #define MALLOC_HEADER_SIZE (sizeof(size_t))
 #define EIGHT_BYTES 8
 #define EIGHT_MB 8388608
@@ -38,6 +41,15 @@
 #define TEN_GB 10737418240
 #define MAX_FILENAME_LEN 128
 #define TEMP_BUF_SIZE EIGHT_MB
+
+typedef enum {
+  E_MEM_NONE = 0,
+  E_MEM_LOAD,
+  E_MEM_STORE,
+  E_MEM_PFETCH,
+  E_MEM_EXEC,
+  E_MEM_UNKNOWN,
+} eMemAccessType;
 
 inline unsigned long long rdtscp() {
 		unsigned int lo, hi;
@@ -75,12 +87,31 @@ typedef struct {
 } thread_data;
 
 typedef struct {
+  int perf_fd;
+  int perf_fd2;
+  uint64_t prev_head;
 	int perf_fd_fault;
 	int perf_fd_tlb_reads;
 	int perf_fd_tlb_writes;
 	int perf_fd_cache_miss;
 	int perf_fd_cache_ref;
 	int perf_fd_instr;
+	// Discontiguous sample data from the perf ring buffer will be copied into
+	// data_buf_copy in the correct order (that is, eliminating the discontinuity
+  // present in the ring buffer (ring_buf)).
+  char * data_buf_copy = NULL;
+  void * ring_buf = NULL;
+  void * ring_buf_data_start = NULL;
+  void * aux_buf = NULL;
+  bool samplesLost;
+  long numSampleReadOps;
+  long numSamples;
+  long numSignalsRecvd;
+  long numSampleHits;
+  uint64_t time_zero;
+  uint64_t time_mult;
+  uint64_t time_shift;
+  bool initialized;
 	pid_t tid;
 } perf_info;
 
@@ -133,7 +164,9 @@ typedef struct {            //struct for holding data about allocations
 
 } thread_alloc_data;
 
-int initSampling(void);
+int initPMU(void);
+void setupCounting(void);
 void setupSampling(void);
-void doPerfRead(void);
+void doPerfCounterRead(void);
+void doSampleRead();
 #endif

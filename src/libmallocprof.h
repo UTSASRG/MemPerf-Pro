@@ -24,6 +24,8 @@
 #define MAX_CLASS_SIZE 1050000
 #define LOCAL_BUF_SIZE 204800000
 
+pid_t gettid();
+
 //Structures
 typedef struct {
 	uint64_t tid = 0;
@@ -43,13 +45,13 @@ typedef struct {
 	uint64_t mprotect_waits = 0;
 	uint64_t mprotect_wait_cycles = 0;
 
-  long realMemoryUsage = 0;
-  long maxRealMemoryUsage = LONG_MIN;
-  long realAllocatedMemoryUsage = 0;
-  long maxRealAllocatedMemoryUsage = LONG_MIN;
-  long totalMemoryUsage = 0;
-  long maxTotalMemoryUsage = LONG_MIN;
-  
+	long realMemoryUsage = 0;
+	long maxRealMemoryUsage = LONG_MIN;
+	long realAllocatedMemoryUsage = 0;
+	long maxRealAllocatedMemoryUsage = LONG_MIN;
+	long totalMemoryUsage = 0;
+	long maxTotalMemoryUsage = LONG_MIN;
+
   uint64_t lock_counter = 0;
   uint64_t critical_section_start = 0;
   uint64_t critical_section_duration = 0;
@@ -102,6 +104,12 @@ typedef struct {
 	uint64_t cache_misses = 0;
 	uint64_t instructions = 0;
 } PerfReadInfo;
+
+typedef struct {
+	unsigned long numAccesses = 0;
+	unsigned long pageUtilTotal = 0;
+	unsigned long cacheUtilTotal = 0;
+} PerfAppFriendly;
 
 typedef struct LockContention {
 	int contention;
@@ -182,7 +190,7 @@ void getBlowup(size_t size, size_t classSize, bool*);
 void getMappingsUsage(size_t size, uint64_t address, size_t classSize);
 void getMetadata(size_t classSize);
 void getOverhead(size_t size, uint64_t address, size_t classSize, bool*);
-void getPerfInfo(PerfReadInfo*);
+void getPerfCounts(PerfReadInfo*);
 void globalizeTAD();
 void myFree (void* ptr);
 void* myMalloc (size_t size);
@@ -213,4 +221,5 @@ SMapEntry* newSMapEntry();
 void start_smaps();
 void sampleMemoryOverhead(int, siginfo_t*, void*);
 
+#include "shadowmemory.hh"
 #endif /* end of include guard: __LIBMALLOCPROF_H__ */

@@ -17,7 +17,6 @@
 #include "libmallocprof.h"
 #include "real.hh"
 #include "selfmap.hh"
-#include "shadowmemory.hh"
 #include "spinlock.hh"
 #include "xthreadx.hh"
 #include "recordfunctions.hh"
@@ -124,12 +123,12 @@ thread_local uint64_t cycles_reused = 0;
 std::atomic<unsigned>* globalFreeArray = nullptr;
 
 //Thread local variables THREAD_LOCAL
-__thread thread_data thrData;
+thread_local thread_data thrData;
 thread_local bool waiting;
 thread_local bool inAllocation;
 thread_local bool inDeallocation;
 thread_local bool inMmap;
-thread_local bool samplingInit = false;
+thread_local bool PMUinit = false;
 thread_local uint64_t timeAttempted;
 thread_local uint64_t timeWaiting;
 thread_local unsigned* localFreeArray = nullptr;
@@ -143,6 +142,7 @@ thread_local void* myLocalMemEnd;
 thread_local uint64_t myLocalPosition;
 thread_local uint64_t myLocalAllocations;
 thread_local bool myLocalMemInitialized = false;
+thread_local PerfAppFriendly friendliness;
 
 spinlock globalize_lck;
 
@@ -230,15 +230,15 @@ __attribute__((constructor)) initStatus initializer() {
 		abort();
 	}
 
-	// Allocate and initialize all shadow memory-related mappings
-	ShadowMemory::initialize();
-
-	RealX::initializer();
-
 	myMemEnd = (void*) (myMem + TEMP_MEM_SIZE);
 	myMemLock.init();
 	globalize_lck.init();
 	pid = getpid();
+
+	// Allocate and initialize all shadow memory-related mappings
+	ShadowMemory::initialize();
+
+	RealX::initializer();
 
 	// Calculate the minimum possible callsite ID by taking the low four bytes
 	// of the start of the program text and repeating them twice, back-to-back,
@@ -329,6 +329,7 @@ __attribute__((constructor)) initStatus initializer() {
 
 	smaps_buffer = (char*) myMalloc(smaps_bufferSize);
 	sprintf(smaps_fileName, "/proc/%d/smaps", pid);
+
 	start_smaps();
 
 	resumeTimer.it_value.tv_sec = timer_sec;
@@ -343,7 +344,8 @@ __attribute__((constructor)) initStatus initializer() {
 
 	worstCaseOverhead.efficiency = 100.00;
 	setupSignalHandler();
-	startSignalTimer();
+	#warning DISABLED SMAPS TIMER!
+	//startSignalTimer();
 
 	inConstructor = false;
 	return profilerInitialized;
@@ -383,9 +385,11 @@ void exitHandler() {
 
 	inRealMain = false;
 	#ifndef NO_PMU
-	doPerfRead();
+	doPerfCounterRead();
 	#endif
 
+	#warning DISABLED SMAPS TIMER!
+	/*
 	if (timer_settime(smap_timer, 0, &stopTimer, NULL) == -1) {
 			perror("timer_settime failed");
 			abort();
@@ -393,6 +397,7 @@ void exitHandler() {
 	if (timer_delete(smap_timer) == -1) {
 			perror("timer_delete failed");
 	}
+	*/
 
 	//    calculateMemOverhead();
 	if(thrData.output) {
@@ -422,6 +427,8 @@ void exitHandler() {
 					worstCaseOverhead.alignment,
 					worstCaseOverhead.blowup,
 					worstCaseOverhead.efficiency);
+
+	fclose(smaps_infile);
 }
 
 // MallocProf's main function
@@ -431,9 +438,9 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
 
 	#ifndef NO_PMU
 	// If the PMU sampler has not yet been set up for this thread, set it up now
-	if(!samplingInit){
-		initSampling();
-		samplingInit = true;
+	if(!PMUinit){
+		initPMU();
+		PMUinit = true;
 	}
 	#endif
 
@@ -487,9 +494,9 @@ extern "C" {
 
 		#ifndef NO_PMU
 		// If the PMU sampler has not yet been set up for this thread, set it up now
-		if(!samplingInit){
-			initSampling();
-			samplingInit = true;
+		if(!PMUinit){
+			initPMU();
+			PMUinit = true;
 		}
 		#endif
 
@@ -507,10 +514,12 @@ extern "C" {
 		allocData.address = (uint64_t) object;
 
 		//Do after
+		fprintf(stderr, "*** malloc(%zu) -> %p\n", sz, object);
 		current_tc->totalMemoryUsage += PAGESIZE * ShadowMemory::updateObject((void *)allocData.address, allocData.size, false);
-    if(current_tc->totalMemoryUsage > current_tc->maxTotalMemoryUsage) {
-      current_tc->maxTotalMemoryUsage = current_tc->totalMemoryUsage;
-    }
+		if(current_tc->totalMemoryUsage > current_tc->maxTotalMemoryUsage) {
+				current_tc->maxTotalMemoryUsage = current_tc->totalMemoryUsage;
+		}
+
 		doAfter(&allocData);
 
 		allocData.cycles = allocData.tsc_after - allocData.tsc_before;
@@ -542,9 +551,9 @@ extern "C" {
 		if (!inRealMain) return RealX::calloc (nelem, elsize);
 
 		// if the PMU sampler has not yet been set up for this thread, set it up now
-		if(!samplingInit){
-			initSampling();
-			samplingInit = true;
+		if(!PMUinit){
+			initPMU();
+			PMUinit = true;
 		}
 
 		// thread_local
@@ -567,9 +576,10 @@ extern "C" {
 
 		// Do after
 		current_tc->totalMemoryUsage += PAGESIZE * ShadowMemory::updateObject((void *)allocData.address, allocData.size, false);
-    if(current_tc->totalMemoryUsage > current_tc->maxTotalMemoryUsage) {
-      current_tc->maxTotalMemoryUsage = current_tc->totalMemoryUsage;
-    }
+		if(current_tc->totalMemoryUsage > current_tc->maxTotalMemoryUsage) {
+				current_tc->maxTotalMemoryUsage = current_tc->totalMemoryUsage;
+		}
+
 		doAfter(&allocData);
 
 		allocData.cycles = allocData.tsc_after - allocData.tsc_before;
@@ -602,9 +612,9 @@ extern "C" {
 		}
 
 		//if the PMU sampler has not yet been set up for this thread, set it up now
-		if(!samplingInit){
-			initSampling();
-			samplingInit = true;
+		if(!PMUinit){
+			initPMU();
+			PMUinit = true;
 		}
 
 		//thread_local
@@ -618,23 +628,21 @@ extern "C" {
 		allocation_metadata allocData = init_allocation(0, FREE);
 		allocData.address = reinterpret_cast <uint64_t> (ptr);
 
-		//fprintf(stderr, "free(%p), before doBefore, allocData.address = %#lx\n", ptr, allocData.address);
+		fprintf(stderr, "*** free(%p)\n", ptr);
 		//Do before free
 		doBefore(&allocData);
 
     decrementMemoryUsage(ptr);
-		#warning Note for Hongyu: we dont need this here in free, do we? return value from updateObject should be 0?
-		//current_tc->totalMemoryUsage += PAGESIZE * ShadowMemory::updateObject((void *)allocData.address, allocData.size);
-		ShadowMemory::updateObject((void *)allocData.address, allocData.size, true);
+		ShadowMemory::updateObject(ptr, 0, true);
+
+		//Update free counters
+		allocData.classSize = updateFreeCounters(allocData.address);
 
 		//Do free
 		RealX::free(ptr);
 
 		//Do after free
 		doAfter(&allocData);
-
-		//Update free counters
-		allocData.classSize = updateFreeCounters(allocData.address);
 
     //thread_local
     inAllocation = false;
@@ -677,9 +685,9 @@ extern "C" {
 		if (!inRealMain) return RealX::realloc (ptr, sz);
 
 		//if the PMU sampler has not yet been set up for this thread, set it up now
-		if(!samplingInit){
-			initSampling();
-			samplingInit = true;
+		if(!PMUinit){
+			initPMU();
+			PMUinit = true;
 		}
 
 		//Data we need for each allocation
@@ -704,11 +712,13 @@ extern "C" {
 		allocData.address = reinterpret_cast <uint64_t> (object);
 
 		//Do after
+		fprintf(stderr, "*** realloc(%p, %zu) -> %p\n", ptr, sz, object);
 		#warning must implement realloc-specific behavior for shadow memory updating
+		// perhaps instead of a bool isFree, use an enum { free, malloc, realloc }
 		current_tc->totalMemoryUsage += PAGESIZE * ShadowMemory::updateObject((void *)allocData.address, allocData.size, false);
-    if(current_tc->totalMemoryUsage > current_tc->maxTotalMemoryUsage) {
-      current_tc->maxTotalMemoryUsage = current_tc->totalMemoryUsage;
-    }
+		if(current_tc->totalMemoryUsage > current_tc->maxTotalMemoryUsage) {
+				current_tc->maxTotalMemoryUsage = current_tc->totalMemoryUsage;
+		}
 		doAfter(&allocData);
 
 		// cyclesForRealloc = tsc_after - tsc_before;
@@ -718,8 +728,8 @@ extern "C" {
 		// analyzeAllocation(sz, address, cyclesForRealloc, classSize, &reused);
 		analyzeAllocation(&allocData);
 
-    if(object != ptr)
-      incrementMemoryUsage(sz);
+		if(object != ptr)
+				incrementMemoryUsage(sz);
 
 		//Get perf info
 		//analyzePerfInfo(&before, &after, classSize, &reused, tid);
@@ -1434,12 +1444,12 @@ bool mappingEditor (void* addr, size_t len, int prot) {
 }
 
 void doBefore (allocation_metadata *metadata) {
-	getPerfInfo(&(metadata->before));
+	getPerfCounts(&(metadata->before));
 	metadata->tsc_before = rdtscp();
 }
 
 void doAfter (allocation_metadata *metadata) {
-	getPerfInfo(&(metadata->after));
+	getPerfCounts(&(metadata->after));
 	metadata->tsc_after = rdtscp();
 }
 
@@ -1451,14 +1461,14 @@ void incrementMemoryUsage(size_t size) {
     classSize = ShadowMemory::libc_malloc_usable_size(size);
   }
 
+	current_tc->realMemoryUsage += size;
 	current_tc->realAllocatedMemoryUsage += classSize;
 	if(current_tc->realAllocatedMemoryUsage > current_tc->maxRealAllocatedMemoryUsage) {
-    current_tc->maxRealAllocatedMemoryUsage = current_tc->realAllocatedMemoryUsage;
-  }
-	current_tc->realMemoryUsage += size;
+			current_tc->maxRealAllocatedMemoryUsage = current_tc->realAllocatedMemoryUsage;
+	}
 	if(current_tc->realMemoryUsage > current_tc->maxRealMemoryUsage) {
-    current_tc->maxRealMemoryUsage = current_tc->realMemoryUsage;
-  }
+			current_tc->maxRealMemoryUsage = current_tc->realMemoryUsage;
+	}
 }
 
 void decrementMemoryUsage(void* addr) {
@@ -1673,10 +1683,7 @@ void sampleMemoryOverhead(int i, siginfo_t* s, void* p) {
 		currentCaseOverhead.kb = 0;
 		currentCaseOverhead.efficiency = 0;
 
-		if ((smaps_infile = fopen (smaps_fileName, "r")) == NULL) {
-				fprintf(stderr, "failed to open smaps\n");
-				return;
-		}
+		fseek(smaps_infile, 0, SEEK_SET);
 
 		while ((getline(&smaps_buffer, &smaps_bufferSize, smaps_infile)) > 0) {
 
@@ -1751,7 +1758,6 @@ void sampleMemoryOverhead(int i, siginfo_t* s, void* p) {
 				worstCaseOverhead.blowup = blowupBytes;
 				worstCaseOverhead.efficiency = e;
 		}
-		fclose(smaps_infile);
 		//    uint64_t endTime = rdtscp();
 
 		//    smap_sample_cycles += (endTime - startTime);
@@ -1863,3 +1869,6 @@ void startSignalTimer() {
 		}
 }
 
+pid_t gettid() {
+    return syscall(__NR_gettid);
+}
