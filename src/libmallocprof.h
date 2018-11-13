@@ -54,8 +54,17 @@ typedef struct {
 
   uint64_t lock_counter = 0;
   uint64_t critical_section_start = 0;
+  uint64_t critical_section_counter = 0;
   uint64_t critical_section_duration = 0;
 } __attribute__((__aligned__(64))) ThreadContention;
+
+typedef struct {
+  long realMemoryUsage = 0;
+	long realAllocatedMemoryUsage = 0;
+	long freedTotalBytes = 0;
+	long totalMemoryUsage = 0;
+	long maxTotalMemoryUsage = 0;
+} MemoryUsage;
 
 typedef struct {
 	unsigned szUsed;
@@ -182,7 +191,7 @@ void analyzeAllocation(allocation_metadata *metadata);
 void calculateMemOverhead ();
 void doBefore(allocation_metadata *metadata);
 void doAfter(allocation_metadata *metadata);
-void incrementMemoryUsage(size_t size);
+void incrementMemoryUsage(size_t size, size_t new_touched_bytes);
 void decrementMemoryUsage(void* addr);
 void getAddressUsage(size_t size, uint64_t address, uint64_t cycles);
 void getAlignment(size_t, size_t);

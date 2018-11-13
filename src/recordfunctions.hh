@@ -36,7 +36,11 @@ extern initStatus profilerInitialized;
 extern const bool d_mmap;
 extern const bool d_mprotect;
 
+extern MemoryUsage max_mu;
+
 extern HashMap <uint64_t, MmapTuple*, spinlock> mappings;
+
+void checkGlobalMemoryUsage();
 
 extern "C" {
 
@@ -117,6 +121,7 @@ int pthread_mutex_unlock(pthread_mutex_t *mutex) {
 			if(current_tc->lock_counter == 0) {
 					uint64_t duration = rdtscp() - current_tc->critical_section_start;
 					current_tc->critical_section_duration += duration;
+          current_tc->critical_section_counter++;
 			}
 	}
 
@@ -177,9 +182,9 @@ int madvise(void *addr, size_t length, int advice){
   }
 
   if (advice == MADV_DONTNEED) {
-			long returned = PAGESIZE * ShadowMemory::cleanupPages((uintptr_t)addr, length);
-			if(current_tc->totalMemoryUsage > returned) {
-					current_tc->totalMemoryUsage -= returned;
+    long returned = PAGESIZE * ShadowMemory::cleanupPages((uintptr_t)addr, length);
+    if(current_tc->totalMemoryUsage > returned) {
+      current_tc->totalMemoryUsage -= returned;
     }
   }
 
@@ -244,7 +249,7 @@ int munmap(void *addr, size_t length) {
 
 	long returned = PAGESIZE * ShadowMemory::cleanupPages((intptr_t)addr, length);
 	if(current_tc->totalMemoryUsage > returned) {
-			current_tc->totalMemoryUsage -= returned;
+    current_tc->totalMemoryUsage -= returned;
   }
 
   mappings.erase((intptr_t)addr);
@@ -294,6 +299,10 @@ void writeThreadContention() {
 
   fprintf (thrData.output, "\n--------------------ThreadContention--------------------\n\n");
 
+  size_t maxRealMemoryUsage = 0;
+  size_t maxRealAllocatedMemoryUsage = 0;
+  size_t maxTotalMemoryUsage = 0;
+
   for (int i=0; i<=threadcontention_index; i++) {
     ThreadContention* data = &all_threadcontention_array[i];
 
@@ -313,11 +322,31 @@ void writeThreadContention() {
     fprintf (thrData.output, ">>> mremap_wait_cycles   %lu\n", data->mremap_wait_cycles);
     fprintf (thrData.output, ">>> mprotect_waits       %lu\n", data->mprotect_waits);
     fprintf (thrData.output, ">>> mprotect_wait_cycle  %lu\n\n", data->mprotect_wait_cycles);
-		fprintf (thrData.output, ">>> maxRealMemoryUsage      %lu\n", data->maxRealMemoryUsage);
-		fprintf (thrData.output, ">>> maxRealAllocatedMemoryUsage      %lu\n", data->maxRealAllocatedMemoryUsage);
-		fprintf (thrData.output, ">>> maxTotalMemoryUsage     %lu\n", data->maxTotalMemoryUsage);
-    fprintf (thrData.output, ">>> critical_section_duration  %lu\n\n", data->critical_section_duration);
+
+    long tmp_maxRealMemoryUsage = data->maxRealMemoryUsage == LONG_MIN ? 0 : data->maxRealMemoryUsage;
+    long tmp_maxRealAllocatedMemoryUsage = data->maxRealAllocatedMemoryUsage == LONG_MIN ? 0 : data->maxRealAllocatedMemoryUsage;
+    long tmp_maxTotalMemoryUsage = data->maxTotalMemoryUsage == LONG_MIN ? 0 : data->maxTotalMemoryUsage;
+
+		fprintf (thrData.output, ">>> maxRealMemoryUsage               %lu\n", tmp_maxRealMemoryUsage);
+		fprintf (thrData.output, ">>> maxRealAllocatedMemoryUsage      %lu\n", tmp_maxRealAllocatedMemoryUsage);
+		fprintf (thrData.output, ">>> maxTotalMemoryUsage              %lu\n", tmp_maxTotalMemoryUsage);
+    fprintf (thrData.output, ">>> critical_section_counter         %lu\n", data->critical_section_counter);
+    fprintf (thrData.output, ">>> critical_section_duration        %lu\n\n", data->critical_section_duration);
+
+    maxRealMemoryUsage += tmp_maxRealMemoryUsage;
+    maxRealAllocatedMemoryUsage += tmp_maxRealAllocatedMemoryUsage;
+    maxTotalMemoryUsage += tmp_maxTotalMemoryUsage;
   }
+  
+  fprintf (thrData.output, "\n--------------------Total Memory Usage--------------------\n\n");
+  fprintf (thrData.output, ">>> Thread Counter:\n");
+  fprintf (thrData.output, ">>> maxRealMemoryUsage           %lu\n", maxRealMemoryUsage);
+  fprintf (thrData.output, ">>> maxRealAllocatedMemoryUsage  %lu\n", maxRealAllocatedMemoryUsage);
+  fprintf (thrData.output, ">>> maxTotalMemoryUsage          %lu\n\n", maxTotalMemoryUsage);
+  fprintf (thrData.output, ">>> Global Counter:\n");
+  fprintf (thrData.output, ">>> realMemoryUsage           %lu\n", max_mu.realMemoryUsage);
+  fprintf (thrData.output, ">>> realAllocatedMemoryUsage  %lu\n", max_mu.realAllocatedMemoryUsage);
+  fprintf (thrData.output, ">>> totalMemoryUsage          %lu\n", max_mu.totalMemoryUsage);
 }
 
 #endif
