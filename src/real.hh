@@ -4,6 +4,8 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <sys/mman.h>
+#include <stdlib.h>
+#include <malloc.h>
 
 #define DECLARE_WRAPPER(name) extern decltype(::name) * name;
 
@@ -15,6 +17,8 @@ namespace RealX {
 	DECLARE_WRAPPER(calloc);
 	DECLARE_WRAPPER(malloc);
 	DECLARE_WRAPPER(realloc);
+	DECLARE_WRAPPER(memalign);
+	DECLARE_WRAPPER(posix_memalign);
 	DECLARE_WRAPPER(pthread_create);
 	DECLARE_WRAPPER(pthread_join);
 	DECLARE_WRAPPER(mmap);

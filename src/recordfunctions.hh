@@ -240,17 +240,21 @@ int munmap(void *addr, size_t length) {
     return RealX::munmap(addr, length);
   }
 
+  // It is extremely important that the call to cleanupPages() occurs BEFORE the call
+  // to RealX::unmap(). If the orders were switched, it would then be possible for
+  // another thread to reallocate the unmapped region *while* the current thread is
+  // still performing the cleanupPages() call, thus clearing the other thread's pages.
+  long returned = PAGESIZE * ShadowMemory::cleanupPages((intptr_t)addr, length);
+  if(current_tc->totalMemoryUsage > returned) {
+      current_tc->totalMemoryUsage -= returned;
+  }
+
   uint64_t timeStart = rdtscp();
   int ret =  RealX::munmap(addr, length);
   uint64_t timeStop = rdtscp();
 
   current_tc->munmap_waits++;
   current_tc->munmap_wait_cycles += (timeStop - timeStart);
-
-	long returned = PAGESIZE * ShadowMemory::cleanupPages((intptr_t)addr, length);
-	if(current_tc->totalMemoryUsage > returned) {
-    current_tc->totalMemoryUsage -= returned;
-  }
 
   mappings.erase((intptr_t)addr);
   // total_mmaps--;

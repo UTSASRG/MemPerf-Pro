@@ -12,6 +12,7 @@ INCS =	xthreadx.hh			\
 				hashfuncs.hh		\
 				interval.hh			\
 				selfmap.hh			\
+				recordfunctions.hh\
 				spinlock.hh			\
 				shadowmemory.hh	\
 				libmallocprof.h
@@ -24,7 +25,7 @@ CXX = g++
 #CXX = clang++ 
 
 CFLAGS += -O2 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-frame-pointer
-CFLAGS2 += -O2 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-frame-pointer -Wl,--no-as-needed -lrt
+CFLAGS2 += -O2 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -Wno-unused-result -fno-omit-frame-pointer -Wl,--no-as-needed -lrt
 
 #THREADTEST_FILE = threadTest.cpp
 # THREADTEST_FILE = malloc-and-free.cpp
