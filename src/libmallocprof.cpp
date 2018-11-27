@@ -39,7 +39,6 @@ extern char data_start;
 extern char _etext;
 extern char * program_invocation_name;
 extern void * __libc_stack_end;
-//extern char __executable_start;
 float memEfficiency = 0;
 initStatus profilerInitialized = NOT_INITIALIZED;
 pid_t pid;
@@ -52,7 +51,6 @@ size_t totalSizeAlloc = 0;
 size_t totalSizeFree = 0;
 size_t totalSizeDiff = 0;
 size_t totalMemOverhead = 0;
-uint64_t min_pos_callsite_id;
 
 //Smaps Sampling-------------//
 void setupSignalHandler();
@@ -120,6 +118,8 @@ thread_local uint64_t cycles_free = 0;
 thread_local uint64_t cycles_new = 0;
 thread_local uint64_t cycles_reused = 0;
 
+MemoryUsage mu;
+MemoryUsage max_mu;
 
 /// REQUIRED!
 std::atomic<unsigned>* globalFreeArray = nullptr;
@@ -192,7 +192,6 @@ extern "C" {
 	// Function prototypes
 	size_t getTotalAllocSize(size_t sz);
 	void exitHandler();
-//	inline void getCallsites(void **callsites);
 
 	// Function aliases
 	void free(void *) __attribute__ ((weak, alias("yyfree")));
@@ -241,12 +240,6 @@ __attribute__((constructor)) initStatus initializer() {
 	ShadowMemory::initialize();
 
 	RealX::initializer();
-
-	// Calculate the minimum possible callsite ID by taking the low four bytes
-	// of the start of the program text and repeating them twice, back-to-back,
-	// resulting in eight bytes which resemble: 0x<lowWord><lowWord>
-	//uint64_t btext = (uint64_t)&__executable_start & 0xFFFFFFFF;
-	//min_pos_callsite_id = (btext << 32) | btext;
 
 	// addressUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 	lockUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 128);
@@ -523,21 +516,17 @@ extern "C" {
 		object = RealX::malloc(sz);
 		allocData.address = (uint64_t) object;
 
+    size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject((void *)allocData.address, allocData.size, false);
+    incrementMemoryUsage(sz, new_touched_bytes);
+
 		//Do after
 		//fprintf(stderr, "*** malloc(%zu) -> %p\n", sz, object);
-		current_tc->totalMemoryUsage += PAGESIZE * ShadowMemory::updateObject((void *)allocData.address, allocData.size, false);
-		if(current_tc->totalMemoryUsage > current_tc->maxTotalMemoryUsage) {
-				current_tc->maxTotalMemoryUsage = current_tc->totalMemoryUsage;
-		}
-
 		doAfter(&allocData);
 
 		allocData.cycles = allocData.tsc_after - allocData.tsc_before;
 
 		// Gets overhead, address usage, mmap usage, memHWM, and prefInfo
 		analyzeAllocation(&allocData);
-
-    incrementMemoryUsage(sz);
 
 		// thread_local
 		inAllocation = false;
@@ -583,20 +572,16 @@ extern "C" {
 		object = RealX::calloc(nelem, elsize);
 		allocData.address = reinterpret_cast <uint64_t> (object);
 
-		// Do after
-		current_tc->totalMemoryUsage += PAGESIZE * ShadowMemory::updateObject((void *)allocData.address, allocData.size, false);
-		if(current_tc->totalMemoryUsage > current_tc->maxTotalMemoryUsage) {
-				current_tc->maxTotalMemoryUsage = current_tc->totalMemoryUsage;
-		}
+    size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject((void *)allocData.address, allocData.size, false);
+    incrementMemoryUsage(nelem * elsize, new_touched_bytes);
 
+		// Do after
 		doAfter(&allocData);
 
 		allocData.cycles = allocData.tsc_after - allocData.tsc_before;
 
 		// Gets overhead, address usage, mmap usage, memHWM, and perfInfo
 		analyzeAllocation(&allocData);
-
-    incrementMemoryUsage(nelem * elsize);
 
 		//thread_local
 		inAllocation = false;
@@ -703,12 +688,12 @@ extern "C" {
 		allocation_metadata allocData = init_allocation(sz, REALLOC);
 
 		// allocated object
-		void* object;
+		void * object;
 
 		//thread_local
 		inAllocation = true;
 
-		if (!localFreeArrayInitialized) {
+		if(!localFreeArrayInitialized) {
 			initLocalFreeArray();
 		}
 
@@ -716,18 +701,19 @@ extern "C" {
 		// doBefore(&before, &tsc_before);
 		doBefore(&allocData);
 
+    if(ptr) {
+        ShadowMemory::updateObject(ptr, 0, true);
+    }
+
 		//Do allocation
 		object = RealX::realloc(ptr, sz);
 		allocData.address = reinterpret_cast <uint64_t> (object);
 
 		//Do after
-		//fprintf(stderr, "*** realloc(%p, %zu) -> %p\n", ptr, sz, object);
-		#warning must implement realloc-specific behavior for shadow memory updating
-		// perhaps instead of a bool isFree, use an enum { free, malloc, realloc }
-		current_tc->totalMemoryUsage += PAGESIZE * ShadowMemory::updateObject((void *)allocData.address, allocData.size, false);
-		if(current_tc->totalMemoryUsage > current_tc->maxTotalMemoryUsage) {
-				current_tc->maxTotalMemoryUsage = current_tc->totalMemoryUsage;
-		}
+    size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject(object, sz, false);
+		if(object != ptr) {
+      incrementMemoryUsage(sz, new_touched_bytes);
+    }
 		doAfter(&allocData);
 
 		// cyclesForRealloc = tsc_after - tsc_before;
@@ -736,9 +722,6 @@ extern "C" {
 		//Gets overhead, address usage, mmap usage
 		// analyzeAllocation(sz, address, cyclesForRealloc, classSize, &reused);
 		analyzeAllocation(&allocData);
-
-		if(object != ptr)
-				incrementMemoryUsage(sz);
 
 		//Get perf info
 		//analyzePerfInfo(&before, &after, classSize, &reused, tid);
@@ -759,59 +742,78 @@ extern "C" {
 		return NULL;
 	}
 	int yyposix_memalign(void **memptr, size_t alignment, size_t size) {
-		logUnsupportedOp();
-		return -1;
+    if (!inRealMain) return RealX::posix_memalign(memptr, alignment, size);
+
+    //thread_local
+    inAllocation = true;
+
+    #ifndef NO_PMU
+    // If the PMU sampler has not yet been set up for this thread, set it up now
+    if(!PMUinit){
+      initPMU();
+      PMUinit = true;
+    }
+    #endif
+
+    if (!localFreeArrayInitialized) initLocalFreeArray();
+
+    //Data we need for each allocation
+    allocation_metadata allocData = init_allocation(size, MALLOC);
+
+    //Do allocation
+    int retval = RealX::posix_memalign(memptr, alignment, size);
+    void * object = *memptr;
+    allocData.address = (uint64_t) object;
+
+    //Do after
+    size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject((void *)allocData.address, allocData.size, false);
+    incrementMemoryUsage(size, new_touched_bytes);
+
+    // thread_local
+    inAllocation = false;
+
+    return retval;
 	}
 	void * yyaligned_alloc(size_t alignment, size_t size) {
 		logUnsupportedOp();
 		return NULL;
 	}
-	void * yymemalign(size_t alignment, size_t size) {
-		logUnsupportedOp();
-		return NULL;
+ void * yymemalign(size_t alignment, size_t size) {
+    if (!inRealMain) return RealX::memalign(alignment, size);
+
+    //thread_local
+    inAllocation = true;
+
+    #ifndef NO_PMU
+    // If the PMU sampler has not yet been set up for this thread, set it up now
+    if(!PMUinit){
+      initPMU();
+      PMUinit = true;
+    }
+    #endif
+
+    if (!localFreeArrayInitialized) initLocalFreeArray();
+
+    //Data we need for each allocation
+    allocation_metadata allocData = init_allocation(size, MALLOC);
+
+    //Do allocation
+    void * object = RealX::memalign(alignment, size);
+    allocData.address = (uint64_t) object;
+
+    //Do after
+    size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject((void *)allocData.address, allocData.size, false);
+    incrementMemoryUsage(size, new_touched_bytes);
+
+    // thread_local
+    inAllocation = false;
+
+    return object;
 	}
 	void * yypvalloc(size_t size) {
 		logUnsupportedOp();
 		return NULL;
 	}
-
-/*
-	inline void getCallsites(void **callsites) {
-		int i = 0;
-		void * btext = &__executable_start;
-		void * etext = &data_start;
-
-		// Fetch the frame address of the topmost stack frame
-		struct stack_frame * current_frame =
-			(struct stack_frame *)(__builtin_frame_address(0));
-
-		// Initialize the prev_frame pointer to equal the current_frame. This
-		// simply ensures that the while loop below will be entered and
-		// executed and least once
-		struct stack_frame * prev_frame = current_frame;
-
-		// Initialize the array elements
-		callsites[0] = (void *)NULL;
-		callsites[1] = (void *)NULL;
-
-		// Loop condition tests the validity of the frame address given for the
-		// previous frame by ensuring it actually points to a location located
-		// on the stack
-		while((i < 2) && ((void *)prev_frame <= (void *)thrData.stackStart) &&
-				(prev_frame >= current_frame)) {
-			// Inspect the return address belonging to the previous stack frame;
-			// if it's located in the program text, record it as the next
-			// callsite
-			void * caller_addr = prev_frame->caller_address;
-			if((caller_addr >= btext) && (caller_addr <= etext)) {
-				callsites[i++] = caller_addr;
-			}
-			// Walk the prev_frame pointer backward in preparation for the
-			// next iteration of the loop
-			prev_frame = prev_frame->prev;
-		}
-	}
-*/
 	/*
 	 * This function returns the total usable size of an object allocated
 	 * using glibc malloc (and therefore it does not include the space occupied
@@ -1441,7 +1443,25 @@ void doAfter (allocation_metadata *metadata) {
 	metadata->tsc_after = rdtscp();
 }
 
-void incrementMemoryUsage(size_t size) {
+void incrementGlobalMemoryAllocation(size_t size, size_t classsize) {
+  __atomic_add_fetch(&mu.realMemoryUsage, size, __ATOMIC_RELAXED);
+  __atomic_add_fetch(&mu.realAllocatedMemoryUsage, classsize, __ATOMIC_RELAXED);
+}
+
+void decrementGlobalMemoryAllocation(size_t size, size_t classsize) {
+  __atomic_sub_fetch(&mu.realMemoryUsage, size, __ATOMIC_RELAXED);
+  __atomic_sub_fetch(&mu.realAllocatedMemoryUsage, classsize, __ATOMIC_RELAXED);
+}
+
+void checkGlobalMemoryUsage() {
+  MemoryUsage mu_tmp = mu;
+  if(mu_tmp.totalMemoryUsage > max_mu.maxTotalMemoryUsage) {
+    mu_tmp.maxTotalMemoryUsage = mu_tmp.totalMemoryUsage;
+    max_mu = mu_tmp;
+  }
+}
+
+void incrementMemoryUsage(size_t size, size_t new_touched_bytes) {
   size_t classSize = 0;
   if(bibop) {
     classSize = getClassSizeFor(size);
@@ -1449,14 +1469,22 @@ void incrementMemoryUsage(size_t size) {
     classSize = ShadowMemory::libc_malloc_usable_size(size);
   }
 
-	current_tc->realMemoryUsage += size;
-	current_tc->realAllocatedMemoryUsage += classSize;
-	if(current_tc->realAllocatedMemoryUsage > current_tc->maxRealAllocatedMemoryUsage) {
-			current_tc->maxRealAllocatedMemoryUsage = current_tc->realAllocatedMemoryUsage;
-	}
-	if(current_tc->realMemoryUsage > current_tc->maxRealMemoryUsage) {
-			current_tc->maxRealMemoryUsage = current_tc->realMemoryUsage;
-	}
+  current_tc->realMemoryUsage += size;
+  current_tc->realAllocatedMemoryUsage += classSize;
+
+  incrementGlobalMemoryAllocation(size, classSize);
+
+  if(new_touched_bytes > 0) {
+    current_tc->totalMemoryUsage += new_touched_bytes;
+    __atomic_add_fetch(&mu.totalMemoryUsage, new_touched_bytes, __ATOMIC_RELAXED);
+    if(current_tc->totalMemoryUsage > current_tc->maxTotalMemoryUsage) {
+      current_tc->maxRealAllocatedMemoryUsage = current_tc->realAllocatedMemoryUsage;
+      current_tc->maxRealMemoryUsage = current_tc->realMemoryUsage;
+      current_tc->maxTotalMemoryUsage = current_tc->totalMemoryUsage;
+    }
+
+    checkGlobalMemoryUsage();
+  }
 }
 
 void decrementMemoryUsage(void* addr) {
@@ -1469,8 +1497,13 @@ void decrementMemoryUsage(void* addr) {
 			classSize = ShadowMemory::getPageClassSize(addr);
 	}
 
+  size_t size = ShadowMemory::getObjectSize(addr);
 	current_tc->realAllocatedMemoryUsage -= classSize;
-	current_tc->realMemoryUsage -= ShadowMemory::getObjectSize(addr);
+	current_tc->realMemoryUsage -= size;
+
+  decrementGlobalMemoryAllocation(size, classSize);
+
+  checkGlobalMemoryUsage();
 }
 
 void collectAllocMetaData(allocation_metadata *metadata) {

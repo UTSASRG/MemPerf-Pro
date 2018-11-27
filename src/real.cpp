@@ -1,5 +1,4 @@
 #include <dlfcn.h>
-#include <stdlib.h>
 #include <unistd.h>
 #include "real.hh"
 
@@ -15,6 +14,8 @@ namespace RealX {
 	DEFINE_WRAPPER(calloc);
 	DEFINE_WRAPPER(malloc);
 	DEFINE_WRAPPER(realloc);
+	DEFINE_WRAPPER(memalign);
+	DEFINE_WRAPPER(posix_memalign);
 	DEFINE_WRAPPER(pthread_create);
 	DEFINE_WRAPPER(pthread_join);
 	DEFINE_WRAPPER(mmap);
@@ -36,6 +37,8 @@ namespace RealX {
 		INIT_WRAPPER(calloc, RTLD_NEXT);
 		INIT_WRAPPER(malloc, RTLD_NEXT);
 		INIT_WRAPPER(realloc, RTLD_NEXT);
+		INIT_WRAPPER(memalign, RTLD_NEXT);
+		INIT_WRAPPER(posix_memalign, RTLD_NEXT);
 		INIT_WRAPPER(mmap, RTLD_NEXT);
 		INIT_WRAPPER(munmap, RTLD_NEXT);
 		INIT_WRAPPER(mremap, RTLD_NEXT);
