@@ -25,14 +25,14 @@ bool ShadowMemory::initialize() {
 	if((void *)(mega_map_begin = (PageMapEntry **)mmap((void *)MEGABYTE_MAP_START, MEGABYTE_MAP_SIZE,
 									PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0)) == MAP_FAILED) {
 			perror("mmap of global megabyte map failed");
-			abort();			// temporary, remove and replace with return false after testing
+//			abort();			// temporary, remove and replace with return false after testing
 	}
 
 	// Allocate 4KB-to-cacheline region
 	if((void *)(page_map_begin = (PageMapEntry *)mmap((void *)PAGE_MAP_START, PAGE_MAP_SIZE,
 									PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0)) == MAP_FAILED) {
 			perror("mmap of global page map failed");
-			abort();			// temporary, remove and replace with return false after testing
+//			abort();			// temporary, remove and replace with return false after testing
 	}
 	page_map_end = page_map_begin + MAX_PAGE_MAP_ENTRIES;
 	page_map_bump_ptr = page_map_begin;
@@ -41,7 +41,7 @@ bool ShadowMemory::initialize() {
 	if((void *)(cache_map_begin = (CacheMapEntry *)mmap((void *)CACHE_MAP_START, CACHE_MAP_SIZE,
 									PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0)) == MAP_FAILED) {
 			perror("mmap of cache map region failed");
-			abort();			// temporary, remove and replace with return false after testing
+//			abort();			// temporary, remove and replace with return false after testing
 	}
 	cache_map_end = cache_map_begin + MAX_CACHE_MAP_ENTRIES;
 	cache_map_bump_ptr = cache_map_begin;
@@ -58,7 +58,7 @@ unsigned ShadowMemory::updateObject(void * address, size_t size, bool isFree) {
 		if(address == NULL) {
 				fprintf(stderr, "ERROR: passed a NULL pointer into %s in %s:%d\n",
 								__FUNCTION__, __FILE__, __LINE__);
-				abort();
+//				abort();
 		}
 
 		unsigned classSize;
@@ -69,7 +69,7 @@ unsigned ShadowMemory::updateObject(void * address, size_t size, bool isFree) {
 		if(mega_index > NUM_MEGABYTE_MAP_ENTRIES) {
 				fprintf(stderr, "ERROR: mega index of 0x%lx too large: %lu > %u\n",
 								uintaddr, mega_index, NUM_MEGABYTE_MAP_ENTRIES);
-				abort();
+//				abort();
 		}
 
 		unsigned firstPageIdx = ((uintaddr & MEGABYTE_MASK) >> LOG2_PAGESIZE);
@@ -232,7 +232,7 @@ unsigned ShadowMemory::getPageClassSize(void * address) {
 		if(mega_index > NUM_MEGABYTE_MAP_ENTRIES) {
 				fprintf(stderr, "ERROR: mega index of 0x%lx is too large: %lu > %u\n",
 								uintaddr, mega_index, NUM_MEGABYTE_MAP_ENTRIES);
-				abort();
+//				abort();
 		}
 
 		unsigned page_index = ((uintaddr & MEGABYTE_MASK) >> LOG2_PAGESIZE);
@@ -287,7 +287,7 @@ unsigned ShadowMemory::getObjectSize(void * address) {
 		if(mega_index > NUM_MEGABYTE_MAP_ENTRIES) {
 				fprintf(stderr, "ERROR: mega index of 0x%lx too large: %lu > %u\n",
 								uintaddr, mega_index, NUM_MEGABYTE_MAP_ENTRIES);
-				abort();
+//				abort();
 		}
 
 		unsigned page_index = ((uintaddr & MEGABYTE_MASK) >> LOG2_PAGESIZE);
@@ -301,14 +301,14 @@ bool ShadowMemory::updateObjectSize(uintptr_t uintaddr, unsigned size, bool isFr
 
 		if(bibop) {
 				classSize = getClassSizeFor(size);
-				if(classSize > malloc_mmap_threshold) {
+				if(classSize > large_object_threshold) {
 						classSize = getPageClassSize((void *)uintaddr);
 				}
 		} else {
 				#warning replaced internal MUS with library call
 				/*
 				classSize = libc_malloc_usable_size(size);
-				if(classSize > malloc_mmap_threshold) {
+				if(classSize > large_object_threshold) {
 						classSize = malloc_usable_size((void *)uintaddr);
 				}
 				*/
@@ -350,7 +350,7 @@ bool ShadowMemory::updateObjectSize(uintptr_t uintaddr, unsigned size, bool isFr
 size_t ShadowMemory::libc_malloc_usable_size(size_t size) {
 		if(size <= LIBC_MIN_OBJECT_SIZE) {
 				return LIBC_MIN_OBJECT_SIZE;
-		} else if(size >= malloc_mmap_threshold) {
+		} else if(size >= large_object_threshold) {
 				return alignup(size, PAGESIZE);
 		}
 		unsigned next_mult_16 = ((~size & 0xf) + size + 1);
@@ -369,7 +369,7 @@ unsigned ShadowMemory::cleanupPages(uintptr_t uintaddr, size_t length) {
 		if(mega_index > NUM_MEGABYTE_MAP_ENTRIES) {
 				fprintf(stderr, "ERROR: mega index of 0x%lx too large: %lu > %u\n",
 								uintaddr, mega_index, NUM_MEGABYTE_MAP_ENTRIES);
-				abort();
+//				abort();
 		}
 
 		unsigned firstPageIdx = ((uintaddr & MEGABYTE_MASK) >> LOG2_PAGESIZE);
@@ -440,7 +440,7 @@ unsigned ShadowMemory::getCacheUsage(uintptr_t uintaddr) {
 		if(uintaddr == (uintptr_t)NULL) {
 				fprintf(stderr, "ERROR: passed a NULL pointer into %s in %s:%d\n",
 								__FUNCTION__, __FILE__, __LINE__);
-				abort();
+//				abort();
 		}
 
 		// First compute the megabyte number of the given address.
@@ -448,7 +448,7 @@ unsigned ShadowMemory::getCacheUsage(uintptr_t uintaddr) {
 		if(mega_index > NUM_MEGABYTE_MAP_ENTRIES) {
 				fprintf(stderr, "ERROR: mega index of 0x%lx too large: %lu > %u\n",
 								uintaddr, mega_index, NUM_MEGABYTE_MAP_ENTRIES);
-				abort();
+//				abort();
 		}
 
 		unsigned page_index = ((uintaddr & MEGABYTE_MASK) >> LOG2_PAGESIZE);
@@ -464,7 +464,7 @@ unsigned ShadowMemory::getPageUsage(uintptr_t uintaddr) {
 		if(uintaddr == (uintptr_t)NULL) {
 				fprintf(stderr, "ERROR: passed a NULL pointer into %s in %s:%d\n",
 								__FUNCTION__, __FILE__, __LINE__);
-				abort();
+//				abort();
 		}
 
 		// First compute the megabyte number of the given address.
@@ -472,7 +472,7 @@ unsigned ShadowMemory::getPageUsage(uintptr_t uintaddr) {
 		if(mega_index > NUM_MEGABYTE_MAP_ENTRIES) {
 				fprintf(stderr, "ERROR: mega index of 0x%lx too large: %lu > %u\n",
 								uintaddr, mega_index, NUM_MEGABYTE_MAP_ENTRIES);
-				abort();
+//				abort();
 		}
 
 		unsigned page_index = ((uintaddr & MEGABYTE_MASK) >> LOG2_PAGESIZE);
@@ -558,7 +558,7 @@ CacheMapEntry * ShadowMemory::doCacheMapBumpPointer() {
 		cache_map_bump_ptr += NUM_CACHELINES_PER_PAGE;
 		if(cache_map_bump_ptr >= cache_map_end) {
 				fprintf(stderr, "ERROR: cache map out of memory\n");
-				abort();
+//				abort();
 		}
 		return cache_map_bump_ptr;
 }
@@ -567,7 +567,7 @@ PageMapEntry * ShadowMemory::doPageMapBumpPointer() {
 		page_map_bump_ptr += NUM_PAGES_PER_MEGABYTE;
 		if(page_map_bump_ptr >= page_map_end) {
 				fprintf(stderr, "ERROR: page map out of memory\n");
-				abort();
+//				abort();
 		}
 		return page_map_bump_ptr;
 }
@@ -607,10 +607,10 @@ bool PageMapEntry::setUsedBytes(unsigned num_bytes) {
 bool PageMapEntry::addUsedBytes(unsigned num_bytes) {
 		assert(num_bytes <= PAGESIZE);
 		assert(num_used_bytes + num_bytes <= PAGESIZE);
-		//fprintf(stderr, "%s(%d) : page map entry at %p, current value = %d, new value = %d\n",__FUNCTION__, num_bytes, this, num_used_bytes, (num_used_bytes + num_bytes));
+		fprintf(stderr, "%s(%d) : page map entry at %p, current value = %d, new value = %d\n",__FUNCTION__, num_bytes, this, num_used_bytes, (num_used_bytes + num_bytes));
 		if(num_used_bytes + num_bytes > PAGESIZE) {
 				fprintf(stderr, "ERROR: incremented page map entry at %p to size %u > %d\n", this, (num_used_bytes + num_bytes), PAGESIZE);
-				abort();
+//				abort();
 		}
 		num_used_bytes += num_bytes;
 		return true;
@@ -622,7 +622,7 @@ bool PageMapEntry::subUsedBytes(unsigned num_bytes) {
 		//fprintf(stderr, "%s(%d) : page map entry at %p, current value = %d, new value = %d\n",__FUNCTION__, num_bytes, this, num_used_bytes, (num_used_bytes - num_bytes));
 		if((num_used_bytes - num_bytes) < 0) {
 				fprintf(stderr, "ERROR: decremented page map entry at %p to size %u < 0\n", this, (num_used_bytes - num_bytes)); 
-				abort();
+//				abort();
 		}
 		num_used_bytes -= num_bytes;
 		if(num_used_bytes < 0) {
@@ -749,7 +749,7 @@ unsigned char CacheMapEntry::addUsedBytes(unsigned num_bytes) {
 		num_used_bytes += num_bytes;
 		if(num_used_bytes > CACHELINE_SIZE) {
 				fprintf(stderr, "ERROR: incremented cache map entry at %p to size %u > %d\n", this, num_used_bytes, CACHELINE_SIZE); 
-				abort();
+//				abort();
 		}
 		return true;
 }
@@ -761,7 +761,7 @@ unsigned char CacheMapEntry::subUsedBytes(unsigned num_bytes) {
 		//				__FUNCTION__, num_bytes, this, num_used_bytes, (num_used_bytes - num_bytes));
 		if((num_used_bytes - num_bytes) < 0) {
 				fprintf(stderr, "ERROR: decremented cache map entry at %p to size %u < 0\n", this, (num_used_bytes - num_bytes)); 
-				abort();
+//				abort();
 		}
 		num_used_bytes -= num_bytes;
 		return true;

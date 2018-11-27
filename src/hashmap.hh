@@ -23,7 +23,6 @@ void* myMalloc (size_t size);
 void myFree();
 bool debug_hashmap = false;
 bool d_initialize = false;
-//std::atomic<uint64_t> hashmaps (0);
 
 template <class KeyType,	// What is the key? A long or string
 			class ValueType,	// What is the value there?

@@ -44,7 +44,7 @@ float memEfficiency = 0;
 initStatus profilerInitialized = NOT_INITIALIZED;
 pid_t pid;
 size_t alignment = 0;
-size_t malloc_mmap_threshold = 0;
+size_t large_object_threshold = 0;
 size_t metadata_object = 0;
 size_t metadata_overhead = 0;
 size_t total_blowup = 0;
@@ -70,8 +70,10 @@ uint64_t smap_samples = 0;
 uint64_t smap_sample_cycles = 0;
 struct itimerspec stopTimer;
 struct itimerspec resumeTimer;
-unsigned timer_nsec = 333000000;
-unsigned timer_sec = 0;
+//unsigned timer_nsec = 333000000;
+unsigned timer_nsec = 0;
+//unsigned timer_sec = 0;
+unsigned timer_sec = 1;
 //Smaps Sampling-------------//
 
 //Array of class sizes
@@ -264,20 +266,28 @@ __attribute__((constructor)) initStatus initializer() {
 	selfmap::getInstance().getTextRegions();
 	selfmapInitialized = true;
 
-	// After this, we have the filename we need to read from
-	// in the form of "allocator.info" in allocatorFileName
-	allocator_name = strrchr(allocator_name, '/') + 1;
-	char* period = strchr(allocator_name, '.');
-	uint64_t bytes = (uint64_t)period - (uint64_t)allocator_name;
-	size_t extensionBytes = 6;
-	allocatorFileName = (char*) myMalloc (bytes+extensionBytes);
-	memcpy (allocatorFileName, allocator_name, bytes);
-	snprintf (allocatorFileName+bytes, extensionBytes, ".info");
-	//myFree(allocator_name);
+	//Build the name of the .info file
+	//This file should be located in the same directory
+	//as the allocator. readAllocatorFile() will open the file
 
-	// Load info from allocatorInfoFile
+	allocatorFileName = (char*)myMalloc(128);
+	char* end_path = strrchr(allocator_name, '/');
+	char* end_name = strchr(end_path, '.') - 1;
+	char* start_name = end_path + 1;
+	uint64_t name_bytes = (uint64_t)end_name - (uint64_t)end_path;
+	uint64_t path_bytes = (uint64_t)start_name - (uint64_t)allocator_name;
+	short ext_bytes = 6;
+	void* r;
+
+	r = memcpy(allocatorFileName, allocator_name, path_bytes);
+	if (r != allocatorFileName) {perror("memcpy fail?"); abort();}
+	r = memcpy((allocatorFileName+path_bytes), start_name, name_bytes);
+	if (r != (allocatorFileName+path_bytes)) {perror("memcpy fail?"); abort();}
+	snprintf ((allocatorFileName+path_bytes+name_bytes), ext_bytes, ".info");
+
 	readAllocatorFile();
 
+	//Initialize the global and free counter arrays (blowup)
 	initGlobalFreeArray();
 	initLocalFreeArray();
 
@@ -342,9 +352,9 @@ __attribute__((constructor)) initStatus initializer() {
 	stopTimer.it_interval.tv_nsec = 0;
 
 	worstCaseOverhead.efficiency = 100.00;
+//	#warning DISABLED SMAPS TIMER!
 	setupSignalHandler();
-	#warning DISABLED SMAPS TIMER!
-	//startSignalTimer();
+	startSignalTimer();
 
 	inConstructor = false;
 	return profilerInitialized;
@@ -387,8 +397,8 @@ void exitHandler() {
 	doPerfCounterRead();
 	#endif
 
-	#warning DISABLED SMAPS TIMER!
-	/*
+//	#warning DISABLED SMAPS TIMER!
+//	/*
 	if (timer_settime(smap_timer, 0, &stopTimer, NULL) == -1) {
 			perror("timer_settime failed");
 			abort();
@@ -396,7 +406,7 @@ void exitHandler() {
 	if (timer_delete(smap_timer) == -1) {
 			perror("timer_delete failed");
 	}
-	*/
+//	*/
 
 	//    calculateMemOverhead();
 	if(thrData.output) {
@@ -408,20 +418,21 @@ void exitHandler() {
 		fclose(thrData.output);
 	}
 
-	//    if (smap_samples != 0) {
-	//            uint64_t avg = (smap_sample_cycles / smap_samples);
-	//            fprintf(stderr, "smap_samples: %lu, avg cycles: %lu\n", smap_samples, avg);
-	//    }
-	//    else {
-	//            fprintf(stderr, "smap_samples was 0\n");
-	//    }
+	uint64_t avg;
+    if (smap_samples != 0) {
+		avg = (smap_sample_cycles / smap_samples);
+    }
 
 	fprintf(stderr, "---WorstCaseOverhead---\n"
+					"Samples:              %lu\n"
+					"AvgCycles:            %lu\n"
 					"PhysicalMem:          %lu\n"
 					"Alignment:            %lu\n"
 					"Blowup:               %lu\n"
 					"Efficiency:           %.4f\n"
 					"-----------------------\n",
+					smap_samples,
+					avg,
 					worstCaseOverhead.kb,
 					worstCaseOverhead.alignment,
 					worstCaseOverhead.blowup,
@@ -523,7 +534,6 @@ extern "C" {
 
 		allocData.cycles = allocData.tsc_after - allocData.tsc_before;
 
-		//            addressUsage.insertIfAbsent(allocData.address, newObjectTuple(allocData.address, sz));
 		// Gets overhead, address usage, mmap usage, memHWM, and prefInfo
 		analyzeAllocation(&allocData);
 
@@ -869,18 +879,17 @@ void analyzeAllocation(allocation_metadata *metadata) {
 	//Analyzes for alignment and blowup
 	getOverhead(metadata->size, metadata->address, metadata->classSize, &(metadata->reused));
 
-	//Analyze address usage
-	#warning disabled call to getAddressUsage
-	//getAddressUsage(metadata->size, metadata->address, metadata->cycles);
-
-	//Update mmap region info
-	#warning disabled call to getMappingsUsage
-	//getMappingsUsage(metadata->size, metadata->address, metadata->classSize);
-
 	// Analyze perfinfo
 	analyzePerfInfo(metadata);
 }
 
+/*
+	updateFreeCounters
+
+	This function updates the local and global counters of free objects
+	needed for determing blowup. If libc, increment a global "freed_bytes"
+	variable
+*/
 size_t updateFreeCounters(uint64_t address) {
 
 	size_t size = 0;
@@ -888,24 +897,28 @@ size_t updateFreeCounters(uint64_t address) {
 
 	if (bibop){
 			size = ShadowMemory::getObjectSize((void*)address);
-
 			current_class_size = getClassSizeFor(size);
-
-			//Increase the free object counter for this class size
-			//GetSizeIndex returns class size for bibop
-			//0 or 1 for bump pointer / 0 for small, 1 for large objects
-			if (size <= malloc_mmap_threshold) {
-					short class_size_index = getClassSizeIndex(size);
-					localFreeArray[class_size_index]++;
-					globalFreeArray[class_size_index]++;
-					if (d_updateCounters) printf ("globalFreeArray[%d]++\n", class_size_index);
-			}
+			short class_size_index = getClassSizeIndex(size);
+			localFreeArray[class_size_index]++;
+			globalFreeArray[class_size_index]++;
+			if (d_updateCounters) printf ("globalFreeArray[%d]++\n", class_size_index);
 	}
 
 	else {freed_bytes += size;}
 	return current_class_size;
 }
 
+/*
+	getClassSizeIndex
+
+	This function finds the class size for the given size
+	and returns the index into the class_sizes array for
+	this class size. 
+
+	This is used in updateFreeCounters. The local and global free
+	counter arrays are "identical" to the class_sizes array.
+	So we can call localFreeArray[index] and globalFreeArray[index]
+*/
 short getClassSizeIndex(size_t size) {
 	if (bumpPointer) {
 		if (size < LARGE_OBJECT) return 0;
@@ -922,43 +935,18 @@ short getClassSizeIndex(size_t size) {
 }
 
 /*
-void getAddressUsage(size_t size, uint64_t address, uint64_t cycles) {
+	getOverhead
 
-	ObjectTuple* t; //Has this address been used before
-	if (addressUsage.find (address, &t)) {
-		t->szUsed = size;
-		cycles_reused += cycles;
-	} else {
-		cycles_new += cycles;
-		addressUsage.insert (address, newObjectTuple(address, size));
-	}
-}
+	Calculates alignment due to class size
 */
-
-void getMappingsUsage(size_t size, uint64_t address, size_t classSize) {
-
-	for (auto entry : mappings) {
-		auto data = entry.getData();
-		if (data->start <= address && address <= data->end) {
-			data->allocations.fetch_add(1, relaxed);
-			break;
-		}
-	}
-}
-
 void getOverhead (size_t size, uint64_t address, size_t classSize, bool* reused) {
 
-	//If size is greater than malloc_mmap_threshold
-	//Then it will be mmap'd. So no need to check
-	if (size <= malloc_mmap_threshold) {
+	//Check for classSize alignment bytes
+	// if (bibop) getAlignment(size, classSize);
+	getAlignment(size, classSize);
 
-		//Check for classSize alignment bytes
-		// if (bibop) getAlignment(size, classSize);
-		getAlignment(size, classSize);
-
-		//Check for memory blowup
-		getBlowup(size, classSize, reused);
-	}
+	//Check for memory blowup
+	getBlowup(size, classSize, reused);
 }
 
 void getMetadata (size_t classSize) {
@@ -1056,7 +1044,7 @@ void getBlowup (size_t size, size_t classSize, bool* reused) {
 //Return the appropriate class size that this object should be in
 size_t getClassSizeFor (size_t size) {
 
-	if(size > malloc_mmap_threshold) {
+	if(size > large_object_threshold) {
 			return size;
 	}
 
@@ -1229,7 +1217,7 @@ void writeAllocData () {
 	if (d_trace) fprintf(stderr, "Entering writeAllocData()\n");
 
 	fprintf(thrData.output, ">>> malloc_mmaps             %u\n", malloc_mmaps);
-	fprintf(thrData.output, ">>> malloc_mmap_threshold    %zu\n", malloc_mmap_threshold);
+	fprintf(thrData.output, ">>> large_object_threshold    %zu\n", large_object_threshold);
 	fprintf(thrData.output, ">>> num_madvise              %u\n", num_madvise);
 	fprintf(thrData.output, ">>> num_sbrk                 %u\n", num_sbrk);
 	fprintf(thrData.output, ">>> size_sbrk                %u\n", size_sbrk);
@@ -1529,8 +1517,7 @@ void readAllocatorFile() {
 	char* token;
 
 	if ((infile = fopen (allocatorFileName, "r")) == NULL) {
-		perror("Failed to open allocator info file. Make sure to run the prerun lib and"
-				"\nthe file (i.e. allocator.info) is in this directory. Quit");
+		perror("Failed to open allocator info file");
 		abort();
 	}
 
@@ -1571,31 +1558,23 @@ void readAllocatorFile() {
 			for (int i = 0; i < num_class_sizes; i++) {
 				token = strtok(NULL, " ");
 				class_sizes[i] = (size_t) atoi(token);
-				if (d_readFile) printf ("class_size[%d]= %zu\n", i, class_sizes[i]);
+				if (d_readFile) printf ("class_sizes[%d]= %zu\n", i, class_sizes[i]);
 			}
 			continue;
 		}
 
-		else if ((strcmp(token, "malloc_mmap_threshold")) == 0) {
-			if (d_readFile) printf ("token matched malloc_mmap_threshold\n");
+		else if ((strcmp(token, "large_object_threshold")) == 0) {
+			if (d_readFile) printf ("token matched large_object_threshold\n");
 			token = strtok(NULL, " ");
-			malloc_mmap_threshold = (size_t) atoi(token);
-			if (d_readFile) printf ("malloc_mmap_threshold= %zu\n", malloc_mmap_threshold);
+			large_object_threshold = (size_t) atoi(token);
+			if (d_readFile) printf ("large_object_threshold= %zu\n", large_object_threshold);
 			continue;
 		}
 
-		else if ((strcmp(token, "metadata_object")) == 0) {
-			if (d_readFile) printf ("token matched metadata_object\n");
-			token = strtok(NULL, " ");
-			metadata_object = (size_t) atoi(token);
-			if (d_readFile) printf ("metadata_object= %zu\n", metadata_object);
-			continue;
-		}
 		if (d_readFile) printf ("\n");
 	}
 
 	myFree(buffer);
-	myFree(allocatorFileName);
 }
 
 void initLocalFreeArray () {
@@ -1661,174 +1640,171 @@ void initMyLocalMem() {
 
 void sampleMemoryOverhead(int i, siginfo_t* s, void* p) {
 
-		size_t alignBytes = alignment_bytes.load();
-		size_t blowupBytes = blowup_bytes.load();
+	size_t alignBytes = alignment_bytes.load();
+	size_t blowupBytes = blowup_bytes.load();
 
-		if (timer_settime(smap_timer, 0, &stopTimer, NULL) == -1) {
-				perror("timer_settime failed");
-				abort();
+	if (timer_settime(smap_timer, 0, &stopTimer, NULL) == -1) {
+		perror("timer_settime failed");
+		abort();
+	}
+
+	uint64_t startTime = rdtscp();
+	smap_samples++;
+	int numSmapEntries = 0;
+	int numSkips = 0;
+	int numHeapMatches = 0;
+	bool dontCheck = false;
+	void* start;
+	void* end;
+	unsigned kb = 0;
+	smapsDontCheckIndex = 0;
+
+	currentCaseOverhead.kb = 0;
+	currentCaseOverhead.efficiency = 0;
+
+	fseek(smaps_infile, 0, SEEK_SET);
+
+	while ((getline(&smaps_buffer, &smaps_bufferSize, smaps_infile)) > 0) {
+
+		dontCheck = false;
+		numSmapEntries++;
+
+		//Get addresses
+		sscanf(smaps_buffer, "%p-%p", &start, &end);
+
+		SMapEntry* entry;
+		short index = smapsDontCheckIndex;
+
+		//Compare against smapsDontCheck
+		while (index < smapsDontCheckNumEntries) {
+
+			entry = smapsDontCheck[index];
+
+			//If it's in smapsDontCheck, skip to next entry in smaps
+			if (start == entry->start) {
+				dontCheck = true;
+				numSkips++;
+				smapsDontCheckIndex++;
+				for (int j = 0; j < 15; j++)
+					getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
+				break;
+			}
+			index++;
 		}
 
-		//    uint64_t startTime = rdtscp();
-		smap_samples++;
-		int numSmapEntries = 0;
-		int numSkips = 0;
-		int numHeapMatches = 0;
-		bool dontCheck = false;
-		void* start;
-		void* end;
-		unsigned kb = 0;
-		smapsDontCheckIndex = 0;
+		if (dontCheck) continue;
 
-		currentCaseOverhead.kb = 0;
-		currentCaseOverhead.efficiency = 0;
+		bool match = false;
+		//Compare against known heaps
+		for (auto entry : mappings) {
+			auto data = entry.getData();
+			if ((data->start >= (uint64_t)start) && (data->start <= (uint64_t)end)) {
+				//Skip two lines
+				for (int j = 0; j < 2; j++)
+					getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
 
-		fseek(smaps_infile, 0, SEEK_SET);
+				//Grab RSS
+				sscanf(smaps_buffer, "Rss:%u", &kb);
 
-		while ((getline(&smaps_buffer, &smaps_bufferSize, smaps_infile)) > 0) {
-
-				dontCheck = false;
-				numSmapEntries++;
-
-				//Get addresses
-				sscanf(smaps_buffer, "%p-%p", &start, &end);
-
-				SMapEntry* entry;
-				short index = smapsDontCheckIndex;
-
-				//Compare against smapsDontCheck
-				while (index < smapsDontCheckNumEntries) {
-
-						entry = smapsDontCheck[index];
-
-						//If it's in smapsDontCheck, skip to next entry in smaps
-						if (start == entry->start) {
-								dontCheck = true;
-								numSkips++;
-								smapsDontCheckIndex++;
-								for (int j = 0; j < 15; j++)
-										getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
-								break;
-						}
-						index++;
-				}
-
-				if (dontCheck) continue;
-
-				bool match = false;
-				//Compare against known heaps
-				for (auto entry : mappings) {
-						auto data = entry.getData();
-						if ((data->start >= (uint64_t)start) && (data->start <= (uint64_t)end)) {
-								//Skip two lines
-								for (int j = 0; j < 2; j++)
-										getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
-
-								//Grab RSS
-								sscanf(smaps_buffer, "Rss:%u", &kb);
-
-								//This is a heap segment
-								currentCaseOverhead.kb += kb;
-								numHeapMatches++;
-								match = true;
-								break;
-						}
-						else continue;
-				}
-				if (match) {
-						for (int j = 0; j < 13; j++)
-								getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
-						continue;
-				}
-				else {
-						//This is an unknown entry, skip it
-						for (int j = 0; j < 15; j++)
-								getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
-				}
+				//This is a heap segment
+				currentCaseOverhead.kb += kb;
+				numHeapMatches++;
+				match = true;
+				break;
+			}
+			else continue;
 		}
-
-		//Get current efficiency
-		uint64_t bytes = currentCaseOverhead.kb*1024;
-		double e = ((bytes - blowupBytes - alignBytes) / (float)bytes);
-
-		//Compare to current worst case
-		if (!(e >= 1) && e < worstCaseOverhead.efficiency) {
-				worstCaseOverhead.kb = bytes;
-				worstCaseOverhead.alignment = alignBytes;
-				worstCaseOverhead.blowup = blowupBytes;
-				worstCaseOverhead.efficiency = e;
+		if (match) {
+			for (int j = 0; j < 13; j++)
+				getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
+			continue;
 		}
-		//    uint64_t endTime = rdtscp();
-
-		//    smap_sample_cycles += (endTime - startTime);
-		//    fprintf(stderr, "leaving sample, %d smap entries\n"
-		//                                    "bytes= %lu, blowup= %zu, alignment= %zu\n"
-		//                                    "skips= %d, hits= %d, cycles: %lu\nefficiency= %.5f\n",
-		//                                    numSmapEntries, bytes, blowupBytes, alignBytes,
-		//                                    numSkips, numHeapMatches, (endTime-startTime), e);
-
-		if (timer_settime(smap_timer, 0, &resumeTimer, NULL) == -1) {
-				perror("timer_settime failed");
-				abort();
+		else {
+			//This is an unknown entry, skip it
+			for (int j = 0; j < 15; j++)
+				getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
 		}
-		//    getchar();
+	}
+
+	//Get current efficiency
+	uint64_t bytes = currentCaseOverhead.kb*1024;
+	double e = ((bytes - blowupBytes - alignBytes) / (float)bytes);
+
+	//Compare to current worst case
+	if (!(e >= 1) && e < worstCaseOverhead.efficiency) {
+		worstCaseOverhead.kb = bytes;
+		worstCaseOverhead.alignment = alignBytes;
+		worstCaseOverhead.blowup = blowupBytes;
+		worstCaseOverhead.efficiency = e;
+	}
+	uint64_t endTime = rdtscp();
+
+	smap_sample_cycles += (endTime - startTime);
+	fprintf(stderr, "leaving sample, %d smap entries\n"
+	                "bytes= %lu, blowup= %zu, alignment= %zu\n"
+	                "skips= %d, hits= %d, cycles: %lu\nefficiency= %.5f\n",
+	                numSmapEntries, bytes, blowupBytes, alignBytes,
+	                numSkips, numHeapMatches, (endTime-startTime), e);
+
+	if (timer_settime(smap_timer, 0, &resumeTimer, NULL) == -1) {
+		perror("timer_settime failed");
+		abort();
+	}
 }
 
 void start_smaps() {
 
-		bool debug = false;
-		if (debug) fprintf(stderr, "Reading smaps on startup, pid %d\n", pid);
-		void* start;
-		void* end;
-		unsigned kb;
-		char heap[] = "heap";
-		bool keep = false;
+	bool debug = false;
+	if (debug) fprintf(stderr, "Reading smaps on startup, pid %d\n", pid);
+	void* start;
+	void* end;
+	unsigned kb;
+	char heap[] = "heap";
+	bool keep = false;
 
-		if ((smaps_infile = fopen (smaps_fileName, "r")) == NULL) {
-				fprintf(stderr, "failed to open smaps\n");
-				return;
+	if ((smaps_infile = fopen (smaps_fileName, "r")) == NULL) {
+		fprintf(stderr, "failed to open smaps\n");
+		return;
+	}
+
+	while ((getline(&smaps_buffer, &smaps_bufferSize, smaps_infile)) > 0) {
+		keep = false;
+		if (strstr(smaps_buffer, (const char*)&heap) != NULL) {
+			keep = true;
 		}
+		sscanf(smaps_buffer, "%p-%p", &start, &end);
+		if (keep) mappings.insert((uint64_t)start, (newMmapTuple((uint64_t)start, 0, PROT_READ | PROT_WRITE, 'a')));
 
-		while ((getline(&smaps_buffer, &smaps_bufferSize, smaps_infile)) > 0) {
-				keep = false;
-				if (strstr(smaps_buffer, (const char*)&heap) != NULL) {
-						keep = true;
-				}
-				sscanf(smaps_buffer, "%p-%p", &start, &end);
-				if (keep) mappings.insert((uint64_t)start, (newMmapTuple((uint64_t)start, 0, PROT_READ | PROT_WRITE, 'a')));
+		//Skip next line
+		getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
 
-				//Skip next line
-				getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
+		getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
+		sscanf(smaps_buffer, "%*s%u", &kb);
 
-				getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
-				sscanf(smaps_buffer, "%*s%u", &kb);
-				//Skip next 13 Lines
-				for (int i = 0; i < 13; i++)
-						getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
-				SMapEntry* entry = newSMapEntry();
-				entry->start = start;
-				entry->end = end;
-				entry->kb = kb;
-				if (!keep) {
-						smapsDontCheck[smapsDontCheckIndex] = entry;
-						smapsDontCheckIndex++;
-				}
-				//            getchar();
+		//Skip next 13 Lines
+		for (int i = 0; i < 13; i++)
+			getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
+
+		SMapEntry* entry = newSMapEntry();
+		entry->start = start;
+		entry->end = end;
+		entry->kb = kb;
+		if (!keep) {
+			smapsDontCheck[smapsDontCheckIndex] = entry;
+			smapsDontCheckIndex++;
 		}
+	}
 
-		smapsDontCheckNumEntries = smapsDontCheckIndex;
-		smapsDontCheckIndex = 0;
+	smapsDontCheckNumEntries = smapsDontCheckIndex;
+	smapsDontCheckIndex = 0;
 
-		if (debug) for (int i = 0; i < smapsDontCheckNumEntries; i++) {
-				fprintf(stderr, "\nSMAP ENTRIES\n");
-				fprintf(stderr, "[%d]->start   %p\n", i, smapsDontCheck[i]->start);
-				fprintf(stderr, "[%d]->end     %p\n", i, smapsDontCheck[i]->end);
-				fprintf(stderr, "[%d]->kb      %u\n", i, smapsDontCheck[i]->kb);
-		}
-		fclose(smaps_infile);
-		//    fprintf(stderr, "numDontCheck %d\n", smapsDontCheckNumEntries);
-
-		//    getchar();
+	if (debug) for (int i = 0; i < smapsDontCheckNumEntries; i++) {
+		fprintf(stderr, "\nSMAP ENTRIES\n");
+		fprintf(stderr, "[%d]->start   %p\n", i, smapsDontCheck[i]->start);
+		fprintf(stderr, "[%d]->end     %p\n", i, smapsDontCheck[i]->end);
+		fprintf(stderr, "[%d]->kb      %u\n", i, smapsDontCheck[i]->kb);
+	}
+//	fclose(smaps_infile);
 }
 
 SMapEntry* newSMapEntry() {

@@ -23,8 +23,8 @@ CXX = g++
 #CC = clang
 #CXX = clang++ 
 
-CFLAGS += -O2 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-frame-pointer
-CFLAGS2 += -O2 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-frame-pointer -Wl,--no-as-needed -lrt
+CFLAGS += -O0 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-frame-pointer
+CFLAGS2 += -O0 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-frame-pointer -Wl,--no-as-needed -lrt
 
 #THREADTEST_FILE = threadTest.cpp
 # THREADTEST_FILE = malloc-and-free.cpp
@@ -56,6 +56,7 @@ TARGETS =	libmallocprof.so 			\
 			test/test-freeguard-thread	\
 			test/test-dieharder-thread	\
 			test/test-tcmalloc-thread	\
+			test/test-jemalloc-thread	\
 			test/bs-obsd				\
 			test/bs-libc				\
 			test/bs-freeguard			\

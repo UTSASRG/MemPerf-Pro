@@ -51,7 +51,7 @@
 extern bool bibop;
 extern bool isLibc;
 extern char * allocator_name;
-extern size_t malloc_mmap_threshold;
+extern size_t large_object_threshold;
 extern thread_local thread_data thrData;
 extern thread_local PerfAppFriendly friendliness;
 

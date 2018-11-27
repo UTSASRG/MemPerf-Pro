@@ -24,7 +24,7 @@ LIBRARY = /home/richard/MallocProf/src/prerun/libmallochelp.so
 RUNFILE = runlib.cpp
 
 XLIBC = /home/richard/Memoryallocators/libc-2.24/libmalloc.so
-FREEGUARD = /home/richard/FreeGuard/libfreeguard.so
+FREEGUARD = /home/sam/FreeGuard/libfreeguard.so
 OBSD = /home/sam/Memoryallocators/OpenBSD-6.0/libomalloc.so
 DIEHARD = /home/sam/Memoryallocators/DieHard-old/src/libdieharder.so
 HOARD =
@@ -33,10 +33,10 @@ all: $(TARGETS)
 
 #libmallocprof helper library
 libmallochelp.so: $(DEPS)
-	$(CXX) $(CFLAGS) $(INCLUDE_DIRS) -shared -fPIC $(SRCS) -o libmallochelp.so -ldl
+	$(CXX) $(CFLAGS) $(INCLUDE_DIRS) -shared -fPIC $(SRCS) -o libmallochelp.so -ldl -lpthread
 
 prerun-xlibc: libmallochelp.so $(RUNFILE)
-	$(CXX) $(CFLAGS) -rdynamic $(LIBRARY) -rdynamic $(XLIBC) $(RUNFILE) -o prerun-xlibc
+	$(CXX) $(CFLAGS) -rdynamic $(LIBRARY) -rdynamic $(XLIBC) $(RUNFILE) -o prerun-xlibc 
 
 prerun-diehard: libmallochelp.so $(RUNFILE)
 	$(CXX) $(CFLAGS) -rdynamic $(LIBRARY) -rdynamic $(DIEHARD) $(RUNFILE) -o prerun-diehard
@@ -48,10 +48,10 @@ prerun-freeguard: libmallochelp.so $(RUNFILE)
 	$(CXX) $(CFLAGS) -rdynamic $(LIBRARY) -rdynamic $(FREEGUARD) $(RUNFILE) -o prerun-freeguard
 
 prerun-tcmalloc: libmallochelp.so $(RUNFILE)
-	$(CXX) $(CFLAGS) -rdynamic $(LIBRARY) -ltcmalloc $(RUNFILE) -o prerun-tcmalloc -lpthread
+	$(CXX) $(CFLAGS) -rdynamic $(LIBRARY) -ltcmalloc $(RUNFILE) -o prerun-tcmalloc 
 
 prerun-jemalloc: libmallochelp.so $(RUNFILE)
-	$(CXX) $(CFLAGS) -rdynamic $(LIBRARY) -ljemalloc $(RUNFILE) -o prerun-jemalloc -lpthread
+	$(CXX) $(CFLAGS) -rdynamic $(LIBRARY) -ljemalloc $(RUNFILE) -o prerun-jemalloc 
 
 .PHONY: clean
 clean:

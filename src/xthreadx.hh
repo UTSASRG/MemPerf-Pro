@@ -50,9 +50,7 @@ class xthreadx {
     // set thread local storeage
     setThreadContention(); 
 
-		#ifdef USE_THREAD_LOCAL
-			initMyLocalMem();
-		#endif
+		initMyLocalMem();
 
 		void * result = NULL;
 		size_t stackSize;
