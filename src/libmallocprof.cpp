@@ -241,10 +241,8 @@ __attribute__((constructor)) initStatus initializer() {
 
 	RealX::initializer();
 
-	// addressUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 	lockUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 128);
 	overhead.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 256);
-	//threadContention.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 	mappings.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 	mapsInitialized = true;
 
@@ -332,7 +330,6 @@ __attribute__((constructor)) initStatus initializer() {
 	smaps_buffer = (char*) myMalloc(smaps_bufferSize);
 	sprintf(smaps_fileName, "/proc/%d/smaps", pid);
 
-	start_smaps();
 
 	resumeTimer.it_value.tv_sec = timer_sec;
 	resumeTimer.it_value.tv_nsec = timer_nsec;
@@ -345,9 +342,13 @@ __attribute__((constructor)) initStatus initializer() {
 	stopTimer.it_interval.tv_nsec = 0;
 
 	worstCaseOverhead.efficiency = 100.00;
-//	#warning DISABLED SMAPS TIMER!
+
+	#warning DISABLED SMAPS TIMER!
+	/*
+	start_smaps();
 	setupSignalHandler();
 	startSignalTimer();
+	*/
 
 	inConstructor = false;
 	return profilerInitialized;
@@ -383,15 +384,15 @@ void printMyMemUtilization () {
 }
 
 void exitHandler() {
-	//    fprintf(stderr, "\nEntering exitHandler\n");
 
 	inRealMain = false;
 	#ifndef NO_PMU
 	doPerfCounterRead();
 	#endif
 
-//	#warning DISABLED SMAPS TIMER!
-//	/*
+	#warning DISABLED SMAPS TIMER!
+	/*
+	fclose(smaps_infile);
 	if (timer_settime(smap_timer, 0, &stopTimer, NULL) == -1) {
 			perror("timer_settime failed");
 			abort();
@@ -399,9 +400,8 @@ void exitHandler() {
 	if (timer_delete(smap_timer) == -1) {
 			perror("timer_delete failed");
 	}
-//	*/
+	*/
 
-	//    calculateMemOverhead();
 	if(thrData.output) {
 			fflush(thrData.output);
 	}
@@ -431,7 +431,6 @@ void exitHandler() {
 					worstCaseOverhead.blowup,
 					worstCaseOverhead.efficiency);
 
-	fclose(smaps_infile);
 }
 
 // MallocProf's main function
@@ -1676,10 +1675,12 @@ void sampleMemoryOverhead(int i, siginfo_t* s, void* p) {
 	size_t alignBytes = alignment_bytes.load();
 	size_t blowupBytes = blowup_bytes.load();
 
+	/*
 	if (timer_settime(smap_timer, 0, &stopTimer, NULL) == -1) {
 		perror("timer_settime failed");
 		abort();
 	}
+	*/
 
 	uint64_t startTime = rdtscp();
 	smap_samples++;
@@ -1687,10 +1688,12 @@ void sampleMemoryOverhead(int i, siginfo_t* s, void* p) {
 	int numSkips = 0;
 	int numHeapMatches = 0;
 	bool dontCheck = false;
+	bool isStack = false;
 	void* start;
 	void* end;
 	unsigned kb = 0;
 	smapsDontCheckIndex = 0;
+	char stack[] = "stack";
 
 	currentCaseOverhead.kb = 0;
 	currentCaseOverhead.efficiency = 0;
@@ -1701,6 +1704,7 @@ void sampleMemoryOverhead(int i, siginfo_t* s, void* p) {
 
 		dontCheck = false;
 		numSmapEntries++;
+		if (strstr(smaps_buffer, (const char*)&stack) != NULL) isStack = true;
 
 		//Get addresses
 		sscanf(smaps_buffer, "%p-%p", &start, &end);
@@ -1728,6 +1732,21 @@ void sampleMemoryOverhead(int i, siginfo_t* s, void* p) {
 		if (dontCheck) continue;
 
 		bool match = false;
+
+		if (isStack) {
+			for (int j = 0; j < 2; j++)
+				getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
+
+			//Grab RSS
+			sscanf(smaps_buffer, "Rss:%u", &kb);
+
+			//This is a heap segment
+			currentCaseOverhead.kb += kb;
+			numHeapMatches++;
+			match = true;
+			goto skipSearchMappings;
+		}
+
 		//Compare against known heaps
 		for (auto entry : mappings) {
 			auto data = entry.getData();
@@ -1747,6 +1766,8 @@ void sampleMemoryOverhead(int i, siginfo_t* s, void* p) {
 			}
 			else continue;
 		}
+
+		skipSearchMappings:
 		if (match) {
 			for (int j = 0; j < 13; j++)
 				getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
@@ -1773,16 +1794,21 @@ void sampleMemoryOverhead(int i, siginfo_t* s, void* p) {
 	uint64_t endTime = rdtscp();
 
 	smap_sample_cycles += (endTime - startTime);
+
+	/*
 	fprintf(stderr, "leaving sample, %d smap entries\n"
 	                "bytes= %lu, blowup= %zu, alignment= %zu\n"
 	                "skips= %d, hits= %d, cycles: %lu\nefficiency= %.5f\n",
 	                numSmapEntries, bytes, blowupBytes, alignBytes,
 	                numSkips, numHeapMatches, (endTime-startTime), e);
+	*/
 
+	/*
 	if (timer_settime(smap_timer, 0, &resumeTimer, NULL) == -1) {
 		perror("timer_settime failed");
 		abort();
 	}
+	*/
 }
 
 void start_smaps() {
