@@ -65,6 +65,10 @@ inline const char * boolToStr(bool p);
 inline size_t alignup(size_t size, size_t alignto) {
 		return (size % alignto == 0) ? size : ((size + (alignto - 1)) & ~(alignto - 1));
 }
+inline void * alignupPointer(void * ptr, size_t alignto) {
+  return ((intptr_t)ptr%alignto == 0) ? ptr : (void *)(((intptr_t)ptr + (alignto - 1)) & ~(alignto - 1));
+}
+
 
 class CacheMapEntry {
 		private:
@@ -75,7 +79,6 @@ class CacheMapEntry {
 				pid_t getOwner();
 				void setOwner(pid_t new_owner);
 				unsigned char getUsedBytes();
-				unsigned char setUsedBytes(unsigned num_bytes);
 				unsigned char addUsedBytes(unsigned num_bytes);
 				unsigned char subUsedBytes(unsigned num_bytes);
 };
@@ -96,7 +99,6 @@ class PageMapEntry {
 				void setTouched();
 				void clearTouched();
 				unsigned getUsedBytes();
-				bool setUsedBytes(unsigned num_bytes);
 				bool addUsedBytes(unsigned num_bytes);
 				bool subUsedBytes(unsigned num_bytes);
 				unsigned getClassSize();
@@ -116,9 +118,11 @@ class ShadowMemory {
 				static CacheMapEntry * cache_map_begin;
 				static CacheMapEntry * cache_map_end;
 				static CacheMapEntry * cache_map_bump_ptr;
+				static pthread_spinlock_t mega_map_lock;
 				static eMapInitStatus isInitialized;
 
 		public:
+				static pthread_spinlock_t cache_map_lock;
 				static void doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType);
 				static unsigned getPageUsage(uintptr_t uintaddr);
 				static unsigned getCacheUsage(uintptr_t uintaddr);
