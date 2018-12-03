@@ -57,6 +57,7 @@ TARGETS =	libmallocprof.so 			\
 			test/test-freeguard-thread	\
 			test/test-dieharder-thread	\
 			test/test-tcmalloc-thread	\
+			test/test-jemalloc-thread	\
 			test/bs-obsd				\
 			test/bs-libc				\
 			test/bs-freeguard			\

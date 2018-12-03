@@ -10,7 +10,6 @@
 */
 #include <dlfcn.h>
 #include <fcntl.h>
-#include <pthread.h>
 #include <sys/types.h>
 #include "../libmallocprof.h"
 #include "../real.hh"
@@ -22,17 +21,15 @@
 #define BUFFER_SIZE 4096000 * 4
 #define PAGE_SIZE 4096
 
-
 //Library Information Globals
-bool isLibc;
 bool inAllocation = false;
 bool inGetAllocStyle = false;
 bool lookingForLargeObject = false;
 bool inMalloc = false;
 bool inMmap = false;
 bool inThread = false;
-bool mmap_found = false;
-bool sbrk_found = false;
+bool mmap_called = false;
+bool sbrk_called = false;
 bool bibop = false;
 bool bump_point = false;
 bool inGetClassSizes = false;
@@ -42,8 +39,7 @@ bool realInitialized = false;
 pid_t pid;
 short nextFreeClassIndex = 0;
 size_t class_sizes[200];
-size_t malloc_mmap_threshold = 0;
-size_t sbrk_threshold = 0;
+size_t large_object_threshold = 0;
 size_t metadata_object = 0;
 size_t thread_mmap_threshold;
 size_t thread_sbrk_threshold;
@@ -54,6 +50,7 @@ FILE* outputFile;
 //Unused
 __thread thread_data thrData;
 bool opening_maps_file;
+bool isLibc;
 
 //Debugging flags DEBUG
 const bool d_mmap = false;
@@ -61,7 +58,6 @@ const bool d_bp_metadata = false;
 const bool d_bibop_metadata = false;
 const bool d_style = false;
 const bool d_getClassSizes = false;
-const bool d_write_mappings = false;
 const bool d_constructor = false;
 const bool d_search_vpage = false;
 
@@ -77,16 +73,11 @@ void exitHandler();
 void printFromGlobal(char*);
 void writeClassSizes();
 void getAllocStyle();
-void getClassSizes();
-void getLargeObjectThreshold();
 void get_bp_metadata();
-void get_bibop_metadata();
 unsigned search_vpage (uintptr_t vpage);
 int find_pages (uintptr_t vstart, uintptr_t vend, unsigned long pagesFound[]);
-void* thread_start(void*);
-
-//Hashmap of mmap addrs to tuple:
-HashMap <uint64_t, MmapTuple*, spinlock> mappings;
+void* find_large_object(void*);
+void* find_class_sizes(void*);
 
 spinlock temp_mem_lock;
 
@@ -102,13 +93,6 @@ extern "C" {
                   int fd, off_t offset) __attribute__ ((weak, alias("yymmap")));
 }
 
-void initMappings() {
-	if (!mapsInitialized) {
-		mappings.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
-		mapsInitialized = true;
-	}
-}
-
 void initReal() {
 	if (!realInitialized) {
 		RealX::initializer();
@@ -120,18 +104,11 @@ __attribute__((constructor)) void libmallochelp_initializer () {
 
 	if (libInitialized) return;
 
-	allocator_name = (char*) myMalloc(100);
+	allocator_name = (char*)myMalloc(128);
 	initReal();
-	initMappings();
 	temp_mem_lock.init();
 	pid = getpid();
 
-	if (d_constructor) {
-		printf("d_write_mappings=%p\n", &d_write_mappings);
-		printf("start of buffer=%p\n", myBuffer);
-		printf("end of buffer=%#lx\n", (uint64_t)(myBuffer + BUFFER_SIZE));
-		printf("libInitialized after this.\n");
-	}
 	libInitialized = true;
 }
 
@@ -146,57 +123,78 @@ int helper_main (int argc, char ** argv, char ** envp) {
 	// Register our cleanup routine as an on-exit handler.
 	atexit(exitHandler);
 	
-	// Determine allocator style. If bibop, this will also
-	// try to find metadata in mmap memory
+	// Determine allocator style
 	getAllocStyle();
 
-	if (bibop) {
-		getClassSizes();
-	}
+	fprintf(stderr, "Allocator style is %s\n", bibop ? "bibop" : "bump-point");
 
-	else {
-		get_bp_metadata();
-		getLargeObjectThreshold();
-	}
-	
-	//thread work
+	//The thread will find a large object threshold. This will be
+	//determined by either mmap or sbrk being called during malloc
 	pthread_t worker;
 	void* result;
 	int create, join;
-	create = pthread_create(&worker, NULL, &thread_start, nullptr);
+
+	fprintf(stderr, "Creating a thread to find large object threshold\n");
+	create = pthread_create(&worker, NULL, &find_large_object, nullptr);
 	if (create != 0) fprintf(stderr, "Error creating thread\n");
-	else fprintf(stderr, "Thread created\n");
 	join = pthread_join(worker, &result);
 	if (join != 0) fprintf(stderr, "Error joining thread\n");
-	else fprintf(stderr, "Worker joined\n");
+	else fprintf(stderr, "Thread has joined\n");
+
+	if (!large_object_threshold) {
+		fprintf(stderr, "Couldn't find a large_object_threshold. Abort()\n");
+		abort();
+	}
+	else fprintf(stderr, "large_object_threshold = %zu\n", large_object_threshold);
+
+	if (bibop) {
+	
+		fprintf(stderr, "Creating a thread to find class sizes\n");
+		create = pthread_create(&worker, NULL, &find_class_sizes, nullptr);
+		if (create != 0) fprintf(stderr, "Error creating thread\n");
+		join = pthread_join(worker, &result);
+		if (join != 0) fprintf(stderr, "Error joining thread\n");
+		else fprintf(stderr, "Thread has joined\n");
+	}
+	else get_bp_metadata();
 
 	selfmap::getInstance().getTextRegions();
-	allocator_name = strrchr(allocator_name, '/') + 1;
-	char* period = strchr(allocator_name, '.');
-	uint64_t bytes = (uint64_t)period - (uint64_t)allocator_name;
-	size_t extensionBytes = 6;
-	char filename[bytes+extensionBytes];
-	memcpy (filename, allocator_name, bytes);
-	snprintf (filename+bytes, extensionBytes, ".info");
+	
+	char* end_path = strrchr(allocator_name, '/');
+	char* end_name = strchr(end_path, '.') - 1;
+	char* start_name = end_path + 1;
+	uint64_t name_bytes = (uint64_t)end_name - (uint64_t)end_path;
+	uint64_t path_bytes = (uint64_t)start_name - (uint64_t)allocator_name;
+	short ext_bytes = 6;
+	char filename[128];
+	void* r;
 
-	myFree(allocator_name);
+	r = memcpy(filename, allocator_name, path_bytes);
+	if (r != filename) {perror("memcpy fail?"); abort();}
+	r = memcpy((filename+path_bytes), start_name, name_bytes);
+	if (r != (filename+path_bytes)) {perror("memcpy fail?"); abort();}
+	snprintf ((filename+path_bytes+name_bytes), ext_bytes, ".info");
+
 	outputFile = fopen(filename, "w");
+	if (outputFile == NULL) {
+		perror("Failed to open \".info\" file");
+		abort();
+	}
+	fprintf(stderr, "The \".info\" file was created here --> %s\n", filename);
 
 	return real_main (argc, argv, envp);
 }
 
 void exitHandler() {
 
-	//Print Info
-
+	//Write .info file
+	fprintf(stderr, "Writing to .info file\n");
 	fprintf (outputFile, "style %s\n", bibop ? "bibop" : "bump_pointer");
 	if (bibop) writeClassSizes();
-	fprintf (outputFile, "malloc_mmap_threshold %zu\n", malloc_mmap_threshold);
-//	fprintf (outputFile, "sbrk_threshold %zu\n", sbrk_threshold);
-	fprintf (outputFile, "metadata_object %zu\n", metadata_object);
-
+	fprintf (outputFile, "large_object_threshold %zu\n", large_object_threshold);
 	fflush(outputFile);
 	fclose(outputFile);
+	fprintf(stderr, "Prerun finished. Exiting\n");
 }
 
 extern "C" int __libc_start_main(main_fn_t, int, char **, void (*)(),
@@ -236,15 +234,6 @@ extern "C" {
 
 		//Do allocation
 		void* p = RealX::malloc(size);
-		uint64_t address = (uint64_t) p;
-
-		for (auto entry : mappings) {
-			auto data = entry.getData();
-			if (data->start <= address && address <= data->end) {
-				data->allocations.fetch_add(1, relaxed);
-				break;
-			}
-		}
 
 		inMalloc = false;
 		inAllocation = false;
@@ -307,42 +296,13 @@ extern "C" {
 	void * yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset) {
 
 		if (inMmap) return RealX::mmap (addr, length, prot, flags, fd, offset);
-
 		if (!libInitialized) libmallochelp_initializer();
 
 		inMmap = true;
 
+		if (inThread) mmap_called = true;
+
 		void* p = RealX::mmap(addr, length, prot, flags, fd, offset);
-		uint64_t address = (uint64_t) p;
-
-		//If getting mmap threshold no need to save data
-		if (lookingForLargeObject) {
-			malloc_mmap_threshold = length;
-			mmap_found = true;
-			inMmap = false;
-			return p;
-		}
-
-		//If this thread currently doing an allocation
-		if (inAllocation) {
-			if (d_mmap) {
-				bool true_initialized = libInitialized;
-				libInitialized = false;
-				printf ("mmap direct from allocation function: length= %zu, prot= %d\n", length, prot);
-				libInitialized = true_initialized;
-			}
-			mappings.insert(address, newMmapTuple(address, length, prot, 'a'));
-		}
-
-		else {
-			if (d_mmap) {
-				bool true_initialized = libInitialized;
-				libInitialized = false;
-				printf ("mmap from unknown source: length= %zu, prot= %d\n", length, prot);
-				libInitialized = true_initialized;
-			}
-			mappings.insert(address, newMmapTuple(address, length, prot, 'u'));
-		}
 
 		total_mmaps++;
 
@@ -355,11 +315,7 @@ extern "C" {
 
 		if (!libInitialized) libmallochelp_initializer();
 
-		if (lookingForLargeObject || inGetClassSizes) sbrk_found = true;
-
-		if (inThread) {
-			
-		}
+		if (inThread) sbrk_called = true;
 
         void *retptr = RealX::sbrk(increment);
 
@@ -401,30 +357,8 @@ void getAllocStyle () {
 	void* p1 = RealX::malloc(64);
 	if (d_style) printf ("p1=%p\n", p1);
 
-	//If the allocator mmap'd memory, check it for metadata
-	//Assuming the allocator used mmap for metadata
-	if (total_mmaps > 0) {
-		if (d_style) printf ("Checking mmap areas for metadata...\n");
-		get_bibop_metadata();
-	}
-	else {
-		if (d_style) printf ("total_mmaps <= 0\n");
-	}
-
 	void* p2 = RealX::malloc (256);
 	if (d_style) printf ("p2=%p\n", p2);
-
-	//This checks how many bytes are in use after the second malloc
-	//for comparion with the first one
-	if (d_style) {
-		if (total_mmaps > 0) {
-			if (d_style) printf ("Checking mmap areas for metadata...\n");
-			get_bibop_metadata();
-		}
-		else {
-			if (d_style) printf ("total_mmaps <= 0\n");
-		}
-	}
 
 	uint64_t addr1 = (uint64_t) p1;
 	uint64_t addr2 = (uint64_t) p2;
@@ -443,62 +377,9 @@ void getAllocStyle () {
 	inGetAllocStyle = false;
 }
 
-void getClassSizes () {
-
-	inGetClassSizes = true;
-	void* oldPointer;
-	void* newPointer;
-	size_t oldSize = 8, newSize = 8;
-
-	oldPointer = RealX::malloc (oldSize);
-
-	// If the object moves, save the oldSize as a class size
-	while (!mmap_found && !sbrk_found && (oldSize < MAX_CLASS_SIZE)) {
-
-		newSize += 8;
-		newPointer = RealX::realloc (oldPointer, newSize);
-		if (newPointer != oldPointer) {
-			//Save the new class Size
-			class_sizes[nextFreeClassIndex] = oldSize;
-			nextFreeClassIndex++;
-		}
-
-		oldPointer = newPointer;
-		oldSize = newSize;
-	}
-
-	RealX::free (newPointer);
-
-	if (sbrk_found) sbrk_threshold = oldSize;
-	if (mmap_found) malloc_mmap_threshold = oldSize;
-
-	//Save the last class size not sure why?
-
-	inGetClassSizes = false;
-}
-
-void getLargeObjectThreshold () {
-
-	lookingForLargeObject = true;
-	size_t size = 3000;
-	void* mallocPtr;
-
-	// Find malloc mmap threshold
-	while (!mmap_found && !sbrk_found && (size < MAX_CLASS_SIZE)) {
-
-		mallocPtr = RealX::malloc (size);
-		RealX::free (mallocPtr);
-		size += 8;
-	}
-
-	if (!malloc_mmap_threshold && !sbrk_threshold) {
-		fprintf (stderr, "Could not find large object threshold\n");
-	}
-
-	lookingForLargeObject = false;
-}
-
 /*
+	Assuming the metadata is placed with the object
+
 	Get metadata size for bump pointer allocator
 	Allocate two objects. Start with a metadata size of
 	the difference between addresses of the objects.
@@ -545,63 +426,6 @@ void get_bp_metadata() {
 	RealX::free(ptr2);
 	RealX::free(realloc_addr);
 	metadata_object = metadata;
-}
-
-void get_bibop_metadata() {
-
-	int bytes_index = 0;
-	int bytes_max = 0;
-	uintptr_t vpage = 0;
-	size_t bytes_in_use[1000];
-
-	for (auto entry : mappings) {
-
-		auto data = entry.getData();
-
-		unsigned long pages[1000];
-		unsigned numEntries = 0;
-
-		if (d_bibop_metadata) printf ("found unused mmap, start= %#lx, finding physically backed pages..\n", data->start);
-
-		numEntries = find_pages(data->start, data->end, pages);
-		if (d_bibop_metadata) printf ("Finished. Found %u physically backed vpages.\n", numEntries);
-
-		if (d_bibop_metadata) printf ("Searching vpages for usage..\n");
-		for (unsigned i = 0; i < numEntries; i++) {
-
-			vpage = (data->start + (pages[i]*PAGE_SIZE));
-
-			unsigned bytes = search_vpage(vpage);
-			if (bytes > 0) {
-				//Keep track of values return from search_vpage function
-				//Store in array to get the lowest value later
-				bytes_in_use[bytes_index] = bytes;
-				bytes_index++;
-			}
-		}
-	}
-
-	bytes_max = bytes_index;
-	size_t smallest = bytes_in_use[0];
-
-	//To see if there is anything in there at all
-	if (d_bibop_metadata) {
-		printf ("Found possible metadata? %s\n", bytes_max > 0 ? "YES" : "NO");
-		printf ("All possible metadata entries:\n");
-		for (int i = 0; i < bytes_max; i++) {
-			printf ("%zu ", bytes_in_use[i]);
-		}
-		printf ("\n");
-	}
-
-	//Find the smallest entry that was returned from calls to search_vpage
-	for (int i = 1; i < bytes_max; i++) {
-		if (bytes_in_use[i] < smallest) smallest = bytes_in_use[i];
-	}
-
-	if (d_bibop_metadata) printf ("Finished metadata. smallest=%zu. Returning\n", smallest);
-	if (smallest > 32) smallest = 0;
-	metadata_object = smallest;
 }
 
 /*
@@ -768,34 +592,71 @@ void writeClassSizes() {
 	fprintf (outputFile, "\n");
 }
 
-void* thread_start (void* arg) {
+void* find_large_object (void* arg) {
 
+	uint64_t tid = pthread_self();
+	fprintf(stderr, "[%lu] has been created. Working..\n", tid);
+
+	//Create the thread heap
+	void* mallocPtr = RealX::malloc(0);
+	RealX::free(mallocPtr);
+
+	size_t size = 4088;
 	inThread = true;
-	fprintf(stderr, "Starting thread routine\n");
-	lookingForLargeObject = true;
-	size_t size = 3000;
-	void* mallocPtr;
-	mmap_found = false;
-	sbrk_found = false;
+	mmap_called = false;
+	sbrk_called = false;
 
-	// Find malloc mmap threshold
-	while (!mmap_found && !sbrk_found && (size < MAX_CLASS_SIZE)) {
+	// Find large object threshold
+	while (!mmap_called && !sbrk_called && (size < MAX_CLASS_SIZE)) {
 
+		size += 8;
 		mallocPtr = RealX::malloc (size);
 		RealX::free (mallocPtr);
-		size += 8;
 	}
-	if (sbrk_found) thread_sbrk_threshold = size - 8;
-	else if (mmap_found) thread_mmap_threshold = size - 8;
 
-	if (!malloc_mmap_threshold) fprintf(stderr, "Could not find an mmap threshold\n");
-	else if (!sbrk_found) fprintf(stderr, "Could not find an sbrk_threshold\n");
-	
-	fprintf(stderr, "malloc_mmap_threshold= %zu\n", malloc_mmap_threshold);
-	fprintf(stderr, "sbrk_threshold= %zu\n", sbrk_threshold);
+	if (mmap_called) {
+		large_object_threshold = size;
+		fprintf(stderr, "[%lu] mmap has been called\n", tid);
+	}
+	else if (sbrk_called) {
+		large_object_threshold = size;
+		fprintf(stderr, "[%lu] sbrk has been called\n", tid);
+	}
 
-	lookingForLargeObject = false;
-	fprintf(stderr, "Leaving thread routine\n");
 	inThread = false;
+	return nullptr;
+}
+
+void* find_class_sizes (void* arg) {
+
+	uint64_t tid = pthread_self();
+	fprintf(stderr, "[%lu] has been created. Working..\n", tid);
+
+	//Create the thread heap
+	void* mallocPtr = RealX::malloc(0);
+	RealX::free(mallocPtr);
+
+	void* oldPointer;
+	void* newPointer;
+	size_t oldSize = 8, newSize = 8;
+
+	oldPointer = RealX::malloc (oldSize);
+
+	// If the object moves, save the oldSize as a class size
+	while (oldSize <= large_object_threshold) {
+
+		newSize += 8;
+		newPointer = RealX::realloc (oldPointer, newSize);
+		if (newPointer != oldPointer) {
+			//Save the new class Size
+			class_sizes[nextFreeClassIndex] = oldSize;
+			nextFreeClassIndex++;
+		}
+
+		oldPointer = newPointer;
+		oldSize = newSize;
+	}
+
+	RealX::free (newPointer);
 	return nullptr;
 }
