@@ -122,7 +122,9 @@ unsigned ShadowMemory::updateObject(void * address, size_t size, bool isFree) {
 
     unsigned numNewPagesTouched = updatePages(uintaddr, mega_index, firstPageIdx, size, isFree);
     PageMapEntry::updateCacheLines(uintaddr, mega_index, firstPageIdx, size, isFree);
-    updateObjectSize(uintaddr, size, isFree);
+		if(!isFree) {
+				updateObjectSize(uintaddr, size);
+		}
 
     return numNewPagesTouched;
 }
@@ -279,40 +281,28 @@ unsigned ShadowMemory::getObjectSize(void * address) {
 }
 
 
-bool ShadowMemory::updateObjectSize(uintptr_t uintaddr, unsigned size, bool isFree) {
-		unsigned classSize;
+bool ShadowMemory::updateObjectSize(uintptr_t uintaddr, unsigned size) {
+    unsigned classSize;
 
-		if(bibop) {
-				classSize = getClassSizeFor(size);
-				if(classSize > MAX_OBJECT_SIZE) {
-						classSize = getPageClassSize((void *)uintaddr);
-				}
-		} else {
-				/*
-				classSize = libc_malloc_usable_size(size);
-				if(classSize > large_object_threshold) {
-						classSize = malloc_usable_size((void *)uintaddr);
-				}
-				*/
-				classSize = malloc_usable_size((void *)uintaddr);
-		}
+    if(bibop) {
+        classSize = getClassSizeFor(size);
+        /*
+        if(classSize > MAX_OBJECT_SIZE) {
+            classSize = getPageClassSize((void *)uintaddr);
+        }
+        */ 
+    } else {
+        classSize = malloc_usable_size((void *)uintaddr);
+    }
 
-		uint32_t * ptrToSentinel = (uint32_t *)(uintaddr + classSize - OBJECT_SIZE_SENTINEL_SIZE);
+    uint32_t * ptrToSentinel = (uint32_t *)(uintaddr + classSize - OBJECT_SIZE_SENTINEL_SIZE);
+    if((size <= MAX_OBJECT_SIZE) && (classSize - size >= OBJECT_SIZE_SENTINEL_SIZE)) {
+        *ptrToSentinel = (OBJECT_SIZE_SENTINEL | size);
+    } else {
+        *ptrToSentinel = 0;
+    }
 
-		if(isFree) {
-				// If this is a free, we just want to obliterate the old sentinel value to prevent it from
-				// accidentally being re-used on a new object that should not have its size stored in this
-				// way.
-				if((classSize - size) >= OBJECT_SIZE_SENTINEL_SIZE) {
-						*ptrToSentinel = 0x0;
-				}
-		} else {
-				if((size <= MAX_OBJECT_SIZE) && (classSize - size >= OBJECT_SIZE_SENTINEL_SIZE)) {
-						*ptrToSentinel = (OBJECT_SIZE_SENTINEL | size);
-				}
-		}
-
-		return true;
+    return true;
 }
 
 // Warning: the logic of this implementation is flawed -- occassionally, glibc will produce

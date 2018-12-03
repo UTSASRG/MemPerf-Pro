@@ -1,7 +1,7 @@
 CXX = g++ 
 CFLAGS += -O0 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-frame-pointer -Wl,--no-as-needed
 
-MP_SRC = /home/richard/MallocProf/src/
+MP_SRC = $(HOME)/MallocProfiler/src/
 
 SRCS =   	libmallochelp.cpp		\
 			$(MP_SRC)real.cpp		\
@@ -20,13 +20,13 @@ TARGETS =	libmallochelp.so	\
 			prerun-tcmalloc		\
 			prerun-jemalloc
 
-LIBRARY = /home/richard/MallocProf/src/prerun/libmallochelp.so
+LIBRARY = $(HOME)/MallocProfiler/src/prerun/libmallochelp.so
 RUNFILE = runlib.cpp
 
-XLIBC = /home/richard/Memoryallocators/libc-2.24/libmalloc.so
-FREEGUARD = /home/sam/FreeGuard/libfreeguard.so
-OBSD = /home/sam/Memoryallocators/OpenBSD-6.0/libomalloc.so
-DIEHARD = /home/sam/Memoryallocators/DieHard-old/src/libdieharder.so
+XLIBC = $(HOME)/libc-2.24/libmalloc.so
+FREEGUARD = $(HOME)/FreeGuard/libfreeguard.so
+OBSD = $(HOME)/Memoryallocators/OpenBSD-6.0/libomalloc.so
+DIEHARD = $(HOME)/Memoryallocators/DieHard-old/src/libdieharder.so
 HOARD =
 
 all: $(TARGETS)

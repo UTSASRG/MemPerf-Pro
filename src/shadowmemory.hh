@@ -108,7 +108,7 @@ class PageMapEntry {
 class ShadowMemory {
 		private:
 				static unsigned updatePages(uintptr_t uintaddr, unsigned long mega_index, unsigned page_index, unsigned size, bool isFree);
-				static bool updateObjectSize(uintptr_t uintaddr, unsigned size, bool isFree);
+				static bool updateObjectSize(uintptr_t uintaddr, unsigned size);
 				static unsigned getPageClassSize(unsigned long mega_index, unsigned page_index);
 
 				static PageMapEntry ** mega_map_begin;
