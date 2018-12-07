@@ -412,9 +412,10 @@ int initPMU(void) {
 				abort();
 		}
 
-		#ifndef NO_PMU
+		#ifdef NO_PMU
+				#warning MEMORY ACCESS SAMPLING IS DISABLED
+		#else
 		setupCounting();
-		#warning MEMORY ACCESS SAMPLING IS DISABLED
 		//setupSampling();
 		#endif
 

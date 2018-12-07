@@ -12,6 +12,7 @@
 #include <stdio.h> //print, getline
 #include <signal.h>
 #include <time.h>
+#include <new>
 #include "hashmap.hh"
 #include "hashfuncs.hh"
 #include "libmallocprof.h"
@@ -548,10 +549,12 @@ extern "C" {
 		if (!inRealMain) return RealX::calloc (nelem, elsize);
 
 		// if the PMU sampler has not yet been set up for this thread, set it up now
+		#ifndef NO_PMU
 		if(!PMUinit){
 			initPMU();
 			PMUinit = true;
 		}
+		#endif
 
 		// thread_local
 		inAllocation = true;
@@ -605,10 +608,12 @@ extern "C" {
 		}
 
 		//if the PMU sampler has not yet been set up for this thread, set it up now
+		#ifndef NO_PMU
 		if(!PMUinit){
 			initPMU();
 			PMUinit = true;
 		}
+		#endif
 
 		//thread_local
 		inAllocation = true;
@@ -678,10 +683,12 @@ extern "C" {
 		if (!inRealMain) return RealX::realloc (ptr, sz);
 
 		//if the PMU sampler has not yet been set up for this thread, set it up now
+		#ifndef NO_PMU
 		if(!PMUinit){
 			initPMU();
 			PMUinit = true;
 		}
+		#endif
 
 		//Data we need for each allocation
 		allocation_metadata allocData = init_allocation(sz, REALLOC);
@@ -856,10 +863,13 @@ extern "C" {
         //fprintf(stderr, "Thread: %lX\n", thread);
 		return result;
 	}
-
 }//End of extern "C"
 
 void * operator new (size_t sz) {
+	return yymalloc(sz);
+}
+
+void * operator new (size_t sz, const std::nothrow_t&) throw() {
 	return yymalloc(sz);
 }
 
@@ -867,8 +877,14 @@ void operator delete (void * ptr) __THROW {
 	yyfree (ptr);
 }
 
-void * operator new[] (size_t size) {
-	return yymalloc(size);
+void * operator new[] (size_t sz) {
+	return yymalloc(sz);
+}
+
+void * operator new[] (size_t sz, const std::nothrow_t&)
+  throw()
+ {
+		 return yymalloc(sz);
 }
 
 void operator delete[] (void * ptr) __THROW {
@@ -876,7 +892,6 @@ void operator delete[] (void * ptr) __THROW {
 }
 
 void analyzeAllocation(allocation_metadata *metadata) {
-
 	//Analyzes for alignment and blowup
 	getOverhead(metadata->size, metadata->address, metadata->classSize, &(metadata->reused));
 
@@ -1548,6 +1563,7 @@ void readAllocatorFile() {
 	char* buffer = (char*) myMalloc(bufferSize);
 	char* token;
 
+	fprintf(stderr, "Opening allocator info file %s...\n", allocatorFileName);
 	if ((infile = fopen (allocatorFileName, "r")) == NULL) {
 		perror("Failed to open allocator info file");
 		abort();

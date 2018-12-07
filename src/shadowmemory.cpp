@@ -67,13 +67,6 @@ unsigned ShadowMemory::updateObject(void * address, size_t size, bool isFree) {
         abort();
     }
 
-		/*
-		#warning SEVERE RESTRICTION IN PLACE, REMOVE THIS IMMEDIATELY
-		if(isLibc) {
-				size = malloc_usable_size(address);
-		}
-		*/
-
     unsigned classSize;
     uintptr_t uintaddr = (uintptr_t)address;
 
@@ -173,13 +166,13 @@ unsigned ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_index,
 								current->setTouched();
 								numNewPagesTouched++;
 						}
-				}
-				size_remain -= curPageBytes;
-				// Do not clear the page's class size on free -- this will be cleared
-				// when the pages are re-utilized for use by a new object or mapping.
-				if(!isFree) {
+						// Do not clear the page's class size on free -- this will be cleared
+						// when the pages are re-utilized for use by a new object or mapping.
+						//fprintf(stderr, ">   obj 0x%lx sz %u : current=%p, mega_index=%lu, page index=%u, set class size=%u\n",
+						//				uintaddr, size, current, mega_index, curPageIdx, classSize);
 						current->setClassSize(classSize);
 				}
+				size_remain -= curPageBytes;
 				curPageIdx++;
 		}
 		// Next, loop until we have accounted for all object bytes...
@@ -202,13 +195,13 @@ unsigned ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_index,
 								current->setTouched();
 								numNewPagesTouched++;
 						}
-				}
-				size_remain -= curPageBytes;
-				// Do not clear the page's class size on free -- this will be cleared
-				// when the pages are re-utilized for use by a new object or mapping.
-				if(!isFree) {
+						// Do not clear the page's class size on free -- this will be cleared
+						// when the pages are re-utilized for use by a new object or mapping.
+						//fprintf(stderr, ">   obj 0x%lx sz %u : current=%p, mega_index=%lu, page index=%u, set class size=%u\n",
+						//				uintaddr, size, current, mega_index, curPageIdx, classSize);
 						current->setClassSize(classSize);
 				}
+				size_remain -= curPageBytes;
 				curPageIdx++;
 		}
 
@@ -236,13 +229,6 @@ unsigned ShadowMemory::getPageClassSize(unsigned long mega_index, unsigned page_
 }
 
 unsigned ShadowMemory::getObjectSize(uintptr_t uintaddr, unsigned long mega_index, unsigned page_index) {
-		/*
-		#warning SEVERE RESTRICTION IN PLACE, REMOVE THIS IMMEDIATELY
-		if(isLibc) {
-				return malloc_usable_size((void *)uintaddr);
-		}
-		*/
-
 		unsigned classSize;
 		if(isLibc) {
 				classSize = malloc_usable_size((void *)uintaddr);
@@ -253,13 +239,23 @@ unsigned ShadowMemory::getObjectSize(uintptr_t uintaddr, unsigned long mega_inde
 		// Check to see if this is a large object (as we define the term) -- we will have no size class info if it is.
 		if(classSize > MAX_OBJECT_SIZE) {
 				return classSize;	
+		} else if(classSize == 0) {
+				fprintf(stderr, "ERROR: an object cannot have a zero class size\n");
+				abort();
 		}
 
 		uint32_t * ptrToSentinel = (uint32_t *)(uintaddr + classSize - OBJECT_SIZE_SENTINEL_SIZE);
 
 		if(((*ptrToSentinel) & OBJECT_SIZE_SENTINEL_MASK) == OBJECT_SIZE_SENTINEL) {
+				//unsigned retval = (*ptrToSentinel) & OBJECT_SIZE_MASK;
+				//fprintf(stderr, "***** retrieved %#lx %u\n", uintaddr, retval);
+				//fprintf(stderr, ">> object %#lx sentinel found at %p (val = 0x%x, enc size = %d)\n",
+				//        uintaddr, ptrToSentinel, *ptrToSentinel, ((*ptrToSentinel) & OBJECT_SIZE_MASK));
+				//return retval;
 				return (*ptrToSentinel) & OBJECT_SIZE_MASK;
 		} else {
+				//fprintf(stderr, ">> object %#lx no sentinel found at %p (val = 0x%x, enc size = %d), classSize = %zu\n",
+				//        uintaddr, ptrToSentinel, *ptrToSentinel, ((*ptrToSentinel) & OBJECT_SIZE_MASK), classSize);
 				return classSize;
 		}
 }
@@ -286,11 +282,6 @@ bool ShadowMemory::updateObjectSize(uintptr_t uintaddr, unsigned size) {
 
     if(bibop) {
         classSize = getClassSizeFor(size);
-        /*
-        if(classSize > MAX_OBJECT_SIZE) {
-            classSize = getPageClassSize((void *)uintaddr);
-        }
-        */ 
     } else {
         classSize = malloc_usable_size((void *)uintaddr);
     }
@@ -493,12 +484,12 @@ PageMapEntry * ShadowMemory::getPageMapEntry(unsigned long mega_idx, unsigned pa
 PageMapEntry ** ShadowMemory::getMegaMapEntry(unsigned long mega_index) {
 		PageMapEntry ** mega_entry = mega_map_begin + mega_index;
 
-    pthread_spin_lock(&mega_map_lock);
-    if(__builtin_expect(*mega_entry == NULL, 0)) {
+    if(__builtin_expect(__atomic_load_n(mega_entry, __ATOMIC_RELAXED) == NULL, 0)) {
         // Create a new page entries
+				pthread_spin_lock(&mega_map_lock);
         *mega_entry = doPageMapBumpPointer();
+				pthread_spin_unlock(&mega_map_lock);
     }
-    pthread_spin_unlock(&mega_map_lock);
 
 		return mega_entry;
 }
@@ -543,20 +534,12 @@ CacheMapEntry * PageMapEntry::getCacheMapEntry(unsigned long mega_idx, unsigned 
 }
 
 bool PageMapEntry::addUsedBytes(unsigned num_bytes) {
-		short retval = __atomic_add_fetch(&num_used_bytes, num_bytes, __ATOMIC_RELAXED);
-		if(retval > PAGESIZE) {
-				fprintf(stderr, "%d : incremented page map entry at %p to size %d > %d\n", thrData.tid, this, retval, PAGESIZE);
-				abort();
-		}
+		__atomic_add_fetch(&num_used_bytes, num_bytes, __ATOMIC_RELAXED);
 		return true;
 }
 
 bool PageMapEntry::subUsedBytes(unsigned num_bytes) {
-		short retval = __atomic_sub_fetch(&num_used_bytes, num_bytes, __ATOMIC_RELAXED);
-		if(retval < 0) {
-				fprintf(stderr, "%d : decremented page map entry at %p to size %d < 0\n", thrData.tid, this, retval); 
-				abort();
-		}
+		__atomic_sub_fetch(&num_used_bytes, num_bytes, __ATOMIC_RELAXED);
 		return true;
 }
 
@@ -620,31 +603,23 @@ void CacheMapEntry::setOwner(pid_t new_owner) {
 
 
 CacheMapEntry * PageMapEntry::getCacheMapEntry_helper() {
-		pthread_spin_lock(&ShadowMemory::cache_map_lock);
-		if(__builtin_expect(cache_map_entry == NULL, 0)) {
+		if(__builtin_expect(__atomic_load_n(&cache_map_entry, __ATOMIC_RELAXED) == NULL, 0)) {
 				// Create a new entries
+				pthread_spin_lock(&ShadowMemory::cache_map_lock);
 				cache_map_entry = ShadowMemory::doCacheMapBumpPointer();
+				pthread_spin_unlock(&ShadowMemory::cache_map_lock);
 		}
-		pthread_spin_unlock(&ShadowMemory::cache_map_lock);
 
 		return cache_map_entry;
 }
 
 unsigned char CacheMapEntry::addUsedBytes(unsigned num_bytes) {
-		short retval = __atomic_add_fetch(&num_used_bytes, num_bytes, __ATOMIC_RELAXED);
-		if(retval > CACHELINE_SIZE) {
-				fprintf(stderr, "%d: incremented cache map entry at %p to size %d > %d\n", thrData.tid, this, num_used_bytes, CACHELINE_SIZE); 
-				abort();
-		}
+		__atomic_add_fetch(&num_used_bytes, num_bytes, __ATOMIC_RELAXED);
 		return true;
 }
 
 unsigned char CacheMapEntry::subUsedBytes(unsigned num_bytes) {
-		short retval = __atomic_sub_fetch(&num_used_bytes, num_bytes, __ATOMIC_RELAXED);
-		if(retval < 0) {
-				fprintf(stderr, "%d: decremented cache map entry at %p to size %d < 0\n", thrData.tid, this, retval); 
-				abort();
-		}
+		__atomic_sub_fetch(&num_used_bytes, num_bytes, __ATOMIC_RELAXED);
 		return true;
 }
 
