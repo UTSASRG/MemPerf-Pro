@@ -3,8 +3,8 @@
 
 /*
  * @file   measurement.h
- * @brief  measure scalability issues 
- * @author Hongyu Liu 
+ * @brief  measure scalability issues
+ * @author Hongyu Liu
  */
 
 #include <stddef.h>
@@ -18,6 +18,8 @@
 int threadcontention_index = -1;
 ThreadContention all_threadcontention_array[MAX_THREAD_NUMBER];
 thread_local ThreadContention* current_tc;
+thread_local bool threadLockWait;
+thread_local uint lockTimeWaited;
 
 // extern thread_local uint num_trylock;
 // extern thread_local uint num_pthread_mutex_locks;
@@ -39,6 +41,7 @@ extern const bool d_mprotect;
 extern MemoryUsage max_mu;
 
 extern HashMap <uint64_t, MmapTuple*, spinlock> mappings;
+extern HashMap <uint64_t, LC*, spinlock> lockUsage;
 
 void checkGlobalMemoryUsage();
 
@@ -50,7 +53,7 @@ void setThreadContention() {
     fprintf(stderr, "Please increase thread number: MAX_THREAD_NUMBER, %d\n", MAX_THREAD_NUMBER);
     abort();
   }
-  current_tc = &all_threadcontention_array[current_index];  
+  current_tc = &all_threadcontention_array[current_index];
   current_tc->tid = gettid();
 }
 
@@ -64,17 +67,39 @@ int pthread_mutex_lock(pthread_mutex_t *mutex) {
   if (!inAllocation) {
     return RealX::pthread_mutex_lock (mutex);
   }
-  
+
+  //Have we encountered this lock before?
+  LC* thisLock;
+  uint64_t lockAddr = (uint64_t) mutex;
+  if (lockUsage.find (lockAddr, &thisLock)) {
+    thisLock->contention++;
+
+    if (thisLock->contention > thisLock->maxContention)
+      thisLock->maxContention = thisLock->contention;
+
+    if (thisLock->contention > 1) {
+      threadLockWait = true;
+      lockTimeWaited = rdtscp();
+    }
+  }
+  else { //Add lock to lockUsage hashmap
+    lockUsage.insert(lockAddr, newLC());
+  }
+
   // num_pthread_mutex_locks += 1;
+
+  if (threadLockWait) {
+    threadLockWait = false;
+    current_tc->mutex_wait_cycles += (rdtscp() - lockTimeWaited);
+  }
 
   uint64_t timeStart = rdtscp();
   //Aquire the lock
   int result = RealX::pthread_mutex_lock (mutex);
   uint64_t timeStop = rdtscp();
-  
+
   current_tc->mutex_waits++;
   current_tc->mutex_wait_cycles += (timeStop - timeStart);
-
   if(current_tc->lock_counter == 0) {
     current_tc->critical_section_start = timeStop;
   }
@@ -100,7 +125,7 @@ int pthread_mutex_trylock (pthread_mutex_t *mutex) {
   int result = RealX::pthread_mutex_trylock (mutex);
   if (result != 0) {
     num_trylock.fetch_add(1, relaxed);
-  
+
     uint64_t lockAddr = reinterpret_cast <uint64_t> (mutex);
     //FIXME two array?
 
@@ -222,7 +247,7 @@ int mprotect(void* addr, size_t len, int prot) {
   if(!inAllocation){
     return RealX::mprotect(addr, len, prot);
   }
-  
+
   uint64_t timeStart = rdtscp();
   int ret =  RealX::mprotect(addr, len, prot);
   uint64_t timeStop = rdtscp();
