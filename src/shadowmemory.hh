@@ -55,6 +55,12 @@ extern size_t large_object_threshold;
 extern thread_local thread_data thrData;
 extern thread_local PerfAppFriendly friendliness;
 
+typedef struct {
+		unsigned long mega_index;
+		unsigned page_index;
+		unsigned cache_index;
+} map_tuple;
+
 typedef enum {
     E_MAP_INIT_NOT = 0,
     E_MAP_INIT_WORKING,
@@ -79,13 +85,12 @@ class CacheMapEntry {
 				pid_t getOwner();
 				void setOwner(pid_t new_owner);
 				unsigned char getUsedBytes();
-				unsigned char addUsedBytes(unsigned num_bytes);
-				unsigned char subUsedBytes(unsigned num_bytes);
+				bool addUsedBytes(unsigned char num_bytes);
+				bool subUsedBytes(unsigned char num_bytes);
 };
 
 class PageMapEntry {
 		private:
-				CacheMapEntry * getCacheMapEntry_helper();
 				bool touched;
 				unsigned classSize;
 				unsigned short num_used_bytes;
@@ -93,14 +98,16 @@ class PageMapEntry {
 
 		public:
 				static bool updateCacheLines(uintptr_t uintaddr, unsigned long mega_index, unsigned page_index, unsigned size, bool isFree);
-				static CacheMapEntry * getCacheMapEntry(unsigned long mega_idx, unsigned page_idx, unsigned cache_idx);
+				static CacheMapEntry * getCacheMapEntry(map_tuple tuple, bool mvBumpPtr = true);
+				static CacheMapEntry * getCacheMapEntry(unsigned long mega_idx, unsigned page_idx, unsigned cache_idx, bool mvBumpPtr = true);
+				CacheMapEntry * getCacheMapEntry(bool mvBumpPtr = true);
 				void clear();
 				bool isTouched();
 				void setTouched();
 				void clearTouched();
-				unsigned getUsedBytes();
-				bool addUsedBytes(unsigned num_bytes);
-				bool subUsedBytes(unsigned num_bytes);
+				unsigned short getUsedBytes();
+				bool addUsedBytes(unsigned short num_bytes);
+				bool subUsedBytes(unsigned short num_bytes);
 				unsigned getClassSize();
 				void setClassSize(unsigned size);
 };
@@ -110,6 +117,7 @@ class ShadowMemory {
 				static unsigned updatePages(uintptr_t uintaddr, unsigned long mega_index, unsigned page_index, unsigned size, bool isFree);
 				static bool updateObjectSize(uintptr_t uintaddr, unsigned size);
 				static unsigned getPageClassSize(unsigned long mega_index, unsigned page_index);
+				static unsigned getLastPageClassSize(unsigned long mega_index, unsigned page_index);
 
 				static PageMapEntry ** mega_map_begin;
 				static PageMapEntry * page_map_begin;
@@ -124,19 +132,19 @@ class ShadowMemory {
 		public:
 				static pthread_spinlock_t cache_map_lock;
 				static void doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType);
-				static unsigned getPageUsage(uintptr_t uintaddr);
-				static unsigned getCacheUsage(uintptr_t uintaddr);
 				static size_t libc_malloc_usable_size(size_t size);
 				static unsigned getPageClassSize(void * address);
 				static bool initialize();
-				static inline PageMapEntry ** getMegaMapEntry(unsigned long mega_index);
+				static inline PageMapEntry ** getMegaMapEntry(unsigned long mega_index, bool mvBumpPtr = true);
 				static unsigned cleanupPages(uintptr_t uintaddr, size_t length);
 				static CacheMapEntry * doCacheMapBumpPointer();
 				static PageMapEntry * doPageMapBumpPointer();
-				static PageMapEntry * getPageMapEntry(unsigned long mega_idx, unsigned page_idx);
+				static PageMapEntry * getPageMapEntry(map_tuple tuple, bool mvBumpPtr = true);
+				static PageMapEntry * getPageMapEntry(unsigned long mega_idx, unsigned page_idx, bool mvBumpPtr = true);
 				static unsigned getObjectSize(uintptr_t uintaddr, unsigned long mega_index, unsigned page_index);
 				static unsigned getObjectSize(void * address);
 				static unsigned updateObject(void * address, size_t size, bool isFree);
+				static map_tuple getMapTupleByAddress(uintptr_t uintaddr);
 };
 
 #endif // __SHADOWMAP_H__

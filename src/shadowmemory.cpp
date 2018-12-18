@@ -134,16 +134,10 @@ unsigned ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_index,
 
 		unsigned curPageIdx;
 		unsigned firstPageOffset = (uintaddr & PAGESIZE_MASK);
-		//unsigned numPages = size >> LOG2_PAGESIZE;		// The actual number
-																		// of *touched* pages could be up to
-																		// two more than the value of numPages.
-		unsigned curPageBytes;
+		unsigned short curPageBytes;
 		unsigned numNewPagesTouched = 0;
 		int size_remain = size;
 		PageMapEntry * current;
-
-		//fprintf(stderr, ">   obj 0x%lx sz %u : numPages >= %u, page_index = %d, firstPageOffset = %u\n",
-		//				uintaddr, size, numPages, page_index, firstPageOffset);
 
 		curPageIdx = page_index;
 		// First test to determine whether this object begins on a page boundary. If not, then we must
@@ -167,8 +161,8 @@ unsigned ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_index,
 								numNewPagesTouched++;
 						}
 						// Do not clear the page's class size on free -- this will be cleared
-						// when the pages are re-utilized for use by a new object or mapping.
-						//fprintf(stderr, ">   obj 0x%lx sz %u : current=%p, mega_index=%lu, page index=%u, set class size=%u\n",
+						// when the pages are re-utilized for use by a new object.
+						//fprintf(stderr, ">   obj 0x%lx sz %u : first page : current=%p, mega_index=%lu, page index=%u, set class size=%u\n",
 						//				uintaddr, size, current, mega_index, curPageIdx, classSize);
 						current->setClassSize(classSize);
 				}
@@ -197,8 +191,6 @@ unsigned ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_index,
 						}
 						// Do not clear the page's class size on free -- this will be cleared
 						// when the pages are re-utilized for use by a new object or mapping.
-						//fprintf(stderr, ">   obj 0x%lx sz %u : current=%p, mega_index=%lu, page index=%u, set class size=%u\n",
-						//				uintaddr, size, current, mega_index, curPageIdx, classSize);
 						current->setClassSize(classSize);
 				}
 				size_remain -= curPageBytes;
@@ -215,7 +207,7 @@ unsigned ShadowMemory::getPageClassSize(void * address) {
 		if(mega_index > NUM_MEGABYTE_MAP_ENTRIES) {
 				fprintf(stderr, "ERROR: mega index of 0x%lx is too large: %lu > %u\n",
 								uintaddr, mega_index, NUM_MEGABYTE_MAP_ENTRIES);
-//				abort();
+				abort();
 		}
 
 		unsigned page_index = ((uintaddr & MEGABYTE_MASK) >> LOG2_PAGESIZE);
@@ -240,7 +232,7 @@ unsigned ShadowMemory::getObjectSize(uintptr_t uintaddr, unsigned long mega_inde
 		if(classSize > MAX_OBJECT_SIZE) {
 				return classSize;	
 		} else if(classSize == 0) {
-				fprintf(stderr, "ERROR: an object cannot have a zero class size\n");
+				fprintf(stderr, "ERROR: object %#lx has zero class size\n", uintaddr);
 				abort();
 		}
 
@@ -268,7 +260,7 @@ unsigned ShadowMemory::getObjectSize(void * address) {
 		if(mega_index > NUM_MEGABYTE_MAP_ENTRIES) {
 				fprintf(stderr, "ERROR: mega index of 0x%lx too large: %lu > %u\n",
 								uintaddr, mega_index, NUM_MEGABYTE_MAP_ENTRIES);
-//				abort();
+				abort();
 		}
 
 		unsigned page_index = ((uintaddr & MEGABYTE_MASK) >> LOG2_PAGESIZE);
@@ -276,6 +268,9 @@ unsigned ShadowMemory::getObjectSize(void * address) {
 		return getObjectSize(uintaddr, mega_index, page_index);
 }
 
+PageMapEntry * ShadowMemory::getPageMapEntry(map_tuple tuple, bool mvBumpPtr) {
+		return getPageMapEntry(tuple.mega_index, tuple.page_index, mvBumpPtr);
+}
 
 bool ShadowMemory::updateObjectSize(uintptr_t uintaddr, unsigned size) {
     unsigned classSize;
@@ -321,7 +316,7 @@ unsigned ShadowMemory::cleanupPages(uintptr_t uintaddr, size_t length) {
 		if(mega_index > NUM_MEGABYTE_MAP_ENTRIES) {
 				fprintf(stderr, "ERROR: mega index of 0x%lx too large: %lu > %u\n",
 								uintaddr, mega_index, NUM_MEGABYTE_MAP_ENTRIES);
-//				abort();
+				abort();
 		}
 
 		unsigned firstPageIdx = ((uintaddr & MEGABYTE_MASK) >> LOG2_PAGESIZE);
@@ -329,8 +324,8 @@ unsigned ShadowMemory::cleanupPages(uintptr_t uintaddr, size_t length) {
 		//PageMapEntry ** mega_entry = getMegaMapEntry(mega_index);
 		//fprintf(stderr, "> mega_entry = %p, *mega_entry = %p, mega_index = %lu\n", mega_entry, *mega_entry, mega_index);
 
+		//fprintf(stderr, "%s(%#lx, %zu) alignup size = %zu\n", __FUNCTION__, uintaddr, length, alignup(length, PAGESIZE));
 		length = alignup(length, PAGESIZE);
-		//fprintf(stderr, "%s(%#lx, %zu)\n", __FUNCTION__, uintaddr, length);
 
 
 		unsigned curPageIdx;
@@ -377,17 +372,40 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType)
 						strAccessType = "no_match";
 		}
 
-		//unsigned curPageUsage = ShadowMemory::getPageUsage(uintaddr);
-		//unsigned curCacheUsage = ShadowMemory::getCacheUsage(uintaddr);
+		map_tuple tuple = ShadowMemory::getMapTupleByAddress(uintaddr);
+		PageMapEntry ** mega_entry = mega_map_begin + tuple.mega_index;
+		if(__atomic_load_n(mega_entry, __ATOMIC_RELAXED) == NULL) {
+				return;
+		}
+		PageMapEntry * pme = NULL;
+		CacheMapEntry * cme = NULL;
+		if((pme = ShadowMemory::getPageMapEntry(tuple, false)) == NULL) {
+				return;
+		}
+		if((cme = PageMapEntry::getCacheMapEntry(tuple, false)) == NULL) {
+				return;
+		}
+		//CacheMapEntry * cme = pme->getCacheMapEntry(tuple);
+		//unsigned curPageUsage = pme->getUsedBytes();
+		//unsigned curCacheUsage = cme->getUsedBytes();
+		//pid_t lineOwner = 0;
+		//pid_t lineOwner = cme->getOwner();
+
+		//fprintf(stderr, "addr=%#lx, curPageUsage=%u, curCacheUsage=%u\n", uintaddr, curPageUsage, curCacheUsage);
 
 		#warning need to test owner and record contention!
+
+		if(accessType == E_MEM_STORE) {
+				// TODO: change cache line owner
+				// TODO: get current owner, if not the same, record contention
+		}
 }
 
-unsigned ShadowMemory::getCacheUsage(uintptr_t uintaddr) {
+map_tuple ShadowMemory::getMapTupleByAddress(uintptr_t uintaddr) {
 		if(uintaddr == (uintptr_t)NULL) {
 				fprintf(stderr, "ERROR: null pointer passed into %s at %s:%d\n",
 								__FUNCTION__, __FILE__, __LINE__);
-//				abort();
+				abort();
 		}
 
 		// First compute the megabyte number of the given address.
@@ -395,7 +413,29 @@ unsigned ShadowMemory::getCacheUsage(uintptr_t uintaddr) {
 		if(mega_index > NUM_MEGABYTE_MAP_ENTRIES) {
 				fprintf(stderr, "ERROR: mega index of 0x%lx too large: %lu > %u\n",
 								uintaddr, mega_index, NUM_MEGABYTE_MAP_ENTRIES);
-//				abort();
+				abort();
+		}
+
+		unsigned page_index = ((uintaddr & MEGABYTE_MASK) >> LOG2_PAGESIZE);
+		unsigned cache_index = ((uintaddr & PAGESIZE_MASK) >> LOG2_CACHELINE_SIZE);
+
+		return {mega_index, page_index, cache_index};
+}
+
+/*
+unsigned ShadowMemory::getCacheUsage(uintptr_t uintaddr) {
+		if(uintaddr == (uintptr_t)NULL) {
+				fprintf(stderr, "ERROR: null pointer passed into %s at %s:%d\n",
+								__FUNCTION__, __FILE__, __LINE__);
+				abort();
+		}
+
+		// First compute the megabyte number of the given address.
+		unsigned long mega_index = (uintaddr >> LOG2_MEGABYTE_SIZE);
+		if(mega_index > NUM_MEGABYTE_MAP_ENTRIES) {
+				fprintf(stderr, "ERROR: mega index of 0x%lx too large: %lu > %u\n",
+								uintaddr, mega_index, NUM_MEGABYTE_MAP_ENTRIES);
+				abort();
 		}
 
 		unsigned page_index = ((uintaddr & MEGABYTE_MASK) >> LOG2_PAGESIZE);
@@ -411,7 +451,7 @@ unsigned ShadowMemory::getPageUsage(uintptr_t uintaddr) {
 		if(uintaddr == (uintptr_t)NULL) {
 				fprintf(stderr, "ERROR: null pointer passed into %s at %s:%d\n",
 								__FUNCTION__, __FILE__, __LINE__);
-//				abort();
+				//abort();
 		}
 
 		// First compute the megabyte number of the given address.
@@ -419,7 +459,7 @@ unsigned ShadowMemory::getPageUsage(uintptr_t uintaddr) {
 		if(mega_index > NUM_MEGABYTE_MAP_ENTRIES) {
 				fprintf(stderr, "ERROR: mega index of 0x%lx too large: %lu > %u\n",
 								uintaddr, mega_index, NUM_MEGABYTE_MAP_ENTRIES);
-//				abort();
+				//abort();
 		}
 
 		unsigned page_index = ((uintaddr & MEGABYTE_MASK) >> LOG2_PAGESIZE);
@@ -428,6 +468,7 @@ unsigned ShadowMemory::getPageUsage(uintptr_t uintaddr) {
 
 		return targetPage->getUsedBytes();
 }
+*/
 
 void PageMapEntry::clear() {
 		if(cache_map_entry) {
@@ -443,16 +484,16 @@ unsigned char CacheMapEntry::getUsedBytes() {
 		return num_used_bytes;
 }
 
-unsigned PageMapEntry::getUsedBytes() {
+unsigned short PageMapEntry::getUsedBytes() {
 		return num_used_bytes;
 }
 
 unsigned PageMapEntry::getClassSize() {
-		return classSize;
+		return __atomic_load_n(&classSize, __ATOMIC_RELAXED);
 }
 
 void PageMapEntry::setClassSize(unsigned size) {
-		classSize = size;
+		__atomic_store_n(&classSize, size, __ATOMIC_RELAXED);
 }
 
 bool PageMapEntry::isTouched() {
@@ -467,29 +508,28 @@ void PageMapEntry::clearTouched() {
 		touched = false;
 }
 
-PageMapEntry * ShadowMemory::getPageMapEntry(unsigned long mega_idx, unsigned page_idx) {
-		unsigned rel_mega_index = mega_idx;
-		unsigned rel_page_index = page_idx;
-
+PageMapEntry * ShadowMemory::getPageMapEntry(unsigned long mega_idx, unsigned page_idx, bool mvBumpPtr) {
 		if(page_idx >= NUM_PAGES_PER_MEGABYTE) {
-				rel_mega_index += (page_idx >> LOG2_NUM_PAGES_PER_MEGABYTE);
-				rel_page_index = (page_idx & NUM_PAGES_PER_MEGABYTE_MASK);
+				mega_idx += (page_idx >> LOG2_NUM_PAGES_PER_MEGABYTE);
+				page_idx &= NUM_PAGES_PER_MEGABYTE_MASK;
 		}
 
-		PageMapEntry ** mega_entry = getMegaMapEntry(rel_mega_index);
+		PageMapEntry ** mega_entry = getMegaMapEntry(mega_idx, mvBumpPtr);
 
-		return (*mega_entry + rel_page_index);
+		return (*mega_entry + page_idx);
 }
 
-PageMapEntry ** ShadowMemory::getMegaMapEntry(unsigned long mega_index) {
+PageMapEntry ** ShadowMemory::getMegaMapEntry(unsigned long mega_index, bool mvBumpPtr) {
 		PageMapEntry ** mega_entry = mega_map_begin + mega_index;
 
-    if(__builtin_expect(__atomic_load_n(mega_entry, __ATOMIC_RELAXED) == NULL, 0)) {
-        // Create a new page entries
+		if(mvBumpPtr && __builtin_expect(__atomic_load_n(mega_entry, __ATOMIC_RELAXED) == NULL, 0)) {
+				// Create a new page entries
 				pthread_spin_lock(&mega_map_lock);
-        *mega_entry = doPageMapBumpPointer();
+				if(__builtin_expect(__atomic_load_n(mega_entry, __ATOMIC_RELAXED) == NULL, 1)) {
+						__atomic_store_n(mega_entry, doPageMapBumpPointer(), __ATOMIC_RELAXED);
+				}
 				pthread_spin_unlock(&mega_map_lock);
-    }
+		}
 
 		return mega_entry;
 }
@@ -499,7 +539,7 @@ CacheMapEntry * ShadowMemory::doCacheMapBumpPointer() {
 		cache_map_bump_ptr += NUM_CACHELINES_PER_PAGE;
 		if(cache_map_bump_ptr >= cache_map_end) {
 				fprintf(stderr, "ERROR: cache map out of memory\n");
-//				abort();
+				abort();
 		}
 		return curPtrValue;
 }
@@ -509,15 +549,25 @@ PageMapEntry * ShadowMemory::doPageMapBumpPointer() {
 		page_map_bump_ptr += NUM_PAGES_PER_MEGABYTE;
 		if(page_map_bump_ptr >= page_map_end) {
 				fprintf(stderr, "ERROR: page map out of memory\n");
-//				abort();
+				abort();
 		}
 		return curPtrValue;
+}
+
+CacheMapEntry * PageMapEntry::getCacheMapEntry(map_tuple tuple, bool mvBumpPtr) {
+		PageMapEntry * targetPage = ShadowMemory::getPageMapEntry(tuple.mega_index, tuple.page_index, mvBumpPtr);
+		CacheMapEntry * cme = targetPage->getCacheMapEntry(mvBumpPtr);
+		if(cme) {
+				return (cme + tuple.cache_index);
+		} else {
+				return NULL;
+		}
 }
 
 
 // Accepts relative page and cache indices -- for example, mega_idx=n, page_idx=257, cache_idx=65 would
 // access mega_idx=n+1, page_idx=2, cache_idx=1.
-CacheMapEntry * PageMapEntry::getCacheMapEntry(unsigned long mega_idx, unsigned page_idx, unsigned cache_idx) {
+CacheMapEntry * PageMapEntry::getCacheMapEntry(unsigned long mega_idx, unsigned page_idx, unsigned cache_idx, bool mvBumpPtr) {
 		unsigned target_cache_idx = cache_idx & CACHELINES_PER_PAGE_MASK;
 		unsigned calc_overflow_pages = cache_idx >> LOG2_NUM_CACHELINES_PER_PAGE;
 		unsigned rel_page_idx = page_idx + calc_overflow_pages;
@@ -525,20 +575,18 @@ CacheMapEntry * PageMapEntry::getCacheMapEntry(unsigned long mega_idx, unsigned 
 		unsigned calc_overflow_megabytes = rel_page_idx >> LOG2_NUM_PAGES_PER_MEGABYTE;
 		unsigned target_mega_idx = mega_idx + calc_overflow_megabytes;
 
-		PageMapEntry * targetPage = ShadowMemory::getPageMapEntry(target_mega_idx, target_page_idx);
-		CacheMapEntry * baseCache = targetPage->getCacheMapEntry_helper();
-		CacheMapEntry * targetCache = baseCache + target_cache_idx;
-		//CacheMapEntry * targetCache = targetPage->getCacheMapEntry_helper() + target_cache_idx;
+		PageMapEntry * targetPage = ShadowMemory::getPageMapEntry(target_mega_idx, target_page_idx, mvBumpPtr);
+		CacheMapEntry * baseCache = targetPage->getCacheMapEntry(mvBumpPtr);
 
-		return targetCache;
+		return (baseCache + target_cache_idx);
 }
 
-bool PageMapEntry::addUsedBytes(unsigned num_bytes) {
+bool PageMapEntry::addUsedBytes(unsigned short num_bytes) {
 		__atomic_add_fetch(&num_used_bytes, num_bytes, __ATOMIC_RELAXED);
 		return true;
 }
 
-bool PageMapEntry::subUsedBytes(unsigned num_bytes) {
+bool PageMapEntry::subUsedBytes(unsigned short num_bytes) {
 		__atomic_sub_fetch(&num_used_bytes, num_bytes, __ATOMIC_RELAXED);
 		return true;
 }
@@ -547,7 +595,7 @@ bool PageMapEntry::updateCacheLines(uintptr_t uintaddr, unsigned long mega_index
 		unsigned firstCacheLineIdx = ((uintaddr & PAGESIZE_MASK) >> LOG2_CACHELINE_SIZE);
 		unsigned firstCacheLineOffset = (uintaddr & CACHELINE_SIZE_MASK);
 		unsigned curCacheLineIdx;
-		unsigned curCacheLineBytes;
+		unsigned char curCacheLineBytes;
 		int size_remain = size;
 		CacheMapEntry * current;
 
@@ -601,24 +649,25 @@ void CacheMapEntry::setOwner(pid_t new_owner) {
 		owner = new_owner;
 }
 
-
-CacheMapEntry * PageMapEntry::getCacheMapEntry_helper() {
-		if(__builtin_expect(__atomic_load_n(&cache_map_entry, __ATOMIC_RELAXED) == NULL, 0)) {
+CacheMapEntry * PageMapEntry::getCacheMapEntry(bool mvBumpPtr) {
+		if(mvBumpPtr && __builtin_expect(__atomic_load_n(&cache_map_entry, __ATOMIC_RELAXED) == NULL, 0)) {
 				// Create a new entries
 				pthread_spin_lock(&ShadowMemory::cache_map_lock);
-				cache_map_entry = ShadowMemory::doCacheMapBumpPointer();
+				if(__builtin_expect(__atomic_load_n(&cache_map_entry, __ATOMIC_RELAXED) == NULL, 1)) {
+						__atomic_store_n(&cache_map_entry, ShadowMemory::doCacheMapBumpPointer(), __ATOMIC_RELAXED);
+				}
 				pthread_spin_unlock(&ShadowMemory::cache_map_lock);
 		}
 
 		return cache_map_entry;
 }
 
-unsigned char CacheMapEntry::addUsedBytes(unsigned num_bytes) {
+bool CacheMapEntry::addUsedBytes(unsigned char num_bytes) {
 		__atomic_add_fetch(&num_used_bytes, num_bytes, __ATOMIC_RELAXED);
 		return true;
 }
 
-unsigned char CacheMapEntry::subUsedBytes(unsigned num_bytes) {
+bool CacheMapEntry::subUsedBytes(unsigned char num_bytes) {
 		__atomic_sub_fetch(&num_used_bytes, num_bytes, __ATOMIC_RELAXED);
 		return true;
 }
