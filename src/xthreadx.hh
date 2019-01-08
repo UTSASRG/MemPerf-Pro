@@ -100,6 +100,9 @@ class xthreadx {
 		doPerfCounterRead();
 		#endif
 
+		// Replicate this thread's application friendliness data before it exits.
+		updateGlobalFriendlinessData();
+
 		if(thrData.output) {
 			fclose(thrData.output);
 		}

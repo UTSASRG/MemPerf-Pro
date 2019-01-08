@@ -268,10 +268,6 @@ unsigned ShadowMemory::getObjectSize(void * address) {
 		return getObjectSize(uintaddr, mega_index, page_index);
 }
 
-PageMapEntry * ShadowMemory::getPageMapEntry(map_tuple tuple, bool mvBumpPtr) {
-		return getPageMapEntry(tuple.mega_index, tuple.page_index, mvBumpPtr);
-}
-
 bool ShadowMemory::updateObjectSize(uintptr_t uintaddr, unsigned size) {
     unsigned classSize;
 
@@ -372,33 +368,68 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType)
 						strAccessType = "no_match";
 		}
 
+		PageMapEntry * pme;
+		CacheMapEntry * cme;
+		// We bypass checking and incrementing the MegaMap's bump pointer by not
+		// calling the usual fetch functions (e.g., getMegaMapEntry, getPageMapEntry, etc.).
+		// Thus, whenever the mega map entry is null/empty, we will simply give up
+		// here (instead of creating one).
 		map_tuple tuple = ShadowMemory::getMapTupleByAddress(uintaddr);
 		PageMapEntry ** mega_entry = mega_map_begin + tuple.mega_index;
 		if(__atomic_load_n(mega_entry, __ATOMIC_RELAXED) == NULL) {
 				return;
 		}
-		PageMapEntry * pme = NULL;
-		CacheMapEntry * cme = NULL;
-		if((pme = ShadowMemory::getPageMapEntry(tuple, false)) == NULL) {
+		// Calculate the PageMap entry based on the page index.
+		pme = (*mega_entry + tuple.page_index);
+		// If the page has not been touched before then we will leave.
+		if(!pme->isTouched()) {
 				return;
 		}
-		if((cme = PageMapEntry::getCacheMapEntry(tuple, false)) == NULL) {
+		// Fetch the PageMapEntry's cache map entry pointer; if it is non-null, we will
+		// add the appropriate cache index offset to it next.
+		// The "false" boolean constant in the call to getCacheMapEntry(false) controls
+		// whether the value of the CacheMap bump pointer is updated and returned
+		// (rather than NULL) if there is no CacheMap entry for this address; we do not
+		// wish to affect the bump pointer in this case, so this parameter should always
+		// be set to false.
+		if((cme = pme->getCacheMapEntry(false)) == NULL) {
 				return;
 		}
-		//CacheMapEntry * cme = pme->getCacheMapEntry(tuple);
-		//unsigned curPageUsage = pme->getUsedBytes();
-		//unsigned curCacheUsage = cme->getUsedBytes();
-		//pid_t lineOwner = 0;
-		//pid_t lineOwner = cme->getOwner();
+		cme += tuple.cache_index;
 
-		//fprintf(stderr, "addr=%#lx, curPageUsage=%u, curCacheUsage=%u\n", uintaddr, curPageUsage, curCacheUsage);
+		unsigned short curPageUsage = pme->getUsedBytes();
+		unsigned char curCacheUsage = cme->getUsedBytes();
+		pid_t curThread = thrData.tid;
+		pid_t lineOwner = cme->getOwner();
 
-		#warning need to test owner and record contention!
+		friendly_data * usageData = &thrData.friendlyData;
+		/*
+			 typedef struct {
+			 unsigned long numAccesses;
+			 unsigned long numCacheOwnerConflicts;
+			 unsigned long numCacheBytes;
+			 unsigned long numPageBytes;
+			 } friendly_data;
+		*/
+
+		usageData->numAccesses++;
+		usageData->numCacheBytes += curCacheUsage;
+		usageData->numPageBytes += curPageUsage;
+
+		//bool isCacheOwnerConflict = false;
 
 		if(accessType == E_MEM_STORE) {
-				// TODO: change cache line owner
-				// TODO: get current owner, if not the same, record contention
+				if(lineOwner != curThread) {
+						//isCacheOwnerConflict = true;
+						usageData->numCacheOwnerConflicts++;
+				}
+				// change cache line owner
+				cme->setOwner(curThread);
 		}
+
+		// DEBUG OUTPUT
+		//fprintf(stderr, "mem access : %s : addr=%#lx, curPageUsage=%u, curCacheUsage=%u, conflict?=%s\n",
+		//				strAccessType, uintaddr, curPageUsage, curCacheUsage, boolToStr(isCacheOwnerConflict));
 }
 
 map_tuple ShadowMemory::getMapTupleByAddress(uintptr_t uintaddr) {
@@ -508,21 +539,21 @@ void PageMapEntry::clearTouched() {
 		touched = false;
 }
 
-PageMapEntry * ShadowMemory::getPageMapEntry(unsigned long mega_idx, unsigned page_idx, bool mvBumpPtr) {
+PageMapEntry * ShadowMemory::getPageMapEntry(unsigned long mega_idx, unsigned page_idx) {
 		if(page_idx >= NUM_PAGES_PER_MEGABYTE) {
 				mega_idx += (page_idx >> LOG2_NUM_PAGES_PER_MEGABYTE);
 				page_idx &= NUM_PAGES_PER_MEGABYTE_MASK;
 		}
 
-		PageMapEntry ** mega_entry = getMegaMapEntry(mega_idx, mvBumpPtr);
+		PageMapEntry ** mega_entry = getMegaMapEntry(mega_idx);
 
 		return (*mega_entry + page_idx);
 }
 
-PageMapEntry ** ShadowMemory::getMegaMapEntry(unsigned long mega_index, bool mvBumpPtr) {
+PageMapEntry ** ShadowMemory::getMegaMapEntry(unsigned long mega_index) {
 		PageMapEntry ** mega_entry = mega_map_begin + mega_index;
 
-		if(mvBumpPtr && __builtin_expect(__atomic_load_n(mega_entry, __ATOMIC_RELAXED) == NULL, 0)) {
+		if(__builtin_expect(__atomic_load_n(mega_entry, __ATOMIC_RELAXED) == NULL, 0)) {
 				// Create a new page entries
 				pthread_spin_lock(&mega_map_lock);
 				if(__builtin_expect(__atomic_load_n(mega_entry, __ATOMIC_RELAXED) == NULL, 1)) {
@@ -554,20 +585,9 @@ PageMapEntry * ShadowMemory::doPageMapBumpPointer() {
 		return curPtrValue;
 }
 
-CacheMapEntry * PageMapEntry::getCacheMapEntry(map_tuple tuple, bool mvBumpPtr) {
-		PageMapEntry * targetPage = ShadowMemory::getPageMapEntry(tuple.mega_index, tuple.page_index, mvBumpPtr);
-		CacheMapEntry * cme = targetPage->getCacheMapEntry(mvBumpPtr);
-		if(cme) {
-				return (cme + tuple.cache_index);
-		} else {
-				return NULL;
-		}
-}
-
-
 // Accepts relative page and cache indices -- for example, mega_idx=n, page_idx=257, cache_idx=65 would
 // access mega_idx=n+1, page_idx=2, cache_idx=1.
-CacheMapEntry * PageMapEntry::getCacheMapEntry(unsigned long mega_idx, unsigned page_idx, unsigned cache_idx, bool mvBumpPtr) {
+CacheMapEntry * PageMapEntry::getCacheMapEntry(unsigned long mega_idx, unsigned page_idx, unsigned cache_idx) {
 		unsigned target_cache_idx = cache_idx & CACHELINES_PER_PAGE_MASK;
 		unsigned calc_overflow_pages = cache_idx >> LOG2_NUM_CACHELINES_PER_PAGE;
 		unsigned rel_page_idx = page_idx + calc_overflow_pages;
@@ -575,8 +595,8 @@ CacheMapEntry * PageMapEntry::getCacheMapEntry(unsigned long mega_idx, unsigned 
 		unsigned calc_overflow_megabytes = rel_page_idx >> LOG2_NUM_PAGES_PER_MEGABYTE;
 		unsigned target_mega_idx = mega_idx + calc_overflow_megabytes;
 
-		PageMapEntry * targetPage = ShadowMemory::getPageMapEntry(target_mega_idx, target_page_idx, mvBumpPtr);
-		CacheMapEntry * baseCache = targetPage->getCacheMapEntry(mvBumpPtr);
+		PageMapEntry * targetPage = ShadowMemory::getPageMapEntry(target_mega_idx, target_page_idx);
+		CacheMapEntry * baseCache = targetPage->getCacheMapEntry(true);
 
 		return (baseCache + target_cache_idx);
 }

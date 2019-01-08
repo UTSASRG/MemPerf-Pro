@@ -24,8 +24,8 @@ CXX = g++
 #CC = clang
 #CXX = clang++ 
 
-CFLAGS += -O2 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -fno-omit-frame-pointer
-CFLAGS2 += -O2 -Wall -DNDEBUG --std=c++11 -g -fPIC -I$(ROOT)/include -Wno-unused-result -fno-omit-frame-pointer -Wl,--no-as-needed -lrt
+CFLAGS += -pipe -g3 -ggdb3 -Wall -DNDEBUG --std=c++11 -fPIC -I$(ROOT)/include -fno-omit-frame-pointer
+CFLAGS2 += -pipe -g3 -ggdb3 -Wall -DNDEBUG --std=c++11 -fPIC -I$(ROOT)/include -Wno-unused-result -fno-omit-frame-pointer -Wl,--no-as-needed -lrt
 
 #THREADTEST_FILE = threadTest.cpp
 # THREADTEST_FILE = malloc-and-free.cpp

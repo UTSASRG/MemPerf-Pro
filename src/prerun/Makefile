@@ -20,14 +20,14 @@ TARGETS =	libmallochelp.so	\
 			prerun-tcmalloc		\
 			prerun-jemalloc
 
-LIBRARY = libmallochelp.so
+LIBRARY = ./libmallochelp.so
 RUNFILE = runlib.cpp
 
 XLIBC = $(HOME)/libc-2.24/libmalloc.so
 FREEGUARD = $(HOME)/FreeGuard/libfreeguard.so
 OBSD = $(HOME)/Memoryallocators/OpenBSD-6.0/libomalloc.so
 DIEHARD = $(HOME)/Memoryallocators/DieHard-old/src/libdieharder.so
-HOARD =
+HOARD = $(HOME)/Memoryallocators/Hoard/src/libhoard.so
 
 all: $(TARGETS)
 
@@ -52,6 +52,9 @@ prerun-tcmalloc: libmallochelp.so $(RUNFILE)
 
 prerun-jemalloc: libmallochelp.so $(RUNFILE)
 	$(CXX) $(CFLAGS) -rdynamic $(LIBRARY) -ljemalloc $(RUNFILE) -o prerun-jemalloc 
+
+prerun-hoard: libhoard.so $(RUNFILE)
+	$(CXX) $(CFLAGS) -rdynamic $(LIBRARY) -lhoard $(RUNFILE) -o prerun-hoard 
 
 .PHONY: clean
 clean:

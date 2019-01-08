@@ -80,6 +80,15 @@ typedef struct {
 	std::atomic_uint allocations;
 } MmapTuple;
 
+/*
+typedef struct {
+    unsigned long numAccesses;
+    unsigned long numCacheOwnerConflicts;
+    unsigned long numCacheBytes;
+    unsigned long numPageBytes;
+} friendly_data;
+*/
+
 typedef struct {
 	std::atomic_size_t metadata;
 	std::atomic_size_t blowup;
@@ -229,6 +238,8 @@ void initGlobalCSM();
 SMapEntry* newSMapEntry();
 void start_smaps();
 void sampleMemoryOverhead(int, siginfo_t*, void*);
+void updateGlobalFriendlinessData();
+void calcAppFriendliness();
 
 #include "shadowmemory.hh"
 #endif /* end of include guard: __LIBMALLOCPROF_H__ */

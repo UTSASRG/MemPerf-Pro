@@ -73,17 +73,19 @@ typedef struct {
     long numAccesses;
 } Tuple;
 
-typedef struct addr2line_info {
-    char exename[15];
-    unsigned int lineNum;
-} addrinfo;
+typedef struct {
+    unsigned long numAccesses;
+    unsigned long numCacheOwnerConflicts;
+    unsigned long numCacheBytes;
+    unsigned long numPageBytes;
+} friendly_data;
 
 typedef struct {
 	char * stackStart = NULL;
 	char * stackEnd = NULL;
-	void * maxObjAddr = (void *)0x0;
 	FILE * output = NULL;
 	pid_t tid = 0;
+	friendly_data friendlyData;
 } thread_data;
 
 typedef struct {

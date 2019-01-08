@@ -156,6 +156,8 @@ uint64_t myMemPosition = 0;
 uint64_t myMemAllocations = 0;
 spinlock myMemLock;
 
+friendly_data globalFriendlyData;
+
 //Hashmap of class size to TAD*
 // typedef HashMap <uint64_t, thread_alloc_data*, spinlock> Class_Size_TAD;
 
@@ -344,7 +346,7 @@ __attribute__((constructor)) initStatus initializer() {
 
 	worstCaseOverhead.efficiency = 100.00;
 
-	#warning DISABLED SMAPS TIMER!
+	#warning Disabled smaps functionality (timer, signal handler)
 	/*
 	start_smaps();
 	setupSignalHandler();
@@ -391,7 +393,7 @@ void exitHandler() {
 	doPerfCounterRead();
 	#endif
 
-	#warning DISABLED SMAPS TIMER!
+	#warning Disabled smaps functionality (timer, file handle cleanup)
 	/*
 	fclose(smaps_infile);
 	if (timer_settime(smap_timer, 0, &stopTimer, NULL) == -1) {
@@ -408,14 +410,20 @@ void exitHandler() {
 	}
 	writeAllocData();
 	// writeContention();
+
+	// Calculate and print the application friendliness numbers.
+	calcAppFriendliness();
+
 	if(thrData.output) {
 		fclose(thrData.output);
 	}
 
+	#warning Disabled smaps functionality (output)
+	/*
 	uint64_t avg;
-    if (smap_samples != 0) {
-		avg = (smap_sample_cycles / smap_samples);
-    }
+	if(smap_samples != 0) {
+			avg = (smap_sample_cycles / smap_samples);
+	}
 
 	fprintf(stderr, "---WorstCaseOverhead---\n"
 					"Samples:              %lu\n"
@@ -431,7 +439,7 @@ void exitHandler() {
 					worstCaseOverhead.alignment,
 					worstCaseOverhead.blowup,
 					worstCaseOverhead.efficiency);
-
+	*/
 }
 
 // MallocProf's main function
@@ -1922,4 +1930,50 @@ void startSignalTimer() {
 
 pid_t gettid() {
     return syscall(__NR_gettid);
+}
+
+void updateGlobalFriendlinessData() {
+		friendly_data * thrFriendlyData = &thrData.friendlyData;
+
+		__atomic_add_fetch(&globalFriendlyData.numAccesses, thrFriendlyData->numAccesses, __ATOMIC_SEQ_CST);
+		__atomic_add_fetch(&globalFriendlyData.numCacheOwnerConflicts, thrFriendlyData->numCacheOwnerConflicts, __ATOMIC_SEQ_CST);
+		__atomic_add_fetch(&globalFriendlyData.numCacheBytes, thrFriendlyData->numCacheBytes, __ATOMIC_SEQ_CST);
+		__atomic_add_fetch(&globalFriendlyData.numPageBytes, thrFriendlyData->numPageBytes, __ATOMIC_SEQ_CST);
+
+		#ifdef THREAD_OUTPUT			// DEBUG BLOCK
+		if(thrData.output) {
+				pid_t tid = thrData.tid;
+				double avgCacheUtil = (double) thrFriendlyData->numCacheBytes / (thrFriendlyData->numAccesses * CACHELINE_SIZE);
+				double avgPageUtil = (double) thrFriendlyData->numPageBytes / (thrFriendlyData->numAccesses * PAGESIZE);
+				FILE * outfd = thrData.output;
+				//FILE * outfd = stderr;
+				fprintf(outfd, "tid %d : num accesses = %ld\n", tid, thrFriendlyData->numAccesses);
+				fprintf(outfd, "tid %d : total cache bytes accessed = %ld\n", tid, thrFriendlyData->numCacheBytes);
+				fprintf(outfd, "tid %d : total page bytes accessed  = %ld\n", tid, thrFriendlyData->numPageBytes);
+				fprintf(outfd, "tid %d : num cache owner conflicts  = %ld\n", tid, thrFriendlyData->numCacheOwnerConflicts);
+				fprintf(outfd, "tid %d : avg. cache util = %0.4f\n", tid, avgCacheUtil);
+				fprintf(outfd, "tid %d : avg. page util  = %0.4f\n", tid, avgPageUtil);
+		}
+		#endif // END DEBUG BLOCK
+}
+
+void calcAppFriendliness() {
+		// Final call to update the global data, using this (the main thread's) local data.
+		updateGlobalFriendlinessData();
+
+		unsigned long totalAccesses = __atomic_load_n(&globalFriendlyData.numAccesses, __ATOMIC_SEQ_CST);
+		unsigned long totalCacheOwnerConflicts = __atomic_load_n(&globalFriendlyData.numCacheOwnerConflicts, __ATOMIC_SEQ_CST);
+		unsigned long totalCacheBytes = __atomic_load_n(&globalFriendlyData.numCacheBytes, __ATOMIC_SEQ_CST);
+		unsigned long totalPageBytes = __atomic_load_n(&globalFriendlyData.numPageBytes, __ATOMIC_SEQ_CST);
+
+		double avgTotalCacheUtil = (double) totalCacheBytes / (totalAccesses * CACHELINE_SIZE);
+		double avgTotalPageUtil = (double) totalPageBytes / (totalAccesses * PAGESIZE);
+		FILE * outfd = thrData.output;
+		//FILE * outfd = stderr;
+		fprintf(outfd, "num accesses = %ld\n", totalAccesses);
+		fprintf(outfd, "total cache bytes accessed = %ld\n", totalCacheBytes);
+		fprintf(outfd, "total page bytes accessed  = %ld\n", totalPageBytes);
+		fprintf(outfd, "cache owner conflicts      = %ld\n", totalCacheOwnerConflicts);
+		fprintf(outfd, "avg. cache util = %0.4f\n", avgTotalCacheUtil);
+		fprintf(outfd, "avg. page util  = %0.4f\n", avgTotalPageUtil);
 }
