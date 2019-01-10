@@ -478,6 +478,9 @@ extern "C" int libmallocprof_libc_start_main(main_fn_t main_fn, int argc,
 // Memory management functions
 extern "C" {
 	void * yymalloc(size_t sz) {
+		if(sz == 0) {
+				return NULL;
+		}
 
 		// Small allocation routine designed to service malloc requests made by
 		// the dlsym() function, as well as code running prior to dlsym(). Due
@@ -496,7 +499,7 @@ extern "C" {
 		}
 
 		//Malloc is being called by a thread that is already in malloc
-		if (inAllocation) return RealX::malloc (sz);
+		if (inAllocation) return RealX::malloc(sz);
 
 		if (!inRealMain) return RealX::malloc(sz);
 
@@ -543,6 +546,9 @@ extern "C" {
 	}
 
 	void * yycalloc(size_t nelem, size_t elsize) {
+		if((nelem * elsize) == 0) {
+				return NULL;
+		}
 
 		if (profilerInitialized != INITIALIZED) {
 
