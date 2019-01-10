@@ -169,6 +169,7 @@ typedef struct {            //struct for holding data about allocations
 int initPMU(void);
 void setupCounting(void);
 void setupSampling(void);
+void stopSampling(void);
 void doPerfCounterRead(void);
 void doSampleRead();
 #endif

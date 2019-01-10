@@ -382,6 +382,32 @@ void setupSampling() {
 	}
 }
 
+void stopSampling(void) {
+		if(!isSamplingInit) {
+				return;
+		}
+
+		if(ioctl(perfInfo.perf_fd, PERF_EVENT_IOC_DISABLE, 0) == -1) {
+				fprintf(stderr, "Failed to disable perf event: %s\n", strerror(errno));
+		}
+		if(ioctl(perfInfo.perf_fd2, PERF_EVENT_IOC_DISABLE, 0) == -1) {
+				fprintf(stderr, "Failed to disable perf event: %s\n", strerror(errno));
+		}
+		// process any sample data still remaining in the ring buffer
+		doSampleRead();
+
+		// Relinquish our mmap'd memory and close perf file descriptors
+		if(munmap(perfInfo.ring_buf, MAPSIZE)) {
+				fprintf(stderr, "Unable to unmap perf ring buffer\n");
+		}
+		if(close(perfInfo.perf_fd) == -1) {
+				fprintf(stderr, "Unable to close perf_fd file descriptor: %s\n", strerror(errno));
+		}
+		if(close(perfInfo.perf_fd2) == -1) {
+				fprintf(stderr, "Unable to close perf_fd2 file descriptor: %s\n", strerror(errno));
+		}
+}
+
 int initPMU(void) {
 		if(isSamplingInit) {
 				return -1;
