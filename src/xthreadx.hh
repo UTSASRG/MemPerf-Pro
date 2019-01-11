@@ -96,9 +96,10 @@ class xthreadx {
 		initPMU();
 		#endif
 		result = current->startRoutine(current->startArg);
-		stopSampling();
 		#ifndef NO_PMU
+		stopSampling();
 		doPerfCounterRead();
+		stopCounting();
 		#endif
 
 		// Replicate this thread's application friendliness data before it exits.
@@ -109,12 +110,6 @@ class xthreadx {
 		}
 
 		globalizeTAD();
-
-		close(perfInfo.perf_fd_fault);
-		close(perfInfo.perf_fd_tlb_reads);
-		close(perfInfo.perf_fd_tlb_writes);
-		close(perfInfo.perf_fd_cache_miss);
-		close(perfInfo.perf_fd_instr);
 
 		return result;
 	}

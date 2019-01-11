@@ -59,6 +59,10 @@ void getPerfCounts (PerfReadInfo * i) {
 	return;
 	#endif
 
+	if(!isCountingInit) {
+			return;
+	}
+
 	struct read_format buffer;
 
 	if(read(perfInfo.perf_fd_fault, &buffer, sizeof(struct read_format)) == -1) {
@@ -382,10 +386,26 @@ void setupSampling() {
 	}
 }
 
+void stopCounting(void) {
+		if(!isCountingInit) {
+				return;
+		}
+
+		isCountingInit = false;
+
+    close(perfInfo.perf_fd_fault);
+    close(perfInfo.perf_fd_tlb_reads);
+    close(perfInfo.perf_fd_tlb_writes);
+    close(perfInfo.perf_fd_cache_miss);
+    close(perfInfo.perf_fd_instr);
+}
+
 void stopSampling(void) {
 		if(!isSamplingInit) {
 				return;
 		}
+
+		isSamplingInit = false;
 
 		if(ioctl(perfInfo.perf_fd, PERF_EVENT_IOC_DISABLE, 0) == -1) {
 				fprintf(stderr, "Failed to disable perf event: %s\n", strerror(errno));

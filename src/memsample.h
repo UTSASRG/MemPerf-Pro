@@ -170,6 +170,7 @@ int initPMU(void);
 void setupCounting(void);
 void setupSampling(void);
 void stopSampling(void);
+void stopCounting(void);
 void doPerfCounterRead(void);
 void doSampleRead();
 #endif

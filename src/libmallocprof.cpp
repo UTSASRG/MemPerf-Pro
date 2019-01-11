@@ -1953,7 +1953,7 @@ void updateGlobalFriendlinessData() {
 				double avgPageUtil = (double) thrFriendlyData->numPageBytes / (thrFriendlyData->numAccesses * PAGESIZE);
 				FILE * outfd = thrData.output;
 				//FILE * outfd = stderr;
-				fprintf(outfd, "tid %d : num accesses = %ld\n", tid, thrFriendlyData->numAccesses);
+				fprintf(outfd, "tid %d : num sampled accesses = %ld\n", tid, thrFriendlyData->numAccesses);
 				fprintf(outfd, "tid %d : total cache bytes accessed = %ld\n", tid, thrFriendlyData->numCacheBytes);
 				fprintf(outfd, "tid %d : total page bytes accessed  = %ld\n", tid, thrFriendlyData->numPageBytes);
 				fprintf(outfd, "tid %d : num cache owner conflicts  = %ld\n", tid, thrFriendlyData->numCacheOwnerConflicts);
