@@ -17,15 +17,12 @@
 
 int threadcontention_index = -1;
 ThreadContention all_threadcontention_array[MAX_THREAD_NUMBER];
+extern thread_local thread_alloc_data localTAD;
+extern std::atomic<uint> num_sbrk;
+extern std::atomic<uint> num_madvise;
+extern std::atomic<uint> malloc_mmaps;
+extern std::atomic<std::size_t> size_sbrk;
 thread_local ThreadContention* current_tc;
-thread_local bool threadLockWait;
-thread_local uint lockTimeWaited;
-
-// extern thread_local uint num_trylock;
-// extern thread_local uint num_pthread_mutex_locks;
-// extern thread_local uint threads;
-extern thread_local uint malloc_mmaps;
-extern thread_local uint size_sbrk;
 
 //__thread thread_data thrData;
 extern thread_local bool inAllocation;
@@ -71,30 +68,19 @@ int pthread_mutex_lock(pthread_mutex_t *mutex) {
   //Have we encountered this lock before?
   LC* thisLock;
   uint64_t lockAddr = (uint64_t) mutex;
-  if (lockUsage.find (lockAddr, &thisLock)) {
+  if(lockUsage.find (lockAddr, &thisLock)) {
     thisLock->contention++;
 
-    if (thisLock->contention > thisLock->maxContention)
+    if(thisLock->contention > thisLock->maxContention) {
       thisLock->maxContention = thisLock->contention;
-
-    if (thisLock->contention > 1) {
-      threadLockWait = true;
-      lockTimeWaited = rdtscp();
-    }
-  }
-  else { //Add lock to lockUsage hashmap
-    lockUsage.insert(lockAddr, newLC());
+		}
+  } else {
+			// Add lock to lockUsage hashmap
+			lockUsage.insert(lockAddr, newLC());
   }
 
-  // num_pthread_mutex_locks += 1;
-
-  if (threadLockWait) {
-    threadLockWait = false;
-    current_tc->mutex_wait_cycles += (rdtscp() - lockTimeWaited);
-  }
-
+  // Time the aquisition of the lock
   uint64_t timeStart = rdtscp();
-  //Aquire the lock
   int result = RealX::pthread_mutex_lock (mutex);
   uint64_t timeStop = rdtscp();
 
@@ -121,10 +107,11 @@ int pthread_mutex_trylock (pthread_mutex_t *mutex) {
     return RealX::pthread_mutex_trylock (mutex);
   }
 
+	localTAD.num_trylock++;
+
   //Try to aquire the lock
   int result = RealX::pthread_mutex_trylock (mutex);
   if (result != 0) {
-    num_trylock.fetch_add(1, relaxed);
 
     uint64_t lockAddr = reinterpret_cast <uint64_t> (mutex);
     //FIXME two array?
@@ -178,21 +165,20 @@ void * yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offs
   //If this thread currently doing an allocation
   if (inAllocation) {
     if (d_mmap) printf ("mmap direct from allocation function: length= %zu, prot= %d\n", length, prot);
-    malloc_mmaps += 1;
 
+    malloc_mmaps++;
+    localTAD.malloc_mmaps++;
     current_tc->mmap_waits++;
     current_tc->mmap_wait_cycles += (timeStop - timeStart);
 
     mappings.insert(address, newMmapTuple(address, length, prot, 'a'));
-  }
-  //Need to check if selfmap.getInstance().getTextRegions() has
-  //ran. If it hasn't, we can't call isAllocatorInCallStack()
-  else if (selfmapInitialized && isAllocatorInCallStack()) {
-    if (d_mmap) printf ("mmap allocator in callstack: length= %zu, prot= %d\n", length, prot);
+
+	// Need to check if selfmap.getInstance().getTextRegions() has
+	// ran. If it hasn't, we can't call isAllocatorInCallStack()
+  } else if(selfmapInitialized && isAllocatorInCallStack()) {
+    if(d_mmap) printf ("mmap allocator in callstack: length= %zu, prot= %d\n", length, prot);
     mappings.insert(address, newMmapTuple(address, length, prot, 's'));
   }
-
-  // total_mmaps++;
 
   inMmap = false;
   return retval;
@@ -207,7 +193,7 @@ int madvise(void *addr, size_t length, int advice){
   }
 
   if (advice == MADV_DONTNEED) {
-    long returned = PAGESIZE * ShadowMemory::cleanupPages((uintptr_t)addr, length);
+    uint returned = PAGESIZE * ShadowMemory::cleanupPages((uintptr_t)addr, length);
     if(current_tc->totalMemoryUsage > returned) {
       current_tc->totalMemoryUsage -= returned;
     }
@@ -217,6 +203,8 @@ int madvise(void *addr, size_t length, int advice){
   int result = RealX::madvise(addr, length, advice);
   uint64_t timeStop = rdtscp();
 
+	num_madvise++;
+	localTAD.num_madvise++;
   current_tc->madvise_waits++;
   current_tc->madvise_wait_cycles += (timeStop - timeStart);
 
@@ -235,6 +223,10 @@ void *sbrk(intptr_t increment){
   current_tc->sbrk_waits++;
   current_tc->sbrk_wait_cycles += (timeStop - timeStart);
 
+  localTAD.num_sbrk++;
+  localTAD.size_sbrk += increment;
+
+  num_sbrk++;
   size_sbrk += increment;
 
   return retptr;
@@ -269,7 +261,7 @@ int munmap(void *addr, size_t length) {
   // to RealX::unmap(). If the orders were switched, it would then be possible for
   // another thread to reallocate the unmapped region *while* the current thread is
   // still performing the cleanupPages() call, thus clearing the other thread's pages.
-  long returned = PAGESIZE * ShadowMemory::cleanupPages((intptr_t)addr, length);
+  ulong returned = PAGESIZE * ShadowMemory::cleanupPages((intptr_t)addr, length);
   if(current_tc->totalMemoryUsage > returned) {
       current_tc->totalMemoryUsage -= returned;
   }
@@ -282,7 +274,6 @@ int munmap(void *addr, size_t length) {
   current_tc->munmap_wait_cycles += (timeStop - timeStart);
 
   mappings.erase((intptr_t)addr);
-  // total_mmaps--;
 
   return ret;
 }
@@ -352,46 +343,70 @@ void writeThreadContention() {
         globalizedThreadContention.mremap_waits += data->mremap_waits;
         globalizedThreadContention.mremap_wait_cycles += data->mremap_wait_cycles;
         globalizedThreadContention.mprotect_waits += data->mprotect_waits;
-        globalizedThreadContention.mprotect_wait_cycles += data->mprotect_wait_cycles;
+        globalizedThreadContention.critical_section_counter += data->critical_section_counter;
+        globalizedThreadContention.critical_section_duration += data->critical_section_duration;
 
-        long tmp_maxRealMemoryUsage = globalizedThreadContention.maxRealMemoryUsage == LONG_MIN ? 0 : data->maxRealMemoryUsage;
-        long tmp_maxRealAllocatedMemoryUsage = globalizedThreadContention.maxRealAllocatedMemoryUsage == LONG_MIN ? 0 : data->maxRealAllocatedMemoryUsage;
-        long tmp_maxTotalMemoryUsage = globalizedThreadContention.maxTotalMemoryUsage == LONG_MIN ? 0 : data->maxTotalMemoryUsage;
+        size_t tmp_maxRealMemoryUsage = globalizedThreadContention.maxRealMemoryUsage == 0 ? 0 : data->maxRealMemoryUsage;
+        size_t tmp_maxRealAllocatedMemoryUsage = globalizedThreadContention.maxRealAllocatedMemoryUsage == 0 ? 0 : data->maxRealAllocatedMemoryUsage;
+        size_t tmp_maxTotalMemoryUsage = globalizedThreadContention.maxTotalMemoryUsage == 0 ? 0 : data->maxTotalMemoryUsage;
 
         maxRealMemoryUsage += tmp_maxRealMemoryUsage;
         maxRealAllocatedMemoryUsage += tmp_maxRealAllocatedMemoryUsage;
         maxTotalMemoryUsage += tmp_maxTotalMemoryUsage;
     }
 
-    if (threadcontention_index > 0) {
-        fprintf (thrData.output, ">>> mutex_waits          %d\n", (int)(globalizedThreadContention.mutex_waits / threadcontention_index));
-        fprintf (thrData.output, ">>> mutex_wait_cycles    %d\n", (int)(globalizedThreadContention.mutex_wait_cycles / threadcontention_index));
-        fprintf (thrData.output, ">>> mutex_trylock_fails  %d\n", (int)(globalizedThreadContention.mutex_trylock_fails / threadcontention_index));
-        fprintf (thrData.output, ">>> mmap_waits           %d\n", (int)(globalizedThreadContention.mmap_waits / threadcontention_index));
-        fprintf (thrData.output, ">>> mmap_wait_cycles     %d\n", (int)(globalizedThreadContention.mmap_wait_cycles / threadcontention_index));
-        fprintf (thrData.output, ">>> sbrk_waits           %d\n", (int)(globalizedThreadContention.sbrk_waits / threadcontention_index));
-        fprintf (thrData.output, ">>> sbrk_wait_cycles     %d\n", (int)(globalizedThreadContention.sbrk_wait_cycles / threadcontention_index));
-        fprintf (thrData.output, ">>> madvise_waits        %d\n", (int)(globalizedThreadContention.madvise_waits / threadcontention_index));
-        fprintf (thrData.output, ">>> madvise_wait_cycles  %d\n", (int)(globalizedThreadContention.madvise_wait_cycles / threadcontention_index));
-        fprintf (thrData.output, ">>> munmap_waits         %d\n", (int)(globalizedThreadContention.munmap_waits / threadcontention_index));
-        fprintf (thrData.output, ">>> munmap_wait_cycles   %d\n", (int)(globalizedThreadContention.munmap_wait_cycles / threadcontention_index));
-        fprintf (thrData.output, ">>> mremap_waits         %d\n", (int)(globalizedThreadContention.mremap_waits / threadcontention_index));
-        fprintf (thrData.output, ">>> mremap_wait_cycles   %d\n", (int)(globalizedThreadContention.mremap_wait_cycles / threadcontention_index));
-        fprintf (thrData.output, ">>> mprotect_waits       %d\n", (int)(globalizedThreadContention.mprotect_waits / threadcontention_index));
-        fprintf (thrData.output, ">>> mprotect_wait_cycle  %d\n\n", (int)(globalizedThreadContention.mprotect_wait_cycles / threadcontention_index));
-        fprintf (thrData.output, ">>> critical_section_counter         %d\n", (int)(globalizedThreadContention.critical_section_counter / threadcontention_index));
-        fprintf (thrData.output, ">>> critical_section_duration        %d\n\n", (int)(globalizedThreadContention.critical_section_duration / threadcontention_index));
-    }
+        fprintf (thrData.output, ">>> mutex_waits                %lu\n",
+								globalizedThreadContention.mutex_waits);
+        fprintf (thrData.output, ">>> mutex_wait_cycles          %lu    (avg %.1f)\n",
+								globalizedThreadContention.mutex_wait_cycles,
+								((double)globalizedThreadContention.mutex_wait_cycles / safeDivisor(globalizedThreadContention.mutex_waits)));
+        fprintf (thrData.output, ">>> mutex_trylock_fails        %lu\n",
+								globalizedThreadContention.mutex_trylock_fails);
+        fprintf (thrData.output, ">>> mmap_waits                 %lu\n",
+								globalizedThreadContention.mmap_waits);
+        fprintf (thrData.output, ">>> mmap_wait_cycles           %lu    (avg %.1f)\n",
+								globalizedThreadContention.mmap_wait_cycles,
+								((double)globalizedThreadContention.mmap_wait_cycles / safeDivisor(globalizedThreadContention.mmap_waits)));
+        fprintf (thrData.output, ">>> sbrk_waits                 %lu\n",
+								globalizedThreadContention.sbrk_waits);
+        fprintf (thrData.output, ">>> sbrk_wait_cycles           %lu    (avg %.1f)\n",
+								globalizedThreadContention.sbrk_wait_cycles,
+								((double)globalizedThreadContention.sbrk_wait_cycles / safeDivisor(globalizedThreadContention.sbrk_waits)));
+        fprintf (thrData.output, ">>> madvise_waits              %lu\n",
+								globalizedThreadContention.madvise_waits);
+        fprintf (thrData.output, ">>> madvise_wait_cycles        %lu    (avg %.1f)\n",
+								globalizedThreadContention.madvise_wait_cycles,
+								((double)globalizedThreadContention.madvise_wait_cycles / safeDivisor(globalizedThreadContention.madvise_waits)));
+        fprintf (thrData.output, ">>> munmap_waits               %lu\n",
+								globalizedThreadContention.munmap_waits);
+        fprintf (thrData.output, ">>> munmap_wait_cycles         %lu    (avg %.1f)\n",
+								globalizedThreadContention.munmap_wait_cycles,
+								((double)globalizedThreadContention.munmap_wait_cycles / safeDivisor(globalizedThreadContention.munmap_waits)));
+        fprintf (thrData.output, ">>> mremap_waits               %lu\n",
+								globalizedThreadContention.mremap_waits);
+        fprintf (thrData.output, ">>> mremap_wait_cycles         %lu    (avg %.1f)\n",
+								globalizedThreadContention.mremap_wait_cycles,
+								((double)globalizedThreadContention.mremap_wait_cycles / safeDivisor(globalizedThreadContention.mremap_waits)));
+        fprintf (thrData.output, ">>> mprotect_waits             %lu\n",
+								globalizedThreadContention.mprotect_waits);
+        fprintf (thrData.output, ">>> mprotect_wait_cycle        %lu    (avg %.1f)\n\n",
+								globalizedThreadContention.mprotect_wait_cycles,
+								((double)globalizedThreadContention.mprotect_wait_cycles / safeDivisor(globalizedThreadContention.mprotect_waits)));
+        fprintf (thrData.output, ">>> critical_section_counter   %lu\n",
+								globalizedThreadContention.critical_section_counter);
+        fprintf (thrData.output, ">>> critical_section_duration  %lu    (avg %.1f)\n\n",
+								globalizedThreadContention.critical_section_duration,
+								((double)globalizedThreadContention.critical_section_duration / safeDivisor(globalizedThreadContention.critical_section_counter)));
 
     fprintf (thrData.output, "\n--------------------Total Memory Usage--------------------\n\n");
     fprintf (thrData.output, ">>> Thread Counter:\n");
-    fprintf (thrData.output, ">>> maxRealMemoryUsage           %lu\n", maxRealMemoryUsage);
-    fprintf (thrData.output, ">>> maxRealAllocatedMemoryUsage  %lu\n", maxRealAllocatedMemoryUsage);
-    fprintf (thrData.output, ">>> maxTotalMemoryUsage          %lu\n\n", maxTotalMemoryUsage);
+    fprintf (thrData.output, ">>> maxRealMemoryUsage           %zu\n", maxRealMemoryUsage);
+    fprintf (thrData.output, ">>> maxRealAllocatedMemoryUsage  %zu\n", maxRealAllocatedMemoryUsage);
+    fprintf (thrData.output, ">>> maxTotalMemoryUsage          %zu\n\n", maxTotalMemoryUsage);
     fprintf (thrData.output, ">>> Global Counter:\n");
-    fprintf (thrData.output, ">>> realMemoryUsage           %lu\n", max_mu.realMemoryUsage);
-    fprintf (thrData.output, ">>> realAllocatedMemoryUsage  %lu\n", max_mu.realAllocatedMemoryUsage);
-    fprintf (thrData.output, ">>> totalMemoryUsage          %lu\n", max_mu.totalMemoryUsage);
+    fprintf (thrData.output, ">>> realMemoryUsage              %zu\n", max_mu.realMemoryUsage);
+    fprintf (thrData.output, ">>> realAllocatedMemoryUsage     %zu\n", max_mu.realAllocatedMemoryUsage);
+    fprintf (thrData.output, ">>> totalMemoryUsage             %zu\n", max_mu.totalMemoryUsage);
 }
 
 #endif

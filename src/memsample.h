@@ -12,6 +12,7 @@
 #include <sys/mman.h>
 #include <atomic>
 
+#define CACHELINE_SIZE 64
 #define PAGESIZE 4096
 #define SAMPLING_PERIOD 500
 #define MMAP_PAGES 33	// must be in the form of 2^N + 1
@@ -119,52 +120,55 @@ typedef struct {
 
 typedef struct {            //struct for holding data about allocations
 
-    uint64_t numAllocationFaults;
-    uint64_t numDeallocationFaults;
+		ulong numAllocs;
+		ulong numAllocsFFL;
+		ulong numFrees;
 
-    uint64_t numAllocationTlbReadMisses;
-    uint64_t numAllocationTlbWriteMisses;
+		ulong numAllocationFaults;
+		ulong numDeallocationFaults;
 
-    uint64_t numDeallocationTlbReadMisses;
-    uint64_t numDeallocationTlbWriteMisses;
+		ulong numAllocationTlbReadMisses;
+		ulong numAllocationTlbWriteMisses;
 
-    uint64_t numAllocationCacheMisses;
-    uint64_t numDeallocationCacheMisses;
+		ulong numDeallocationTlbReadMisses;
+		ulong numDeallocationTlbWriteMisses;
 
-    uint64_t numAllocationCacheRefs;
-    uint64_t numDeallocationCacheRefs;
+		ulong numAllocationCacheMisses;
+		ulong numDeallocationCacheMisses;
 
-    uint64_t numAllocationInstrs;
-    uint64_t numDeallocationInstrs;
+		ulong numAllocationCacheRefs;
+		ulong numDeallocationCacheRefs;
 
-    uint64_t numAllocationFaultsFFL;
+		ulong numAllocationInstrs;
+		ulong numDeallocationInstrs;
 
-    uint64_t numAllocationTlbReadMissesFFL;
-    uint64_t numAllocationTlbWriteMissesFFL;
+		ulong numAllocationFaultsFFL;
 
-    uint64_t numAllocationCacheMissesFFL;
-    uint64_t numAllocationCacheRefsFFL;
-    uint64_t numAllocationInstrsFFL;
+		ulong numAllocationTlbReadMissesFFL;
+		ulong numAllocationTlbWriteMissesFFL;
 
-	uint threads;
-	uint num_pthread_mutex_locks;
-	uint num_trylock;
-	uint64_t total_time_wait;
-	size_t blowup_bytes;
+		ulong numAllocationCacheMissesFFL;
+		ulong numAllocationCacheRefsFFL;
+		ulong numAllocationInstrsFFL;
 
-	uint num_sbrk;
-	uint num_madvise;
-	uint malloc_mmaps;
-	uint total_mmaps;
+		uint threads;
+		uint num_pthread_mutex_locks;
+		uint num_trylock;
+		uint64_t total_time_wait;
+		size_t blowup_bytes;
 
-	uint size_sbrk;
-	uint blowup_allocations;
+		uint num_sbrk;
+		uint num_madvise;
+		uint malloc_mmaps;
 
-	uint64_t cycles_free;
-	uint64_t cycles_new;
-	uint64_t cycles_reused;
+		uint size_sbrk;
+		uint blowup_allocations;
 
-} thread_alloc_data;
+		uint64_t cycles_alloc;
+		uint64_t cycles_allocFFL;
+		uint64_t cycles_free;
+
+} __attribute__((__aligned__(CACHELINE_SIZE))) thread_alloc_data;
 
 int initPMU(void);
 void setupCounting(void);
