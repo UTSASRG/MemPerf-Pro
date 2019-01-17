@@ -343,6 +343,7 @@ void writeThreadContention() {
         globalizedThreadContention.mremap_waits += data->mremap_waits;
         globalizedThreadContention.mremap_wait_cycles += data->mremap_wait_cycles;
         globalizedThreadContention.mprotect_waits += data->mprotect_waits;
+        globalizedThreadContention.mprotect_cycles += data->mprotect_wait_cycles;
         globalizedThreadContention.critical_section_counter += data->critical_section_counter;
         globalizedThreadContention.critical_section_duration += data->critical_section_duration;
 
