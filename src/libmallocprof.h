@@ -5,6 +5,15 @@
 #include <signal.h>
 #include <limits.h>
 
+#define MAX(a,b) \
+    ({ __typeof__ (a) _a = (a); \
+     __typeof__ (b) _b = (b); \
+     _a > _b ? _a : _b; })
+#define MIN(a,b) \
+    ({ __typeof__ (a) _a = (a); \
+     __typeof__ (b) _b = (b); \
+     _a < _b ? _a : _b; })
+
 #define relaxed std::memory_order_relaxed
 #define acquire std::memory_order_acquire
 #define release std::memory_order_release
@@ -80,15 +89,6 @@ typedef struct {
 	std::atomic_uint allocations;
 } MmapTuple;
 
-/*
-typedef struct {
-    unsigned long numAccesses;
-    unsigned long numCacheOwnerConflicts;
-    unsigned long numCacheBytes;
-    unsigned long numPageBytes;
-} friendly_data;
-*/
-
 typedef struct {
 	std::atomic_size_t metadata;
 	std::atomic_size_t blowup;
@@ -115,6 +115,7 @@ typedef struct {
 	}
 } Overhead;
 
+/*
 typedef struct {
 	uint64_t faults = 0;
 	uint64_t tlb_read_misses = 0;
@@ -122,6 +123,7 @@ typedef struct {
 	uint64_t cache_misses = 0;
 	uint64_t instructions = 0;
 } PerfReadInfo;
+*/
 
 typedef struct {
 	unsigned long numAccesses = 0;
@@ -208,7 +210,7 @@ void getBlowup(size_t size, size_t classSize, bool*);
 void getMappingsUsage(size_t size, uint64_t address, size_t classSize);
 void getMetadata(size_t classSize);
 void getOverhead(size_t size, uint64_t address, size_t classSize, bool*);
-void getPerfCounts(PerfReadInfo*);
+void getPerfCounts(PerfReadInfo*, bool enableCounters);
 void globalizeTAD();
 void myFree (void* ptr);
 void* myMalloc (size_t size);

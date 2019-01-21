@@ -90,6 +90,14 @@ typedef struct {
 } thread_data;
 
 typedef struct {
+  uint64_t faults = 0;
+  uint64_t tlb_read_misses = 0;
+  uint64_t tlb_write_misses = 0;
+  uint64_t cache_misses = 0;
+  uint64_t instructions = 0;
+} PerfReadInfo;
+
+typedef struct {
   int perf_fd;
   int perf_fd2;
   uint64_t prev_head;
@@ -124,32 +132,28 @@ typedef struct {            //struct for holding data about allocations
 		ulong numAllocsFFL;
 		ulong numFrees;
 
-		ulong numAllocationFaults;
-		ulong numDeallocationFaults;
+		long numAllocationFaults;
+		long numDeallocationFaults;
 
-		ulong numAllocationTlbReadMisses;
-		ulong numAllocationTlbWriteMisses;
+		long numAllocationTlbReadMisses;
+		long numAllocationTlbWriteMisses;
 
-		ulong numDeallocationTlbReadMisses;
-		ulong numDeallocationTlbWriteMisses;
+		long numDeallocationTlbReadMisses;
+		long numDeallocationTlbWriteMisses;
 
-		ulong numAllocationCacheMisses;
-		ulong numDeallocationCacheMisses;
+		long numAllocationCacheMisses;
+		long numDeallocationCacheMisses;
 
-		ulong numAllocationCacheRefs;
-		ulong numDeallocationCacheRefs;
+		long numAllocationInstrs;
+		long numDeallocationInstrs;
 
-		ulong numAllocationInstrs;
-		ulong numDeallocationInstrs;
+		long numAllocationFaultsFFL;
 
-		ulong numAllocationFaultsFFL;
+		long numAllocationTlbReadMissesFFL;
+		long numAllocationTlbWriteMissesFFL;
 
-		ulong numAllocationTlbReadMissesFFL;
-		ulong numAllocationTlbWriteMissesFFL;
-
-		ulong numAllocationCacheMissesFFL;
-		ulong numAllocationCacheRefsFFL;
-		ulong numAllocationInstrsFFL;
+		long numAllocationCacheMissesFFL;
+		long numAllocationInstrsFFL;
 
 		uint threads;
 		uint num_pthread_mutex_locks;

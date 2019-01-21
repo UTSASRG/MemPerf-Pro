@@ -53,13 +53,29 @@ inline int create_perf_event(perf_event_attr * attr, int group) {
 }
 
 //get data from PMU and store it into the PerfReadInfo struct
-void getPerfCounts (PerfReadInfo * i) {
+void getPerfCounts (PerfReadInfo * i, bool enableCounters) {
 	#ifdef NO_PMU
 	#warning NO_PMU flag set -> sampling will be disabled
 	return;
 	#endif
 
 	if(!isCountingInit) {
+			return;
+	}
+
+	if(enableCounters) {
+			ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_RESET, 0);
+			//ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_RESET, 0);
+			//ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_RESET, 0);
+			//ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_RESET, 0);
+			//ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_RESET, 0);
+
+			//ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_ENABLE, 0);
+			//ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_ENABLE, 0);
+			//ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_ENABLE, 0);
+			//ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_ENABLE, 0);
+			//ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_ENABLE, 0);
+
 			return;
 	}
 
@@ -75,15 +91,15 @@ void getPerfCounts (PerfReadInfo * i) {
 	i->cache_misses = buffer.values[3].value;
 	i->instructions = buffer.values[4].value;
 
-	/*
-	// DEBUG OUTPUT
-	fprintf(stderr, "nr = %ld\n", buffer.nr);
-	fprintf(stderr, "  faults           = %ld\n", buffer.values[0].value);
-	fprintf(stderr, "  tlb read misses  = %ld\n", buffer.values[1].value);
-	fprintf(stderr, "  tlb write misses = %ld\n", buffer.values[2].value);
-	fprintf(stderr, "  cache misses     = %ld\n", buffer.values[3].value);
-	fprintf(stderr, "  instructions     = %ld\n", buffer.values[4].value);
-	*/
+
+	if(!enableCounters) {
+			ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_DISABLE, 0);
+			//ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_DISABLE, 0);
+			//ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_DISABLE, 0);
+			//ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_DISABLE, 0);
+			//ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_DISABLE, 0);
+	}
+
 }
 
 void doPerfCounterRead() {
@@ -91,7 +107,7 @@ void doPerfCounterRead() {
 	return;
 	#endif
 	PerfReadInfo perf;
-	getPerfCounts(&perf);
+	getPerfCounts(&perf, false);
 
 	ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_DISABLE, 0);
 	ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_DISABLE, 0);
@@ -161,8 +177,10 @@ void setupCounting(void) {
 
 	//Precise_ip: This controls the amount of skid. See perf_event.h
 	pe_fault.precise_ip = 1;
-	pe_fault.freq = 0;
-	pe_fault.sample_period = 10000;
+	pe_fault.freq = 1;
+	pe_fault.sample_freq = 10000;
+	//pe_fault.freq = 0;
+	//pe_fault.sample_period = 10000;
 
 	//Sample_id_all: TID, TIME, ID, STREAM_ID, and CPU added to every sample.
 	pe_fault.sample_id_all = 0;
