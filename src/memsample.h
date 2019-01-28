@@ -76,6 +76,7 @@ typedef struct {
 
 typedef struct {
     unsigned long numAccesses;
+    unsigned long numCacheWrites;
     unsigned long numCacheOwnerConflicts;
     unsigned long numCacheBytes;
     unsigned long numPageBytes;

@@ -243,8 +243,8 @@ void sampleMemoryOverhead(int, siginfo_t*, void*);
 void updateGlobalFriendlinessData();
 void calcAppFriendliness();
 
-inline ulong safeDivisor(ulong divisor) {
-	return (!divisor) ? 1 : divisor;
+inline double safeDivisor(ulong divisor) {
+	return (!divisor) ? 1.0 : (double)divisor;
 }
 
 #include "shadowmemory.hh"

@@ -98,7 +98,7 @@ class xthreadx {
 		result = current->startRoutine(current->startArg);
 		#ifndef NO_PMU
 		stopSampling();
-		doPerfCounterRead();
+		//doPerfCounterRead();
 		stopCounting();
 		#endif
 

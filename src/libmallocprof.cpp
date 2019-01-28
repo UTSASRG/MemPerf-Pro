@@ -389,7 +389,7 @@ void exitHandler() {
 
 	inRealMain = false;
 	#ifndef NO_PMU
-	doPerfCounterRead();
+	//doPerfCounterRead();
 	#endif
 
 	#warning Disabled smaps functionality (timer, file handle cleanup)
@@ -1277,35 +1277,35 @@ void writeAllocData () {
 }
 
 void writeThreadMaps () {
-	ulong numAllocs = safeDivisor(globalTAD.numAllocs);
-	ulong numAllocsFFL = safeDivisor(globalTAD.numAllocsFFL);
-	ulong numFrees = safeDivisor(globalTAD.numFrees);
+	double numAllocs = safeDivisor(globalTAD.numAllocs);
+	double numAllocsFFL = safeDivisor(globalTAD.numAllocsFFL);
+	double numFrees = safeDivisor(globalTAD.numFrees);
 
 	fprintf (thrData.output, "\n>>>>> NEW ALLOCATIONS : total (average) <<<<<\n");
-	fprintf (thrData.output, "allocation cycles               %lu (%0.1lf)\n", globalTAD.cycles_alloc, ((double) globalTAD.cycles_alloc / numAllocs));
-	fprintf (thrData.output, "allocation faults               %lu (%0.1lf)\n", globalTAD.numAllocationFaults, ((double) globalTAD.numAllocationFaults / numAllocs));
-	fprintf (thrData.output, "allocation tlb read misses      %lu (%0.1lf)\n", globalTAD.numAllocationTlbReadMisses, ((double) globalTAD.numAllocationTlbReadMisses / numAllocs));
-	fprintf (thrData.output, "allocation tlb write misses     %lu (%0.1lf)\n", globalTAD.numAllocationTlbWriteMisses, ((double) globalTAD.numAllocationTlbWriteMisses / numAllocs));
-	fprintf (thrData.output, "allocation cache misses         %lu (%0.1lf)\n", globalTAD.numAllocationCacheMisses, ((double) globalTAD.numAllocationCacheMisses / numAllocs));
-	fprintf (thrData.output, "num allocation instr            %lu (%0.1lf)\n", globalTAD.numAllocationInstrs, ((double) globalTAD.numAllocationInstrs / numAllocs));
+	fprintf (thrData.output, "allocation cycles               %lu (%0.1lf)\n", globalTAD.cycles_alloc, (globalTAD.cycles_alloc / numAllocs));
+	fprintf (thrData.output, "allocation faults               %lu (%0.1lf)\n", globalTAD.numAllocationFaults, (globalTAD.numAllocationFaults / numAllocs));
+	fprintf (thrData.output, "allocation tlb read misses      %lu (%0.1lf)\n", globalTAD.numAllocationTlbReadMisses, (globalTAD.numAllocationTlbReadMisses / numAllocs));
+	fprintf (thrData.output, "allocation tlb write misses     %lu (%0.1lf)\n", globalTAD.numAllocationTlbWriteMisses, (globalTAD.numAllocationTlbWriteMisses / numAllocs));
+	fprintf (thrData.output, "allocation cache misses         %lu (%0.1lf)\n", globalTAD.numAllocationCacheMisses, (globalTAD.numAllocationCacheMisses / numAllocs));
+	fprintf (thrData.output, "num allocation instr            %lu (%0.1lf)\n", globalTAD.numAllocationInstrs, (globalTAD.numAllocationInstrs / numAllocs));
 	fprintf (thrData.output, "\n");
 
 	fprintf (thrData.output, "\n>>>>> FREELIST ALLOCATIONS : total (average) <<<<<\n");
-	fprintf (thrData.output, "allocation cycles               %lu (%0.1lf)\n", globalTAD.cycles_allocFFL, ((double) globalTAD.cycles_allocFFL / numAllocsFFL));
-	fprintf (thrData.output, "allocation faults               %lu (%0.1lf)\n", globalTAD.numAllocationFaultsFFL, ((double) globalTAD.numAllocationFaultsFFL / numAllocsFFL));
-	fprintf (thrData.output, "allocation tlb read misses      %lu (%0.1lf)\n", globalTAD.numAllocationTlbReadMissesFFL, ((double) globalTAD.numAllocationTlbReadMissesFFL / numAllocsFFL));
-	fprintf (thrData.output, "allocation tlb write misses     %lu (%0.1lf)\n", globalTAD.numAllocationTlbWriteMissesFFL, ((double) globalTAD.numAllocationTlbWriteMissesFFL / numAllocsFFL));
-	fprintf (thrData.output, "allocation cache misses         %lu (%0.1lf)\n", globalTAD.numAllocationCacheMissesFFL, ((double) globalTAD.numAllocationCacheMissesFFL / numAllocsFFL));
-	fprintf (thrData.output, "num allocation instr            %lu (%0.1lf)\n", globalTAD.numAllocationInstrsFFL, ((double) globalTAD.numAllocationInstrsFFL / numAllocsFFL));
+	fprintf (thrData.output, "allocation cycles               %lu (%0.1lf)\n", globalTAD.cycles_allocFFL, (globalTAD.cycles_allocFFL / numAllocsFFL));
+	fprintf (thrData.output, "allocation faults               %lu (%0.1lf)\n", globalTAD.numAllocationFaultsFFL, (globalTAD.numAllocationFaultsFFL / numAllocsFFL));
+	fprintf (thrData.output, "allocation tlb read misses      %lu (%0.1lf)\n", globalTAD.numAllocationTlbReadMissesFFL, (globalTAD.numAllocationTlbReadMissesFFL / numAllocsFFL));
+	fprintf (thrData.output, "allocation tlb write misses     %lu (%0.1lf)\n", globalTAD.numAllocationTlbWriteMissesFFL, (globalTAD.numAllocationTlbWriteMissesFFL / numAllocsFFL));
+	fprintf (thrData.output, "allocation cache misses         %lu (%0.1lf)\n", globalTAD.numAllocationCacheMissesFFL, (globalTAD.numAllocationCacheMissesFFL / numAllocsFFL));
+	fprintf (thrData.output, "num allocation instr            %lu (%0.1lf)\n", globalTAD.numAllocationInstrsFFL, (globalTAD.numAllocationInstrsFFL / numAllocsFFL));
 	fprintf (thrData.output, "\n");
 
 	fprintf (thrData.output, "\n>>>>> DEALLOCATIONS : total (average) <<<<<\n");
-	fprintf (thrData.output, "deallocation cycles             %lu (%0.1lf)\n", globalTAD.cycles_free, ((double) globalTAD.cycles_free / numFrees));
-	fprintf (thrData.output, "deallocation faults             %lu (%0.1lf)\n", globalTAD.numDeallocationFaults, ((double) globalTAD.numDeallocationFaults / numFrees));
-	fprintf (thrData.output, "deallocation tlb read misses    %lu (%0.1lf)\n", globalTAD.numDeallocationTlbReadMisses, ((double) globalTAD.numDeallocationTlbReadMisses / numFrees));
-	fprintf (thrData.output, "deallocation tlb write misses   %lu (%0.1lf)\n", globalTAD.numDeallocationTlbWriteMisses, ((double) globalTAD.numDeallocationTlbWriteMisses / numFrees));
-	fprintf (thrData.output, "deallocation cache misses       %lu (%0.1lf)\n", globalTAD.numDeallocationCacheMisses, ((double) globalTAD.numDeallocationCacheMisses / numFrees));
-	fprintf (thrData.output, "num deallocation instr          %lu (%0.1lf)\n", globalTAD.numDeallocationInstrs, ((double) globalTAD.numDeallocationInstrs / numFrees));
+	fprintf (thrData.output, "deallocation cycles             %lu (%0.1lf)\n", globalTAD.cycles_free, (globalTAD.cycles_free / numFrees));
+	fprintf (thrData.output, "deallocation faults             %lu (%0.1lf)\n", globalTAD.numDeallocationFaults, (globalTAD.numDeallocationFaults / numFrees));
+	fprintf (thrData.output, "deallocation tlb read misses    %lu (%0.1lf)\n", globalTAD.numDeallocationTlbReadMisses, (globalTAD.numDeallocationTlbReadMisses / numFrees));
+	fprintf (thrData.output, "deallocation tlb write misses   %lu (%0.1lf)\n", globalTAD.numDeallocationTlbWriteMisses, (globalTAD.numDeallocationTlbWriteMisses / numFrees));
+	fprintf (thrData.output, "deallocation cache misses       %lu (%0.1lf)\n", globalTAD.numDeallocationCacheMisses, (globalTAD.numDeallocationCacheMisses / numFrees));
+	fprintf (thrData.output, "num deallocation instr          %lu (%0.1lf)\n", globalTAD.numDeallocationInstrs, (globalTAD.numDeallocationInstrs / numFrees));
 }
 
 void writeOverhead () {
@@ -1967,6 +1967,7 @@ void updateGlobalFriendlinessData() {
 		friendly_data * thrFriendlyData = &thrData.friendlyData;
 
 		__atomic_add_fetch(&globalFriendlyData.numAccesses, thrFriendlyData->numAccesses, __ATOMIC_SEQ_CST);
+		__atomic_add_fetch(&globalFriendlyData.numCacheWrites, thrFriendlyData->numCacheWrites, __ATOMIC_SEQ_CST);
 		__atomic_add_fetch(&globalFriendlyData.numCacheOwnerConflicts, thrFriendlyData->numCacheOwnerConflicts, __ATOMIC_SEQ_CST);
 		__atomic_add_fetch(&globalFriendlyData.numCacheBytes, thrFriendlyData->numCacheBytes, __ATOMIC_SEQ_CST);
 		__atomic_add_fetch(&globalFriendlyData.numPageBytes, thrFriendlyData->numPageBytes, __ATOMIC_SEQ_CST);
@@ -1981,6 +1982,7 @@ void updateGlobalFriendlinessData() {
 				fprintf(outfd, "tid %d : num sampled accesses = %ld\n", tid, thrFriendlyData->numAccesses);
 				fprintf(outfd, "tid %d : total cache bytes accessed = %ld\n", tid, thrFriendlyData->numCacheBytes);
 				fprintf(outfd, "tid %d : total page bytes accessed  = %ld\n", tid, thrFriendlyData->numPageBytes);
+				fprintf(outfd, "tid %d : num cache line writes      = %ld\n", tid, thrFriendlyData->numCacheWrites);
 				fprintf(outfd, "tid %d : num cache owner conflicts  = %ld\n", tid, thrFriendlyData->numCacheOwnerConflicts);
 				fprintf(outfd, "tid %d : avg. cache util = %0.4f\n", tid, avgCacheUtil);
 				fprintf(outfd, "tid %d : avg. page util  = %0.4f\n", tid, avgPageUtil);
@@ -1993,6 +1995,7 @@ void calcAppFriendliness() {
 		updateGlobalFriendlinessData();
 
 		unsigned long totalAccesses = __atomic_load_n(&globalFriendlyData.numAccesses, __ATOMIC_SEQ_CST);
+		unsigned long totalCacheWrites = __atomic_load_n(&globalFriendlyData.numCacheWrites, __ATOMIC_SEQ_CST);
 		unsigned long totalCacheOwnerConflicts = __atomic_load_n(&globalFriendlyData.numCacheOwnerConflicts, __ATOMIC_SEQ_CST);
 		unsigned long totalCacheBytes = __atomic_load_n(&globalFriendlyData.numCacheBytes, __ATOMIC_SEQ_CST);
 		unsigned long totalPageBytes = __atomic_load_n(&globalFriendlyData.numPageBytes, __ATOMIC_SEQ_CST);
@@ -2004,7 +2007,8 @@ void calcAppFriendliness() {
 		fprintf(outfd, "num sampled accesses       = %ld\n", totalAccesses);
 		fprintf(outfd, "total cache bytes accessed = %ld\n", totalCacheBytes);
 		fprintf(outfd, "total page bytes accessed  = %ld\n", totalPageBytes);
-		fprintf(outfd, "cache owner conflicts      = %ld\n", totalCacheOwnerConflicts);
+		fprintf(outfd, "cache line writes          = %ld\n", totalCacheWrites);
+		fprintf(outfd, "cache owner conflicts      = %ld (%7.4lf%%)\n", totalCacheOwnerConflicts, (totalCacheOwnerConflicts / safeDivisor(totalCacheWrites)));
 		fprintf(outfd, "avg. cache utilization     = %6.3f%%\n", (avgTotalCacheUtil * 100.0));
 		fprintf(outfd, "avg. page utilization      = %6.3f%%\n", (avgTotalPageUtil * 100.0));
 }

@@ -65,17 +65,16 @@ void getPerfCounts (PerfReadInfo * i, bool enableCounters) {
 
 	if(enableCounters) {
 			ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_RESET, 0);
-			//ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_RESET, 0);
-			//ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_RESET, 0);
-			//ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_RESET, 0);
-			//ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_RESET, 0);
+			ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_RESET, 0);
+			ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_RESET, 0);
+			ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_RESET, 0);
+			ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_RESET, 0);
 
-			//ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_ENABLE, 0);
+			ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_ENABLE, 0);
 			//ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_ENABLE, 0);
 			//ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_ENABLE, 0);
 			//ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_ENABLE, 0);
 			//ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_ENABLE, 0);
-
 			return;
 	}
 
@@ -90,7 +89,6 @@ void getPerfCounts (PerfReadInfo * i, bool enableCounters) {
 	i->tlb_write_misses = buffer.values[2].value;
 	i->cache_misses = buffer.values[3].value;
 	i->instructions = buffer.values[4].value;
-
 
 	if(!enableCounters) {
 			ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_DISABLE, 0);
@@ -115,6 +113,13 @@ void doPerfCounterRead() {
 	ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_DISABLE, 0);
 	ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_DISABLE, 0);
 
+	/*
+	// Commented this out because it doesn't work, particularly now that we are resetting/enabling/disabling
+	// the PMU counters between function calls, and thus we can no longer obtain a grand total of events
+	// from reading their counter values. Even prior to this changeover, only the main thread is producing an
+	// output file (at least with our default settings), and thus these totals would only apply to the core
+	// the main thread is running on. In fact, there is no reason to call this function anymore at all,
+	// other than to disable the counters (which should already be disabled at the time this is called).	-- SAS
 	if(thrData.output) {
 			fprintf(thrData.output, "\n");
 			fprintf(thrData.output, ">>> total page faults        %ld\n", perf.faults);
@@ -123,6 +128,7 @@ void doPerfCounterRead() {
 			fprintf(thrData.output, ">>> total cache misses       %ld\n", perf.cache_misses);
 			fprintf(thrData.output, ">>> total instructions       %ld\n", perf.instructions);
 	}
+	*/
 }
 
 void setupCounting(void) {

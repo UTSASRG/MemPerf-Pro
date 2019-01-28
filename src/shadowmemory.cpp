@@ -406,6 +406,7 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType)
 		/*
 			 typedef struct {
 			 unsigned long numAccesses;
+			 unsigned long numCacheWrites;
 			 unsigned long numCacheOwnerConflicts;
 			 unsigned long numCacheBytes;
 			 unsigned long numPageBytes;
@@ -419,6 +420,7 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType)
 		//bool isCacheOwnerConflict = false;
 
 		if(accessType == E_MEM_STORE) {
+				usageData->numCacheWrites++;
 				if(lineOwner != curThread) {
 						//isCacheOwnerConflict = true;
 						usageData->numCacheOwnerConflicts++;
