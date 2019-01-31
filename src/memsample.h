@@ -157,9 +157,10 @@ typedef struct {            //struct for holding data about allocations
 		long numAllocationInstrsFFL;
 
 		uint threads;
-		uint num_pthread_mutex_locks;
-		uint num_trylock;
-		uint64_t total_time_wait;
+		uint num_mutex_locks;
+		uint num_try_locks;
+		uint num_spin_locks;
+		uint num_spin_trylocks;
 		size_t blowup_bytes;
 
 		uint num_sbrk;

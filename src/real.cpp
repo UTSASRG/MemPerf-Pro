@@ -24,6 +24,9 @@ namespace RealX {
 	DEFINE_WRAPPER(pthread_mutex_lock);
 	DEFINE_WRAPPER(pthread_mutex_unlock);
 	DEFINE_WRAPPER(pthread_mutex_trylock);
+	DEFINE_WRAPPER(pthread_spin_lock);
+	DEFINE_WRAPPER(pthread_spin_unlock);
+	DEFINE_WRAPPER(pthread_spin_trylock);
   DEFINE_WRAPPER(madvise);
   DEFINE_WRAPPER(mprotect);
 
@@ -49,6 +52,9 @@ namespace RealX {
 		INIT_WRAPPER(pthread_mutex_lock, RTLD_NEXT);
 		INIT_WRAPPER(pthread_mutex_unlock, RTLD_NEXT);
 		INIT_WRAPPER(pthread_mutex_trylock, RTLD_NEXT);
+		INIT_WRAPPER(pthread_spin_lock, RTLD_NEXT);
+		INIT_WRAPPER(pthread_spin_unlock, RTLD_NEXT);
+		INIT_WRAPPER(pthread_spin_trylock, RTLD_NEXT);
 
 		realInitialized = true;
 	}

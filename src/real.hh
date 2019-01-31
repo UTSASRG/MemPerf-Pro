@@ -27,6 +27,9 @@ namespace RealX {
 	DECLARE_WRAPPER(pthread_mutex_lock);
 	DECLARE_WRAPPER(pthread_mutex_unlock);
 	DECLARE_WRAPPER(pthread_mutex_trylock);
+	DECLARE_WRAPPER(pthread_spin_lock);
+	DECLARE_WRAPPER(pthread_spin_unlock);
+	DECLARE_WRAPPER(pthread_spin_trylock);
   DECLARE_WRAPPER(madvise);
   DECLARE_WRAPPER(mprotect);
 };

@@ -557,11 +557,11 @@ PageMapEntry ** ShadowMemory::getMegaMapEntry(unsigned long mega_index) {
 
 		if(__builtin_expect(__atomic_load_n(mega_entry, __ATOMIC_RELAXED) == NULL, 0)) {
 				// Create a new page entries
-				pthread_spin_lock(&mega_map_lock);
+				RealX::pthread_spin_lock(&mega_map_lock);
 				if(__builtin_expect(__atomic_load_n(mega_entry, __ATOMIC_RELAXED) == NULL, 1)) {
 						__atomic_store_n(mega_entry, doPageMapBumpPointer(), __ATOMIC_RELAXED);
 				}
-				pthread_spin_unlock(&mega_map_lock);
+				RealX::pthread_spin_unlock(&mega_map_lock);
 		}
 
 		return mega_entry;
@@ -674,11 +674,11 @@ void CacheMapEntry::setOwner(pid_t new_owner) {
 CacheMapEntry * PageMapEntry::getCacheMapEntry(bool mvBumpPtr) {
 		if(mvBumpPtr && __builtin_expect(__atomic_load_n(&cache_map_entry, __ATOMIC_RELAXED) == NULL, 0)) {
 				// Create a new entries
-				pthread_spin_lock(&ShadowMemory::cache_map_lock);
+				RealX::pthread_spin_lock(&ShadowMemory::cache_map_lock);
 				if(__builtin_expect(__atomic_load_n(&cache_map_entry, __ATOMIC_RELAXED) == NULL, 1)) {
 						__atomic_store_n(&cache_map_entry, ShadowMemory::doCacheMapBumpPointer(), __ATOMIC_RELAXED);
 				}
-				pthread_spin_unlock(&ShadowMemory::cache_map_lock);
+				RealX::pthread_spin_unlock(&ShadowMemory::cache_map_lock);
 		}
 
 		return cache_map_entry;

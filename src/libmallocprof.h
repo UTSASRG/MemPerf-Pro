@@ -35,12 +35,24 @@
 
 pid_t gettid();
 
+typedef enum {
+		MUTEX,
+		SPINLOCK,
+		TRYLOCK,
+		SPIN_TRYLOCK
+} LockType;
+
 //Structures
 typedef struct {
 	pid_t tid = 0;
 	ulong mutex_waits = 0;
 	ulong mutex_wait_cycles = 0;
+	ulong spinlock_waits = 0;
+	ulong spinlock_wait_cycles = 0;
+	ulong mutex_trylock_waits = 0;
 	ulong mutex_trylock_fails = 0;
+	ulong spin_trylock_waits = 0;
+	ulong spin_trylock_fails = 0;
 	ulong mmap_waits = 0;
 	ulong mmap_wait_cycles = 0;
 	ulong sbrk_waits = 0;
@@ -115,16 +127,6 @@ typedef struct {
 	}
 } Overhead;
 
-/*
-typedef struct {
-	uint64_t faults = 0;
-	uint64_t tlb_read_misses = 0;
-	uint64_t tlb_write_misses = 0;
-	uint64_t cache_misses = 0;
-	uint64_t instructions = 0;
-} PerfReadInfo;
-*/
-
 typedef struct {
 	unsigned long numAccesses = 0;
 	unsigned long pageUtilTotal = 0;
@@ -132,8 +134,9 @@ typedef struct {
 } PerfAppFriendly;
 
 typedef struct LockContention {
-	int contention;
-	int maxContention;
+	std::atomic<int> contention;
+	std::atomic<int> maxContention;
+	LockType lockType;
 } LC;
 
 struct stack_frame {
@@ -199,7 +202,7 @@ size_t getClassSizeFor(size_t size);
 int num_used_pages(uintptr_t vstart, uintptr_t vend);
 void analyzePerfInfo(allocation_metadata *metadata);
 void analyzeAllocation(allocation_metadata *metadata);
-void calculateMemOverhead ();
+void calculateMemOverhead();
 void doBefore(allocation_metadata *metadata);
 void doAfter(allocation_metadata *metadata);
 void incrementMemoryUsage(size_t size, size_t new_touched_bytes, void * object);
@@ -221,12 +224,10 @@ void writeMappings();
 void writeOverhead();
 void writeThreadContention();
 void writeThreadMaps();
-LC* newLC ();
+LC* newLC(LockType lockType, int contention = 1);
 MmapTuple* newMmapTuple (uint64_t address, size_t length, int prot, char origin);
 ObjectTuple* newObjectTuple (uint64_t address, size_t size);
 Overhead* newOverhead();
-ThreadContention* newThreadContention (uint64_t);
-thread_alloc_data* newTad();
 allocation_metadata init_allocation(size_t sz, enum memAllocType type);
 size_t updateFreeCounters(void * address);
 short getClassSizeIndex(size_t size);
@@ -242,6 +243,7 @@ void start_smaps();
 void sampleMemoryOverhead(int, siginfo_t*, void*);
 void updateGlobalFriendlinessData();
 void calcAppFriendliness();
+const char * LockTypeToString(LockType type);
 
 inline double safeDivisor(ulong divisor) {
 	return (!divisor) ? 1.0 : (double)divisor;
