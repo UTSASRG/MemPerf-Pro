@@ -12,7 +12,7 @@ extern "C" void setThreadContention();
 extern "C" void printHashMap();
 //extern "C" pid_t gettid();
 void* myMalloc(size_t);
-void initMyLocalMem();
+extern void initMyLocalMem();
 
 thread_local extern uint64_t thread_stack_start;
 thread_local extern uint64_t myThreadID;

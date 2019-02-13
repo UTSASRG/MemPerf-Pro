@@ -494,6 +494,8 @@ extern "C" {
 		// using a memory mapped region. Once dlsym finishes, all future malloc
 		// requests will be fulfilled by RealX::malloc, which itself is a
 		// reference to the real malloc routine.
+		// Also, we can't call initializer() from here, because the initializer
+		// itself will call malloc().
 		if((profilerInitialized != INITIALIZED) || (!selfmapInitialized)) {
 			return myMalloc (sz);
 		}
@@ -687,10 +689,19 @@ extern "C" {
 	void * yyrealloc(void * ptr, size_t sz) {
 
 		if (!realInitialized) RealX::initializer();
-		if (profilerInitialized != INITIALIZED) {
-			if(ptr == NULL) return yymalloc(sz);
+		if((profilerInitialized != INITIALIZED) || (ptr >= (void *)myMem && ptr <= myMemEnd)) {
+			if(ptr == NULL) {
+					return yymalloc(sz);
+			}
+			int * metadata = (int *)ptr - 1;
+			unsigned old_size = *metadata;
+			if(sz <= old_size) {
+					return ptr;
+			}
+			void * new_obj = yymalloc(sz);
+			memcpy(new_obj, ptr, old_size);
 			yyfree(ptr);
-			return yymalloc(sz);
+			return new_obj;
 		}
 
 		if (!mapsInitialized) return RealX::realloc (ptr, sz);
@@ -1174,9 +1185,11 @@ void* myMalloc (size_t size) {
 
 	myMemLock.lock ();
 	void* p;
-	if((myMemPosition + size) < TEMP_MEM_SIZE) {
-		p = (void *)(myMem + myMemPosition);
-		myMemPosition += size;
+	if((myMemPosition + size + MY_METADATA_SIZE) < TEMP_MEM_SIZE) {
+		unsigned * metadata = (unsigned *)(myMem + myMemPosition);
+		*metadata = size;
+		p = (void *)(myMem + myMemPosition + MY_METADATA_SIZE);
+		myMemPosition += size + MY_METADATA_SIZE;
 		myMemAllocations++;
 	}
 	else {
