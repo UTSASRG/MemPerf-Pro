@@ -25,6 +25,18 @@ For bump-pointer allocators, such as the Glibc allocator, we confirms size class
 We differentiate the big objects and small objects. 
 
 \subsection{Profiling Memory Overhead}
+\texttt{maprof} profiles allocator memory overhead using three measures, each tracked both globally and per-thread. These measures are: maximum real memory usage, maximum real allocated memory usage, and maximum total memory usage.
+
+\subsubsection{Real Memory Usage}
+This value represents the amount of memory actually being used by the application. This is adjusted during runtime using the direct values requested by the application itself. For example, if the application performs a call to \texttt{malloc(454)}, then the ``real memory usage '' is correspondingly incremented by $454$.
+
+\subsubsection{Real Allocated Memory Usage}
+``Real allocated'' memory usage refers to the memory usage of the allocator, given that the user-requested size will often be placed in the nearest-fitting container, and thus will also contain some unused slack space. For example, given a call to \texttt{malloc(454)}, a power-of-two-style BIBOP allocator will utilize a 512-byte bag from which to satisfy this request. In this instance, the class size of the requested object, $512$, will be used to increment the ``real allocated'' memory usage counter.
+
+\subsubsection{Total Memory Usage}
+``Total memory usage'' refers to the total actual physical memory dedicated to backing the objects served from the heap. For example, 
+
+In order to track their maximal values, each time any of these measures is incremented, \texttt{maprof} will perform a check to determine whether the newly adjusted value exceeds the previously stored maximum value.
 
 \subsection{Profiling Scalability}
 

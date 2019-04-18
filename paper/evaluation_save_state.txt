@@ -1,0 +1,109 @@
+All allocators, 10 runs, ht off, SRG1:
+
+                   |                                                                                                  Time |                                                                                                  Size |
+Test name          | cmalloc224 |    pthread |      hoard |   tcmalloc |    omalloc | cmalloc221 |   jemalloc |  dieharder | cmalloc224 |    pthread |      hoard |   tcmalloc |    omalloc | cmalloc221 |   jemalloc |  dieharder |
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+aget               |       5.50 |       5.49 |       5.50 |       5.49 |       5.49 |       5.49 |       5.49 |       5.50 |       4982 |       4416 |      68174 |       9322 |       3407 |       4711 |      33195 |       5822 |
+blackscholes       |      60.89 |      60.52 |      60.52 |      60.85 |      61.35 |      60.58 |      61.20 |      61.19 |     627347 |     628103 |     647403 |     635214 |     628312 |     627813 |     640453 |     634200 |
+bodytrack          |      31.67 |      31.62 |      31.54 |      31.90 |      33.37 |      31.69 |      31.46 |      34.00 |      34526 |      34266 |     201742 |      41994 |      32318 |      34522 |      55996 |      42270 |
+canneal            |      61.48 |      61.35 |      57.03 |      57.54 |      67.15 |      61.52 |      60.39 |      92.84 |     966230 |     966256 |     857162 |     779726 |     828530 |     966215 |     965594 |    1158054 |
+dedup              |      12.67 |      12.51 |      10.23 |      10.58 |      23.35 |      16.53 |      10.39 |      27.64 |    1558874 |    1544115 |    2107986 |     905685 |    1031577 |    1710884 |    1687977 |    2107256 |
+facesim            |      89.20 |      89.06 |      90.21 |      91.12 |      91.05 |      88.59 |      87.73 |     101.41 |    2499812 |    2501287 |    3543776 |    2585988 |    2579716 |    2500269 |    2887186 |    3582350 |
+ferret             |       4.70 |       4.68 |       4.72 |       4.71 |       4.73 |       4.68 |       4.70 |       4.83 |      69086 |      68818 |     294836 |      79288 |      70388 |      70226 |      82326 |      94872 |
+fluidanimate       |      39.86 |      37.96 |      39.41 |      36.16 |      37.08 |      38.65 |      38.29 |      38.47 |     418554 |     418242 |     456146 |     427996 |     440655 |     418065 |     418066 |     475282 |
+freqmine           |      54.73 |      54.45 |      25.35 |      56.30 |      52.08 |      53.79 |      54.77 |     185.08 |    1507155 |    1506831 |     642414 |    1121526 |    1100256 |    1510505 |    1511559 |    1167073 |
+pbzip2             |       1.61 |       1.62 |       1.57 |       1.53 |       1.57 |       1.58 |       1.62 |       1.65 |     245152 |     244495 |     295654 |     274665 |     255081 |     244432 |     244572 |     252745 |
+pfscan             |      54.54 |      53.58 |      53.63 |      54.33 |      53.82 |      54.73 |      54.71 |      54.09 |     845453 |     845040 |     866451 |     852298 |     847792 |     844810 |     857540 |     849418 |
+raytrace           |      93.62 |      90.65 |      82.53 |      69.90 |      80.52 |      93.89 |      86.02 |     102.55 |    1162131 |    1162004 |    1568268 |    1115487 |    1110797 |    1161856 |    1665620 |    1722894 |
+streamcluster      |      53.67 |      54.02 |      55.44 |      53.93 |      54.17 |      53.57 |      55.45 |      54.01 |     116693 |     114473 |     139023 |     122510 |     114693 |     113747 |     122963 |     117356 |
+swaptions          |      37.48 |      36.89 |      40.90 |      38.13 |      99.22 |      37.45 |      36.81 |     163.43 |       9300 |       9860 |     165203 |      13770 |       7621 |      10120 |      42382 |      11508 |
+vips               |     116.78 |     116.67 |     115.89 |     115.71 |     119.32 |     116.79 |     116.35 |     121.99 |      31815 |      31504 |      59560 |      39450 |      32044 |      31791 |      40158 |      36086 |
+x264               |      50.64 |      50.66 |      50.77 |      50.46 |      50.45 |      50.66 |      50.28 |      50.92 |     498224 |     496521 |     552222 |     515456 |     517812 |     498261 |     609121 |     529431 |
+
+
+
+- Big challenge: no lock data for Hoard/DieHarder/etc.
+	- try changing spinlock to spinlock for tcmalloc 
+- Other challenge: comparing allocators based on pathway cycles/instructions doesn't really work.. maybe total instructions instead?
+	- change pmu counters to application overall rather than library
+- Small: implement pthread_exit
+- need tlb misses etc for total runtime
+- Change mmprof output so that there is a TOTAL global cycles value as well,
+	to make allocator comparisons easier
+- Add number of allocations and frees to each category in mmprof output
+- Several open questions:
+	- should we just use the totals of all allocation functions (free + two types of malloc)? I have been comparing these separately
+	- how should we compare lock usage between allocators?
+	- how do we address unexplainable differences? (i.e., tcmalloc's -23% on raytrace)
+
+
+
+Hoard:
+
+In general, Hoard performs more, but smaller capacity mmaps than the default
+allocator, resulting in an overall increase in time spent, but a lower per-call
+average.
+
+
+aget: performs 20% slower than default allocator.
+		Over 3x the number of new allocation path cycles.
+		We need to intercept pthread_exit in order to get proper values for
+			aget.
+		
+		
+canneal: performs 19% better than default.
+			30% fewer new allocation path cycles overall, with 35% fewer instructions on that same path.
+			66% fewer freelist-based allocation instructions, however only <1 % fewer cycles for that path.
+			18 mutex locks associated with the default allocator, producing >30m mutex waits for ~2.7b cycles.
+			Everything else basically similar.
+			Hoard did have 345 mmaps versus libc's 16, however the total number of wait cycles was only 10x more,
+			with a much smaller per-call average, and an absolute difference of ~20m cycles.
+			
+dedup: performs about 13% better then default.
+			In this case Hoard actually has a large 7.8x overhead in new allocation path cycles versus the default, as well as about 26x
+			the number of mmap wait cycles (actual difference = ~161m cycles).
+			However, libc makes up for this difference by having much worse thread contention data. Libc has
+			5,248,877 waits across 15 mutex locks (resulting in ~1.2b wait cycles, with 8 locks encountering contention at some point),
+			258 madvise calls, 787 munmap calls, and 242,379 mprotect calls.
+			Detractors: Hoard has a much larger number of cache owner conflicts (0.2416% vs 0.0082%), for a similar number of
+			accesses, as well as lower cache and page utilization (70.8%/63.821% vs 89.1%/84.4%, respectively).
+			
+raytrace: performs 12% better than default.
+			Similar to dedup, again in this case Hoard has an even larger 20x overhead in new allocation path cycles versus the default,
+			however, the vast majority of allocated objects come from the "object reuse" execution path (51 versus 45m).
+			
+
+
+tcmalloc:
+raytrace: performs 23% better than default.
+			tcmalloc used 442,615,818,615 cycles during execution, whereas libc utilized 475,129,278,043, a
+			difference of about 7%. 
+			Only possible explanation is lock usage/contention or optimized overall layout (tlb, cache, etc.)
+			
+
+\subsection{Issues Identified in Different Allocators}
+
+\paragraph{glibc-2.21:}
+This version of the default Linux allocator has a known bug which causes it to make excessively large number of \texttt{madvise} systems calls under certain memory use patterns. This is exhibited clearly under the dedup test of the PARSEC suite.
+	Using a non-buggy version of glibc (2.24), the allocator typically makes around $280$ calls to \texttt{madvise}, whereas the affected version (2.21) makes about $505,233$.
+	This phenomenon is seen clearly in the \texttt{num\_advise} and \texttt{madvise\_wait\_cycles} output fields in the log produced by \texttt{mmprof}.
+
+%\paragraph{glibc-2.24:}
+
+\paragraph{DieHarder:}
+DieHarder often performs much slower than other secure allocators, with some cases as high as $8x$ runtime overhead compared to the default Linux allocator. This can been attributed to several design elements of DieHarder, including its use of bitmaps to track heap objects, and the specific implementation details regarding how randomization is performed. Upon allocation, objects are chosen from a potentially large number of ``miniheaps'', without regard for the temporal locality of previously freed objects. Additionally, if the chosen object is currently in-use, the allocator will then continue to repeat this random selection process until it is success in locating an available object. These design decisions result in higher cache misses, as well as an increase in instruction count along allocation/deallocation pathways.
+As evidence for this, we can see the results of \texttt{mmprof}'s analysis of DieHarder when used to run the \texttt{dedup}, which runs about $3.4x$ slower as compared to glibc 2.24. \texttt{mmprof} reports a $320x$ increase in CPU cycles for newly allocated objects in DieHarder, as well as a $3.7x$ increase in cycles for reused objects, and a $7.7x$ increase in cycles for freed objects.
+While part of this increase is attributable to the over $16x$ increase in allocation instructions, there is also a large and noticeable difference between the number of mutex waits performed ($24x$), which corresponds to an increase of $1552x$ more cycles spent waiting on these mutex locks. While there were roughly the same number of critical sections entered by both allocators, DieHarder spent $26x$ longer within them than did glibc.
+Finally, there was significantly more cache line owner conflicts seen in DieHarder than in glibc (a ratio of about $14x$). Application friendliness data shows that DieHarder had significantly lower values for average cache and page utilization, about 45\% and 57\% lower, respectively.
+
+Next, in the case of freqmine, DieHarder performs $8.8x$ slower than glibc 2.24. \texttt{mmprof} reveals that in this case, DieHarder had $58x$ more CPU cycles spent within in the object-reuse allocation pathway, and $61x$ more cycles spent in the object deallocation path.
+	Additionally, we see $102x$ more read TLB misses along reused object allocation paths, and $188x$ more on deallocation paths.
+	
+	Further, we see $7091$ mmap system calls with DieHarder versus only 189 for glibc, as well as almost $10x$ mutex lock acquisitions, resulting in an enormous increase in the number of cycles spent waiting on these lock acquisitions (about 5 million times longer).
+	Finally, we see DieHarder with about $4x$ as many cache owner conflicts as in glibc.
+
+\paragraph{jemalloc:}
+During evaluation, the \texttt{reverse\_index} benchmark was found to perform approximately 21\% slower when paired with \texttt{jemalloc} versus the default Linux allocator. Upon inspection, we find that, with \texttt{jemalloc}, the program exhibited over $2x$ the number of CPU cycles associated with the deallocation execution path, as well as a 34\% increase in critical section duration (i.e., the cycles spent within outermost critical sections).
+
+\paragraph{TCMalloc:}
+Despite its BIBOP-style memory layout, \texttt{tcmalloc} typically performs very well, often performing as well or better than the default Linux allocator. However, in the case of \texttt{swaptions}, it produces a 21\% runtime overhead compared to glibc. Using \texttt{maprof}, we find that, in this instance the number of new allocation cycles, is $2.6x$ greater than that of glibc. We additionally see (albeit smaller) increases in the number of reused object allocation cycles as well as deallocation cycles.
