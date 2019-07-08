@@ -126,10 +126,10 @@ test/test-dieharder-thread: libmallocprof.so test/$(THREADTEST_FILE)
 
 # Libc
 test/test-xlibc: libmallocprof.so test/$(TEST_FILE)
-	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/richard/Memoryallocators/libc-2.24/libmalloc.so -o test/test-xlibc test/$(TEST_FILE)
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/sam/libc-2.24/libmalloc.so -o test/test-xlibc test/$(TEST_FILE)
 
 test/test-xlibc-thread: libmallocprof.so test/$(THREADTEST_FILE)
-	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/richard/Memoryallocators/libc-2.24/libmalloc.so -o test/test-xlibc-thread test/$(THREADTEST_FILE) -pthread
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/sam/libc-2.24/libmalloc.so -o test/test-xlibc-thread test/$(THREADTEST_FILE) -pthread
 
 # JeMalloc
 test/test-jemalloc-thread: libmallocprof.so test/$(THREADTEST_FILE)
@@ -137,7 +137,7 @@ test/test-jemalloc-thread: libmallocprof.so test/$(THREADTEST_FILE)
 
 #Parsec Black-Scholes multithreaded
 test/bs-libc: libmallocprof.so test/blackscholes-pthread.cpp
-	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/richard/Memoryallocators/libc-2.24/libmalloc.so -o test/bs-libc test/blackscholes-pthread.cpp -lpthread -DENABLE_THREADS
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/sam/libc-2.24/libmalloc.so -o test/bs-libc test/blackscholes-pthread.cpp -lpthread -DENABLE_THREADS
 
 test/bs-obsd: libmallocprof.so test/blackscholes-pthread.cpp
 	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/sam/Memoryallocators/OpenBSD-6.0/libomalloc.so -o test/bs-obsd test/blackscholes-pthread.cpp -lpthread -DENABLE_THREADS
@@ -150,7 +150,7 @@ test/bs-freeguard: libmallocprof.so test/blackscholes-pthread.cpp
 
 #tests for pmu accuracy
 test/pmu-libc-test: libmallocprof.so test/pmu-test.cpp
-	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/richard/Memoryallocators/libc-2.24/libmalloc.so -o test/pmu-libc-test test/pmu-test.cpp
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/sam/libc-2.24/libmalloc.so -o test/pmu-libc-test test/pmu-test.cpp
 
 test/pmu-obsd-test: libmallocprof.so test/pmu-test.cpp
 	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic /home/sam/Memoryallocators/OpenBSD-6.0/libomalloc.so -o test/pmu-obsd-test test/pmu-test.cpp

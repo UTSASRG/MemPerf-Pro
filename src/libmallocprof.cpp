@@ -114,6 +114,8 @@ std::atomic<uint> malloc_mmaps (0);
 std::atomic<std::size_t> size_sbrk (0);
 
 thread_local uint blowup_allocations = 0;
+thread_local unsigned long long total_cycles_start = 0;
+std::atomic<std::uint64_t> total_global_cycles (0);
 std::atomic<std::uint64_t> cycles_alloc (0);
 std::atomic<std::uint64_t> cycles_allocFFL (0);
 std::atomic<std::uint64_t> cycles_free (0);
@@ -352,6 +354,7 @@ __attribute__((constructor)) initStatus initializer() {
 	startSignalTimer();
 	*/
 
+	total_cycles_start = rdtscp();
 	inConstructor = false;
 	return profilerInitialized;
 }
@@ -388,6 +391,8 @@ void printMyMemUtilization () {
 void exitHandler() {
 
 	inRealMain = false;
+	unsigned long long total_cycles_end = rdtscp();
+	total_global_cycles += total_cycles_end - total_cycles_start;
 	#ifndef NO_PMU
 	//doPerfCounterRead();
 	#endif
@@ -1274,6 +1279,7 @@ void writeAllocData () {
 	fprintf(thrData.output, ">>> cycles_alloc               %20lu\n", cycles_alloc.load());
 	fprintf(thrData.output, ">>> cycles_allocFFL            %20lu\n", cycles_allocFFL.load());
 	fprintf(thrData.output, ">>> cycles_free                %20lu\n", cycles_free.load());
+	fprintf(thrData.output, ">>> total_global_cycles        %20lu\n", total_global_cycles.load());
 	//fprintf(thrData.output, ">>> alignment                %20zu\n", alignment);
 
 	// writeOverhead();
@@ -1568,6 +1574,7 @@ void decrementMemoryUsage(void* addr) {
 
   decrementGlobalMemoryAllocation(size, classSize);
 
+	#warning is this call really necessary?
   checkGlobalMemoryUsage();
 }
 

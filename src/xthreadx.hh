@@ -7,6 +7,8 @@
 #include "real.hh"
 
 extern thread_local thread_data thrData;
+extern thread_local unsigned long long total_cycles_start;
+extern std::atomic<std::uint64_t> total_global_cycles;
 
 extern "C" void setThreadContention();
 extern "C" void printHashMap();
@@ -35,10 +37,13 @@ class xthreadx {
 		children->startArg = arg;
 		children->startRoutine = fn;
 
+		total_cycles_start = rdtscp();
 		int result = RealX::pthread_create(tid, attr, xthreadx::startThread, (void *)children);
 		if(result) {
 			fprintf(stderr, "error: pthread_create failed: %s\n", strerror(errno));
 		}
+		unsigned long long total_cycles_end = rdtscp();
+		total_global_cycles += total_cycles_end - total_cycles_start;
 
 		return result;
 	}
