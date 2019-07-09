@@ -32,9 +32,6 @@ extern bool mapsInitialized;
 extern bool selfmapInitialized;
 extern initStatus profilerInitialized;
 
-extern const bool d_mmap;
-extern const bool d_mprotect;
-
 extern MemoryUsage max_mu;
 
 extern HashMap <uint64_t, MmapTuple*, spinlock> mappings;
@@ -289,8 +286,6 @@ void * yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offs
 
   //If this thread currently doing an allocation
   if (inAllocation) {
-    if (d_mmap) printf ("mmap direct from allocation function: length= %zu, prot= %d\n", length, prot);
-
     malloc_mmaps++;
     localTAD.malloc_mmaps++;
     current_tc->mmap_waits++;
@@ -301,7 +296,6 @@ void * yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offs
 	// Need to check if selfmap.getInstance().getTextRegions() has
 	// ran. If it hasn't, we can't call isAllocatorInCallStack()
   } else if(selfmapInitialized && isAllocatorInCallStack()) {
-    if(d_mmap) printf ("mmap allocator in callstack: length= %zu, prot= %d\n", length, prot);
     mappings.insert(address, newMmapTuple(address, length, prot, 's'));
   }
 

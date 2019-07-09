@@ -79,25 +79,6 @@ unsigned timer_sec = 1;
 int num_class_sizes;
 size_t* class_sizes;
 
-//Debugging flags DEBUG
-const bool d_malloc_info = false;
-const bool d_mprotect = false;
-const bool d_mmap = false;
-const bool d_class_sizes = false;
-const bool d_pmuData = false;
-const bool d_write_tad = true;
-const bool d_readFile = false;
-const bool d_initLocal = false;
-const bool d_initGlobal = false;
-const bool d_getBlowup = false;
-const bool d_updateCounters = false;
-const bool d_myLocalMalloc = false;
-const bool d_initMyLocalBuffer = false;
-const bool d_checkSizes = false;
-const bool d_myMemUsage = false;
-const bool d_dumpHashmaps = false;
-const bool d_trace = false;
-
 //Atomic Globals ATOMIC
 std::atomic_bool mmap_active(false);
 std::atomic_bool sbrk_active(false);
@@ -222,7 +203,6 @@ __attribute__((constructor)) initStatus initializer() {
 	
 	profilerInitialized = IN_PROGRESS;
 
-	if (d_myMemUsage) fprintf(stderr, "Entering constructor..\n");
 	inConstructor = true;
 
 	// Ensure we are operating on a system using 64-bit pointers.
@@ -311,7 +291,6 @@ __attribute__((constructor)) initStatus initializer() {
 
 			size_t cs = class_sizes[i];
 
-			if (d_class_sizes) printf ("hashmap entry %d key is %zu\n", i, cs);
 			fprintf (thrData.output, "%zu ", cs);
 			overhead.insert(cs, newOverhead());
 		}
@@ -326,10 +305,6 @@ __attribute__((constructor)) initStatus initializer() {
 	}
 
 	profilerInitialized = INITIALIZED;
-	if (d_myMemUsage) {
-		printMyMemUtilization();
-		fprintf(stderr, "Leaving constructor..\n\n");
-	}
 
 	smaps_buffer = (char*) myMalloc(smaps_bufferSize);
 	sprintf(smaps_fileName, "/proc/%d/smaps", pid);
@@ -676,7 +651,9 @@ extern "C" {
 		localTAD.numDeallocationCacheMisses += allocData.after.cache_misses - allocData.before.cache_misses;
 		localTAD.numDeallocationInstrs += allocData.after.instructions - allocData.before.instructions;
 
-		if (((allocData.after.instructions - allocData.before.instructions) != 0) && d_pmuData){
+		/*
+		// DEBUG BLOCK
+		if((allocData.after.instructions - allocData.before.instructions) != 0) {
 			fprintf(stderr, "Free from thread %d\n"
 					"Num faults:              %ld\n"
 					"Num TLB read misses:     %ld\n"
@@ -689,6 +666,7 @@ extern "C" {
 					allocData.after.cache_misses - allocData.before.cache_misses,
 					allocData.after.instructions - allocData.before.instructions);
 		}
+		*/
 	}
 
 	void * yyrealloc(void * ptr, size_t sz) {
@@ -946,7 +924,6 @@ size_t updateFreeCounters(void * address) {
 			short class_size_index = getClassSizeIndex(size);
 			localFreeArray[class_size_index]++;
 			globalFreeArray[class_size_index]++;
-			if (d_updateCounters) printf ("globalFreeArray[%d]++\n", class_size_index);
 	} else {
 		size_t size = malloc_usable_size(address);
 		current_class_size = size;
@@ -1038,7 +1015,6 @@ void getBlowup (size_t size, size_t classSize, bool* reused) {
 			*reused = true;
 			localFreeArray[class_size_index]--;
 			if (globalFreeArray[class_size_index] > 0) globalFreeArray[class_size_index]--;
-			if (d_getBlowup) printf ("I have free. globalFreeArray[%d]--\n", class_size_index);
 			return;
 		}
 
@@ -1049,7 +1025,6 @@ void getBlowup (size_t size, size_t classSize, bool* reused) {
 			//Log this as blowup. Don't return
 
 			globalFreeArray[class_size_index]--;
-			if (d_getBlowup) printf ("I don't have free. globalFreeArray[%d]--\n", class_size_index);
 		}
 		//I don't have free objects, and no one else does either
 		else return;
@@ -1269,7 +1244,6 @@ void globalizeTAD() {
 }
 
 void writeAllocData () {
-	if (d_trace) fprintf(stderr, "Entering writeAllocData()\n");
 
 	fprintf(thrData.output, ">>> malloc_mmaps               %20u\n", malloc_mmaps.load());
 	fprintf(thrData.output, ">>> large_object_threshold     %20zu\n", large_object_threshold);
@@ -1285,8 +1259,8 @@ void writeAllocData () {
 	// writeOverhead();
 
 	// writeMappings();
+	writeThreadMaps();
 
-	if (d_write_tad) writeThreadMaps();
 	writeThreadContention();
 
 	fflush (thrData.output);
@@ -1346,7 +1320,6 @@ void writeOverhead () {
 
 void writeContention () {
 
-		if(d_trace) fprintf(stderr, "Entering writeContention()\n");
 		fprintf(thrData.output, "\n>>>>>>>>>>>>>>>>>>>>>>>>> Detailed Lock Usage <<<<<<<<<<<<<<<<<<<<<<<<<\n");
 		for(auto lock : lockUsage) {
 				LC * data = lock.getData();
@@ -1603,7 +1576,9 @@ void collectAllocMetaData(allocation_metadata *metadata) {
 void analyzePerfInfo(allocation_metadata *metadata) {
 	collectAllocMetaData(metadata);
 
-	if (metadata->after.instructions - metadata->before.instructions != 0 && d_pmuData){
+	/*
+	// DEBUG BLOCK
+	if((metadata->after.instructions - metadata->before.instructions) != 0) {
 		fprintf(stderr, "Malloc from thread       %d\n"
 				"From free list:          %s\n"
 				"Num faults:              %ld\n"
@@ -1618,6 +1593,7 @@ void analyzePerfInfo(allocation_metadata *metadata) {
 				metadata->after.cache_misses - metadata->before.cache_misses,
 				metadata->after.instructions - metadata->before.instructions);
 	}
+	*/
 }
 
 void readAllocatorFile() {
@@ -1635,55 +1611,35 @@ void readAllocatorFile() {
 
 	while ((getline(&buffer, &bufferSize, infile)) > 0) {
 
-		if (d_readFile) printf ("buffer= %s\n", buffer);
-
 		token = strtok(buffer, " ");
-		if (d_readFile) printf ("token= %s\n", token);
 
 		if ((strcmp(token, "style")) == 0) {
-			if (d_readFile) printf ("token matched style\n");
 
 			token = strtok(NULL, " ");
 
-			if (d_readFile) printf ("styleToken= %s\n", token);
-
 			if ((strcmp(token, "bibop\n")) == 0) {
-				if (d_readFile) printf ("styleToken matched bibop\n");
 				bibop = true;
-			}
-			else {
+			} else {
 				bumpPointer = true;
-				if (d_readFile) printf ("styleToken matched bump_pointer\n");
 			}
 			continue;
-		}
-
-		else if ((strcmp(token, "class_sizes")) == 0) {
-			if (d_readFile) printf ("token matched class_sizes\n");
+		} else if ((strcmp(token, "class_sizes")) == 0) {
 
 			token = strtok(NULL, " ");
 			num_class_sizes = atoi(token);
-			if (d_readFile) printf ("num_class_sizes= %d\n", num_class_sizes);
 
 			class_sizes = (size_t*) myMalloc (num_class_sizes*sizeof(size_t));
 
 			for (int i = 0; i < num_class_sizes; i++) {
 				token = strtok(NULL, " ");
 				class_sizes[i] = (size_t) atoi(token);
-				if (d_readFile) printf ("class_sizes[%d]= %zu\n", i, class_sizes[i]);
 			}
 			continue;
-		}
-
-		else if ((strcmp(token, "large_object_threshold")) == 0) {
-			if (d_readFile) printf ("token matched large_object_threshold\n");
+		} else if ((strcmp(token, "large_object_threshold")) == 0) {
 			token = strtok(NULL, " ");
 			large_object_threshold = (size_t) atoi(token);
-			if (d_readFile) printf ("large_object_threshold= %zu\n", large_object_threshold);
 			continue;
 		}
-
-		if (d_readFile) printf ("\n");
 	}
 
 	myFree(buffer);
@@ -1692,24 +1648,18 @@ void readAllocatorFile() {
 void initLocalFreeArray () {
 	if (bibop) {
 		localFreeArray = (unsigned*) myMalloc(num_class_sizes*sizeof(unsigned));
-	}
-
-	else {
+	} else {
 		localFreeArray = (unsigned*) myMalloc(2*sizeof(unsigned));
 	}
-	if (d_initLocal) printf ("tid %zu - initLocalFreeArray\n", pthread_self());
 	localFreeArrayInitialized = true;
 }
 
 void initGlobalFreeArray () {
 	if (bibop) {
 		globalFreeArray = (std::atomic<unsigned>*) myMalloc(num_class_sizes*sizeof(unsigned));
-	}
-
-	else {
+	} else {
 		globalFreeArray = (std::atomic<unsigned>*) myMalloc(2*sizeof(unsigned));
 	}
-	if (d_initGlobal) printf ("initGlobalFreeArray\n");
 }
 
 void* myLocalMalloc(size_t size) {
@@ -1726,7 +1676,6 @@ void* myLocalMalloc(size_t size) {
 		dumpHashmaps();
 		abort();
 	}
-	if (d_myLocalMalloc) fprintf (stderr, "Thread %lu: new local allocation. Total %lu\n", myThreadID, myLocalAllocations);
 	return p;
 }
 
@@ -1744,7 +1693,6 @@ void initMyLocalMem() {
 		fprintf (stderr, "Thread %lu failed to mmap myLocalMem\n", myThreadID);
 		abort();
 	}
-	if (d_initMyLocalBuffer) fprintf (stderr, "Thread %lu localBuffer address is %p\n", myThreadID, myLocalMem);
 	myLocalMemEnd = (void*) ((char*)myLocalMem + LOCAL_BUF_SIZE);
 	myLocalPosition = 0;
 	myLocalMemInitialized = true;
