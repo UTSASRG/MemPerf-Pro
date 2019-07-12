@@ -18,6 +18,7 @@ namespace RealX {
 	DEFINE_WRAPPER(posix_memalign);
 	DEFINE_WRAPPER(pthread_create);
 	DEFINE_WRAPPER(pthread_join);
+	DEFINE_WRAPPER(pthread_exit);
 	DEFINE_WRAPPER(mmap);
 	DEFINE_WRAPPER(munmap);
 	DEFINE_WRAPPER(mremap);
@@ -49,6 +50,7 @@ namespace RealX {
     INIT_WRAPPER(mprotect, RTLD_NEXT);
 		INIT_WRAPPER(pthread_create, RTLD_NEXT);
 		INIT_WRAPPER(pthread_join, RTLD_NEXT);
+		INIT_WRAPPER(pthread_exit, RTLD_NEXT);
 		INIT_WRAPPER(pthread_mutex_lock, RTLD_NEXT);
 		INIT_WRAPPER(pthread_mutex_unlock, RTLD_NEXT);
 		INIT_WRAPPER(pthread_mutex_trylock, RTLD_NEXT);

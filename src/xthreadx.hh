@@ -118,4 +118,21 @@ class xthreadx {
 
 		return result;
 	}
+
+  static void threadExit() {
+    #ifndef NO_PMU
+    stopSampling();
+    //doPerfCounterRead();
+    stopCounting();
+    #endif
+
+    // Replicate this thread's application friendliness data before it exits.
+    updateGlobalFriendlinessData();
+
+    if(thrData.output) {
+      fclose(thrData.output);
+    }
+
+    globalizeTAD();
+	}
 };

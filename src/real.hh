@@ -21,6 +21,7 @@ namespace RealX {
 	DECLARE_WRAPPER(posix_memalign);
 	DECLARE_WRAPPER(pthread_create);
 	DECLARE_WRAPPER(pthread_join);
+	DECLARE_WRAPPER(pthread_exit);
 	DECLARE_WRAPPER(mmap);
 	DECLARE_WRAPPER(munmap);
 	DECLARE_WRAPPER(mremap);

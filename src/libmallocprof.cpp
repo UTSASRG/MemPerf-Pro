@@ -868,8 +868,15 @@ extern "C" {
 		if (!realInitialized) RealX::initializer();
 
 		int result = RealX::pthread_join (thread, retval);
-        //fprintf(stderr, "Thread: %lX\n", thread);
 		return result;
+	}
+
+	// PTHREAD_EXIT
+	void pthread_exit(void *retval) {
+		if (!realInitialized) RealX::initializer();
+
+		xthreadx::threadExit();
+		RealX::pthread_exit(retval);
 	}
 }//End of extern "C"
 
