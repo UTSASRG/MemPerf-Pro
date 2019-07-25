@@ -1,8 +1,16 @@
 \section{Overview}
 
-\MP{} is designed as a drop-in library that can be simply linked to applications (and allocators), without the requirement of changing the code or even re-compilation. Although \MP{} could employ the binary-instrumentation to perform a more detailed profiling, such as identifying the instructions within each allocation or deallocation, the binary instrumentation may impose prohibitive performance overhead. With a high overhead, the profiling results may be significantly skewed, such as the waiting time of each lock acquisition inside the allocation. Instead, \MP{} employs the PMU hardware, RDTSC timestamp hardware, and simple counters together to perform the profiling.  
+\MP{} is designed as a drop-in library that can be simply linked to applications (and allocators) with the preloading mechanism, which does not require the changing of the code or re-compilation. %Although \MP{} may employ the binary instrumentation to perform a more detailed profiling, such as identifying the instructions within each allocation or deallocation, the binary instrumentation may impose prohibitive performance overhead. With a high overhead, the profiling results may be significantly skewed, such as the waiting time of each lock acquisition inside the allocation. Instead, \MP{} employs the PMU hardware, RDTSC timestamp hardware, and simple counters together to perform the profiling.  
+As shown in Figure~\ref{fig:basicidea}, \MP{} intercepts the interfaces between the memory allocator with other components of the system, such as applications, the OS (e.g.,  memory related system calls), and the pthreads library (e.g., synchronizations). At the same time, \MP{} also employs  hardware performance counters to collect more detailed information about memory accesses, such as cache misses or TLB misses. 
  
-As described above, \MP{} focuses on two aspects of the allocator, the allocator itself and its potential impact on applications (application friendliness). In order to adapt to different allocators, a small program is designed to collect the allocator's specific feature, such as the type of allocators, the size class information, or others. 
+\begin{figure}[!ht]
+\centering
+\includegraphics[width=3.3in]{figures/basicidea}
+\caption{Basic Idea of mmprof\label{fig:basicidea}}
+\end{figure}
+
+Overall, \MP{} focuses on the allocator itself and its potential impact on applications (called as ``application friendliness''). These two factors, when combined together, explain the performance difference when an application is integrated with different allocators. \MP{} will also assist the allocator designer to identify the potential  design issue, without writing a specialized profiler. 
+%In order to adapt to different allocators, a small program is designed to collect the allocator's specific feature, such as the type of allocators, the size class information, or others. 
 
 In the remainder of this section, we describe the profiled items for each category, and the basic idea of profiling. 
 
@@ -26,7 +34,7 @@ In order to support multithreaded applications, most allocators typically suppor
 \subsubsection{Performance Monitoring Units}
 \label{sec:pmu}
 
-Hardware performance monitor units (PMU), ubiquitous in modern architectures~\cite{AMDIBS:07, IntelArch:PEBS:Sept09, armpmu}, can be employed to sample memory accesses or hardware-related activities~\cite{DBLP:conf/sc/ItzkowitzWAK03, ibs-sc, ibs-pact, Sheng:2011:RLN:1985793.1985848, LASER, Cheetah}. For hardware-related events, it could collect the number of events, such as the number of retired instructions, page faults, TLB load/store misses. Also, it could sample the detailed information about memory loads and stores, such as IP, timestamps, and memory addresses. Currently, the Linux kernel has supported PMUs starting from 2009 (Linux-2.6.31)~\cite{pmulinuxsupport}, where users could set up performance monitoring via  the \texttt{perf\_event\_open} system call. After collecting events, the user program could fetch these events. 
+Hardware Performance Monitor Units (PMU), ubiquitous in modern architectures~\cite{AMDIBS:07, IntelArch:PEBS:Sept09, armpmu}, can be employed to sample memory accesses or hardware-related activities~\cite{DBLP:conf/sc/ItzkowitzWAK03, ibs-sc, ibs-pact, Sheng:2011:RLN:1985793.1985848, LASER, Cheetah}. For hardware-related events, it could collect the number of events, such as the number of retired instructions, page faults, TLB load/store misses. Also, it could sample the detailed information about memory loads and stores, such as IP, timestamps, and memory addresses. Currently, the Linux kernel has supported PMUs starting from 2009 (Linux-2.6.31)~\cite{pmulinuxsupport}, where users could set up performance monitoring via  the \texttt{perf\_event\_open} system call. After collecting events, the user program could fetch these events. 
 
 \subsubsection{Time-Stamp Counter}
 
@@ -94,8 +102,6 @@ That is, we could compute the metadata overhead if we could know the total overh
 
 For memory overhead, programmers only care about the time with the maximum overhead. To achieve this, \MP{} periodically gets the data about the memory overhead, but only shows the data with the maximum overhead to programmers.  
  
-%How much memory are due to memory re-utilization rate? For instance, we may not fully utilize the memory due to the randomization mechanism. We only care about physical memory waste. Then we should also investigate how much memory has been explicitly returned back to the OS. How much memory are due to the metadata itself? 
-
 \subsubsection{Scalability Analysis} 
 
 \MP{} profiles the scalability issues of allocators as well. Since the contention is the major reason that could significantly affect the scalability of applications, \MP{} focuses on both user-space contention and kernel-space contention. 
