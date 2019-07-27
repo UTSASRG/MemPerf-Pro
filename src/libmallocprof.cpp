@@ -873,12 +873,17 @@ extern "C" {
 
 	// PTHREAD_EXIT
 	void pthread_exit(void *retval) {
-		if (!realInitialized) RealX::initializer();
+		if(!realInitialized) {
+				RealX::initializer();
+		}
 
 		xthreadx::threadExit();
 		RealX::pthread_exit(retval);
+
+		// We should no longer be here, as pthread_exit is marked [[noreturn]]
+		abort();
 	}
-}//End of extern "C"
+} // End of extern "C"
 
 void * operator new (size_t sz) {
 	return yymalloc(sz);
