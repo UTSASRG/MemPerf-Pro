@@ -344,6 +344,8 @@ unsigned ShadowMemory::cleanupPages(uintptr_t uintaddr, size_t length) {
 }
 
 void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType) {
+		/*
+		// Only used for debug output (see end of function below)
 		const char * strAccessType;
 		switch(accessType) {
 				case E_MEM_NONE:
@@ -367,6 +369,7 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType)
 				default:
 						strAccessType = "no_match";
 		}
+		*/
 
 		PageMapEntry * pme;
 		CacheMapEntry * cme;

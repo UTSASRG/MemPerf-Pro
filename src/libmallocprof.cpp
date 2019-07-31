@@ -194,6 +194,16 @@ extern "C" {
 				alias("yyposix_memalign")));
 }
 
+ inline void PMU_init_check() {
+    #ifndef NO_PMU
+    // If the PMU sampler has not yet been set up for this thread, set it up now
+    if(__builtin_expect(!PMUinit, false)) {
+      initPMU();
+      PMUinit = true;
+    }
+    #endif
+ }
+
 // Constructor
 __attribute__((constructor)) initStatus initializer() {
 
@@ -369,6 +379,8 @@ void exitHandler() {
 	unsigned long long total_cycles_end = rdtscp();
 	total_global_cycles += total_cycles_end - total_cycles_start;
 	#ifndef NO_PMU
+	stopSampling();
+
 	//doPerfCounterRead();
 	#endif
 
@@ -427,13 +439,7 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
 	// Register our cleanup routine as an on-exit handler.
 	atexit(exitHandler);
 
-	#ifndef NO_PMU
-	// If the PMU sampler has not yet been set up for this thread, set it up now
-	if(!PMUinit){
-		initPMU();
-		PMUinit = true;
-	}
-	#endif
+	PMU_init_check();
 
 	inRealMain = true;
 	int result = real_main_mallocprof (argc, argv, envp);
@@ -488,13 +494,7 @@ extern "C" {
 		//thread_local
 		inAllocation = true;
 
-		#ifndef NO_PMU
-		// If the PMU sampler has not yet been set up for this thread, set it up now
-		if(!PMUinit){
-			initPMU();
-			PMUinit = true;
-		}
-		#endif
+		PMU_init_check();
 
 		if (!localFreeArrayInitialized) initLocalFreeArray();
 
@@ -544,13 +544,7 @@ extern "C" {
 
 		if (!inRealMain) return RealX::calloc (nelem, elsize);
 
-		// if the PMU sampler has not yet been set up for this thread, set it up now
-		#ifndef NO_PMU
-		if(!PMUinit){
-			initPMU();
-			PMUinit = true;
-		}
-		#endif
+		PMU_init_check();
 
 		// thread_local
 		inAllocation = true;
@@ -603,13 +597,7 @@ extern "C" {
 			return;
 		}
 
-		//if the PMU sampler has not yet been set up for this thread, set it up now
-		#ifndef NO_PMU
-		if(!PMUinit){
-			initPMU();
-			PMUinit = true;
-		}
-		#endif
+		PMU_init_check();
 
 		//thread_local
 		inAllocation = true;
@@ -691,13 +679,7 @@ extern "C" {
 		if (inAllocation) return RealX::realloc (ptr, sz);
 		if (!inRealMain) return RealX::realloc (ptr, sz);
 
-		//if the PMU sampler has not yet been set up for this thread, set it up now
-		#ifndef NO_PMU
-		if(!PMUinit){
-			initPMU();
-			PMUinit = true;
-		}
-		#endif
+		PMU_init_check();
 
 		//Data we need for each allocation
 		allocation_metadata allocData = init_allocation(sz, REALLOC);
@@ -761,13 +743,7 @@ extern "C" {
     //thread_local
     inAllocation = true;
 
-    #ifndef NO_PMU
-    // If the PMU sampler has not yet been set up for this thread, set it up now
-    if(!PMUinit){
-      initPMU();
-      PMUinit = true;
-    }
-    #endif
+		PMU_init_check();
 
     if (!localFreeArrayInitialized) initLocalFreeArray();
 
@@ -792,19 +768,14 @@ extern "C" {
 		logUnsupportedOp();
 		return NULL;
 	}
+
  void * yymemalign(size_t alignment, size_t size) {
     if (!inRealMain) return RealX::memalign(alignment, size);
 
     //thread_local
     inAllocation = true;
 
-    #ifndef NO_PMU
-    // If the PMU sampler has not yet been set up for this thread, set it up now
-    if(!PMUinit){
-      initPMU();
-      PMUinit = true;
-    }
-    #endif
+		PMU_init_check();
 
     if (!localFreeArrayInitialized) initLocalFreeArray();
 
@@ -881,7 +852,7 @@ extern "C" {
 		RealX::pthread_exit(retval);
 
 		// We should no longer be here, as pthread_exit is marked [[noreturn]]
-		abort();
+		__builtin_unreachable();
 	}
 } // End of extern "C"
 
@@ -1282,6 +1253,12 @@ void writeThreadMaps () {
 	double numAllocs = safeDivisor(globalTAD.numAllocs);
 	double numAllocsFFL = safeDivisor(globalTAD.numAllocsFFL);
 	double numFrees = safeDivisor(globalTAD.numFrees);
+
+  fprintf (thrData.output, "\n>>>>>>>>>>>>>>>    NEW ALLOCATIONS : total (average)    <<<<<<<<<<<<<<<\n");
+	fprintf (thrData.output, "total allocations (new)        %10.0lf\n", numAllocs);
+	fprintf (thrData.output, "total allocations (reused)     %10.0lf\n", numAllocsFFL);
+	fprintf (thrData.output, "total deallocations            %10.0lf\n", numFrees);
+	fprintf (thrData.output, "\n");
 
   fprintf (thrData.output, "\n>>>>>>>>>>>>>>>    NEW ALLOCATIONS : total (average)    <<<<<<<<<<<<<<<\n");
 	fprintf (thrData.output, "allocation cycles              %20lu    avg = %0.1lf\n", globalTAD.cycles_alloc, (globalTAD.cycles_alloc / numAllocs));
