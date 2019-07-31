@@ -10,10 +10,10 @@
 
 \label{sec:understandingallocators}
 
-\MP{} relies on a ``prerun'' program to understand the details of different allocators, such as the allocator's style (bibop, or bump-pointer), class sizes, the threshold for small objects and big objects, and an approximate size of metadata per object. 
+\MP{} relies on a ``prerun'' program to understand the details of different allocators, such as the allocator's style (BIBOP versus bump-pointer-based), class sizes, the threshold separating small objects from large objects, and an approximate size of metadata per object. 
 
-In order to identify different class sizes, the prerun starts to allocate an object with 8 bytes, and continues to allocate  objects with the increase of 8 bytes each time. For BIBOP style allocators, we confirm whether objects are allocated from a different page when the allocation of an object is moved to a different location (another bag). 
-For bump-pointer allocators, such as the Glibc allocator, we confirms size classes by checking the address difference between different objects. 
+In order to identify the various class sizes, the prerun routine begins by allocating an object of 8 bytes, and continues to allocate  additional objects using a stepped increase of 8 bytes each time. For BIBOP-style allocators, we confirm whether objects are allocated from within different pages to detect when the allocation of an object has been moved to a different location (i.e., another bag). 
+For bump-pointer-based allocators, such as the glibc allocator, we confirm size classes by checking the proximity of contiguously allocated objects of distinct sizes, and observing whether a significant address difference exists between the placement of these objects. For example, if an 8 byte object is located immediately adjacent to a 512 byte object, this is typically a strong indication that the allocator utilizes a bump-pointer-based object management style.
 %Open BSD's allocator ``reverse aligns'' objects that are between 2Kb and 4Kb in size. The allocator aligns the objects last byte to the end of the page in which it resides, so that the object starting byte is somewhere in the middle. The prerun would see the address change and believe it has found a new class size. Open BSD provides a flag to turn this behavior off, however this is one example of the challenges of making the profiler general purpose.
 
 %There are many challenges in searching for metadata. Different allocators employ completely different methods in storing metadata for it's internal use. There are a number of ways we attempt to get metadata size for each object. For a bibop allocator, it's metadata has a good chance of being located in a private memory region returned from mmap. The prerun detects the mmap and checks to see if it was used to fulfill a memory request. If it wasn't we will search it for metadata. The prerun library utilizes the /proc/pid/pagemap file to identify the virtual pages which are backed by physical frames. The prerun searches the entire mmap region for physically backed virtual pages, remembering their page numbers in relation to the mmap region starting address. Finally, the prerun counts the number of non-zero bytes on all physically-backed virtual pages, using the minimum of all these values as an estimated metadata size. This method works with the assumption that the bibop-style allocator \emph{is} placing it's metadata in mmap memory. One of the allocators we tested, Dieharder, does mmap memory that was not used for allocations nor metadata, however the prerun includes these regions in it's search for metadata incorrectly. Additionally, the actual metadata is interpreted differently for different allocators. One allocator can store primitive data types in it's metadata, while another allocator uses bitmaps or byte values that have specific meaning only to that allocator. The numerous ways of storing and interpreting metadata is a huge challenge for us.
@@ -22,25 +22,47 @@ For bump-pointer allocators, such as the Glibc allocator, we confirms size class
 
 \subsection{Profiling Performance Overhead}
 
-We differentiate the big objects and small objects. 
+Performance overhead is profiled using several measures which, when viewed together, help to describe the performance profile of a particular allocator/application pairing.
+
+First, as virtually all allocators treat new and reused objects differently, we differentiate between these execution paths in order to understand how each allocator differs with regard to allocation efficiency when reusing a previously freed object versus a new one. Timestamps taken both before and after each such execution pathway are compared in order to determine the total number of cycles spent within each path.
+
+We differentiate between used and new objects differently for BIBOP-style allocators and bump-pointer-based ones. For the former, counter arrays are used to track the number of free objects for each class size used by the allocator. In this way, if the given class size free-object-counter is non-zero, we will count the executed cycles toward the ``reused object'' pathway.
+
+Similarly for bump-pointer-based allocators, a simple running total is maintained for freed objects, and this total is compared to the size of the current allocation request.
+
+%We differentiate the big objects and small objects. 
 
 \subsection{Profiling Memory Overhead}
-\texttt{maprof} profiles allocator memory overhead using three measures, each tracked both globally and per-thread. These measures are: maximum real memory usage, maximum real allocated memory usage, and maximum total memory usage.
+\MP{} profiles allocator memory overhead using three measures, each tracked both on both a global and per-thread basis. These measures are: maximum real memory usage, maximum real allocated memory usage, and maximum total memory usage.
 
 \subsubsection{Real Memory Usage}
-This value represents the amount of memory actually being used by the application. This is adjusted during runtime using the direct values requested by the application itself. For example, if the application performs a call to \texttt{malloc(454)}, then the ``real memory usage '' is correspondingly incremented by $454$.
+This value represents the amount of memory actually requested (and presumably being used) by the application. This is adjusted throughout runtime using the direct values provided to the allocator from the application itself. For example, if the application performs a call to \texttt{malloc(454)}, then the ``real memory usage'' parameter is correspondingly incremented by $454$.
 
 \subsubsection{Real Allocated Memory Usage}
-``Real allocated'' memory usage refers to the memory usage of the allocator, given that the user-requested size will often be placed in the nearest-fitting container, and thus will also contain some unused slack space. For example, given a call to \texttt{malloc(454)}, a power-of-two-style BIBOP allocator will utilize a 512-byte bag from which to satisfy this request. In this instance, the class size of the requested object, $512$, will be used to increment the ``real allocated'' memory usage counter.
+``Real allocated memory usage'' refers to the memory usage of the allocator, given that the user-requested size will often be placed in the nearest-fitting container, and thus will often also contain some unused slack space. For example, given a call to \texttt{malloc(454)}, a power-of-two-style BIBOP allocator will utilize a 512-byte bag from which to satisfy this request. In this instance, the class size of the requested object, $512$, will be used to increment the ``real allocated memory usage'' counter.
 
 \subsubsection{Total Memory Usage}
-``Total memory usage'' refers to the total actual physical memory dedicated to backing the objects served from the heap. For example, 
+``Total memory usage'' refers to the total actual physical memory dedicated to backing the objects served from the heap. To continue with the previous example, given a call to \texttt{malloc(454)}, the ``total memory usage'' counter will be incremented by the system page size (e.g. 4096 bytes), provided that the page was previously unused. Tracking of page and cache line usage is described in more detail in Section~\ref{sec:fastlookup}.
 
-In order to track their maximal values, each time any of these measures is incremented, \texttt{maprof} will perform a check to determine whether the newly adjusted value exceeds the previously stored maximum value.
+Finally, in order to track their maximal values, each time any of these measures is incremented, \MP{} will simply perform a check to determine whether the newly adjusted value exceeds its respective previously stored maximal value.
 
 \subsection{Profiling Scalability}
+Allocator scalability is evaluated by \MP{} using a variety of metrics to indicate its ability to scale well. The tracked parameters include the number various lock types (i.e., pthread mutex locks, spin locks, and try locks), as well as the maximum contention observed on each individual lock.
+Further, both the number and wait cycles associated with common allocator-related system calls are tracked, including \texttt{mmap}, \texttt{munmap}, \texttt{mremap}, \texttt{sbrk}, \texttt{madvise}, and \texttt{mprotect}.
+
+Lastly, memory blowup also has an effect on an allocator's scalability (e.g., an allocator that exhausts physical memory will not be considered to scale as well as others that do not). To this end, \MP{} tracks allocator memory blowup, but does so slightly differently for both BIBOP-style and bump-pointer-style allocators.
+
+For BIBOP-style allocators, thread local counts of freed objects for each supported size class are maintained, as well as corresponding global counters as well. Upon an allocation request, if the current thread does not possess any freed objects of the given size class -- but if the global counter does -- we record this event as an allocation responsible for increasing the allocator's memory blowup.
+
+Similarly, for bump-pointer-style allocators, a global counter is used to track the number of freed bytes, rather than freed objects. If the current allocation request cannot be fully satisfied from the available freed bytes, the allocator will thus utilize unused memory from the top of the heap in order to fulfill the allocation request, therefore increasing memory blowup as well.
+
 
 \subsection{Application Friendliness}
+Application friendliness is characterized by how well a particular allocator makes use of resources when paired with a given application, but which may also provide a pattern of usage that may be generalized across multiple applications as well.
+
+This information includes characteristics such as (1)~the number of cache line accesses on heap data; (2)~the average cache line utilization; (3)~the average page utilization; (4)~the number of cache line writes to heap objects; and (5)~the number of cache line writes featuring an owner conflicts (i.e., a thread writes to a cache line ``belonging to'' another thread).
+
+These data are collected using a PMU-based memory access sampling mechanism, configured with a default sampling period of 500 (plus or minus 10\%, randomly), determined at thread creation.
 
 \subsection{Optimizations}
 
