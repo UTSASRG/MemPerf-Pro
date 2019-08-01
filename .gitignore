@@ -1,3 +1,7 @@
+paper/mmprof.pdf
+.texpadtmp/
+~$*.xlsx
+.DS_Store
 *.swp
 *.o
 */test/*
