@@ -70,24 +70,6 @@ void getPerfCounts (PerfReadInfo * i, bool enableCounters) {
 			ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_RESET, 0);
 			ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_RESET, 0);
 
-			#warning added by SAS on 7/12 for underflow troubleshooting purposes
-			if((i->faults > 0) ||
-							(i->tlb_read_misses > 0) ||
-							(i->tlb_write_misses > 0) ||
-							(i->cache_misses > 0) ||
-							(i->instructions > 0)) {
-					fprintf(stderr, "ERROR: doBefore structure values != 0\n");
-					abort();
-			}
-
-			/*
-			i->faults = 0;
-			i->tlb_read_misses = 0;
-			i->tlb_write_misses = 0;
-			i->cache_misses = 0;
-			i->instructions = 0;
-			*/
-
 			ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_ENABLE, 0);
 			//ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_ENABLE, 0);
 			//ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_ENABLE, 0);
@@ -102,55 +84,59 @@ void getPerfCounts (PerfReadInfo * i, bool enableCounters) {
 				perror("perf read failed");
 	}
 
-	i->faults = buffer.values[0].value;
-	if(i->faults < 0) {
-			fprintf(stderr, "negative PMU counter encountered: faults=%ld\n", i->faults);
-			i->faults = 0;
-	}
-	i->tlb_read_misses = buffer.values[1].value;
-	if(i->tlb_read_misses < 0) {
-			fprintf(stderr, "negative PMU counter encountered: tlb read misses=%ld\n", i->tlb_read_misses);
-			i->tlb_read_misses = 0;
-	}
-	i->tlb_write_misses = buffer.values[2].value;
-	if(i->tlb_write_misses < 0) {
-			fprintf(stderr, "negative PMU counter encountered: tlb write misses=%ld\n", i->tlb_write_misses);
-			i->tlb_write_misses = 0;
-	}
-	i->cache_misses = buffer.values[3].value;
-	if(i->cache_misses < 0) {
-			fprintf(stderr, "negative PMU counter encountered: cache misses=%ld\n", i->cache_misses);
-			i->cache_misses = 0;
-	}
-	i->instructions = buffer.values[4].value;
-	if(i->instructions < 0) {
-			fprintf(stderr, "negative PMU counter encountered: instructions=%ld\n", i->instructions);
-			i->instructions = 0;
-	}
-
 	/*
 	#warning DEBUG CHECK FOR NEGATIVE PMU COUNTERS IN USE
+	thread_local static int bad_occurrences = 0;
+	thread_local static int good_occurrences = 0;
 	if(((int64_t)i->faults < 0) ||
 					((int64_t)i->tlb_read_misses < 0) ||
 					((int64_t)i->tlb_write_misses < 0) ||
 					((int64_t)i->cache_misses < 0) ||
 					((int64_t)i->instructions < 0)) {
-			fprintf(stderr, "negative PMU counter encountered\n");
+			fprintf(stderr, "negative PMU counter encountered (tid=%d, good=%d, bad=%d)\n", gettid(), good_occurrences, bad_occurrences);
 			fprintf(stderr, "   faults=%ld, tlb_readm=%ld, tlb_writem=%ld, cachem=%ld, instr=%ld\n", 
 							(int64_t)i->faults, (int64_t)i->tlb_read_misses,
 							(int64_t)i->tlb_write_misses, 
 							(int64_t)i->cache_misses, (int64_t)i->instructions);
+			bad_occurrences++;
+	} else {
+			good_occurrences++;
 	}
 	*/
 
-	if(!enableCounters) {
-			ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_DISABLE, 0);
-			//ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_DISABLE, 0);
-			//ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_DISABLE, 0);
-			//ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_DISABLE, 0);
-			//ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_DISABLE, 0);
+	// From experimental data, approximately 0.1% to 2.7% of these calls will
+	// result in a negative value (i.e., a very large unsigned value). The
+	// following block checks for this condition and eliminates this count,
+	// effectively pretending the read never happened, as the counter will
+	// not be contributed to the total count.
+	/*
+	int64_t faults = (int64_t)i->faults;
+	int64_t tlb_read_misses = (int64_t)i->tlb_read_misses;
+	int64_t tlb_write_misses = (int64_t)i->tlb_write_misses;
+	int64_t cache_misses = (int64_t)i->cache_misses;
+	int64_t instructions = (int64_t)i->instructions;
+	*/
+	if(__builtin_expect((int64_t)i->faults < 0, 0)) {
+			i->faults = 0;
+	}
+	if(__builtin_expect((int64_t)i->tlb_read_misses < 0, 0)) {
+			i->tlb_read_misses = 0;
+	}
+	if(__builtin_expect((int64_t)i->tlb_write_misses < 0, 0)) {
+			i->tlb_write_misses = 0;
+	}
+	if(__builtin_expect((int64_t)i->cache_misses < 0, 0)) {
+			i->cache_misses = 0;
+	}
+	if(__builtin_expect((int64_t)i->instructions < 0, 0)) {
+			i->instructions = 0;
 	}
 
+	ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_DISABLE, 0);
+	//ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_DISABLE, 0);
+	//ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_DISABLE, 0);
+	//ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_DISABLE, 0);
+	//ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_DISABLE, 0);
 }
 
 void doPerfCounterRead() {
