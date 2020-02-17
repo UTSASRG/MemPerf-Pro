@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include "shadowmemory.hh"
 #include "real.hh"
+#include "test/alloc.cpp"
 
 PageMapEntry ** ShadowMemory::mega_map_begin = nullptr;
 PageMapEntry * ShadowMemory::page_map_begin = nullptr;
@@ -30,14 +31,16 @@ bool ShadowMemory::initialize() {
 	// Allocate 1MB-to-4KB mapping region
 	if((void *)(mega_map_begin = (PageMapEntry **)mmap((void *)MEGABYTE_MAP_START, MEGABYTE_MAP_SIZE,
 									PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0)) == MAP_FAILED) {
-			perror("mmap of global megabyte map failed");
+			fprintf(stderr, "mmap of global megabyte map failed. Adddress %lx error %s\n", MEGABYTE_MAP_START, strerror(errno));
 //			abort();			// temporary, remove and replace with return false after testing
 	}
 
 	// Allocate 4KB-to-cacheline region
 	if((void *)(page_map_begin = (PageMapEntry *)mmap((void *)PAGE_MAP_START, PAGE_MAP_SIZE,
 									PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0)) == MAP_FAILED) {
-			perror("mmap of global page map failed");
+    fprintf(stderr, "errno %d\n", ENOMEM);
+			fprintf(stderr, "mmap of global page map failed. Adddress %lx size %lx error (%d) %s\n", PAGE_MAP_START, PAGE_MAP_SIZE, errno, strerror(errno));
+      while(1) { ;} 
 //			abort();			// temporary, remove and replace with return false after testing
 	}
 	page_map_end = page_map_begin + MAX_PAGE_MAP_ENTRIES;
@@ -112,7 +115,6 @@ unsigned ShadowMemory::updateObject(void * address, size_t size, bool isFree) {
 		//unsigned firstPageOffset = (uintaddr & PAGESIZE_MASK);
 		//unsigned firstCacheLineIdx = ((uintaddr & PAGESIZE_MASK) >> LOG2_CACHELINE_SIZE);
 		//unsigned firstCacheLineOffset = (uintaddr & CACHELINE_SIZE_MASK);
-
     unsigned numNewPagesTouched = updatePages(uintaddr, mega_index, firstPageIdx, size, isFree);
     PageMapEntry::updateCacheLines(uintaddr, mega_index, firstPageIdx, size, isFree);
 		if(!isFree) {
@@ -344,7 +346,8 @@ unsigned ShadowMemory::cleanupPages(uintptr_t uintaddr, size_t length) {
 }
 
 void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType) {
-		/*
+
+
 		// Only used for debug output (see end of function below)
 		const char * strAccessType;
 		switch(accessType) {
@@ -369,7 +372,6 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType)
 				default:
 						strAccessType = "no_match";
 		}
-		*/
 
 		PageMapEntry * pme;
 		CacheMapEntry * cme;
@@ -395,37 +397,36 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType)
 		// (rather than NULL) if there is no CacheMap entry for this address; we do not
 		// wish to affect the bump pointer in this case, so this parameter should always
 		// be set to false.
-		if((cme = pme->getCacheMapEntry(false)) == NULL) {
-				return;
-		}
-		cme += tuple.cache_index;
+    if((cme = pme->getCacheMapEntry(false)) == NULL) {
+            return;
+        }
+    cme += tuple.cache_index;
 
-		unsigned short curPageUsage = pme->getUsedBytes();
-		unsigned char curCacheUsage = cme->getUsedBytes();
-		pid_t curThread = thrData.tid;
-		pid_t lineOwner = cme->getOwner();
+    unsigned short curPageUsage = pme->getUsedBytes();
+    unsigned char curCacheUsage = cme->getUsedBytes();
+    pid_t curThread = thrData.tid;
+    pid_t lineOwner = cme->getOwner();
 
-		friendly_data * usageData = &thrData.friendlyData;
-		/*
-			 typedef struct {
-			 unsigned long numAccesses;
-			 unsigned long numCacheWrites;
-			 unsigned long numCacheOwnerConflicts;
-			 unsigned long numCacheBytes;
-			 unsigned long numPageBytes;
-			 } friendly_data;
-		*/
-
+    friendly_data * usageData = &thrData.friendlyData;
+    /*
+         typedef struct {
+         unsigned long numAccesses;
+         unsigned long numCacheWrites;
+         unsigned long numCacheOwnerConflicts;
+         unsigned long numCacheBytes;
+         unsigned long numPageBytes;
+         } friendly_data;
+    */
 		usageData->numAccesses++;
 		usageData->numCacheBytes += curCacheUsage;
 		usageData->numPageBytes += curPageUsage;
 
-		//bool isCacheOwnerConflict = false;
+		bool isCacheOwnerConflict = false;
 
 		if(accessType == E_MEM_STORE) {
 				usageData->numCacheWrites++;
 				if(lineOwner != curThread) {
-						//isCacheOwnerConflict = true;
+						isCacheOwnerConflict = true;
 						usageData->numCacheOwnerConflicts++;
 				}
 				// change cache line owner
@@ -435,6 +436,7 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType)
 		// DEBUG OUTPUT
 		//fprintf(stderr, "mem access : %s : addr=%#lx, curPageUsage=%u, curCacheUsage=%u, conflict?=%s\n",
 		//				strAccessType, uintaddr, curPageUsage, curCacheUsage, boolToStr(isCacheOwnerConflict));
+		//getchar();
 }
 
 map_tuple ShadowMemory::getMapTupleByAddress(uintptr_t uintaddr) {
@@ -447,15 +449,19 @@ map_tuple ShadowMemory::getMapTupleByAddress(uintptr_t uintaddr) {
 		// First compute the megabyte number of the given address.
 		unsigned long mega_index = (uintaddr >> LOG2_MEGABYTE_SIZE);
 		if(mega_index > NUM_MEGABYTE_MAP_ENTRIES) {
-				fprintf(stderr, "ERROR: mega index of 0x%lx too large: %lu > %u\n",
+            fprintf(stderr, "ERROR: mega index of 0x%lx too large: %lu > %u\n",
 								uintaddr, mega_index, NUM_MEGABYTE_MAP_ENTRIES);
-				abort();
-		}
+            abort();
+        }
 
-		unsigned page_index = ((uintaddr & MEGABYTE_MASK) >> LOG2_PAGESIZE);
-		unsigned cache_index = ((uintaddr & PAGESIZE_MASK) >> LOG2_CACHELINE_SIZE);
+    unsigned page_index =
+            ((uintaddr & MEGABYTE_MASK) >> LOG2_PAGESIZE);
+    unsigned cache_index =
+            ((uintaddr & PAGESIZE_MASK) >> LOG2_CACHELINE_SIZE);
+//    fprintf(stderr, "%p, %p, %p, %p, %p, %p\n", uintaddr,
+//           mega_index, (uintaddr & MEGABYTE_MASK), page_index, (uintaddr & PAGESIZE_MASK), cache_index);
 
-		return {mega_index, page_index, cache_index};
+    return {mega_index, page_index, cache_index};
 }
 
 /*
@@ -549,7 +555,6 @@ PageMapEntry * ShadowMemory::getPageMapEntry(unsigned long mega_idx, unsigned pa
 				mega_idx += (page_idx >> LOG2_NUM_PAGES_PER_MEGABYTE);
 				page_idx &= NUM_PAGES_PER_MEGABYTE_MASK;
 		}
-
 		PageMapEntry ** mega_entry = getMegaMapEntry(mega_idx);
 
 		return (*mega_entry + page_idx);
@@ -557,7 +562,6 @@ PageMapEntry * ShadowMemory::getPageMapEntry(unsigned long mega_idx, unsigned pa
 
 PageMapEntry ** ShadowMemory::getMegaMapEntry(unsigned long mega_index) {
 		PageMapEntry ** mega_entry = mega_map_begin + mega_index;
-
 		if(__builtin_expect(__atomic_load_n(mega_entry, __ATOMIC_RELAXED) == NULL, 0)) {
 				// Create a new page entries
 				RealX::pthread_spin_lock(&mega_map_lock);

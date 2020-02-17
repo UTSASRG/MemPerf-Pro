@@ -46,8 +46,9 @@ inline void releaseGlobalPerfLock() {
 inline int create_perf_event(perf_event_attr * attr, int group) {
 	int fd = perf_event_open(attr, 0, -1, group, 0);
 	if(fd == -1) {
-		perror("Failed to open perf event");
-		abort();
+		fprintf(stderr, "Failed to open perf event %s\n", strerror(errno));
+    while(1) { ; }
+  abort();
 	}
 	return fd;
 }
@@ -64,21 +65,21 @@ void getPerfCounts (PerfReadInfo * i, bool enableCounters) {
 	}
 
 	if(enableCounters) {
-			ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_RESET, 0);
-			ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_RESET, 0);
-			ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_RESET, 0);
-			ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_RESET, 0);
-			ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_RESET, 0);
-
-			ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_ENABLE, 0);
-			//ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_ENABLE, 0);
-			//ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_ENABLE, 0);
-			//ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_ENABLE, 0);
-			//ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_ENABLE, 0);
-			return;
+//        ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_RESET, 0);
+//        ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_RESET, 0);
+//        ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_RESET, 0);
+//        ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_RESET, 0);
+//        ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_RESET, 0);
+        ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_ENABLE, 0);
+        ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_ENABLE, 0);
+        ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_ENABLE, 0);
+        ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_ENABLE, 0);
+        ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_ENABLE, 0);
+        return;
 	}
 
 	struct read_format buffer;
+
 
 	if(read(perfInfo.perf_fd_fault, &buffer, sizeof(struct read_format)) == -1) {
 				perror("perf read failed");
@@ -106,37 +107,48 @@ void getPerfCounts (PerfReadInfo * i, bool enableCounters) {
 
 	// From experimental data, approximately 0.1% to 2.7% of these calls will
 	// result in a negative value (i.e., a very large unsigned value). The
-	// following block checks for this condition and eliminates this count,
-	// effectively pretending the read never happened, as the counter will
-	// not be contributed to the total count.
-	/*
-	int64_t faults = (int64_t)i->faults;
-	int64_t tlb_read_misses = (int64_t)i->tlb_read_misses;
-	int64_t tlb_write_misses = (int64_t)i->tlb_write_misses;
-	int64_t cache_misses = (int64_t)i->cache_misses;
-	int64_t instructions = (int64_t)i->instructions;
-	*/
-	if(__builtin_expect((int64_t)i->faults < 0, 0)) {
+    // following block checks for this condition and eliminates this count,
+    // effectively pretending the read never happened, as the counter will
+    // not be contributed to the total count.
+    /*
+    int64_t faults = (int64_t)i->faults;
+    int64_t tlb_read_misses = (int64_t)i->tlb_read_misses;
+    int64_t tlb_write_misses = (int64_t)i->tlb_write_misses;
+    int64_t cache_misses = (int64_t)i->cache_misses;
+    int64_t instructions = (int64_t)i->instructions;
+    */
+
+    memcpy(i, &(buffer.values), sizeof(buffer.values));
+    if(__builtin_expect((int64_t)i->faults < 0, 0) || i->faults > 10000000000) {
 			i->faults = 0;
 	}
-	if(__builtin_expect((int64_t)i->tlb_read_misses < 0, 0)) {
+	if(__builtin_expect((int64_t)i->tlb_read_misses < 0, 0) || i->tlb_read_misses > 10000000000) {
 			i->tlb_read_misses = 0;
 	}
-	if(__builtin_expect((int64_t)i->tlb_write_misses < 0, 0)) {
+	if(__builtin_expect((int64_t)i->tlb_write_misses < 0, 0) || i->tlb_write_misses > 10000000000) {
 			i->tlb_write_misses = 0;
 	}
-	if(__builtin_expect((int64_t)i->cache_misses < 0, 0)) {
+	if(__builtin_expect((int64_t)i->cache_misses < 0, 0) || i->cache_misses > 10000000000) {
 			i->cache_misses = 0;
 	}
-	if(__builtin_expect((int64_t)i->instructions < 0, 0)) {
+	if(__builtin_expect((int64_t)i->instructions < 0, 0) || i->instructions > 10000000000) {
 			i->instructions = 0;
 	}
 
-	ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_DISABLE, 0);
-	//ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_DISABLE, 0);
-	//ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_DISABLE, 0);
-	//ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_DISABLE, 0);
-	//ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_DISABLE, 0);
+
+//    fprintf(stderr, "%ld, %ld, %ld, %ld, %ld\n",
+//            i->faults, i->tlb_read_misses, i->tlb_write_misses, i->cache_misses, i->instructions);
+    ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_DISABLE, 0);
+    ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_DISABLE, 0);
+	ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_DISABLE, 0);
+	ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_DISABLE, 0);
+	ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_DISABLE, 0);
+
+    ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_RESET, 0);
+    ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_RESET, 0);
+    ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_RESET, 0);
+    ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_RESET, 0);
+    ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_RESET, 0);
 }
 
 void doPerfCounterRead() {
@@ -144,7 +156,7 @@ void doPerfCounterRead() {
 	return;
 	#endif
 	PerfReadInfo perf;
-	getPerfCounts(&perf, false);
+	//getPerfCounts(&perf, false);
 
 	ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_DISABLE, 0);
 	ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_DISABLE, 0);
@@ -185,12 +197,7 @@ void setupCounting(void) {
 
 	pe_fault.type = PERF_TYPE_SOFTWARE;
 	pe_fault.size = sizeof(struct perf_event_attr);
-
-	// config: this field is set depending on the type of bridge in the processor
-	// and whether we would like to sample load/store accesses.
-	// For more information see the Intel 64 and IA-32 Architectures Software Developer's Manual:
-	// http://courses.cs.washington.edu/courses/cse451/15au/readings/ia32-3.pdf
-	pe_fault.config = PERF_COUNT_SW_PAGE_FAULTS;
+    pe_fault.config = PERF_COUNT_SW_PAGE_FAULTS;
 
 	//This field specifies the format of the data returned by
 	//read() on a perf_event_open() file descriptor.
@@ -198,6 +205,8 @@ void setupCounting(void) {
 
 	//Disabled: whether the counter starts with disabled/enabled status.
 	pe_fault.disabled = 1;
+	// Make an exact copy of the pe_fault attributes to be used for the
+    // corresponding store events' attributes.
 
 	//Pinned: The pinned bit specifies that the counter should always be on
 	//the CPU if at all possible.
@@ -216,28 +225,30 @@ void setupCounting(void) {
 
 	//Exclude_xxx: Do not sample a specified side of events,
 	//user, kernel, or hypevisor
-	pe_fault.exclude_user = 0;
-	pe_fault.exclude_kernel = 1;
-	pe_fault.exclude_hv = 1;
 
-	//Precise_ip: This controls the amount of skid. See perf_event.h
-	pe_fault.precise_ip = 1;
-	pe_fault.freq = 1;
-	pe_fault.sample_freq = 10000;
-	//pe_fault.freq = 0;
-	//pe_fault.sample_period = 10000;
+    pe_fault.exclude_user = 0;
+    pe_fault.exclude_kernel = 1;
+    pe_fault.exclude_hv = 1;
 
-	//Sample_id_all: TID, TIME, ID, STREAM_ID, and CPU added to every sample.
-	pe_fault.sample_id_all = 0;
+    //Precise_ip: This controls the amount of skid. See perf_event.h
 
-	//Exclude_xxx: Sample guest/host instances or not.
-	pe_fault.exclude_host = 0;
-	pe_fault.exclude_guest = 1;
+    pe_fault.precise_ip = 1;
 
-	// Make an exact copy of the pe_fault attributes to be used for the
-	// corresponding store events' attributes.
-	memcpy(&pe_tlb_reads, &pe_fault, sizeof(struct perf_event_attr));
-	memcpy(&pe_tlb_writes, &pe_fault, sizeof(struct perf_event_attr));
+    pe_fault.freq = 1;
+    pe_fault.sample_freq = 1;
+//
+//    pe_fault.freq = 0;
+//    pe_fault.sample_period = 1;
+
+    //Sample_id_all: TID, TIME, ID, STREAM_ID, and CPU added to every sample.
+    pe_fault.sample_id_all = 0;
+
+    //Exclude_xxx: Sample guest/host instances or not.
+    pe_fault.exclude_host = 0;
+    pe_fault.exclude_guest = 1;
+
+    memcpy(&pe_tlb_reads, &pe_fault, sizeof(struct perf_event_attr));
+    memcpy(&pe_tlb_writes, &pe_fault, sizeof(struct perf_event_attr));
 	memcpy(&pe_cache_miss, &pe_fault, sizeof(struct perf_event_attr));
 	memcpy(&pe_instr, &pe_fault, sizeof(struct perf_event_attr));
 
@@ -279,18 +290,18 @@ void setupCounting(void) {
 	ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_RESET, 0);
 	ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_RESET, 0);
 
-	ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_ENABLE, 0);
-	ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_ENABLE, 0);
-	ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_ENABLE, 0);
-	ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_ENABLE, 0);
-	ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_ENABLE, 0);
+//	ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_ENABLE, 0);
+//	ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_ENABLE, 0);
+//	ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_ENABLE, 0);
+//	ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_ENABLE, 0);
+//	ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_ENABLE, 0);
 }
 
 void sampleHandler(int signum, siginfo_t *info, void *p) {
+    //printf("Here\n");
   #ifndef NDEBUG
   perfInfo->numSignalsRecvd++;
   #endif
-
   // If the overflow counter has reached zero (indicated by the POLL_HUP code),
   // read the sample data and reset the overflow counter to start again.
   if(info->si_code == POLL_HUP) {
@@ -333,8 +344,10 @@ void setupSampling() {
 	}
 	int fuzzed_period = SAMPLING_PERIOD * (1 + fraction);
 
- 	pe_load.sample_period = fuzzed_period;
-	pe_load.freq = 0;
+    //pe_load.sample_period = fuzzed_period;
+    //pe_load.freq = 1;
+    pe_load.sample_freq = 10000;
+    pe_load.freq = 1;
 	pe_load.sample_type = sample_type;
 	pe_load.read_format = read_format;
 	pe_load.disabled = 1;
@@ -383,12 +396,13 @@ void setupSampling() {
 	releaseGlobalPerfLock();
 
 	// Setting up memory to pass information about a trap
+
 	if((perfInfo.ring_buf = mmap(NULL, MAPSIZE, PROT_READ | PROT_WRITE,
-					MAP_SHARED, perfInfo.perf_fd, 0)) == MAP_FAILED) {
-			fprintf(stderr, "mmap failed on tid=%d, perf_fd=%d: %s\n",
-							perfInfo.tid, perfInfo.perf_fd, strerror(errno));
-			abort();
-	}
+                                      MAP_SHARED, perfInfo.perf_fd, 0)) == MAP_FAILED) {
+        fprintf(stderr, "mmap failed on tid=%d, perf_fd=%d: %s\n",
+                perfInfo.tid, perfInfo.perf_fd, strerror(errno));
+        abort();
+    }
 	perfInfo.ring_buf_data_start = (void *)((uintptr_t)perfInfo.ring_buf + PAGESIZE);
 
 	// Set the perf_event file to async mode
@@ -555,7 +569,6 @@ long long perf_mmap_read() {
 		fprintf(stderr, "sample data size is dangerously close "
 				"to buffer size; data loss is likely to occur\n");
 	}
-
 	prev_head_wrapped = perfInfo.prev_head % DATA_MAPSIZE;
 
 	copy_amt = size;
@@ -575,7 +588,6 @@ long long perf_mmap_read() {
 	} else {
 			use_data_buf = (char *)data_mmap + prev_head_wrapped;
 	}
-
 	offset = 0;
 	while(offset < size) {
 		long long starting_offset = offset;
@@ -612,7 +624,6 @@ long long perf_mmap_read() {
 			}
 
 			if(sample_type & PERF_SAMPLE_ADDR) {
-					//memcpy(&intpaddr, &use_data_buf[offset], sizeof(uint64_t));
 					intpaddr = *(uint64_t *)(use_data_buf + offset);
 					offset += sizeof(uint64_t);
 			}

@@ -33,9 +33,9 @@ int main(int argc, char* argv[]) {
 
 		if (create != 0) {
 
-			fprintf (stderr, "Error creating thread.\n");
-			abort ();
-		}
+            fprintf(stderr, "Error creating thread.\n");
+            abort();
+        }
 	}
 
 
@@ -56,15 +56,13 @@ int main(int argc, char* argv[]) {
 }
 
 void* thread_start (void* arg) {
-
 	size_t size;
 	void* pointer[numMallocs];
-	
+
 	for (int i = 0; i < numMallocs; i++) {
-		size = (size_t) (lrand48() % 1000) + 8;
+	    size = (size_t) (lrand48() % 1000) + 8;
 		pointer[i] = malloc (size);
 	}
-
 	for (int i = 0; i < numMallocs; i++) {
 		free (pointer[i]);
 	}

@@ -1,0 +1,47 @@
+cmake_minimum_required(VERSION 3.15)
+project(mmprof)
+
+set(CMAKE_CXX_STANDARD 14)
+
+include_directories(.)
+include_directories(libtestperf)
+
+add_executable(mmprof
+        libtestperf/libtestperf.cpp
+        libtestperf/libtestperf.h
+        libtestperf/real.cpp
+        libtestperf/real.hh
+        libtestperf/test-bestcase.c
+        libtestperf/test-worstcase.c
+        libtestperf/xthread.hh
+        prerun/libmallochelp.cpp
+        prerun/runlib.cpp
+        test/alloc.cpp
+        test/alloc2.cpp
+        test/blackscholes-pthread.cpp
+        test/fighting_with_the_heap.cpp
+        test/madvise.cpp
+        test/malloc-and-free.cpp
+        test/malloc-then-free.cpp
+        test/mmapmadvise.cpp
+        test/pmu-test.cpp
+        test/pmu-test2.cpp
+        test/threadTest.cpp
+        hashfuncs.hh
+        hashmap.hh
+        interval.hh
+        libmallocprof.cpp
+        libmallocprof.h
+        list.hh
+        memsample.c
+        memsample.h
+        mytest.cpp
+        real.cpp
+        real.hh
+        recordfunctions.hh
+        selfmap.cpp
+        selfmap.hh
+        shadowmemory.cpp
+        shadowmemory.hh
+        spinlock.hh
+        xthreadx.hh)

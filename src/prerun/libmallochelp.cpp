@@ -48,7 +48,7 @@ char* allocator_name;
 FILE* outputFile;
 
 //Unused
-__thread thread_data thrData;
+//__thread thread_data thrData;
 bool opening_maps_file;
 bool isLibc;
 
@@ -101,14 +101,11 @@ void initReal() {
 
 //Constructor
 __attribute__((constructor)) void libmallochelp_initializer () {
-
 	if (libInitialized) return;
-
 	allocator_name = (char*)myMalloc(128);
 	initReal();
 	temp_mem_lock.init();
 	pid = getpid();
-
 	libInitialized = true;
 }
 

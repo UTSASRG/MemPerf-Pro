@@ -52,8 +52,8 @@ class xthreadx {
 
 		myThreadID = pthread_self();
   
-    // set thread local storeage
-    setThreadContention(); 
+        // set thread local storeage
+        setThreadContention();
 
 		initMyLocalMem();
 
@@ -110,7 +110,7 @@ class xthreadx {
   static void threadExit() {
     #ifndef NO_PMU
     stopSampling();
-    //doPerfCounterRead();
+    doPerfCounterRead();
     stopCounting();
     #endif
 
@@ -120,7 +120,6 @@ class xthreadx {
     if(thrData.output) {
       fclose(thrData.output);
     }
-
     globalizeTAD();
 	}
 };

@@ -46,8 +46,8 @@ namespace RealX {
 		INIT_WRAPPER(mmap, RTLD_NEXT);
 		INIT_WRAPPER(munmap, RTLD_NEXT);
 		INIT_WRAPPER(mremap, RTLD_NEXT);
-    INIT_WRAPPER(madvise, RTLD_NEXT);
-    INIT_WRAPPER(mprotect, RTLD_NEXT);
+        INIT_WRAPPER(madvise, RTLD_NEXT);
+        INIT_WRAPPER(mprotect, RTLD_NEXT);
 		INIT_WRAPPER(pthread_create, RTLD_NEXT);
 		INIT_WRAPPER(pthread_join, RTLD_NEXT);
 		INIT_WRAPPER(pthread_exit, RTLD_NEXT);
