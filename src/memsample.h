@@ -15,11 +15,13 @@
 #define CACHELINE_SIZE 64
 #define PAGESIZE 4096
 #define SAMPLING_PERIOD 500
-#define MMAP_PAGES 33	// must be in the form of 2^N + 1
+///#define MMAP_PAGES 33	// must be in the form of 2^N + 1
+#define MMAP_PAGES 129
 #define DATA_MMAP_PAGES (MMAP_PAGES - 1)
 #define MAPSIZE (MMAP_PAGES * getpagesize())
 #define DATA_MAPSIZE (DATA_MMAP_PAGES * getpagesize())
-#define OVERFLOW_INTERVAL 100
+//#define OVERFLOW_INTERVAL 100
+#define OVERFLOW_INTERVAL 1
 #define SHADOW_MEM_SIZE (16 * ONE_GB)
 #define WORD_SIZE (sizeof(void *))
 
@@ -27,10 +29,10 @@
 // greater than LOWEST_POS_CALLSITE_ID, and using a more obvious choice,
 // such as 0x0, would not allow for this.
 #define NO_CALLSITE 0xffffffffffffffff
-#define LOAD_ACCESS 0x1cd
-#define STORE_ACCESS 0x2cd
-//#define LOAD_ACCESS 0x81d0
-//#define STORE_ACCESS 0x82d0
+//#define LOAD_ACCESS 0x1cd
+//#define STORE_ACCESS 0x2cd
+#define LOAD_ACCESS 0x81d0
+#define STORE_ACCESS 0x82d0
 #define LAST_USER_ADDR 0x7fffffffffff
 #define MALLOC_HEADER_SIZE (sizeof(size_t))
 #define EIGHT_BYTES 8
@@ -133,28 +135,28 @@ typedef struct {            //struct for holding data about allocations
 		ulong numAllocsFFL;
 		ulong numFrees;
 
-		long numAllocationFaults;
-		long numDeallocationFaults;
+    uint64_t numAllocationFaults;
+    uint64_t numDeallocationFaults;
 
-		long numAllocationTlbReadMisses;
-		long numAllocationTlbWriteMisses;
+    uint64_t numAllocationTlbReadMisses;
+    uint64_t numAllocationTlbWriteMisses;
 
-		long numDeallocationTlbReadMisses;
-		long numDeallocationTlbWriteMisses;
+    uint64_t numDeallocationTlbReadMisses;
+    uint64_t numDeallocationTlbWriteMisses;
 
-		long numAllocationCacheMisses;
-		long numDeallocationCacheMisses;
+    uint64_t numAllocationCacheMisses;
+    uint64_t numDeallocationCacheMisses;
 
-		long numAllocationInstrs;
-		long numDeallocationInstrs;
+    uint64_t numAllocationInstrs;
+    uint64_t numDeallocationInstrs;
 
-		long numAllocationFaultsFFL;
+    uint64_t numAllocationFaultsFFL;
 
-		long numAllocationTlbReadMissesFFL;
-		long numAllocationTlbWriteMissesFFL;
+    uint64_t numAllocationTlbReadMissesFFL;
+    uint64_t numAllocationTlbWriteMissesFFL;
 
-		long numAllocationCacheMissesFFL;
-		long numAllocationInstrsFFL;
+    uint64_t numAllocationCacheMissesFFL;
+    uint64_t numAllocationInstrsFFL;
 
 		uint threads;
 		uint num_mutex_locks;

@@ -120,6 +120,7 @@ thread_local unsigned* localFreeArray = nullptr;
 thread_local bool localFreeArrayInitialized = false;
 thread_local uint64_t myThreadID;
 thread_local thread_alloc_data localTAD;
+thread_local bool globalized = false;
 thread_alloc_data globalTAD;
 
 thread_local void* myLocalMem;
@@ -214,7 +215,6 @@ __attribute__((constructor)) initStatus initializer() {
 	profilerInitialized = IN_PROGRESS;
 
 	inConstructor = true;
-
 	// Ensure we are operating on a system using 64-bit pointers.
 	// This is necessary, as later we'll be taking the low 8-byte word
 	// of callsites. This could obviously be expanded to support 32-bit systems
@@ -269,7 +269,7 @@ __attribute__((constructor)) initStatus initializer() {
 	r = memcpy((allocatorFileName+path_bytes), start_name, name_bytes);
 	if (r != (allocatorFileName+path_bytes)) {perror("memcpy fail?"); abort();}
 	snprintf ((allocatorFileName+path_bytes+name_bytes), ext_bytes, ".info");
-
+    fprintf(stderr, "name: %s\n", allocatorFileName);
 	readAllocatorFile();
 
 	//Initialize the global and free counter arrays (blowup)
@@ -336,8 +336,8 @@ __attribute__((constructor)) initStatus initializer() {
 	/*
 	start_smaps();
 	setupSignalHandler();
-	startSignalTimer();
-	*/
+	startSignalTimer();*/
+
 
 	total_cycles_start = rdtscp();
 	inConstructor = false;
@@ -381,7 +381,7 @@ void exitHandler() {
 	#ifndef NO_PMU
 	stopSampling();
 
-	//doPerfCounterRead();
+	doPerfCounterRead();
 	#endif
 
 	#warning Disabled smaps functionality (timer, file handle cleanup)
@@ -464,52 +464,65 @@ extern "C" int libmallocprof_libc_start_main(main_fn_t main_fn, int argc,
 // Memory management functions
 extern "C" {
 	void * yymalloc(size_t sz) {
-		if(sz == 0) {
-				return NULL;
-		}
+        //fprintf(stderr, "malloc... %d\n", sz);
 
-		// Small allocation routine designed to service malloc requests made by
-		// the dlsym() function, as well as code running prior to dlsym(). Due
-		// to our linkage alias which redirects malloc calls to yymalloc
-		// located in this file; when dlsym calls malloc, yymalloc is called
-		// instead. Without this routine, yymalloc would simply rely on
-		// RealX::malloc to fulfill the request, however, RealX::malloc would not
-		// yet be assigned until the dlsym call returns. This results in a
-		// segmentation fault. To remedy the problem, we detect whether the RealX
-		// has finished initializing; if it has not, we fulfill malloc requests
-		// using a memory mapped region. Once dlsym finishes, all future malloc
-		// requests will be fulfilled by RealX::malloc, which itself is a
-		// reference to the real malloc routine.
-		// Also, we can't call initializer() from here, because the initializer
-		// itself will call malloc().
-		if((profilerInitialized != INITIALIZED) || (!selfmapInitialized)) {
-			return myMalloc (sz);
-		}
+        if(sz == 0) {
+            return NULL;
+        }
 
-		//Malloc is being called by a thread that is already in malloc
-		if (inAllocation) return RealX::malloc(sz);
+        // Small allocation routine designed to service malloc requests made by
+        // the dlsym() function, as well as code running prior to dlsym(). Due
+        // to our linkage alias which redirects malloc calls to yymalloc
+        // located in this file; when dlsym calls malloc, yymalloc is called
+        // instead. Without this routine, yymalloc would simply rely on
+        // RealX::malloc to fulfill the request, however, RealX::malloc would not
+        // yet be assigned until the dlsym call returns. This results in a
+        // segmentation fault. To remedy the problem, we detect whether the RealX
+        // has finished initializing; if it has not, we fulfill malloc requests
+        // using a memory mapped region. Once dlsym finishes, all future malloc
+        // requests will be fulfilled by RealX::malloc, which itself is a
+        // reference to the real malloc routine.
+        // Also, we can't call initializer() from here, because the initializer
+        // itself will call malloc().
+        if((profilerInitialized != INITIALIZED) || (!selfmapInitialized)) {
+            void* ptr= myMalloc (sz);
+            //fprintf(stderr, "malloc0... %p %d\n", ptr, sz);
+            return ptr;
+            //return myMalloc (sz);
+        }
 
-		if (!inRealMain) return RealX::malloc(sz);
+        //Malloc is being called by a thread that is already in malloc
+        if (inAllocation) {
+            void* ptr = RealX::malloc(sz);
+            //fprintf(stderr, "malloc... %p %d\n", ptr, sz);
+            return ptr;
+            //return RealX::malloc(sz);
+        }
 
-		//thread_local
-		inAllocation = true;
-
-		PMU_init_check();
-
+        if (!inRealMain) {
+            void* ptr = RealX::malloc(sz);
+            //fprintf(stderr, "malloc... %p %d\n", ptr, sz);
+            return ptr;
+            //return RealX::malloc(sz);
+        }
+        //thread_local
+        inAllocation = true;
+        PMU_init_check();
 		if (!localFreeArrayInitialized) initLocalFreeArray();
 
 		//Data we need for each allocation
 		allocation_metadata allocData = init_allocation(sz, MALLOC);
 		void* object;
-
 		//Do before
 		doBefore(&allocData);
-
 		//Do allocation
+        //fprintf(stderr, "malloc %d\n", sz);
 		object = RealX::malloc(sz);
+        //fprintf(stderr, "malloc done %d %p\n", sz, object);
 		allocData.address = (uint64_t) object;
-
-    size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject((void *)allocData.address, allocData.size, false);
+        size_t new_touched_bytes =
+            PAGESIZE * ShadowMemory::updateObject(
+            (void *)allocData.address,allocData.size, false);
 		incrementMemoryUsage(sz, new_touched_bytes, object);
 
 		//Do after
@@ -520,14 +533,13 @@ extern "C" {
 
 		// Gets overhead, address usage, mmap usage, memHWM, and prefInfo
 		analyzeAllocation(&allocData);
-
 		// thread_local
-		inAllocation = false;
-
-		return object;
+        inAllocation = false;
+        return object;
 	}
 
 	void * yycalloc(size_t nelem, size_t elsize) {
+	    //fprintf(stderr, "yycalloc... %d %d\n", nelem, elsize);
 		if((nelem * elsize) == 0) {
 				return NULL;
 		}
@@ -582,21 +594,19 @@ extern "C" {
 	}
 
 	void yyfree(void * ptr) {
+        //fprintf(stderr, "free...%p\n", ptr);
 		if (!realInitialized) RealX::initializer();
 		if(ptr == NULL) return;
-
 		// Determine whether the specified object came from our global memory;
 		// only call RealX::free() if the object did not come from here.
 		if (ptr >= (void *)myMem && ptr <= myMemEnd) {
 			myFree (ptr);
 			return;
 		}
-
 		if ((profilerInitialized != INITIALIZED) || !inRealMain) {
 			myFree(ptr);
 			return;
 		}
-
 		PMU_init_check();
 
 		//thread_local
@@ -614,51 +624,60 @@ extern "C" {
 		//Do before free
 		doBefore(&allocData);
 
-    decrementMemoryUsage(ptr);
+        decrementMemoryUsage(ptr);
 		ShadowMemory::updateObject(ptr, 0, true);
 
 		//Update free counters
 		allocData.classSize = updateFreeCounters(ptr);
-
+        //fprintf(stderr, "free\n");
 		//Do free
 		RealX::free(ptr);
 
 		//Do after free
 		doAfter(&allocData);
 
-    //thread_local
-    inAllocation = false;
-
-		cycles_free += (allocData.tsc_after - allocData.tsc_before);
-
-		localTAD.numFrees++;
-		localTAD.cycles_free += (allocData.tsc_after - allocData.tsc_before);
-		localTAD.numDeallocationFaults += allocData.after.faults - allocData.before.faults;
-		localTAD.numDeallocationTlbReadMisses += allocData.after.tlb_read_misses - allocData.before.tlb_read_misses;
-		localTAD.numDeallocationTlbWriteMisses += allocData.after.tlb_write_misses - allocData.before.tlb_write_misses;
-		localTAD.numDeallocationCacheMisses += allocData.after.cache_misses - allocData.before.cache_misses;
-		localTAD.numDeallocationInstrs += allocData.after.instructions - allocData.before.instructions;
-
-		/*
-		// DEBUG BLOCK
-		if((allocData.after.instructions - allocData.before.instructions) != 0) {
-			fprintf(stderr, "Free from thread %d\n"
-					"Num faults:              %ld\n"
-					"Num TLB read misses:     %ld\n"
-					"Num TLB write misses:    %ld\n"
-					"Num cache misses:        %ld\n"
-					"Num instructions:        %ld\n\n",
-					allocData.tid, allocData.after.faults - allocData.before.faults,
-					allocData.after.tlb_read_misses - allocData.before.tlb_read_misses,
-					allocData.after.tlb_write_misses - allocData.before.tlb_write_misses,
-					allocData.after.cache_misses - allocData.before.cache_misses,
-					allocData.after.instructions - allocData.before.instructions);
-		}
-		*/
-	}
+        //thread_local
+        cycles_free += (allocData.tsc_after - allocData.tsc_before);
+        if (!globalized) {
+            localTAD.numFrees++;
+            localTAD.cycles_free += (allocData.tsc_after - allocData.tsc_before);
+            localTAD.numDeallocationFaults += allocData.after.faults - allocData.before.faults;
+            localTAD.numDeallocationTlbReadMisses += allocData.after.tlb_read_misses - allocData.before.tlb_read_misses;
+            localTAD.numDeallocationTlbWriteMisses += allocData.after.tlb_write_misses - allocData.before.tlb_write_misses;
+            localTAD.numDeallocationCacheMisses += allocData.after.cache_misses - allocData.before.cache_misses;
+            localTAD.numDeallocationInstrs += allocData.after.instructions - allocData.before.instructions;
+        } else {
+            globalize_lck.lock();
+            globalTAD.numFrees++;
+            globalTAD.cycles_free += (allocData.tsc_after - allocData.tsc_before);
+            globalTAD.numDeallocationFaults += allocData.after.faults - allocData.before.faults;
+            globalTAD.numDeallocationTlbReadMisses += allocData.after.tlb_read_misses - allocData.before.tlb_read_misses;
+            globalTAD.numDeallocationTlbWriteMisses += allocData.after.tlb_write_misses - allocData.before.tlb_write_misses;
+            globalTAD.numDeallocationCacheMisses += allocData.after.cache_misses - allocData.before.cache_misses;
+            globalTAD.numDeallocationInstrs += allocData.after.instructions - allocData.before.instructions;
+            globalize_lck.unlock();
+        }
+        inAllocation = false;
+        /*
+        // DEBUG BLOCK
+        if((allocData.after.instructions - allocData.before.instructions) != 0) {
+            fprintf(stderr, "Free from thread %d\n"
+                    "Num faults:              %ld\n"
+                    "Num TLB read misses:     %ld\n"
+                    "Num TLB write misses:    %ld\n"
+                    "Num cache misses:        %ld\n"
+                    "Num instructions:        %ld\n\n",
+                    allocData.tid, allocData.after.faults - allocData.before.faults,
+                    allocData.after.tlb_read_misses - allocData.before.tlb_read_misses,
+                    allocData.after.tlb_write_misses - allocData.before.tlb_write_misses,
+                    allocData.after.cache_misses - allocData.before.cache_misses,
+                    allocData.after.instructions - allocData.before.instructions);
+        }
+        */
+    }
 
 	void * yyrealloc(void * ptr, size_t sz) {
-
+	    //fprintf(stderr, "yyrealloc...%p, %d\n", ptr, sz);
 		if (!realInitialized) RealX::initializer();
 		if((profilerInitialized != INITIALIZED) || (ptr >= (void *)myMem && ptr <= myMemEnd)) {
 			if(ptr == NULL) {
@@ -997,7 +1016,8 @@ void getBlowup (size_t size, size_t classSize, bool* reused) {
 		if (localFreeArray[class_size_index] > 0) {
 			*reused = true;
 			localFreeArray[class_size_index]--;
-			if (globalFreeArray[class_size_index] > 0) globalFreeArray[class_size_index]--;
+			if (globalFreeArray[class_size_index] > 0)
+			    globalFreeArray[class_size_index]--;
 			return;
 		}
 
@@ -1167,14 +1187,11 @@ void* myMalloc (size_t size) {
 }
 
 void myFree (void* ptr) {
-
 	if (ptr == NULL) return;
-
 	if (ptr >= myLocalMem && ptr <= myLocalMemEnd) {
 		myLocalFree(ptr);
 		return;
 	}
-
 	myMemLock.lock();
 	if (ptr >= (void*)myMem && ptr <= myMemEnd) {
 		myMemAllocations--;
@@ -1184,8 +1201,12 @@ void myFree (void* ptr) {
 }
 
 void globalizeTAD() {
-	globalize_lck.lock();
-	globalTAD.numAllocationFaults += localTAD.numAllocationFaults;
+    globalize_lck.lock();
+    if (globalized) {
+        fprintf(stderr, "The thread %lld has been globalized!\n", gettid());
+    }
+
+    globalTAD.numAllocationFaults += localTAD.numAllocationFaults;
 	globalTAD.numAllocationTlbReadMisses += localTAD.numAllocationTlbReadMisses;
 	globalTAD.numAllocationTlbWriteMisses += localTAD.numAllocationTlbWriteMisses;
 	globalTAD.numAllocationCacheMisses += localTAD.numAllocationCacheMisses;
@@ -1218,11 +1239,10 @@ void globalizeTAD() {
 	globalTAD.cycles_alloc += localTAD.cycles_alloc;
 	globalTAD.cycles_allocFFL += localTAD.cycles_allocFFL;
 	globalTAD.cycles_free += localTAD.cycles_free;
-
 	globalTAD.numAllocs += localTAD.numAllocs;
 	globalTAD.numAllocsFFL += localTAD.numAllocsFFL;
 	globalTAD.numFrees += localTAD.numFrees;
-
+    globalized = true;
 	globalize_lck.unlock();
 }
 
@@ -1259,7 +1279,6 @@ void writeThreadMaps () {
 	fprintf (thrData.output, "total allocations (reused)     %10.0lf\n", numAllocsFFL);
 	fprintf (thrData.output, "total deallocations            %10.0lf\n", numFrees);
 	fprintf (thrData.output, "\n");
-
   fprintf (thrData.output, "\n>>>>>>>>>>>>>>>    NEW ALLOCATIONS : total (average)    <<<<<<<<<<<<<<<\n");
 	fprintf (thrData.output, "allocation cycles              %20lu    avg = %0.1lf\n", globalTAD.cycles_alloc, (globalTAD.cycles_alloc / numAllocs));
 	fprintf (thrData.output, "allocation faults              %20lu    avg = %0.1lf\n", globalTAD.numAllocationFaults, (globalTAD.numAllocationFaults / numAllocs));
@@ -1467,13 +1486,16 @@ bool mappingEditor (void* addr, size_t len, int prot) {
 }
 
 void doBefore (allocation_metadata *metadata) {
+    //printf(stderr, "Dobefore, %d, %d\n", metadata->size, metadata->type);
 	getPerfCounts(&(metadata->before), true);
 	metadata->tsc_before = rdtscp();
 }
 
 void doAfter (allocation_metadata *metadata) {
+    //fprintf(stderr, "Doafter, %d, %d\n", metadata->size, metadata->type);
+    metadata->tsc_after = rdtscp();
 	getPerfCounts(&(metadata->after), false);
-	metadata->tsc_after = rdtscp();
+
 }
 
 void incrementGlobalMemoryAllocation(size_t size, size_t classsize) {
@@ -1494,7 +1516,8 @@ void checkGlobalMemoryUsage() {
   }
 }
 
-void incrementMemoryUsage(size_t size, size_t new_touched_bytes, void * object) {
+void incrementMemoryUsage(
+        size_t size, size_t new_touched_bytes, void * object) {
 		size_t classSize = 0;
 		if(bibop) {
 				classSize = getClassSizeFor(size);
@@ -1541,31 +1564,55 @@ void decrementMemoryUsage(void* addr) {
 }
 
 void collectAllocMetaData(allocation_metadata *metadata) {
-	if (!metadata->reused) {
-		cycles_alloc += metadata->cycles;
-		localTAD.cycles_alloc += metadata->cycles;
-		localTAD.numAllocs++;
-		localTAD.numAllocationFaults += metadata->after.faults - metadata->before.faults;
-		localTAD.numAllocationTlbReadMisses += metadata->after.tlb_read_misses - metadata->before.tlb_read_misses;
-		localTAD.numAllocationTlbWriteMisses += metadata->after.tlb_write_misses - metadata->before.tlb_write_misses;
-		localTAD.numAllocationCacheMisses += metadata->after.cache_misses - metadata->before.cache_misses;
-		localTAD.numAllocationInstrs += metadata->after.instructions - metadata->before.instructions;
-	} else {
-		cycles_allocFFL += metadata->cycles;
-		localTAD.cycles_allocFFL += metadata->cycles;
-		localTAD.numAllocsFFL++;
-		localTAD.numAllocationFaultsFFL += metadata->after.faults - metadata->before.faults;
-		localTAD.numAllocationTlbReadMissesFFL += metadata->after.tlb_read_misses - metadata->before.tlb_read_misses;
-		localTAD.numAllocationTlbWriteMissesFFL += metadata->after.tlb_write_misses - metadata->before.tlb_write_misses;
-		localTAD.numAllocationCacheMissesFFL += metadata->after.cache_misses - metadata->before.cache_misses;
-		localTAD.numAllocationInstrsFFL += metadata->after.instructions - metadata->before.instructions;
-	}
+    if (!globalized) {
+        if (!metadata->reused) {
+            cycles_alloc += metadata->cycles;
+            localTAD.cycles_alloc += metadata->cycles;
+            localTAD.numAllocs++;
+            localTAD.numAllocationFaults += metadata->after.faults - metadata->before.faults;
+            localTAD.numAllocationTlbReadMisses += metadata->after.tlb_read_misses - metadata->before.tlb_read_misses;
+            localTAD.numAllocationTlbWriteMisses += metadata->after.tlb_write_misses - metadata->before.tlb_write_misses;
+            localTAD.numAllocationCacheMisses += metadata->after.cache_misses - metadata->before.cache_misses;
+            localTAD.numAllocationInstrs += metadata->after.instructions - metadata->before.instructions;
+        } else {
+            cycles_allocFFL += metadata->cycles;
+            localTAD.cycles_allocFFL += metadata->cycles;
+            localTAD.numAllocsFFL++;
+            localTAD.numAllocationFaultsFFL += metadata->after.faults - metadata->before.faults;
+            localTAD.numAllocationTlbReadMissesFFL += metadata->after.tlb_read_misses - metadata->before.tlb_read_misses;
+            localTAD.numAllocationTlbWriteMissesFFL += metadata->after.tlb_write_misses - metadata->before.tlb_write_misses;
+            localTAD.numAllocationCacheMissesFFL += metadata->after.cache_misses - metadata->before.cache_misses;
+            localTAD.numAllocationInstrsFFL += metadata->after.instructions - metadata->before.instructions;
+        }
+    } else {
+        globalize_lck.lock();
+        if (!metadata->reused) {
+            cycles_alloc += metadata->cycles;
+            globalTAD.cycles_alloc += metadata->cycles;
+            globalTAD.numAllocs++;
+            globalTAD.numAllocationFaults += metadata->after.faults - metadata->before.faults;
+            globalTAD.numAllocationTlbReadMisses += metadata->after.tlb_read_misses - metadata->before.tlb_read_misses;
+            globalTAD.numAllocationTlbWriteMisses += metadata->after.tlb_write_misses - metadata->before.tlb_write_misses;
+            globalTAD.numAllocationCacheMisses += metadata->after.cache_misses - metadata->before.cache_misses;
+            globalTAD.numAllocationInstrs += metadata->after.instructions - metadata->before.instructions;
+        } else {
+            cycles_allocFFL += metadata->cycles;
+            globalTAD.cycles_allocFFL += metadata->cycles;
+            globalTAD.numAllocsFFL++;
+            globalTAD.numAllocationFaultsFFL += metadata->after.faults - metadata->before.faults;
+            globalTAD.numAllocationTlbReadMissesFFL += metadata->after.tlb_read_misses - metadata->before.tlb_read_misses;
+            globalTAD.numAllocationTlbWriteMissesFFL += metadata->after.tlb_write_misses - metadata->before.tlb_write_misses;
+            globalTAD.numAllocationCacheMissesFFL += metadata->after.cache_misses - metadata->before.cache_misses;
+            globalTAD.numAllocationInstrsFFL += metadata->after.instructions - metadata->before.instructions;
+        }
+        globalize_lck.unlock();
+    }
 }
 
 void analyzePerfInfo(allocation_metadata *metadata) {
 	collectAllocMetaData(metadata);
 
-	/*
+/*
 	// DEBUG BLOCK
 	if((metadata->after.instructions - metadata->before.instructions) != 0) {
 		fprintf(stderr, "Malloc from thread       %d\n"
@@ -1582,7 +1629,7 @@ void analyzePerfInfo(allocation_metadata *metadata) {
 				metadata->after.cache_misses - metadata->before.cache_misses,
 				metadata->after.instructions - metadata->before.instructions);
 	}
-	*/
+*/
 }
 
 void readAllocatorFile() {
@@ -1591,7 +1638,6 @@ void readAllocatorFile() {
 	FILE* infile = nullptr;
 	char* buffer = (char*) myMalloc(bufferSize);
 	char* token;
-
 	fprintf(stderr, "Opening allocator info file %s...\n", allocatorFileName);
 	if ((infile = fopen (allocatorFileName, "r")) == NULL) {
 		perror("Failed to open allocator info file");
@@ -1618,7 +1664,6 @@ void readAllocatorFile() {
 			num_class_sizes = atoi(token);
 
 			class_sizes = (size_t*) myMalloc (num_class_sizes*sizeof(size_t));
-
 			for (int i = 0; i < num_class_sizes; i++) {
 				token = strtok(NULL, " ");
 				class_sizes[i] = (size_t) atoi(token);
@@ -1962,8 +2007,10 @@ void calcAppFriendliness() {
 		unsigned long totalCacheBytes = __atomic_load_n(&globalFriendlyData.numCacheBytes, __ATOMIC_SEQ_CST);
 		unsigned long totalPageBytes = __atomic_load_n(&globalFriendlyData.numPageBytes, __ATOMIC_SEQ_CST);
 
-		double avgTotalCacheUtil = (double) totalCacheBytes / (totalAccesses * CACHELINE_SIZE);
-		double avgTotalPageUtil = (double) totalPageBytes / (totalAccesses * PAGESIZE);
+		double avgTotalCacheUtil =
+		        (double) totalCacheBytes / (totalAccesses * CACHELINE_SIZE);
+		double avgTotalPageUtil =
+		        (double) totalPageBytes / (totalAccesses * PAGESIZE);
 		FILE * outfd = thrData.output;
 		//FILE * outfd = stderr;
 		fprintf(outfd, "num sampled accesses       = %ld\n", totalAccesses);

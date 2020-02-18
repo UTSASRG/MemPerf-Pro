@@ -333,7 +333,8 @@ int madvise(void *addr, size_t length, int advice){
 // SBRK
 void *sbrk(intptr_t increment){
   if (!realInitialized) RealX::initializer();
-  if(profilerInitialized != INITIALIZED || !inAllocation) return RealX::sbrk(increment);
+  if(profilerInitialized != INITIALIZED || !inAllocation)
+      return RealX::sbrk(increment);
 
   uint64_t timeStart = rdtscp();
   void *retptr = RealX::sbrk(increment);

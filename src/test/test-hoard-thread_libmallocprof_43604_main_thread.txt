@@ -1,0 +1,98 @@
+>>> stack start @ 0x7ffe7a4b00e0, stack end @ 0x7ffe7a4b0140
+>>> program break @ 0x55d686418000
+>>> class_sizes 16 32 64 128 256 512 1024 2048 4096 
+>>> malloc_mmaps                                  7
+>>> large_object_threshold                     4096
+>>> num_madvise                                   0
+>>> num_sbrk                                      0
+>>> size_sbrk                                     0
+>>> cycles_alloc                             982778
+>>> cycles_allocFFL                               0
+>>> cycles_free                               27426
+>>> total_global_cycles                    36414344
+
+>>>>>>>>>>>>>>>    NEW ALLOCATIONS : total (average)    <<<<<<<<<<<<<<<
+total allocations (new)                 3
+total allocations (reused)              1
+total deallocations                     1
+
+
+>>>>>>>>>>>>>>>    NEW ALLOCATIONS : total (average)    <<<<<<<<<<<<<<<
+allocation cycles                            982778    avg = 327592.7
+allocation faults                                49    avg = 16.3
+allocation tlb read misses                       49    avg = 16.3
+allocation tlb write misses                     157    avg = 52.3
+allocation cache misses                          30    avg = 10.0
+num allocation instr                         156239    avg = 52079.7
+
+
+>>>>>>>>>>>>>>>  FREELIST ALLOCATIONS : total (average) <<<<<<<<<<<<<<<
+allocation cycles                                 0    avg = 0.0
+allocation faults                                 0    avg = 0.0
+allocation tlb read misses                        0    avg = 0.0
+allocation tlb write misses                       0    avg = 0.0
+allocation cache misses                           0    avg = 0.0
+num allocation instr                              0    avg = 0.0
+
+
+>>>>>>>>>>>>>>>     DEALLOCATIONS : total (average)     <<<<<<<<<<<<<<<
+deallocation cycles                               0    avg = 0.0
+deallocation faults                               0    avg = 0.0
+deallocation tlb read misses                      0    avg = 0.0
+deallocation tlb write misses                     0    avg = 0.0
+deallocation cache misses                         0    avg = 0.0
+num deallocation instr                            0    avg = 0.0
+
+>>>>>>>>>>>>>>>               LOCK TOTALS               <<<<<<<<<<<<<<<
+num pthread mutex locks                           0
+num pthread trylocks                              0
+num pthread spin locks                            0
+num pthread spin trylocks                         0
+
+>>>>>>>>>>>>>>>>>>>>>>>>>> Thread Contention <<<<<<<<<<<<<<<<<<<<<<<<<<
+
+>>> mutex_waits                                   0
+>>> mutex_wait_cycles                             0    avg = 0.0
+>>> mutex_trylock_waits                           0
+>>> mutex_trylock_fails                           0
+>>> spinlock_waits                                0
+>>> spinlock_wait_cycles                          0    avg = 0.0
+>>> spin_trylock_waits                            0
+>>> spin_trylock_fails                            0
+>>> mmap_waits                                    7
+>>> mmap_wait_cycles                          52568    avg = 7509.7
+>>> sbrk_waits                                    0
+>>> sbrk_wait_cycles                              0    avg = 0.0
+>>> madvise_waits                                 0
+>>> madvise_wait_cycles                           0    avg = 0.0
+>>> munmap_waits                                  6
+>>> munmap_wait_cycles                        72012    avg = 12002.0
+>>> mremap_waits                                  0
+>>> mremap_wait_cycles                            0    avg = 0.0
+>>> mprotect_waits                                0
+>>> mprotect_wait_cycle                           0    avg = 0.0
+
+>>> critical_section_counter                      0
+>>> critical_section_duration                     0    avg = 0.0
+
+
+>>>>>>>>>>>>>>>>>>>>>>>>>> Total Memory Usage <<<<<<<<<<<<<<<<<<<<<<<<<
+
+>>> Thread Counter:
+>>> maxRealMemoryUsage                          336
+>>> maxRealAllocMemoryUsage                     528
+>>> maxTotalMemoryUsage                        8192
+
+>>> Global Counter:
+>>> realMemoryUsage                             368
+>>> realAllocatedMemoryUsage                    560
+>>> totalMemoryUsage                          12288
+
+>>>>>>>>>>>>>>>>>>>>>>>>> Detailed Lock Usage <<<<<<<<<<<<<<<<<<<<<<<<<
+num sampled accesses       = 3
+total cache bytes accessed = 192
+total page bytes accessed  = 960
+cache line writes          = 0
+cache owner conflicts      = 0 ( 0.0000%)
+avg. cache utilization     = 100.000%
+avg. page utilization      =  7.812%

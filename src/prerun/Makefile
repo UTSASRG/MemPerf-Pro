@@ -18,11 +18,13 @@ TARGETS =	libmallochelp.so	\
 			prerun-obsd			\
 			prerun-freeguard	\
 			prerun-tcmalloc		\
-			prerun-jemalloc
+			prerun-jemalloc     \
+			prerun-tcmalloc-minimal
 
 LIBRARY = ./libmallochelp.so
 RUNFILE = runlib.cpp
 
+NUMALLOC_LIBC = /media/umass/datasystem/xin/numalloc/source/libnumalloc.so
 XLIBC = $(HOME)/libc-2.24/libmalloc.so
 FREEGUARD = $(HOME)/FreeGuard/libfreeguard.so
 OBSD = $(HOME)/Memoryallocators/OpenBSD-6.0/libomalloc.so
@@ -47,14 +49,23 @@ prerun-obsd: libmallochelp.so $(RUNFILE)
 prerun-freeguard: libmallochelp.so $(RUNFILE)
 	$(CXX) $(CFLAGS) -rdynamic $(LIBRARY) -rdynamic $(FREEGUARD) $(RUNFILE) -o prerun-freeguard
 
+prerun-numalloc: libmallochelp.so $(RUNFILE)
+	$(CXX) $(CFLAGS) -rdynamic $(LIBRARY) -rdynamic $(NUMALLOC_LIBC) $(RUNFILE) -o prerun-numalloc
+
 prerun-tcmalloc: libmallochelp.so $(RUNFILE)
-	$(CXX) $(CFLAGS) -rdynamic $(LIBRARY) -ltcmalloc $(RUNFILE) -o prerun-tcmalloc 
+	$(CXX) $(CFLAGS) -rdynamic $(LIBRARY) -ltcmalloc $(RUNFILE) -o prerun-tcmalloc
+
+prerun-tcmalloc-minimal: libmallochelp.so $(RUNFILE)
+	$(CXX) $(CFLAGS) -rdynamic $(LIBRARY) -ltcmalloc_minimal $(RUNFILE) -o prerun-tcmalloc-minimal
 
 prerun-jemalloc: libmallochelp.so $(RUNFILE)
 	$(CXX) $(CFLAGS) -rdynamic $(LIBRARY) -ljemalloc $(RUNFILE) -o prerun-jemalloc 
 
-prerun-hoard: libhoard.so $(RUNFILE)
-	$(CXX) $(CFLAGS) -rdynamic $(LIBRARY) -lhoard $(RUNFILE) -o prerun-hoard 
+prerun-hoard: libmallochelp.so $(RUNFILE)
+	$(CXX) $(CFLAGS) -rdynamic $(LIBRARY) -rdynamic $(HOARD) $(RUNFILE) -o prerun-hoard
+
+#prerun-hoard: libhoard.so $(RUNFILE)
+#	$(CXX) $(CFLAGS) -rdynamic $(LIBRARY) -lhoard $(RUNFILE) -o prerun-hoard
 
 .PHONY: clean
 clean:
