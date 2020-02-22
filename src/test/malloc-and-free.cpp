@@ -61,6 +61,7 @@ void* thread_start (void* arg) {
 
 	for (int i = 0; i < numMallocs; i++) {
 	    size = (size_t) (lrand48() % 1000) + 8;
+	    //size = sizeof(int);
 		pointer[i] = malloc (size);
 	}
 	for (int i = 0; i < numMallocs; i++) {

@@ -101,6 +101,12 @@ std::atomic<std::uint64_t> cycles_alloc (0);
 std::atomic<std::uint64_t> cycles_allocFFL (0);
 std::atomic<std::uint64_t> cycles_free (0);
 
+uint64_t * realMemoryUsageBySizes = nullptr;
+uint64_t * memoryUsageBySizes = nullptr;
+uint64_t * freedMemoryUsageBySizes = nullptr;
+uint64_t * realMemoryUsageBySizesWhenMax = nullptr;
+uint64_t * memoryUsageBySizesWhenMax = nullptr;
+uint64_t * freedMemoryUsageBySizesWhenMax = nullptr;
 MemoryUsage mu;
 MemoryUsage max_mu;
 
@@ -285,6 +291,13 @@ __attribute__((constructor)) initStatus initializer() {
     initLocalNumAllocsFFLBySizes();
     initGlobalnumAllocsBySizes();
     initGlobalnumAllocsFFLBySizes();
+
+    initRealMemoryUsageBySizes();
+    initMemoryUsageBySizes();
+    initFreedMemoryUsageBySizes();
+    initRealMemoryUsageBySizesWhenMax();
+    initMemoryUsageBySizesWhenMax();
+    initFreedMemoryUsageBySizesWhenMax();
 
 	// Generate the name of our output file, then open it for writing.
 	char outputFile[MAX_FILENAME_LEN];
@@ -474,7 +487,6 @@ extern "C" int libmallocprof_libc_start_main(main_fn_t main_fn, int argc,
 // Memory management functions
 extern "C" {
 	void * yymalloc(size_t sz) {
-	    if (gettid() == getpid())
         if(sz == 0) {
             return NULL;
         }
@@ -1313,12 +1325,22 @@ void writeThreadMaps () {
 	double numAllocs = safeDivisor(globalTAD.numAllocs);
 	double numAllocsFFL = safeDivisor(globalTAD.numAllocsFFL);
 	double numFrees = safeDivisor(globalTAD.numFrees);
+    fprintf (thrData.output, "\n>>>>>>>>>>>>>>>     Total Memory Usage When Max Overload : for class_sizes    <<<<<<<<<<<<<<<\n");
+    if (bibop) for(int i = 0; i < num_class_sizes; ++i) {
+            fprintf(thrData.output, "class size index: %10d real: %10lu memory: %10lu wasted: %10lu freed: %10lu\n",
+                    i, realMemoryUsageBySizesWhenMax[i], memoryUsageBySizesWhenMax[i],
+                    memoryUsageBySizesWhenMax[i]-realMemoryUsageBySizesWhenMax[i], freedMemoryUsageBySizesWhenMax[i]);
+    } else for(int i = 0; i < 2; ++i) {
+            fprintf(thrData.output, "class size index: %10d real: %10lu memory: %10lu wasted: %10lu freed: %10lu\n",
+                    i, realMemoryUsageBySizesWhenMax[i], memoryUsageBySizesWhenMax[i],
+                    memoryUsageBySizesWhenMax[i]-realMemoryUsageBySizesWhenMax[i], freedMemoryUsageBySizesWhenMax[i]);
+    }
     fprintf (thrData.output, "\n>>>>>>>>>>>>>>>    NEW ALLOCATIONS : for class_sizes    <<<<<<<<<<<<<<<\n");
     if (bibop) for(int i = 0; i < num_class_sizes; ++i) {
             fprintf(thrData.output, "class size index: %10d new alloc: %10lu reused alloc: %10lu\n", i, globalNumAllocsBySizes[i], globalNumAllocsFFLBySizes[i]);
-    } else for(int i = 0; i < 2; ++i) {
+        } else for(int i = 0; i < 2; ++i) {
             fprintf(thrData.output, "class size index: %10d new alloc: %10lu reused alloc: %10lu\n", i, globalNumAllocsBySizes[i], globalNumAllocsFFLBySizes[i]);
-    }
+        }
   fprintf (thrData.output, "\n>>>>>>>>>>>>>>>    NEW ALLOCATIONS : total (average)    <<<<<<<<<<<<<<<\n");
 	fprintf (thrData.output, "total allocations (new)        %20lu\n", globalTAD.numAllocs);
 	fprintf (thrData.output, "total allocations (reused)     %20lu\n", globalTAD.numAllocsFFL);
@@ -1553,6 +1575,53 @@ void decrementGlobalMemoryAllocation(size_t size, size_t classsize) {
   __atomic_sub_fetch(&mu.realAllocatedMemoryUsage, classsize, __ATOMIC_RELAXED);
 }
 
+void incrementGlobalMemoryAllocationBySizes(size_t size, size_t classsize) {
+    short classSizeIndex = getClassSizeIndex(classsize);
+    __atomic_add_fetch(&realMemoryUsageBySizes[classSizeIndex], size, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&memoryUsageBySizes[classSizeIndex], classsize, __ATOMIC_RELAXED);
+}
+
+void decrementGlobalMemoryAllocationBySizes(size_t size, size_t classsize) {
+    short classSizeIndex = getClassSizeIndex(classsize);
+    __atomic_sub_fetch(&realMemoryUsageBySizes[classSizeIndex], size, __ATOMIC_RELAXED);
+    __atomic_sub_fetch(&memoryUsageBySizes[classSizeIndex], classsize, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&freedMemoryUsageBySizes[classSizeIndex], classsize, __ATOMIC_RELAXED);
+}
+
+void checkGlobalMemoryUsageBySizes() {
+    if(mu.realAllocatedMemoryUsage > max_mu.realAllocatedMemoryUsage) {
+        if (bibop) {
+            memcpy(realMemoryUsageBySizesWhenMax, realMemoryUsageBySizes, num_class_sizes*sizeof(uint64_t));
+            memcpy(memoryUsageBySizesWhenMax, memoryUsageBySizes, num_class_sizes*sizeof(uint64_t));
+            memcpy(freedMemoryUsageBySizesWhenMax, freedMemoryUsageBySizes, num_class_sizes*sizeof(uint64_t));
+        } else {
+            memcpy(realMemoryUsageBySizesWhenMax, realMemoryUsageBySizes, 2*sizeof(uint64_t));
+            memcpy(memoryUsageBySizesWhenMax, memoryUsageBySizes, 2*sizeof(uint64_t));
+            memcpy(freedMemoryUsageBySizesWhenMax, freedMemoryUsageBySizes, 2*sizeof(uint64_t));
+        }
+    }
+}
+
+void checkGlobalRealMemoryUsage() {
+    if(mu.realMemoryUsage > max_mu.realMemoryUsage) {
+        max_mu.realMemoryUsage = mu.realMemoryUsage;
+    }
+}
+
+void checkGlobalAllocatedMemoryUsage() {
+    if(mu.realAllocatedMemoryUsage > max_mu.realAllocatedMemoryUsage) {
+        max_mu.realAllocatedMemoryUsage = mu.realAllocatedMemoryUsage;
+    }
+}
+
+
+void checkGlobalTotalMemoryUsage() {
+    if(mu.totalMemoryUsage > max_mu.maxTotalMemoryUsage) {
+        max_mu.maxTotalMemoryUsage = mu.totalMemoryUsage;
+        max_mu.totalMemoryUsage = mu.totalMemoryUsage;
+    }
+}
+
 void checkGlobalMemoryUsage() {
   MemoryUsage mu_tmp = mu;
   if(mu_tmp.totalMemoryUsage > max_mu.maxTotalMemoryUsage) {
@@ -1572,19 +1641,27 @@ void incrementMemoryUsage(
 
 		current_tc->realMemoryUsage += size;
 		current_tc->realAllocatedMemoryUsage += classSize;
-
+        if(current_tc->realAllocatedMemoryUsage > current_tc->maxRealAllocatedMemoryUsage) {
+            current_tc->maxRealAllocatedMemoryUsage = current_tc->realAllocatedMemoryUsage;
+        }
+        if(current_tc->realMemoryUsage > current_tc->maxRealMemoryUsage) {
+            current_tc->maxRealMemoryUsage = current_tc->realMemoryUsage;
+        }
 		incrementGlobalMemoryAllocation(size, classSize);
+
+        incrementGlobalMemoryAllocationBySizes(size, classSize);
+    checkGlobalMemoryUsageBySizes();
+
+    checkGlobalRealMemoryUsage();
+    checkGlobalAllocatedMemoryUsage();
 
 		if(new_touched_bytes > 0) {
 				current_tc->totalMemoryUsage += new_touched_bytes;
 				__atomic_add_fetch(&mu.totalMemoryUsage, new_touched_bytes, __ATOMIC_RELAXED);
 				if(current_tc->totalMemoryUsage > current_tc->maxTotalMemoryUsage) {
-						current_tc->maxRealAllocatedMemoryUsage = current_tc->realAllocatedMemoryUsage;
-						current_tc->maxRealMemoryUsage = current_tc->realMemoryUsage;
-						current_tc->maxTotalMemoryUsage = current_tc->totalMemoryUsage;
+				    current_tc->maxTotalMemoryUsage = current_tc->totalMemoryUsage;
 				}
-
-				checkGlobalMemoryUsage();
+                checkGlobalTotalMemoryUsage();
 		}
 }
 
@@ -1603,9 +1680,9 @@ void decrementMemoryUsage(void* addr) {
 	current_tc->realMemoryUsage -= size;
 
   decrementGlobalMemoryAllocation(size, classSize);
-
-	#warning is this call really necessary?
-  checkGlobalMemoryUsage();
+    decrementGlobalMemoryAllocationBySizes(size, classSize);
+//	#warning is this call really necessary?
+//  checkGlobalMemoryUsage();
 }
 
 void collectAllocMetaData(allocation_metadata *metadata) {
@@ -1777,6 +1854,54 @@ void initGlobalnumAllocsFFLBySizes () {
         globalNumAllocsFFLBySizes = (uint64_t*) myMalloc(num_class_sizes*sizeof(uint64_t));
     } else {
         globalNumAllocsFFLBySizes = (uint64_t*) myMalloc(2*sizeof(uint64_t));
+    }
+}
+
+void initRealMemoryUsageBySizes() {
+    if (bibop) {
+        realMemoryUsageBySizes = (uint64_t*) myMalloc(num_class_sizes*sizeof(uint64_t));
+    } else {
+        realMemoryUsageBySizes = (uint64_t*) myMalloc(2*sizeof(uint64_t));
+    }
+}
+
+void initMemoryUsageBySizes() {
+    if (bibop) {
+        memoryUsageBySizes = (uint64_t*) myMalloc(num_class_sizes*sizeof(uint64_t));
+    } else {
+        memoryUsageBySizes = (uint64_t*) myMalloc(2*sizeof(uint64_t));
+    }
+}
+
+void initFreedMemoryUsageBySizes() {
+    if (bibop) {
+        freedMemoryUsageBySizes = (uint64_t*) myMalloc(num_class_sizes*sizeof(uint64_t));
+    } else {
+        freedMemoryUsageBySizes = (uint64_t*) myMalloc(2*sizeof(uint64_t));
+    }
+}
+
+void initRealMemoryUsageBySizesWhenMax() {
+    if (bibop) {
+        realMemoryUsageBySizesWhenMax = (uint64_t*) myMalloc(num_class_sizes*sizeof(uint64_t));
+    } else {
+        realMemoryUsageBySizesWhenMax = (uint64_t*) myMalloc(2*sizeof(uint64_t));
+    }
+}
+
+void initMemoryUsageBySizesWhenMax() {
+    if (bibop) {
+        memoryUsageBySizesWhenMax = (uint64_t*) myMalloc(num_class_sizes*sizeof(uint64_t));
+    } else {
+        memoryUsageBySizesWhenMax = (uint64_t*) myMalloc(2*sizeof(uint64_t));
+    }
+}
+
+void initFreedMemoryUsageBySizesWhenMax() {
+    if (bibop) {
+        freedMemoryUsageBySizesWhenMax = (uint64_t*) myMalloc(num_class_sizes*sizeof(uint64_t));
+    } else {
+        freedMemoryUsageBySizesWhenMax = (uint64_t*) myMalloc(2*sizeof(uint64_t));
     }
 }
 

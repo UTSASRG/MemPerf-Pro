@@ -37,6 +37,10 @@ extern MemoryUsage max_mu;
 extern HashMap <uint64_t, MmapTuple*, spinlock> mappings;
 extern HashMap <uint64_t, LC*, spinlock> lockUsage;
 
+void checkGlobalMemoryUsageBySizes();
+void checkGlobalRealMemoryUsage();
+void checkGlobalAllocatedMemoryUsage();
+void checkGlobalTotalMemoryUsage();
 void checkGlobalMemoryUsage();
 
 extern "C" {
@@ -436,7 +440,7 @@ void *mremap(void *old_address, size_t old_size, size_t new_size,
 };
 
 void writeThreadContention() {
-
+    fprintf(stderr, "writing\n");
     fprintf (thrData.output, "\n>>>>>>>>>>>>>>>>>>>>>>>>>> Thread Contention <<<<<<<<<<<<<<<<<<<<<<<<<<\n\n");
 
     size_t maxRealMemoryUsage = 0;

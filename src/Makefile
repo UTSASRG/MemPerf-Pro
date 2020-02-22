@@ -32,7 +32,7 @@ CFLAGS2 += -O0 -pipe -g3 -ggdb3 -Wall -DNDEBUG --std=c++11 -fPIC -I$(ROOT)/inclu
 # THREADTEST_FILE = malloc-and-free.cpp
 # TEST_FILE = malloc-and-free.cpp
 
-THREADTEST_FILE = malloc-then-free.cpp
+THREADTEST_FILE = malloc-and-free.cpp
 TEST_FILE = alloc.cpp
 
 NUM_THREADS = 20

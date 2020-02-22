@@ -239,6 +239,14 @@ void initLocalNumAllocsBySizes ();
 void initGlobalnumAllocsBySizes ();
 void initLocalNumAllocsFFLBySizes ();
 void initGlobalnumAllocsFFLBySizes ();
+
+void initRealMemoryUsageBySizes();
+void initMemoryUsageBySizes();
+void initFreedMemoryUsageBySizes();
+void initRealMemoryUsageBySizesWhenMax();
+void initMemoryUsageBySizesWhenMax();
+void initFreedMemoryUsageBySizesWhenMax();
+
 void initMyLocalMem();
 void* myLocalMalloc(size_t);
 void myLocalFree(void*);
