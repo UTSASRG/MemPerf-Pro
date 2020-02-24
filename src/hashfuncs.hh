@@ -1,4 +1,4 @@
-#if !defined(DOUBLETAKE_HASHFUNCS_H)
+#ifndef DOUBLETAKE_HASHFUNCS_H
 #define DOUBLETAKE_HASHFUNCS_H
 
 /*
@@ -25,7 +25,8 @@ public:
     return size_t(__h);
   }
 
-  static size_t hashInt(unsigned long x, size_t) { return x; }
+  //static size_t hashInt(unsigned long x, size_t) { return x; }
+  static size_t hashInt(int x, size_t) { return x; }
 
   static size_t hashLong(long x, size_t) { return x; }
 
@@ -49,7 +50,8 @@ public:
 
   static bool compareAddr(void* addr1, void* addr2, size_t) { return addr1 == addr2; }
 
-  static bool compareInt(unsigned long var1, unsigned long var2, size_t) { return var1 == var2; }
+//  static bool compareInt(unsigned long var1, unsigned long var2, size_t) { return var1 == var2; }
+    static bool compareInt(int var1, int var2, size_t) { return var1 == var2; }
 
   static bool compareCallsiteId(uint64_t var1, uint64_t var2, size_t) { return var1 == var2; }
 

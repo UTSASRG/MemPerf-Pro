@@ -21,6 +21,7 @@
 #include "spinlock.hh"
 #include "xthreadx.hh"
 #include "recordfunctions.hh"
+#include "memwaste.h"
 
 //Globals
 bool bibop = false;
@@ -299,6 +300,8 @@ __attribute__((constructor)) initStatus initializer() {
     initMemoryUsageBySizesWhenMax();
     initFreedMemoryUsageBySizesWhenMax();
 
+    MemoryWaste::initialize();
+
 	// Generate the name of our output file, then open it for writing.
 	char outputFile[MAX_FILENAME_LEN];
 	snprintf(outputFile, MAX_FILENAME_LEN, "%s_libmallocprof_%d_main_thread.txt",
@@ -433,6 +436,8 @@ void exitHandler() {
 		fclose(thrData.output);
 	}
 
+    MemoryWaste::reportMemory();
+
 	#warning Disabled smaps functionality (output)
 	/*
 	uint64_t avg;
@@ -547,7 +552,7 @@ extern "C" {
             PAGESIZE * ShadowMemory::updateObject(
             (void *)allocData.address,allocData.size, false);
 		incrementMemoryUsage(sz, new_touched_bytes, object);
-
+        MemoryWaste::allocUpdate(allocData.tid, allocData.size, object);
 		//Do after
 		//fprintf(stderr, "*** malloc(%zu) -> %p\n", sz, object);
 		doAfter(&allocData);
@@ -660,6 +665,8 @@ extern "C" {
 		doBefore(&allocData);
 
         decrementMemoryUsage(ptr);
+        uint64_t size = ShadowMemory::getObjectSize(ptr);
+        MemoryWaste::freeUpdate(allocData.tid, ptr);
 		ShadowMemory::updateObject(ptr, 0, true);
 
 		//Update free counters

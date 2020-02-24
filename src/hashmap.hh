@@ -1,4 +1,4 @@
-#if !defined(DOUBLETAKE_HASHMAP_H)
+#ifndef DOUBLETAKE_HASHMAP_H
 #define DOUBLETAKE_HASHMAP_H
 
 /*
@@ -21,8 +21,8 @@
 
 void* myMalloc (size_t size);
 void myFree();
-bool debug_hashmap = false;
-bool d_initialize = false;
+//bool debug_hashmap = false;
+//bool d_initialize = false;
 
 template <class KeyType,	// What is the key? A long or string
 			class ValueType,	// What is the value there?
