@@ -436,8 +436,6 @@ void exitHandler() {
 		fclose(thrData.output);
 	}
 
-    MemoryWaste::reportMemory();
-
 	#warning Disabled smaps functionality (output)
 	/*
 	uint64_t avg;
@@ -612,7 +610,7 @@ extern "C" {
 
     size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject((void *)allocData.address, allocData.size, false);
     incrementMemoryUsage(nelem * elsize, new_touched_bytes, object);
-
+        MemoryWaste::allocUpdate(allocData.tid, allocData.size, object);
 		// Do after
 		doAfter(&allocData);
 
@@ -776,6 +774,10 @@ extern "C" {
     size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject(object, sz, false);
 		if(object != ptr) {
       incrementMemoryUsage(sz, new_touched_bytes, object);
+      if(ptr){
+          MemoryWaste::freeUpdate(allocData.tid, ptr);
+      }
+      MemoryWaste::allocUpdate(allocData.tid, allocData.size, object);
     }
 		doAfter(&allocData);
 
@@ -1329,9 +1331,14 @@ void writeAllocData () {
 }
 
 void writeThreadMaps () {
+
+    MemoryWaste::reportMaxMemory(thrData.output);
+
 	double numAllocs = safeDivisor(globalTAD.numAllocs);
 	double numAllocsFFL = safeDivisor(globalTAD.numAllocsFFL);
 	double numFrees = safeDivisor(globalTAD.numFrees);
+
+	/*
     fprintf (thrData.output, "\n>>>>>>>>>>>>>>>     Total Memory Usage When Max Overload : for class_sizes    <<<<<<<<<<<<<<<\n");
     if (bibop) for(int i = 0; i < num_class_sizes; ++i) {
             fprintf(thrData.output, "class size index: %10d real: %10lu memory: %10lu wasted: %10lu freed: %10lu\n",
@@ -1347,7 +1354,8 @@ void writeThreadMaps () {
             fprintf(thrData.output, "class size index: %10d new alloc: %10lu reused alloc: %10lu\n", i, globalNumAllocsBySizes[i], globalNumAllocsFFLBySizes[i]);
         } else for(int i = 0; i < 2; ++i) {
             fprintf(thrData.output, "class size index: %10d new alloc: %10lu reused alloc: %10lu\n", i, globalNumAllocsBySizes[i], globalNumAllocsFFLBySizes[i]);
-        }
+        } */
+
   fprintf (thrData.output, "\n>>>>>>>>>>>>>>>    NEW ALLOCATIONS : total (average)    <<<<<<<<<<<<<<<\n");
 	fprintf (thrData.output, "total allocations (new)        %20lu\n", globalTAD.numAllocs);
 	fprintf (thrData.output, "total allocations (reused)     %20lu\n", globalTAD.numAllocsFFL);
@@ -1575,6 +1583,7 @@ void doAfter (allocation_metadata *metadata) {
 void incrementGlobalMemoryAllocation(size_t size, size_t classsize) {
   __atomic_add_fetch(&mu.realMemoryUsage, size, __ATOMIC_RELAXED);
   __atomic_add_fetch(&mu.realAllocatedMemoryUsage, classsize, __ATOMIC_RELAXED);
+  MemoryWaste::recordMemory((uint64_t)mu.realAllocatedMemoryUsage);
 }
 
 void decrementGlobalMemoryAllocation(size_t size, size_t classsize) {

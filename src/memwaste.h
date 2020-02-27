@@ -20,7 +20,6 @@
 extern int num_class_sizes;
 
 typedef struct {
-    size_t remain_size;
     pid_t tid;
     size_t size_using;
     size_t classSize;
@@ -28,21 +27,28 @@ typedef struct {
 
 class MemoryWaste{
 private:
-    static void initForNewTid(pid_t tid);
-    static void initForNewPage(void* pageidx);
-    static obj_status * newObjStatus(size_t remain_size, pid_t tid, size_t size_using, size_t classSize);
-
-public:
-    static HashMap <void*, HashMap<void*, bool*, spinlock>*, spinlock> objects_each_page;
     static HashMap <void*, obj_status*, spinlock> addr_obj_status;
     static HashMap <pid_t, std::atomic<uint64_t>*, spinlock> mem_alloc_real_using;
     static HashMap <pid_t, std::atomic<uint64_t>*, spinlock> mem_alloc_wasted;
     static HashMap <pid_t, std::atomic<uint64_t>*, spinlock> mem_freelist_wasted;
-    static std::atomic<uint64_t> * mem_never_used;
+
+    static spinlock record_lock;
+    static std::atomic<uint64_t> now_max_usage;
+    const static uint64_t stride = ONE_MEGABYTE;
+    static HashMap <pid_t, uint64_t*, spinlock> mem_alloc_real_using_record;
+    static HashMap <pid_t, uint64_t*, spinlock> mem_alloc_wasted_record;
+    static HashMap <pid_t, uint64_t*, spinlock> mem_freelist_wasted_record;
+
+    static void initForNewTid(pid_t tid);
+    static obj_status * newObjStatus(pid_t tid, size_t size_using, size_t classSize);
+
+public:
     static void initialize();
     static bool allocUpdate(pid_t tid, size_t size, void * address);
     static void freeUpdate(pid_t tid, void* address);
-    static void reportMemory();
+    static bool recordMemory(uint64_t now_usage);
+    static void reportMemory(FILE * output);
+    static void reportMaxMemory(FILE * output);
 };
 
 #endif //MMPROF_MEMWASTE_H

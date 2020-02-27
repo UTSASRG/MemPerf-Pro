@@ -11,9 +11,9 @@ int main() {
 
 
 //    printf("addr i = %p, addr j = %p, ptr = %p\n", &i, &j, ptr);
-    for(i = 0; i < 100; i++) {
-        for(j = 0; j < 100; j++) {
-            ptr = (int *) malloc(sizeof(int));
+//    for(i = 0; i < 1; i++) {
+//        for(j = 0; j < 2; j++) {
+            ptr = (int *) malloc(6);
             //ptr2 = (int *) malloc(sizeof(int));
 //            fprintf(stderr, "Malloc\n");
 //            ptr[0] = i * j;
@@ -22,8 +22,9 @@ int main() {
 //            fprintf(stderr, "free\n");
             free(ptr);
             //free(ptr2);
-        }
-    }
+            ptr = (int *) malloc(4);
+//        }
+//    }
 //
 //	getchar();
 	return EXIT_SUCCESS;
