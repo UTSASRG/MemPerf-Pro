@@ -22,7 +22,7 @@ int main() {
 //            fprintf(stderr, "free\n");
             free(ptr);
             //free(ptr2);
-            ptr = (int *) malloc(4);
+            //ptr = (int *) malloc(4);
 //        }
 //    }
 //

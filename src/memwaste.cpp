@@ -46,19 +46,19 @@ void MemoryWaste::initForNewTid(pid_t tid) {
     if(bibop) {
         tmp_addr = (std::atomic<uint64_t>*) myMalloc(num_class_sizes * sizeof(std::atomic<uint64_t>));
     } else {
-        tmp_addr = (std::atomic<uint64_t>*) myMalloc(num_class_sizes * sizeof(std::atomic<uint64_t>));
+        tmp_addr = (std::atomic<uint64_t>*) myMalloc(2 * sizeof(std::atomic<uint64_t>));
     }
     mem_alloc_real_using.insert(tid, tmp_addr);
     if(bibop) {
         tmp_addr = (std::atomic<uint64_t>*) myMalloc(num_class_sizes * sizeof(std::atomic<uint64_t>));
     } else {
-        tmp_addr = (std::atomic<uint64_t>*) myMalloc(num_class_sizes * sizeof(std::atomic<uint64_t>));
+        tmp_addr = (std::atomic<uint64_t>*) myMalloc(2 * sizeof(std::atomic<uint64_t>));
     }
     mem_alloc_wasted.insert(tid, tmp_addr);
     if(bibop) {
         tmp_addr = (std::atomic<uint64_t>*) myMalloc(num_class_sizes * sizeof(std::atomic<uint64_t>));
     } else {
-        tmp_addr = (std::atomic<uint64_t>*) myMalloc(num_class_sizes * sizeof(std::atomic<uint64_t>));
+        tmp_addr = (std::atomic<uint64_t>*) myMalloc(2 * sizeof(std::atomic<uint64_t>));
     }
     mem_freelist_wasted.insert(tid, tmp_addr);
 
@@ -66,25 +66,24 @@ void MemoryWaste::initForNewTid(pid_t tid) {
     if(bibop) {
         tmp_addr2 = (uint64_t*) myMalloc(num_class_sizes * sizeof(uint64_t));
     } else {
-        tmp_addr2 = (uint64_t*) myMalloc(num_class_sizes * sizeof(uint64_t));
+        tmp_addr2 = (uint64_t*) myMalloc(2 * sizeof(uint64_t));
     }
     mem_alloc_real_using_record.insert(tid, tmp_addr2);
     if(bibop) {
         tmp_addr2 = (uint64_t*) myMalloc(num_class_sizes * sizeof(uint64_t));
     } else {
-        tmp_addr2 = (uint64_t*) myMalloc(num_class_sizes * sizeof(uint64_t));
+        tmp_addr2 = (uint64_t*) myMalloc(2 * sizeof(uint64_t));
     }
     mem_alloc_wasted_record.insert(tid, tmp_addr2);
     if(bibop) {
         tmp_addr2 = (uint64_t*) myMalloc(num_class_sizes * sizeof(uint64_t));
     } else {
-        tmp_addr2 = (uint64_t*) myMalloc(num_class_sizes * sizeof(uint64_t));
+        tmp_addr2 = (uint64_t*) myMalloc(2 * sizeof(uint64_t));
     }
     mem_freelist_wasted_record.insert(tid, tmp_addr2);
 }
 
 bool MemoryWaste::allocUpdate(pid_t tid, size_t size, void * address) {
-
     bool reused;
     size_t classSize;
     if(bibop) {
@@ -144,7 +143,6 @@ bool MemoryWaste::allocUpdate(pid_t tid, size_t size, void * address) {
         addr_obj_status.erase(address);
         addr_obj_status.insert(address, new_status);
     }
-
     return reused;
 }
 
@@ -159,6 +157,7 @@ void MemoryWaste::freeUpdate(pid_t tid, void* address) {
     size_t size = old_status->size_using;
     size_t classSize = old_status->classSize;
     short classSizeIndex = getClassSizeIndex(classSize);
+
 
     /* mem_alloc_real_using[oldthread] */
     std::atomic<uint64_t>* the_mem_alloc_real_using;
