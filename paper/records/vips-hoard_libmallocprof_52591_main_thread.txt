@@ -1,0 +1,140 @@
+>>> stack start @ 0x7ffc0e435610, stack end @ 0x7ffc0e435670
+>>> program break @ 0x5640fe5fa000
+>>> class_sizes 16 32 64 128 256 512 1024 2048 4096 
+>>> malloc_mmaps                               2931
+>>> large_object_threshold                     4096
+>>> num_madvise                                   0
+>>> num_sbrk                                      0
+>>> size_sbrk                                     0
+>>> cycles_alloc                           42823722
+>>> cycles_allocFFL                     41209498626
+>>> cycles_free                         47127694706
+>>> total_global_cycles                343403718634
+
+>>>>>>>>>>>>>>>    Memory Distribution    <<<<<<<<<<<<<<<
+----tid =      52591----
+idx:          0, real:    4347257, alloc wasted:       1093, freelist wasted:      30049
+idx:          1, real:       7854, alloc wasted:       1778, freelist wasted:        736
+idx:          2, real:       6821, alloc wasted:       3803, freelist wasted:          0
+idx:          3, real:      14053, alloc wasted:       6683, freelist wasted:          0
+idx:          4, real:       2809, alloc wasted:       1287, freelist wasted:          0
+idx:          5, real:      14456, alloc wasted:       8072, freelist wasted:       2048
+idx:          6, real:       1024, alloc wasted:          0, freelist wasted:       5120
+idx:          7, real:       4064, alloc wasted:         32, freelist wasted:       2048
+idx:          8, real:       7282, alloc wasted:        910, freelist wasted:       4096
+----tid =      52592----
+idx:          0, real:     988417, alloc wasted:          0, freelist wasted:     370231
+idx:          1, real:       1104, alloc wasted:         16, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:          0
+idx:          3, real:       4912, alloc wasted:       3280, freelist wasted:        512
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:       2032, alloc wasted:         16, freelist wasted:       2048
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      52593----
+idx:          0, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, real:         32, alloc wasted:          0, freelist wasted:          0
+idx:          2, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          3, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      52594----
+idx:          0, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, real:         32, alloc wasted:          0, freelist wasted:          0
+idx:          2, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          3, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+
+>>>>>>>>>>>>>>>    NEW ALLOCATIONS : total (average)    <<<<<<<<<<<<<<<
+total allocations (new)                        1383
+total allocations (reused)                  1420953
+total deallocations                         1421718
+
+
+>>>>>>>>>>>>>>>    NEW ALLOCATIONS : total (average)    <<<<<<<<<<<<<<<
+allocation cycles                          42823722    avg = 30964.4
+allocation faults                               330    avg = 0.2
+allocation tlb read misses                     1029    avg = 0.7
+allocation tlb write misses                     539    avg = 0.4
+allocation cache misses                        1710    avg = 1.2
+num allocation instr                       25266867    avg = 18269.6
+
+
+>>>>>>>>>>>>>>>  FREELIST ALLOCATIONS : total (average) <<<<<<<<<<<<<<<
+allocation cycles                       41209498626    avg = 29001.3
+allocation faults                              6888    avg = 0.0
+allocation tlb read misses                   104460    avg = 0.1
+allocation tlb write misses                   35796    avg = 0.0
+allocation cache misses                      457108    avg = 0.3
+num allocation instr                    32150851721    avg = 22626.3
+
+
+>>>>>>>>>>>>>>>     DEALLOCATIONS : total (average)     <<<<<<<<<<<<<<<
+deallocation cycles                     47127694706    avg = 33148.4
+deallocation faults                            6698    avg = 0.0
+deallocation tlb read misses                 112691    avg = 0.1
+deallocation tlb write misses                 40451    avg = 0.0
+deallocation cache misses                    723981    avg = 0.5
+num deallocation instr                  32000491469    avg = 22508.3
+
+>>>>>>>>>>>>>>>               LOCK TOTALS               <<<<<<<<<<<<<<<
+num pthread mutex locks                           0
+num pthread trylocks                              0
+num pthread spin locks                            0
+num pthread spin trylocks                         0
+
+>>>>>>>>>>>>>>>>>>>>>>>>>> Thread Contention <<<<<<<<<<<<<<<<<<<<<<<<<<
+
+>>> mutex_waits                                   0
+>>> mutex_wait_cycles                             0    avg = 0.0
+>>> mutex_trylock_waits                           0
+>>> mutex_trylock_fails                           0
+>>> spinlock_waits                                0
+>>> spinlock_wait_cycles                          0    avg = 0.0
+>>> spin_trylock_waits                            0
+>>> spin_trylock_fails                            0
+>>> mmap_waits                                 2931
+>>> mmap_wait_cycles                       12809800    avg = 4370.5
+>>> sbrk_waits                                    0
+>>> sbrk_wait_cycles                              0    avg = 0.0
+>>> madvise_waits                                 0
+>>> madvise_wait_cycles                           0    avg = 0.0
+>>> munmap_waits                               2976
+>>> munmap_wait_cycles                     16158684    avg = 5429.7
+>>> mremap_waits                                  0
+>>> mremap_wait_cycles                            0    avg = 0.0
+>>> mprotect_waits                                0
+>>> mprotect_wait_cycle                           0    avg = 0.0
+
+>>> critical_section_counter                      0
+>>> critical_section_duration                     0    avg = 0.0
+
+
+>>>>>>>>>>>>>>>>>>>>>>>>>> Total Memory Usage <<<<<<<<<<<<<<<<<<<<<<<<<
+
+>>> Thread Counter:
+>>> maxRealMemoryUsage         18446744073709550033
+>>> maxRealAllocMemoryUsage    18446744073708632243
+>>> maxTotalMemoryUsage                     8130560
+
+>>> Global Counter:
+>>> realMemoryUsage                         9472209
+>>> realAllocatedMemoryUsage                9504916
+>>> totalMemoryUsage                       11059200
+
+>>>>>>>>>>>>>>>>>>>>>>>>> Detailed Lock Usage <<<<<<<<<<<<<<<<<<<<<<<<<
+num sampled accesses       = 761937
+total cache bytes accessed = 43690223
+total page bytes accessed  = 2584270375
+cache line writes          = 311684
+cache owner conflicts      = 13033 ( 0.0418%)
+avg. cache utilization     = 89.595%
+avg. page utilization      = 82.805%

@@ -1,0 +1,524 @@
+>>> stack start @ 0x7ffc3f75d190, stack end @ 0x7ffc3f75d1f0
+>>> program break @ 0x563088912000
+>>> class_sizes 16 32 64 128 256 512 1024 2048 4096 
+>>> malloc_mmaps                              30313
+>>> large_object_threshold                     4096
+>>> num_madvise                                   0
+>>> num_sbrk                                      0
+>>> size_sbrk                                     0
+>>> cycles_alloc                       283351033828
+>>> cycles_allocFFL                     17199179916
+>>> cycles_free                         41994521834
+>>> total_global_cycles                130506950010
+
+>>>>>>>>>>>>>>>    Memory Distribution    <<<<<<<<<<<<<<<
+----tid =      53262----
+idx:          0, real:    4330768, alloc wasted:          0, freelist wasted:    7296016
+idx:          1, real:       1248, alloc wasted:        320, freelist wasted:       2144
+idx:          2, real:        744, alloc wasted:        216, freelist wasted:      18816
+idx:          3, real:     496793, alloc wasted:      16103, freelist wasted:      10624
+idx:          4, real:        160, alloc wasted:         96, freelist wasted:       1280
+idx:          5, real:      13472, alloc wasted:       8544, freelist wasted:        512
+idx:          6, real:      27176, alloc wasted:      17880, freelist wasted:       4096
+idx:          7, real:       1600, alloc wasted:        448, freelist wasted:          0
+idx:          8, real:       3840, alloc wasted:        256, freelist wasted:       4096
+----tid =      53263----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      12072, alloc wasted:        472, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53264----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      12196, alloc wasted:        476, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53265----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      15296, alloc wasted:        576, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53266----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      12196, alloc wasted:        476, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53267----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      16164, alloc wasted:        604, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53268----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      12196, alloc wasted:        476, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53269----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      12196, alloc wasted:        476, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53270----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      12196, alloc wasted:        476, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53271----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      12196, alloc wasted:        476, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53272----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      12196, alloc wasted:        476, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53273----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      12196, alloc wasted:        476, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53274----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      12196, alloc wasted:        476, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53275----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      16164, alloc wasted:        604, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53276----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      12196, alloc wasted:        476, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53277----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      16164, alloc wasted:        604, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53278----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      12196, alloc wasted:        476, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53279----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      12196, alloc wasted:        476, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53280----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      12196, alloc wasted:        476, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53281----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      12196, alloc wasted:        476, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53282----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      16164, alloc wasted:        604, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53283----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      12196, alloc wasted:        476, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53284----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      12196, alloc wasted:        476, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53285----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      12196, alloc wasted:        476, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53286----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      12196, alloc wasted:        476, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53287----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      12196, alloc wasted:        476, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53288----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      12196, alloc wasted:        476, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53289----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      12196, alloc wasted:        476, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53290----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      12196, alloc wasted:        476, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53291----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      12196, alloc wasted:        476, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53292----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      12196, alloc wasted:        476, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53293----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      12196, alloc wasted:        476, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53294----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      12196, alloc wasted:        476, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53295----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      12196, alloc wasted:        476, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53296----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      12196, alloc wasted:        476, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53297----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      12196, alloc wasted:        476, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53298----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      12196, alloc wasted:        476, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53299----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      12196, alloc wasted:        476, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53300----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      12196, alloc wasted:        476, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53301----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      12196, alloc wasted:        476, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53302----
+idx:          0, real:         16, alloc wasted:          0, freelist wasted:         16
+idx:          1, real:         56, alloc wasted:          8, freelist wasted:          0
+idx:          2, real:         48, alloc wasted:         16, freelist wasted:         64
+idx:          3, real:      12196, alloc wasted:        476, freelist wasted:          0
+idx:          4, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          5, real:       1280, alloc wasted:        768, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:          0
+----tid =      53303----
+idx:          0, real:   22272272, alloc wasted:          0, freelist wasted:    4492788
+idx:          1, real:       4256, alloc wasted:          0, freelist wasted:       6624
+idx:          2, real:        460, alloc wasted:         52, freelist wasted:      25792
+idx:          3, real:       1792, alloc wasted:        512, freelist wasted:     100224
+idx:          4, real:       2560, alloc wasted:       1536, freelist wasted:          0
+idx:          5, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          6, real:          0, alloc wasted:          0, freelist wasted:      17408
+idx:          7, real:          0, alloc wasted:          0, freelist wasted:          0
+idx:          8, real:          0, alloc wasted:          0, freelist wasted:      61440
+
+>>>>>>>>>>>>>>>    NEW ALLOCATIONS : total (average)    <<<<<<<<<<<<<<<
+total allocations (new)                      329888
+total allocations (reused)                   182541
+total deallocations                          512383
+
+
+>>>>>>>>>>>>>>>    NEW ALLOCATIONS : total (average)    <<<<<<<<<<<<<<<
+allocation cycles                      283351033828    avg = 858931.0
+allocation faults                              5896    avg = 0.0
+allocation tlb read misses                   873608    avg = 2.6
+allocation tlb write misses                  283139    avg = 0.9
+allocation cache misses                     4134145    avg = 12.5
+num allocation instr                    19570879602    avg = 59325.8
+
+
+>>>>>>>>>>>>>>>  FREELIST ALLOCATIONS : total (average) <<<<<<<<<<<<<<<
+allocation cycles                       17199179916    avg = 94220.9
+allocation faults                              7514    avg = 0.0
+allocation tlb read misses                   306889    avg = 1.7
+allocation tlb write misses                  114867    avg = 0.6
+allocation cache misses                     1456233    avg = 8.0
+num allocation instr                     4080544430    avg = 22354.1
+
+
+>>>>>>>>>>>>>>>     DEALLOCATIONS : total (average)     <<<<<<<<<<<<<<<
+deallocation cycles                     41994521834    avg = 81959.2
+deallocation faults                            5020    avg = 0.0
+deallocation tlb read misses                 806700    avg = 1.6
+deallocation tlb write misses                226348    avg = 0.4
+deallocation cache misses                   3349737    avg = 6.5
+num deallocation instr                   7570863304    avg = 14775.8
+
+>>>>>>>>>>>>>>>               LOCK TOTALS               <<<<<<<<<<<<<<<
+num pthread mutex locks                           4
+num pthread trylocks                              0
+num pthread spin locks                            0
+num pthread spin trylocks                         0
+
+>>>>>>>>>>>>>>>>>>>>>>>>>> Thread Contention <<<<<<<<<<<<<<<<<<<<<<<<<<
+
+>>> mutex_waits                             9327305
+>>> mutex_wait_cycles                  234560126518    avg = 25147.7
+>>> mutex_trylock_waits                           0
+>>> mutex_trylock_fails                           0
+>>> spinlock_waits                                0
+>>> spinlock_wait_cycles                          0    avg = 0.0
+>>> spin_trylock_waits                            0
+>>> spin_trylock_fails                            0
+>>> mmap_waits                                30313
+>>> mmap_wait_cycles                       89505314    avg = 2952.7
+>>> sbrk_waits                                    0
+>>> sbrk_wait_cycles                              0    avg = 0.0
+>>> madvise_waits                                 0
+>>> madvise_wait_cycles                           0    avg = 0.0
+>>> munmap_waits                              13064
+>>> munmap_wait_cycles                    527501602    avg = 40378.3
+>>> mremap_waits                                  0
+>>> mremap_wait_cycles                            0    avg = 0.0
+>>> mprotect_waits                                0
+>>> mprotect_wait_cycle                           0    avg = 0.0
+
+>>> critical_section_counter                2049624
+>>> critical_section_duration           29623895982    avg = 14453.3
+
+
+>>>>>>>>>>>>>>>>>>>>>>>>>> Total Memory Usage <<<<<<<<<<<<<<<<<<<<<<<<<
+
+>>> Thread Counter:
+>>> maxRealMemoryUsage         18446744073709346105
+>>> maxRealAllocMemoryUsage    18446744073709389120
+>>> maxTotalMemoryUsage                   337596416
+
+>>> Global Counter:
+>>> realMemoryUsage                        28641489
+>>> realAllocatedMemoryUsage               28738784
+>>> totalMemoryUsage                     4130545664
+
+>>>>>>>>>>>>>>>>>>>>>>>>> Detailed Lock Usage <<<<<<<<<<<<<<<<<<<<<<<<<
+lockAddr = 0x7f711a6a1680, type = mutex, maxContention = 41
+lockAddr = 0x7f711a6a1998, type = mutex, maxContention = 1
+lockAddr = 0x7f711a6a19c8, type = mutex, maxContention = 1
+lockAddr = 0x7f711a6a1940, type = mutex, maxContention = 1
+num sampled accesses       = 3272354
+total cache bytes accessed = 197646666
+total page bytes accessed  = 8759389994
+cache line writes          = 754328
+cache owner conflicts      = 384956 ( 0.5103%)
+avg. cache utilization     = 94.373%
+avg. page utilization      = 65.351%
