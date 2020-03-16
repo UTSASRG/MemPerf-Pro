@@ -1,0 +1,399 @@
+>>> stack start @ 0x7ffc865a7080, stack end @ 0x7ffc865a70e0
+>>> program break @ 0x5612c28fc000
+>>> class_sizes 8 16 32 48 64 80 96 112 128 160 192 224 256 320 384 448 512 640 768 896 1024 1280 1536 1792 2048 2560 3072 3584 4096 5120 6144 7168 8192 10240 12288 14336 786440 
+>>> malloc_mmaps                                346
+>>> large_object_threshold                   786440
+>>> num_madvise                                   1
+>>> num_sbrk                                      0
+>>> size_sbrk                                     0
+>>> cycles_alloc                         5641964410
+>>> cycles_allocFFL                    154595478822
+>>> cycles_free                        161405435200
+>>> total_global_cycles                 69259271438
+
+>>>>>>>>>>>>>>>    NEW ALLOCATIONS : total (average)    <<<<<<<<<<<<<<<
+total allocations (new)                        1167
+total allocations (reused)                      144
+total deallocations                             657
+
+
+>>>>>>>>>>>>>>>    NEW ALLOCATIONS : total (average)    <<<<<<<<<<<<<<<
+allocation cycles                        1815334612    avg = 1555556.7
+allocation faults                             14799    avg = 12.7
+allocation tlb read misses                    45219    avg = 38.7
+allocation tlb write misses                   11173    avg = 9.6
+allocation cache misses                      112711    avg = 96.6
+num allocation instr                     1755153234    avg = 1503987.3
+
+
+>>>>>>>>>>>>>>>  FREELIST ALLOCATIONS : total (average) <<<<<<<<<<<<<<<
+allocation cycles                        3052819294    avg = 21200134.0
+allocation faults                               518    avg = 3.6
+allocation tlb read misses                     2837    avg = 19.7
+allocation tlb write misses                     443    avg = 3.1
+allocation cache misses                     1353394    avg = 9398.6
+num allocation instr                     2686863499    avg = 18658774.3
+
+
+>>>>>>>>>>>>>>>     DEALLOCATIONS : total (average)     <<<<<<<<<<<<<<<
+deallocation cycles                      5621651784    avg = 8556547.6
+deallocation faults                           27310    avg = 41.6
+deallocation tlb read misses                 112536    avg = 171.3
+deallocation tlb write misses                 20220    avg = 30.8
+deallocation cache misses                   3372594    avg = 5133.3
+num deallocation instr                   5268410709    avg = 8018890.0
+
+>>>>>>>>>>>>>>>               LOCK TOTALS               <<<<<<<<<<<<<<<
+num pthread mutex locks                          28
+num pthread trylocks                              0
+num pthread spin locks                            0
+num pthread spin trylocks                         0
+
+>>>>>>>>>>>>>>>>>>>>>>>>>> Thread Contention <<<<<<<<<<<<<<<<<<<<<<<<<<
+
+>>> mutex_waits                               51718
+>>> mutex_wait_cycles                      98663500    avg = 1907.7
+>>> mutex_trylock_waits                           0
+>>> mutex_trylock_fails                           0
+>>> spinlock_waits                                0
+>>> spinlock_wait_cycles                          0    avg = 0.0
+>>> spin_trylock_waits                            0
+>>> spin_trylock_fails                            0
+>>> mmap_waits                                  346
+>>> mmap_wait_cycles                       21241930    avg = 61392.9
+>>> sbrk_waits                                    0
+>>> sbrk_wait_cycles                              0    avg = 0.0
+>>> madvise_waits                                 1
+>>> madvise_wait_cycles                       10018    avg = 10018.0
+>>> munmap_waits                                  0
+>>> munmap_wait_cycles                            0    avg = 0.0
+>>> mremap_waits                                  0
+>>> mremap_wait_cycles                            0    avg = 0.0
+>>> mprotect_waits                                0
+>>> mprotect_wait_cycle                           0    avg = 0.0
+
+>>> critical_section_counter                  51672
+>>> critical_section_duration              50553046    avg = 978.3
+
+
+>>>>>>>>>>>>>>>>>>>>>>>>>> Total Memory Usage <<<<<<<<<<<<<<<<<<<<<<<<<
+
+>>> Thread Counter:
+>>> maxRealMemoryUsage         18446744073708891648
+>>> maxRealAllocMemoryUsage    18446744073708891648
+>>> maxTotalMemoryUsage                  1461739520
+
+>>> Global Counter:
+>>> realMemoryUsage                      2082381500
+>>> realAllocatedMemoryUsage             2283169212
+>>> totalMemoryUsage                     3926687744
+
+>>>>>>>>>>>>>>>>>>>>>>>>> Detailed Lock Usage <<<<<<<<<<<<<<<<<<<<<<<<<
+lockAddr = 0x7f2c8f1a10d0, type = mutex, maxContention = 1
+lockAddr = 0x7f2c8f1a1988, type = mutex, maxContention = 2
+lockAddr = 0x7f285ad220d0, type = mutex, maxContention = 1
+lockAddr = 0x7f285a9220d0, type = mutex, maxContention = 1
+lockAddr = 0x7f285a7220d0, type = mutex, maxContention = 1
+lockAddr = 0x7f285a3220d0, type = mutex, maxContention = 1
+lockAddr = 0x7f2859f220d0, type = mutex, maxContention = 1
+lockAddr = 0x7f2859b220d0, type = mutex, maxContention = 1
+lockAddr = 0x7f28597220d0, type = mutex, maxContention = 1
+lockAddr = 0x7f28593220d0, type = mutex, maxContention = 1
+lockAddr = 0x7f2858d220d0, type = mutex, maxContention = 1
+lockAddr = 0x7f28589220d0, type = mutex, maxContention = 1
+lockAddr = 0x7f285ad228c8, type = mutex, maxContention = 1
+lockAddr = 0x7f285a9228c8, type = mutex, maxContention = 1
+lockAddr = 0x7f285a7228c8, type = mutex, maxContention = 1
+lockAddr = 0x7f285a3228c8, type = mutex, maxContention = 1
+lockAddr = 0x7f2859f228c8, type = mutex, maxContention = 1
+lockAddr = 0x7f2859b228c8, type = mutex, maxContention = 1
+lockAddr = 0x7f28597228c8, type = mutex, maxContention = 1
+lockAddr = 0x7f28593228c8, type = mutex, maxContention = 1
+lockAddr = 0x7f2858d228c8, type = mutex, maxContention = 1
+lockAddr = 0x7f28589228c8, type = mutex, maxContention = 1
+lockAddr = 0x7f2c8f1a39c8, type = mutex, maxContention = 3
+lockAddr = 0x7f2c8f1a3970, type = mutex, maxContention = 2
+lockAddr = 0x7f2c8f1a4078, type = mutex, maxContention = 1
+lockAddr = 0x7f2c8f1a4738, type = mutex, maxContention = 2
+lockAddr = 0x7f2c8f1a4848, type = mutex, maxContention = 1
+lockAddr = 0x7f2c8f1a4be0, type = mutex, maxContention = 1
+lockAddr = 0x7f2c8f1a4900, type = mutex, maxContention = 1
+lockAddr = 0x7f285ad24908, type = mutex, maxContention = 1
+lockAddr = 0x7f285a924908, type = mutex, maxContention = 1
+lockAddr = 0x7f285a724908, type = mutex, maxContention = 1
+lockAddr = 0x7f285a324908, type = mutex, maxContention = 1
+lockAddr = 0x7f2859f24908, type = mutex, maxContention = 1
+lockAddr = 0x7f2859b24908, type = mutex, maxContention = 1
+lockAddr = 0x7f2859724908, type = mutex, maxContention = 1
+lockAddr = 0x7f2859324908, type = mutex, maxContention = 1
+lockAddr = 0x7f2858d24908, type = mutex, maxContention = 1
+lockAddr = 0x7f2858924908, type = mutex, maxContention = 1
+lockAddr = 0x7f28593248b0, type = mutex, maxContention = 1
+lockAddr = 0x7f2859f248b0, type = mutex, maxContention = 1
+lockAddr = 0x7f28597248b0, type = mutex, maxContention = 1
+lockAddr = 0x7f285a7248b0, type = mutex, maxContention = 1
+lockAddr = 0x7f285a3248b0, type = mutex, maxContention = 1
+lockAddr = 0x7f2858d248b0, type = mutex, maxContention = 1
+lockAddr = 0x7f2859b248b0, type = mutex, maxContention = 1
+lockAddr = 0x7f28589248b0, type = mutex, maxContention = 1
+lockAddr = 0x7f285ad248b0, type = mutex, maxContention = 1
+lockAddr = 0x7f285a9248b0, type = mutex, maxContention = 1
+lockAddr = 0x7f2c8f1a4ec0, type = mutex, maxContention = 1
+lockAddr = 0x7f285ad24fb8, type = mutex, maxContention = 1
+lockAddr = 0x7f285a924fb8, type = mutex, maxContention = 1
+lockAddr = 0x7f285a724fb8, type = mutex, maxContention = 1
+lockAddr = 0x7f285a324fb8, type = mutex, maxContention = 1
+lockAddr = 0x7f2859f24fb8, type = mutex, maxContention = 1
+lockAddr = 0x7f2859b24fb8, type = mutex, maxContention = 1
+lockAddr = 0x7f2859724fb8, type = mutex, maxContention = 1
+lockAddr = 0x7f2859324fb8, type = mutex, maxContention = 1
+lockAddr = 0x7f2858d24fb8, type = mutex, maxContention = 1
+lockAddr = 0x7f2858924fb8, type = mutex, maxContention = 1
+lockAddr = 0x7f2c8f1a4e08, type = mutex, maxContention = 1
+lockAddr = 0x7f2c8f1a53c8, type = mutex, maxContention = 1
+lockAddr = 0x7f2c8f1a50e8, type = mutex, maxContention = 1
+lockAddr = 0x7f2c8f1a5310, type = mutex, maxContention = 1
+lockAddr = 0x7f2c8f1a5030, type = mutex, maxContention = 1
+lockAddr = 0x7f2c8f1a5258, type = mutex, maxContention = 1
+lockAddr = 0x7f2c8f1a51a0, type = mutex, maxContention = 1
+lockAddr = 0x7f2c8f1a56a8, type = mutex, maxContention = 1
+lockAddr = 0x7f2c8f1a55f0, type = mutex, maxContention = 1
+lockAddr = 0x7f2c8f1a5538, type = mutex, maxContention = 1
+lockAddr = 0x7f285ad25678, type = mutex, maxContention = 1
+lockAddr = 0x7f285a925678, type = mutex, maxContention = 1
+lockAddr = 0x7f285a725678, type = mutex, maxContention = 1
+lockAddr = 0x7f285a325678, type = mutex, maxContention = 1
+lockAddr = 0x7f2859f25678, type = mutex, maxContention = 1
+lockAddr = 0x7f2859b25678, type = mutex, maxContention = 1
+lockAddr = 0x7f2859725678, type = mutex, maxContention = 1
+lockAddr = 0x7f2859325678, type = mutex, maxContention = 1
+lockAddr = 0x7f2858d25678, type = mutex, maxContention = 1
+lockAddr = 0x7f2858925678, type = mutex, maxContention = 1
+lockAddr = 0x7f2c8f1a5bb0, type = mutex, maxContention = 1
+lockAddr = 0x7f2c8f1a5818, type = mutex, maxContention = 1
+lockAddr = 0x7f2c8f1a5af8, type = mutex, maxContention = 1
+lockAddr = 0x7f285ad25840, type = mutex, maxContention = 1
+lockAddr = 0x7f285a925840, type = mutex, maxContention = 1
+lockAddr = 0x7f285a725840, type = mutex, maxContention = 1
+lockAddr = 0x7f285a325840, type = mutex, maxContention = 1
+lockAddr = 0x7f2859f25840, type = mutex, maxContention = 1
+lockAddr = 0x7f2859b25840, type = mutex, maxContention = 1
+lockAddr = 0x7f2859725840, type = mutex, maxContention = 1
+lockAddr = 0x7f2859325840, type = mutex, maxContention = 1
+lockAddr = 0x7f2858d25840, type = mutex, maxContention = 1
+lockAddr = 0x7f2858925840, type = mutex, maxContention = 1
+lockAddr = 0x7f2c8f1a5dd8, type = mutex, maxContention = 1
+lockAddr = 0x7f2c8f1a5f48, type = mutex, maxContention = 1
+lockAddr = 0x7f2c8f1a60b8, type = mutex, maxContention = 1
+lockAddr = 0x7f28638480d0, type = mutex, maxContention = 1
+lockAddr = 0x7f28638488c8, type = mutex, maxContention = 1
+lockAddr = 0x7f286384a908, type = mutex, maxContention = 1
+lockAddr = 0x7f286384a8b0, type = mutex, maxContention = 1
+lockAddr = 0x7f286384afb8, type = mutex, maxContention = 1
+lockAddr = 0x7f286384b678, type = mutex, maxContention = 1
+lockAddr = 0x7f286384b840, type = mutex, maxContention = 1
+lockAddr = 0x7f285fc2c0d0, type = mutex, maxContention = 1
+lockAddr = 0x7f285f82c0d0, type = mutex, maxContention = 1
+lockAddr = 0x7f285f42c0d0, type = mutex, maxContention = 1
+lockAddr = 0x7f285f02c0d0, type = mutex, maxContention = 1
+lockAddr = 0x7f285ec2c0d0, type = mutex, maxContention = 1
+lockAddr = 0x7f285e82c0d0, type = mutex, maxContention = 1
+lockAddr = 0x7f285e42c0d0, type = mutex, maxContention = 1
+lockAddr = 0x7f285e02c0d0, type = mutex, maxContention = 1
+lockAddr = 0x7f285dc2c0d0, type = mutex, maxContention = 1
+lockAddr = 0x7f285d82c0d0, type = mutex, maxContention = 1
+lockAddr = 0x7f285d22c0d0, type = mutex, maxContention = 1
+lockAddr = 0x7f285d02c0d0, type = mutex, maxContention = 1
+lockAddr = 0x7f285cc2c0d0, type = mutex, maxContention = 1
+lockAddr = 0x7f285c82c0d0, type = mutex, maxContention = 1
+lockAddr = 0x7f285c42c0d0, type = mutex, maxContention = 1
+lockAddr = 0x7f285c02c0d0, type = mutex, maxContention = 1
+lockAddr = 0x7f285ba2c0d0, type = mutex, maxContention = 1
+lockAddr = 0x7f285b82c0d0, type = mutex, maxContention = 1
+lockAddr = 0x7f285fc2c8c8, type = mutex, maxContention = 1
+lockAddr = 0x7f285f82c8c8, type = mutex, maxContention = 1
+lockAddr = 0x7f285f42c8c8, type = mutex, maxContention = 1
+lockAddr = 0x7f285f02c8c8, type = mutex, maxContention = 1
+lockAddr = 0x7f285ec2c8c8, type = mutex, maxContention = 1
+lockAddr = 0x7f285e82c8c8, type = mutex, maxContention = 1
+lockAddr = 0x7f285e42c8c8, type = mutex, maxContention = 1
+lockAddr = 0x7f285e02c8c8, type = mutex, maxContention = 1
+lockAddr = 0x7f285dc2c8c8, type = mutex, maxContention = 1
+lockAddr = 0x7f285d82c8c8, type = mutex, maxContention = 1
+lockAddr = 0x7f285d22c8c8, type = mutex, maxContention = 1
+lockAddr = 0x7f285d02c8c8, type = mutex, maxContention = 1
+lockAddr = 0x7f285cc2c8c8, type = mutex, maxContention = 1
+lockAddr = 0x7f285c82c8c8, type = mutex, maxContention = 1
+lockAddr = 0x7f285c42c8c8, type = mutex, maxContention = 1
+lockAddr = 0x7f285c02c8c8, type = mutex, maxContention = 1
+lockAddr = 0x7f285ba2c8c8, type = mutex, maxContention = 1
+lockAddr = 0x7f285b82c8c8, type = mutex, maxContention = 1
+lockAddr = 0x7f28600ad0d0, type = mutex, maxContention = 1
+lockAddr = 0x7f28600ad8c8, type = mutex, maxContention = 1
+lockAddr = 0x7f286232e0d0, type = mutex, maxContention = 1
+lockAddr = 0x7f2861f2e0d0, type = mutex, maxContention = 1
+lockAddr = 0x7f2861d2e0d0, type = mutex, maxContention = 1
+lockAddr = 0x7f286192e0d0, type = mutex, maxContention = 1
+lockAddr = 0x7f286152e0d0, type = mutex, maxContention = 1
+lockAddr = 0x7f286112e0d0, type = mutex, maxContention = 1
+lockAddr = 0x7f2860d2e0d0, type = mutex, maxContention = 1
+lockAddr = 0x7f286092e0d0, type = mutex, maxContention = 1
+lockAddr = 0x7f286052e0d0, type = mutex, maxContention = 1
+lockAddr = 0x7f286232e8c8, type = mutex, maxContention = 1
+lockAddr = 0x7f2861f2e8c8, type = mutex, maxContention = 1
+lockAddr = 0x7f2861d2e8c8, type = mutex, maxContention = 1
+lockAddr = 0x7f286192e8c8, type = mutex, maxContention = 1
+lockAddr = 0x7f286152e8c8, type = mutex, maxContention = 1
+lockAddr = 0x7f286112e8c8, type = mutex, maxContention = 1
+lockAddr = 0x7f2860d2e8c8, type = mutex, maxContention = 1
+lockAddr = 0x7f286092e8c8, type = mutex, maxContention = 1
+lockAddr = 0x7f286052e8c8, type = mutex, maxContention = 1
+lockAddr = 0x7f285fc2e908, type = mutex, maxContention = 1
+lockAddr = 0x7f285f82e908, type = mutex, maxContention = 1
+lockAddr = 0x7f285f42e908, type = mutex, maxContention = 1
+lockAddr = 0x7f285f02e908, type = mutex, maxContention = 1
+lockAddr = 0x7f285ec2e908, type = mutex, maxContention = 1
+lockAddr = 0x7f285e82e908, type = mutex, maxContention = 1
+lockAddr = 0x7f285e42e908, type = mutex, maxContention = 1
+lockAddr = 0x7f285e02e908, type = mutex, maxContention = 1
+lockAddr = 0x7f285dc2e908, type = mutex, maxContention = 1
+lockAddr = 0x7f285d82e908, type = mutex, maxContention = 1
+lockAddr = 0x7f285d22e908, type = mutex, maxContention = 1
+lockAddr = 0x7f285d02e908, type = mutex, maxContention = 1
+lockAddr = 0x7f285cc2e908, type = mutex, maxContention = 1
+lockAddr = 0x7f285c82e908, type = mutex, maxContention = 1
+lockAddr = 0x7f285c02e908, type = mutex, maxContention = 1
+lockAddr = 0x7f285c42e908, type = mutex, maxContention = 1
+lockAddr = 0x7f285ba2e908, type = mutex, maxContention = 1
+lockAddr = 0x7f285b82e908, type = mutex, maxContention = 1
+lockAddr = 0x7f285d02e8b0, type = mutex, maxContention = 1
+lockAddr = 0x7f285b82e8b0, type = mutex, maxContention = 1
+lockAddr = 0x7f285f82e8b0, type = mutex, maxContention = 1
+lockAddr = 0x7f285dc2e8b0, type = mutex, maxContention = 1
+lockAddr = 0x7f285f42e8b0, type = mutex, maxContention = 1
+lockAddr = 0x7f285e42e8b0, type = mutex, maxContention = 1
+lockAddr = 0x7f285ba2e8b0, type = mutex, maxContention = 1
+lockAddr = 0x7f285e82e8b0, type = mutex, maxContention = 1
+lockAddr = 0x7f285cc2e8b0, type = mutex, maxContention = 1
+lockAddr = 0x7f285d82e8b0, type = mutex, maxContention = 1
+lockAddr = 0x7f285f02e8b0, type = mutex, maxContention = 1
+lockAddr = 0x7f285ec2e8b0, type = mutex, maxContention = 1
+lockAddr = 0x7f285e02e8b0, type = mutex, maxContention = 1
+lockAddr = 0x7f285fc2e8b0, type = mutex, maxContention = 1
+lockAddr = 0x7f285c82e8b0, type = mutex, maxContention = 1
+lockAddr = 0x7f285c02e8b0, type = mutex, maxContention = 1
+lockAddr = 0x7f285d22e8b0, type = mutex, maxContention = 1
+lockAddr = 0x7f285c42e8b0, type = mutex, maxContention = 1
+lockAddr = 0x7f285fc2efb8, type = mutex, maxContention = 1
+lockAddr = 0x7f285f82efb8, type = mutex, maxContention = 1
+lockAddr = 0x7f285f42efb8, type = mutex, maxContention = 1
+lockAddr = 0x7f285f02efb8, type = mutex, maxContention = 1
+lockAddr = 0x7f285ec2efb8, type = mutex, maxContention = 1
+lockAddr = 0x7f285e82efb8, type = mutex, maxContention = 1
+lockAddr = 0x7f285e42efb8, type = mutex, maxContention = 1
+lockAddr = 0x7f285e02efb8, type = mutex, maxContention = 1
+lockAddr = 0x7f285dc2efb8, type = mutex, maxContention = 1
+lockAddr = 0x7f285d82efb8, type = mutex, maxContention = 1
+lockAddr = 0x7f285d22efb8, type = mutex, maxContention = 1
+lockAddr = 0x7f285d02efb8, type = mutex, maxContention = 1
+lockAddr = 0x7f285cc2efb8, type = mutex, maxContention = 1
+lockAddr = 0x7f285c82efb8, type = mutex, maxContention = 1
+lockAddr = 0x7f285c02efb8, type = mutex, maxContention = 1
+lockAddr = 0x7f285c42efb8, type = mutex, maxContention = 1
+lockAddr = 0x7f285ba2efb8, type = mutex, maxContention = 1
+lockAddr = 0x7f285b82efb8, type = mutex, maxContention = 1
+lockAddr = 0x7f285fc2f678, type = mutex, maxContention = 1
+lockAddr = 0x7f285f82f678, type = mutex, maxContention = 1
+lockAddr = 0x7f285f42f678, type = mutex, maxContention = 1
+lockAddr = 0x7f285f02f678, type = mutex, maxContention = 1
+lockAddr = 0x7f285ec2f678, type = mutex, maxContention = 1
+lockAddr = 0x7f285e82f678, type = mutex, maxContention = 1
+lockAddr = 0x7f285e42f678, type = mutex, maxContention = 1
+lockAddr = 0x7f285e02f678, type = mutex, maxContention = 1
+lockAddr = 0x7f285dc2f678, type = mutex, maxContention = 1
+lockAddr = 0x7f285d82f678, type = mutex, maxContention = 1
+lockAddr = 0x7f285d22f678, type = mutex, maxContention = 1
+lockAddr = 0x7f285d02f678, type = mutex, maxContention = 1
+lockAddr = 0x7f285cc2f678, type = mutex, maxContention = 1
+lockAddr = 0x7f285c82f678, type = mutex, maxContention = 1
+lockAddr = 0x7f285c02f678, type = mutex, maxContention = 1
+lockAddr = 0x7f285c42f678, type = mutex, maxContention = 1
+lockAddr = 0x7f285ba2f678, type = mutex, maxContention = 1
+lockAddr = 0x7f285b82f678, type = mutex, maxContention = 1
+lockAddr = 0x7f28600af908, type = mutex, maxContention = 1
+lockAddr = 0x7f285fc2f840, type = mutex, maxContention = 1
+lockAddr = 0x7f285f82f840, type = mutex, maxContention = 1
+lockAddr = 0x7f285f42f840, type = mutex, maxContention = 1
+lockAddr = 0x7f285f02f840, type = mutex, maxContention = 1
+lockAddr = 0x7f285ec2f840, type = mutex, maxContention = 1
+lockAddr = 0x7f285e82f840, type = mutex, maxContention = 1
+lockAddr = 0x7f285e42f840, type = mutex, maxContention = 1
+lockAddr = 0x7f285e02f840, type = mutex, maxContention = 1
+lockAddr = 0x7f285dc2f840, type = mutex, maxContention = 1
+lockAddr = 0x7f285d82f840, type = mutex, maxContention = 1
+lockAddr = 0x7f285d22f840, type = mutex, maxContention = 1
+lockAddr = 0x7f285d02f840, type = mutex, maxContention = 1
+lockAddr = 0x7f285cc2f840, type = mutex, maxContention = 1
+lockAddr = 0x7f285c82f840, type = mutex, maxContention = 1
+lockAddr = 0x7f285c02f840, type = mutex, maxContention = 1
+lockAddr = 0x7f285c42f840, type = mutex, maxContention = 1
+lockAddr = 0x7f285ba2f840, type = mutex, maxContention = 1
+lockAddr = 0x7f285b82f840, type = mutex, maxContention = 1
+lockAddr = 0x7f28600af8b0, type = mutex, maxContention = 1
+lockAddr = 0x7f28600affb8, type = mutex, maxContention = 1
+lockAddr = 0x7f28600b0678, type = mutex, maxContention = 1
+lockAddr = 0x7f2862330908, type = mutex, maxContention = 1
+lockAddr = 0x7f2861f30908, type = mutex, maxContention = 1
+lockAddr = 0x7f2861d30908, type = mutex, maxContention = 1
+lockAddr = 0x7f2861930908, type = mutex, maxContention = 1
+lockAddr = 0x7f2861530908, type = mutex, maxContention = 1
+lockAddr = 0x7f2861130908, type = mutex, maxContention = 1
+lockAddr = 0x7f2860d30908, type = mutex, maxContention = 1
+lockAddr = 0x7f2860930908, type = mutex, maxContention = 1
+lockAddr = 0x7f2860530908, type = mutex, maxContention = 1
+lockAddr = 0x7f28600b0840, type = mutex, maxContention = 1
+lockAddr = 0x7f28619308b0, type = mutex, maxContention = 1
+lockAddr = 0x7f28611308b0, type = mutex, maxContention = 1
+lockAddr = 0x7f2861f308b0, type = mutex, maxContention = 1
+lockAddr = 0x7f2861d308b0, type = mutex, maxContention = 1
+lockAddr = 0x7f28615308b0, type = mutex, maxContention = 1
+lockAddr = 0x7f28605308b0, type = mutex, maxContention = 1
+lockAddr = 0x7f2860d308b0, type = mutex, maxContention = 1
+lockAddr = 0x7f28623308b0, type = mutex, maxContention = 1
+lockAddr = 0x7f28609308b0, type = mutex, maxContention = 1
+lockAddr = 0x7f2862330fb8, type = mutex, maxContention = 1
+lockAddr = 0x7f2861f30fb8, type = mutex, maxContention = 1
+lockAddr = 0x7f2861d30fb8, type = mutex, maxContention = 1
+lockAddr = 0x7f2861930fb8, type = mutex, maxContention = 1
+lockAddr = 0x7f2861530fb8, type = mutex, maxContention = 1
+lockAddr = 0x7f2861130fb8, type = mutex, maxContention = 1
+lockAddr = 0x7f2860d30fb8, type = mutex, maxContention = 1
+lockAddr = 0x7f2860930fb8, type = mutex, maxContention = 1
+lockAddr = 0x7f2860530fb8, type = mutex, maxContention = 1
+lockAddr = 0x7f2862331678, type = mutex, maxContention = 1
+lockAddr = 0x7f2861f31678, type = mutex, maxContention = 1
+lockAddr = 0x7f2861d31678, type = mutex, maxContention = 1
+lockAddr = 0x7f2861931678, type = mutex, maxContention = 1
+lockAddr = 0x7f2861531678, type = mutex, maxContention = 1
+lockAddr = 0x7f2861131678, type = mutex, maxContention = 1
+lockAddr = 0x7f2860d31678, type = mutex, maxContention = 1
+lockAddr = 0x7f2860931678, type = mutex, maxContention = 1
+lockAddr = 0x7f2860531678, type = mutex, maxContention = 1
+lockAddr = 0x7f2862331840, type = mutex, maxContention = 1
+lockAddr = 0x7f2861f31840, type = mutex, maxContention = 1
+lockAddr = 0x7f2861d31840, type = mutex, maxContention = 1
+lockAddr = 0x7f2861931840, type = mutex, maxContention = 1
+lockAddr = 0x7f2861531840, type = mutex, maxContention = 1
+lockAddr = 0x7f2861131840, type = mutex, maxContention = 1
+lockAddr = 0x7f2860d31840, type = mutex, maxContention = 1
+lockAddr = 0x7f2860931840, type = mutex, maxContention = 1
+lockAddr = 0x7f2860531840, type = mutex, maxContention = 1
+lockAddr = 0x7f2c90b7a340, type = mutex, maxContention = 16
+lockAddr = 0x7f2c90b7a7c8, type = mutex, maxContention = 1
+num sampled accesses       = 324007
+total cache bytes accessed = 20744136
+total page bytes accessed  = 1214850920
+cache line writes          = 164270
+cache owner conflicts      = 595 ( 0.0036%)
+avg. cache utilization     = 100.037%
+avg. page utilization      = 91.540%
