@@ -1,0 +1,269 @@
+>>> stack start @ 0x7ffcc0e27a40, stack end @ 0x7ffcc0e27aa0
+>>> program break @ 0x55ff0ca02000
+>>> malloc_mmaps                                 46
+>>> large_object_threshold                   132864
+>>> num_madvise                                   1
+>>> num_sbrk                                      0
+>>> size_sbrk                                     0
+>>> cycles_alloc                        12927400330
+>>> cycles_allocFFL                     58935045194
+>>> cycles_free                          9714359958
+>>> total_global_cycles                 70011770252
+
+>>>>>>>>>>>>>>>    Memory Distribution    <<<<<<<<<<<<<<<
+----tid =      55336----
+idx:          0, alloc wasted:      48927, freelist wasted:      15848
+idx:          1, alloc wasted:       3976, freelist wasted:    8709112
+----tid =      55337----
+idx:          0, alloc wasted:       1516, freelist wasted:         64
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55338----
+idx:          0, alloc wasted:        844, freelist wasted:         64
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55339----
+idx:          0, alloc wasted:       1228, freelist wasted:         64
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55340----
+idx:          0, alloc wasted:       1228, freelist wasted:         64
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55341----
+idx:          0, alloc wasted:       1600, freelist wasted:         64
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55342----
+idx:          0, alloc wasted:       1612, freelist wasted:         64
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55343----
+idx:          0, alloc wasted:       1612, freelist wasted:         64
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55344----
+idx:          0, alloc wasted:       1612, freelist wasted:         64
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55345----
+idx:          0, alloc wasted:       1228, freelist wasted:         64
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55346----
+idx:          0, alloc wasted:       1612, freelist wasted:         64
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55347----
+idx:          0, alloc wasted:       1228, freelist wasted:         64
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55348----
+idx:          0, alloc wasted:       1612, freelist wasted:         64
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55349----
+idx:          0, alloc wasted:       1612, freelist wasted:         64
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55350----
+idx:          0, alloc wasted:       1228, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55351----
+idx:          0, alloc wasted:       1228, freelist wasted:         64
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55352----
+idx:          0, alloc wasted:       1228, freelist wasted:         64
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55353----
+idx:          0, alloc wasted:        844, freelist wasted:         64
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55354----
+idx:          0, alloc wasted:       1612, freelist wasted:         64
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55355----
+idx:          0, alloc wasted:       1228, freelist wasted:         64
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55356----
+idx:          0, alloc wasted:        844, freelist wasted:         64
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55357----
+idx:          0, alloc wasted:       1228, freelist wasted:         64
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55358----
+idx:          0, alloc wasted:       1228, freelist wasted:         64
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55359----
+idx:          0, alloc wasted:       1228, freelist wasted:         64
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55360----
+idx:          0, alloc wasted:        844, freelist wasted:         64
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55361----
+idx:          0, alloc wasted:       1228, freelist wasted:         64
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55362----
+idx:          0, alloc wasted:       1228, freelist wasted:         64
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55363----
+idx:          0, alloc wasted:        844, freelist wasted:         64
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55364----
+idx:          0, alloc wasted:       1612, freelist wasted:         64
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55365----
+idx:          0, alloc wasted:       1228, freelist wasted:         64
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55366----
+idx:          0, alloc wasted:       1228, freelist wasted:         64
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55367----
+idx:          0, alloc wasted:       1228, freelist wasted:         64
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55368----
+idx:          0, alloc wasted:       1228, freelist wasted:         64
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55369----
+idx:          0, alloc wasted:       1624, freelist wasted:         64
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55370----
+idx:          0, alloc wasted:        844, freelist wasted:         64
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55371----
+idx:          0, alloc wasted:       1228, freelist wasted:         64
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55372----
+idx:          0, alloc wasted:       1276, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55373----
+idx:          0, alloc wasted:        844, freelist wasted:         64
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55374----
+idx:          0, alloc wasted:       1228, freelist wasted:         64
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55375----
+idx:          0, alloc wasted:       1228, freelist wasted:         64
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55376----
+idx:          0, alloc wasted:       1612, freelist wasted:         64
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      55377----
+idx:          0, alloc wasted:       1692, freelist wasted:      13976
+idx:          1, alloc wasted:        784, freelist wasted:    2619280
+
+>>>>>>>>>>>>>>>    NEW ALLOCATIONS : total (average)    <<<<<<<<<<<<<<<
+total allocations (new)                      171656
+total allocations (reused)                   340773
+total deallocations                          512383
+
+
+>>>>>>>>>>>>>>>    NEW ALLOCATIONS : total (average)    <<<<<<<<<<<<<<<
+allocation cycles                       12927400330    avg = 75309.9
+allocation faults                              4582    avg = 0.0
+allocation tlb read misses                   308368    avg = 1.8
+allocation tlb write misses                   12499    avg = 0.1
+allocation cache misses                     1003060    avg = 5.8
+num allocation instr                     5076761366    avg = 29575.2
+
+
+>>>>>>>>>>>>>>>  FREELIST ALLOCATIONS : total (average) <<<<<<<<<<<<<<<
+allocation cycles                       58935045194    avg = 172945.2
+allocation faults                              1130    avg = 0.0
+allocation tlb read misses                   930822    avg = 2.7
+allocation tlb write misses                   37885    avg = 0.1
+allocation cache misses                     3607024    avg = 10.6
+num allocation instr                    22521049483    avg = 66088.1
+
+
+>>>>>>>>>>>>>>>     DEALLOCATIONS : total (average)     <<<<<<<<<<<<<<<
+deallocation cycles                      9714359958    avg = 18959.2
+deallocation faults                            1461    avg = 0.0
+deallocation tlb read misses                 761898    avg = 1.5
+deallocation tlb write misses                 55894    avg = 0.1
+deallocation cache misses                   1036172    avg = 2.0
+num deallocation instr                   6061380013    avg = 11829.8
+
+>>>>>>>>>>>>>>>               LOCK TOTALS               <<<<<<<<<<<<<<<
+num pthread mutex locks                          44
+num pthread trylocks                              0
+num pthread spin locks                            0
+num pthread spin trylocks                         0
+
+>>>>>>>>>>>>>>>>>>>>>>>>>> Thread Contention <<<<<<<<<<<<<<<<<<<<<<<<<<
+
+>>> mutex_waits                             1995414
+>>> mutex_wait_cycles                     157081496    avg = 78.7
+>>> mutex_trylock_waits                           0
+>>> mutex_trylock_fails                           0
+>>> spinlock_waits                                0
+>>> spinlock_wait_cycles                          0    avg = 0.0
+>>> spin_trylock_waits                            0
+>>> spin_trylock_fails                            0
+>>> mmap_waits                                   46
+>>> mmap_wait_cycles                       25982586    avg = 564838.8
+>>> sbrk_waits                                    0
+>>> sbrk_wait_cycles                              0    avg = 0.0
+>>> madvise_waits                                 1
+>>> madvise_wait_cycles                      366316    avg = 366316.0
+>>> munmap_waits                                 34
+>>> munmap_wait_cycles                      3297244    avg = 96977.8
+>>> mremap_waits                                  0
+>>> mremap_wait_cycles                            0    avg = 0.0
+>>> mprotect_waits                             1819
+>>> mprotect_wait_cycle                    39178392    avg = 21538.4
+
+>>> critical_section_counter                1995414
+>>> critical_section_duration             768907120    avg = 385.3
+
+
+>>>>>>>>>>>>>>>>>>>>>>>>>> Total Memory Usage <<<<<<<<<<<<<<<<<<<<<<<<<
+
+>>> Thread Counter:
+>>> maxRealMemoryUsage         18446744073709346765
+>>> maxRealAllocMemoryUsage    18446744073709398168
+>>> maxTotalMemoryUsage                    26615808
+
+>>> Global Counter:
+>>> realMemoryUsage                        28028933
+>>> realAllocatedMemoryUsage               28135400
+>>> totalMemoryUsage                       67907584
+
+>>>>>>>>>>>>>>>>>>>>>>>>> Detailed Lock Usage <<<<<<<<<<<<<<<<<<<<<<<<<
+lockAddr = 0x7f56d4000020, type = mutex, maxContention = 1
+lockAddr = 0x7f56cc000020, type = mutex, maxContention = 1
+lockAddr = 0x7f56d0000020, type = mutex, maxContention = 1
+lockAddr = 0x7f56c4000020, type = mutex, maxContention = 1
+lockAddr = 0x7f56bc000020, type = mutex, maxContention = 1
+lockAddr = 0x7f56b4000020, type = mutex, maxContention = 1
+lockAddr = 0x7f56b8000020, type = mutex, maxContention = 1
+lockAddr = 0x7f56c8000020, type = mutex, maxContention = 1
+lockAddr = 0x7f56c0000020, type = mutex, maxContention = 1
+lockAddr = 0x7f5684000020, type = mutex, maxContention = 1
+lockAddr = 0x7f5688000020, type = mutex, maxContention = 1
+lockAddr = 0x7f5620000020, type = mutex, maxContention = 1
+lockAddr = 0x7f561c000020, type = mutex, maxContention = 1
+lockAddr = 0x7f5618000020, type = mutex, maxContention = 1
+lockAddr = 0x7f560c000020, type = mutex, maxContention = 1
+lockAddr = 0x7f55f0000020, type = mutex, maxContention = 1
+lockAddr = 0x7f567c000020, type = mutex, maxContention = 1
+lockAddr = 0x7f5680000020, type = mutex, maxContention = 1
+lockAddr = 0x7f55e4000020, type = mutex, maxContention = 1
+lockAddr = 0x7f56ac000020, type = mutex, maxContention = 1
+lockAddr = 0x7f568c000020, type = mutex, maxContention = 1
+lockAddr = 0x7f5634000020, type = mutex, maxContention = 1
+lockAddr = 0x7f5664000020, type = mutex, maxContention = 1
+lockAddr = 0x7f55f4000020, type = mutex, maxContention = 1
+lockAddr = 0x7f55fc000020, type = mutex, maxContention = 1
+lockAddr = 0x7f5644000020, type = mutex, maxContention = 2
+lockAddr = 0x7f569c000020, type = mutex, maxContention = 1
+lockAddr = 0x7f5694000020, type = mutex, maxContention = 1
+lockAddr = 0x7f5654000020, type = mutex, maxContention = 1
+lockAddr = 0x7f562c000020, type = mutex, maxContention = 1
+lockAddr = 0x7f564c000020, type = mutex, maxContention = 1
+lockAddr = 0x7f5610000020, type = mutex, maxContention = 1
+lockAddr = 0x7f5624000020, type = mutex, maxContention = 1
+lockAddr = 0x7f56a4000020, type = mutex, maxContention = 1
+lockAddr = 0x7f5604000020, type = mutex, maxContention = 1
+lockAddr = 0x7f563c000020, type = mutex, maxContention = 1
+lockAddr = 0x7f5674000020, type = mutex, maxContention = 1
+lockAddr = 0x7f566c000020, type = mutex, maxContention = 1
+lockAddr = 0x7f55e8000020, type = mutex, maxContention = 1
+lockAddr = 0x7f55dc000020, type = mutex, maxContention = 1
+lockAddr = 0x7f565c000020, type = mutex, maxContention = 1
+lockAddr = 0x7f5b5a4bb1c0, type = mutex, maxContention = 1
+lockAddr = 0x7f5b5a4bbb00, type = mutex, maxContention = 1
+lockAddr = 0x7f5b5a4bbb40, type = mutex, maxContention = 1
+num sampled accesses       = 2422193
+total cache bytes accessed = 145341336
+total page bytes accessed  = 5173714818
+cache line writes          = 566819
+cache owner conflicts      = 280228 ( 0.4944%)
+avg. cache utilization     = 93.756%
+avg. page utilization      = 52.148%

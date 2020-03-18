@@ -1,0 +1,524 @@
+>>> stack start @ 0x7ffeb7b84a90, stack end @ 0x7ffeb7b84af0
+>>> program break @ 0x55a6f877a000
+>>> class_sizes 16 32 64 128 256 512 1024 2048 4096 
+>>> malloc_mmaps                              30313
+>>> large_object_threshold                     4096
+>>> num_madvise                                   0
+>>> num_sbrk                                      0
+>>> size_sbrk                                     0
+>>> cycles_alloc                        11764599592
+>>> cycles_allocFFL                    227401038774
+>>> cycles_free                         32332866372
+>>> total_global_cycles                113895025334
+
+>>>>>>>>>>>>>>>    Memory Distribution    <<<<<<<<<<<<<<<
+----tid =      55039----
+idx:          0, alloc wasted:          0, freelist wasted:   10521632
+idx:          1, alloc wasted:        320, freelist wasted:       3136
+idx:          2, alloc wasted:        216, freelist wasted:      19520
+idx:          3, alloc wasted:      16119, freelist wasted:      16128
+idx:          4, alloc wasted:         96, freelist wasted:       1792
+idx:          5, alloc wasted:       8544, freelist wasted:          0
+idx:          6, alloc wasted:      18352, freelist wasted:       4096
+idx:          7, alloc wasted:        448, freelist wasted:          0
+idx:          8, alloc wasted:        256, freelist wasted:          0
+----tid =      55040----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        476, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55041----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        476, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55042----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        476, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55043----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        476, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55044----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        604, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55045----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        348, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55046----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        608, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55047----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        476, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55048----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        476, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55049----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        476, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55050----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        476, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55051----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        348, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55052----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        476, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55053----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        604, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55054----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        476, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55055----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        476, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55056----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        476, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55057----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        476, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55058----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        476, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55059----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        476, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55060----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        476, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55061----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        476, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55062----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        476, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55063----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        476, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55064----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        620, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55065----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        476, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55066----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        476, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55067----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        572, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55068----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        476, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55069----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        476, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55070----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        476, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55071----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        476, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55072----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        476, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55073----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        476, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55074----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        476, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55075----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        476, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55076----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        476, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55077----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        472, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55078----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        604, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55079----
+idx:          0, alloc wasted:          0, freelist wasted:         16
+idx:          1, alloc wasted:          8, freelist wasted:          0
+idx:          2, alloc wasted:         16, freelist wasted:         64
+idx:          3, alloc wasted:        604, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:        768, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+----tid =      55080----
+idx:          0, alloc wasted:          0, freelist wasted:    2342388
+idx:          1, alloc wasted:          0, freelist wasted:       7104
+idx:          2, alloc wasted:         52, freelist wasted:      26944
+idx:          3, alloc wasted:        544, freelist wasted:     107904
+idx:          4, alloc wasted:       1632, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:      15360
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:      61440
+
+>>>>>>>>>>>>>>>    NEW ALLOCATIONS : total (average)    <<<<<<<<<<<<<<<
+total allocations (new)                       32503
+total allocations (reused)                   479926
+total deallocations                          512383
+
+
+>>>>>>>>>>>>>>>    NEW ALLOCATIONS : total (average)    <<<<<<<<<<<<<<<
+allocation cycles                       11764599592    avg = 361954.3
+allocation faults                              1510    avg = 0.0
+allocation tlb read misses                    70944    avg = 2.2
+allocation tlb write misses                   13184    avg = 0.4
+allocation cache misses                      173729    avg = 5.3
+num allocation instr                     1867067916    avg = 57442.9
+
+
+>>>>>>>>>>>>>>>  FREELIST ALLOCATIONS : total (average) <<<<<<<<<<<<<<<
+allocation cycles                      227401038774    avg = 473825.2
+allocation faults                              4388    avg = 0.0
+allocation tlb read misses                  1380624    avg = 2.9
+allocation tlb write misses                  243491    avg = 0.5
+allocation cache misses                     3728637    avg = 7.8
+num allocation instr                    29624094123    avg = 61726.4
+
+
+>>>>>>>>>>>>>>>     DEALLOCATIONS : total (average)     <<<<<<<<<<<<<<<
+deallocation cycles                     32332866372    avg = 63102.9
+deallocation faults                            5110    avg = 0.0
+deallocation tlb read misses                 935679    avg = 1.8
+deallocation tlb write misses                212499    avg = 0.4
+deallocation cache misses                   2144992    avg = 4.2
+num deallocation instr                   8422472365    avg = 16437.8
+
+>>>>>>>>>>>>>>>               LOCK TOTALS               <<<<<<<<<<<<<<<
+num pthread mutex locks                           4
+num pthread trylocks                              0
+num pthread spin locks                            0
+num pthread spin trylocks                         0
+
+>>>>>>>>>>>>>>>>>>>>>>>>>> Thread Contention <<<<<<<<<<<<<<<<<<<<<<<<<<
+
+>>> mutex_waits                             9326453
+>>> mutex_wait_cycles                  191191986032    avg = 20500.0
+>>> mutex_trylock_waits                           0
+>>> mutex_trylock_fails                           0
+>>> spinlock_waits                                0
+>>> spinlock_wait_cycles                          0    avg = 0.0
+>>> spin_trylock_waits                            0
+>>> spin_trylock_fails                            0
+>>> mmap_waits                                30313
+>>> mmap_wait_cycles                       82219716    avg = 2712.4
+>>> sbrk_waits                                    0
+>>> sbrk_wait_cycles                              0    avg = 0.0
+>>> madvise_waits                                 0
+>>> madvise_wait_cycles                           0    avg = 0.0
+>>> munmap_waits                              13064
+>>> munmap_wait_cycles                    497211912    avg = 38059.7
+>>> mremap_waits                                  0
+>>> mremap_wait_cycles                            0    avg = 0.0
+>>> mprotect_waits                                0
+>>> mprotect_wait_cycle                           0    avg = 0.0
+
+>>> critical_section_counter                2049624
+>>> critical_section_duration           25763567830    avg = 12569.9
+
+
+>>>>>>>>>>>>>>>>>>>>>>>>>> Total Memory Usage <<<<<<<<<<<<<<<<<<<<<<<<<
+
+>>> Thread Counter:
+>>> maxRealMemoryUsage         18446744073709346109
+>>> maxRealAllocMemoryUsage    18446744073709389120
+>>> maxTotalMemoryUsage                   337797120
+
+>>> Global Counter:
+>>> realMemoryUsage                        28382013
+>>> realAllocatedMemoryUsage               28473472
+>>> totalMemoryUsage                     4130643968
+
+>>>>>>>>>>>>>>>>>>>>>>>>> Detailed Lock Usage <<<<<<<<<<<<<<<<<<<<<<<<<
+lockAddr = 0x7f0fab7e5680, type = mutex, maxContention = 41
+lockAddr = 0x7f0fab7e5998, type = mutex, maxContention = 1
+lockAddr = 0x7f0fab7e59c8, type = mutex, maxContention = 1
+lockAddr = 0x7f0fab7e5940, type = mutex, maxContention = 1
+num sampled accesses       = 3048145
+total cache bytes accessed = 184015233
+total page bytes accessed  = 7985686506
+cache line writes          = 706158
+cache owner conflicts      = 356694 ( 0.5051%)
+avg. cache utilization     = 94.327%
+avg. page utilization      = 63.961%

@@ -1,0 +1,1629 @@
+>>> stack start @ 0x7fff2196ac70, stack end @ 0x7fff2196acd0
+>>> program break @ 0x55fef859a000
+>>> class_sizes 8 16 32 48 64 80 112 144 192 240 320 416 576 768 1024 1280 1792 2304 3072 4096 5120 6656 9216 12288 16384 20480 26624 40960 57344 73728 98304 122880 155648 196608 204808 
+>>> malloc_mmaps                                  0
+>>> large_object_threshold                   204808
+>>> num_madvise                                   6
+>>> num_sbrk                                   3232
+>>> size_sbrk                            1955110912
+>>> cycles_alloc                      1065526708806
+>>> cycles_allocFFL                    395025516428
+>>> cycles_free                       2666080943160
+>>> total_global_cycles               1650755437274
+
+>>>>>>>>>>>>>>>    Memory Distribution    <<<<<<<<<<<<<<<
+----tid =      63488----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:        112, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63489----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:        112, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63490----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:        112, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63491----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:          0, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63492----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:        112, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63493----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:        112, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63494----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:          0, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63495----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:        112, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63278----
+idx:          0, alloc wasted:          0, freelist wasted:    6677328
+idx:          1, alloc wasted:          0, freelist wasted:    7482064
+idx:          2, alloc wasted:          0, freelist wasted:  100448896
+idx:          3, alloc wasted:         12, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:   20000008, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:    2721424, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:       2952, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:        576
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:          0, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:       9216
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:    4732800, freelist wasted:      16384
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:        160, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63457----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:        112, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63458----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:        112, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63459----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:        112, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63460----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:        112, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63461----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:        112, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63462----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:        112, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63463----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:        112, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63464----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:        112, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63465----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:        112, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63466----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:        112, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63467----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:        112, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63468----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:        112, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63469----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:        112, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63470----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:          0, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63471----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:        112, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63472----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:        112, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63473----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:        112, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63474----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:        112, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63475----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:        112, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63476----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:        112, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63477----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:        112, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63478----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:        112, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63479----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:        112, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63480----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:          0, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63481----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:        112, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63482----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:          0, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63483----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:        112, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63484----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:        112, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63485----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:          0, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63486----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:        112, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+----tid =      63487----
+idx:          0, alloc wasted:          0, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+idx:          2, alloc wasted:          0, freelist wasted:          0
+idx:          3, alloc wasted:          0, freelist wasted:          0
+idx:          4, alloc wasted:          0, freelist wasted:          0
+idx:          5, alloc wasted:          0, freelist wasted:          0
+idx:          6, alloc wasted:          0, freelist wasted:          0
+idx:          7, alloc wasted:          0, freelist wasted:          0
+idx:          8, alloc wasted:          0, freelist wasted:          0
+idx:          9, alloc wasted:          0, freelist wasted:          0
+idx:         10, alloc wasted:          0, freelist wasted:          0
+idx:         11, alloc wasted:          0, freelist wasted:          0
+idx:         12, alloc wasted:          0, freelist wasted:          0
+idx:         13, alloc wasted:          0, freelist wasted:          0
+idx:         14, alloc wasted:          0, freelist wasted:          0
+idx:         15, alloc wasted:          0, freelist wasted:          0
+idx:         16, alloc wasted:          0, freelist wasted:          0
+idx:         17, alloc wasted:          0, freelist wasted:          0
+idx:         18, alloc wasted:          0, freelist wasted:          0
+idx:         19, alloc wasted:          0, freelist wasted:          0
+idx:         20, alloc wasted:        112, freelist wasted:          0
+idx:         21, alloc wasted:          0, freelist wasted:          0
+idx:         22, alloc wasted:          0, freelist wasted:          0
+idx:         23, alloc wasted:          0, freelist wasted:          0
+idx:         24, alloc wasted:          0, freelist wasted:          0
+idx:         25, alloc wasted:          0, freelist wasted:          0
+idx:         26, alloc wasted:          0, freelist wasted:          0
+idx:         27, alloc wasted:          0, freelist wasted:          0
+idx:         28, alloc wasted:          0, freelist wasted:          0
+idx:         29, alloc wasted:          0, freelist wasted:          0
+idx:         30, alloc wasted:          0, freelist wasted:          0
+idx:         31, alloc wasted:          0, freelist wasted:          0
+idx:         32, alloc wasted:          0, freelist wasted:          0
+idx:         33, alloc wasted:          0, freelist wasted:          0
+idx:         34, alloc wasted:          0, freelist wasted:          0
+
+>>>>>>>>>>>>>>>    NEW ALLOCATIONS : total (average)    <<<<<<<<<<<<<<<
+total allocations (new)                    11926213
+total allocations (reused)                  9215328
+total deallocations                        21141458
+
+
+>>>>>>>>>>>>>>>    NEW ALLOCATIONS : total (average)    <<<<<<<<<<<<<<<
+allocation cycles                     1065526708806    avg = 89343.3
+allocation faults                            138512    avg = 0.0
+allocation tlb read misses               1457997860    avg = 122.3
+allocation tlb write misses                 1100997    avg = 0.1
+allocation cache misses                  1925982337    avg = 161.5
+num allocation instr                   152916566747    avg = 12821.9
+
+
+>>>>>>>>>>>>>>>  FREELIST ALLOCATIONS : total (average) <<<<<<<<<<<<<<<
+allocation cycles                      395025516428    avg = 42866.1
+allocation faults                             51154    avg = 0.0
+allocation tlb read misses                813926948    avg = 88.3
+allocation tlb write misses                  444799    avg = 0.0
+allocation cache misses                   206342758    avg = 22.4
+num allocation instr                   198520679537    avg = 21542.4
+
+
+>>>>>>>>>>>>>>>     DEALLOCATIONS : total (average)     <<<<<<<<<<<<<<<
+deallocation cycles                   2666080943160    avg = 126106.8
+deallocation faults                          115685    avg = 0.0
+deallocation tlb read misses             3645899491    avg = 172.5
+deallocation tlb write misses              12423676    avg = 0.6
+deallocation cache misses                3863189443    avg = 182.7
+num deallocation instr                 678574272153    avg = 32096.9
+
+>>>>>>>>>>>>>>>               LOCK TOTALS               <<<<<<<<<<<<<<<
+num pthread mutex locks                           0
+num pthread trylocks                              0
+num pthread spin locks                           89
+num pthread spin trylocks                         0
+
+>>>>>>>>>>>>>>>>>>>>>>>>>> Thread Contention <<<<<<<<<<<<<<<<<<<<<<<<<<
+
+>>> mutex_waits                                   0
+>>> mutex_wait_cycles                             0    avg = 0.0
+>>> mutex_trylock_waits                           0
+>>> mutex_trylock_fails                           0
+>>> spinlock_waits                          2417554
+>>> spinlock_wait_cycles                  161699820    avg = 66.9
+>>> spin_trylock_waits                            0
+>>> spin_trylock_fails                            0
+>>> mmap_waits                                    0
+>>> mmap_wait_cycles                              0    avg = 0.0
+>>> sbrk_waits                                 3232
+>>> sbrk_wait_cycles                       16849430    avg = 5213.3
+>>> madvise_waits                                 6
+>>> madvise_wait_cycles                      156606    avg = 26101.0
+>>> munmap_waits                                  0
+>>> munmap_wait_cycles                            0    avg = 0.0
+>>> mremap_waits                                  0
+>>> mremap_wait_cycles                            0    avg = 0.0
+>>> mprotect_waits                                0
+>>> mprotect_wait_cycle                           0    avg = 0.0
+
+>>> critical_section_counter                2415858
+>>> critical_section_duration            4451935794    avg = 1842.8
+
+
+>>>>>>>>>>>>>>>>>>>>>>>>>> Total Memory Usage <<<<<<<<<<<<<<<<<<<<<<<<<
+
+>>> Thread Counter:
+>>> maxRealMemoryUsage                    747240708
+>>> maxRealAllocMemoryUsage               774701888
+>>> maxTotalMemoryUsage                  1900445696
+
+>>> Global Counter:
+>>> realMemoryUsage                       747427716
+>>> realAllocatedMemoryUsage              774889440
+>>> totalMemoryUsage                     1900662784
+
+>>>>>>>>>>>>>>>>>>>>>>>>> Detailed Lock Usage <<<<<<<<<<<<<<<<<<<<<<<<<
+lockAddr = 0x7f6817d60424, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d608e4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d60da4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d61264, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d61724, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d61be4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d620a4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d62564, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d62a24, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d62ee4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d633a4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d63864, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d63d24, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d641e4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d646a4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d64b64, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d65024, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d654e4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d659a4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d65e64, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d66324, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d667e4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d66ca4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d67164, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d67624, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d67ae4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d67fa4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d68464, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d68924, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d68de4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d692a4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d69764, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d69c24, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d6a0e4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d6a5a4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d6aa64, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d6af24, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d6b3e4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d6b8a4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d6bd64, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d6c224, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d6c6e4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d6cba4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d6d064, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d6d524, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d6d9e4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d6dea4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d6e364, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d6e824, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d6ece4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d6f1a4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d6f664, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d6fb24, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d6ffe4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d704a4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817bd0b8c, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d70964, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d70e24, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d712e4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817bd4c8c, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d755ac, type = spinlock, maxContention = 9
+lockAddr = 0x7f6817d57f24, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d583e4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d588a4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d58d64, type = spinlock, maxContention = 2
+lockAddr = 0x7f6817d59224, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d596e4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d59ba4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d5a064, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d5a524, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d5a9e4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d5aea4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d5b364, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d5b824, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d5bce4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d5c1a4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d5c664, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d5cb24, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d5cfe4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d5d4a4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d5d964, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d5de24, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d5e2e4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d5e7a4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d5ec64, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d5f124, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d5f5e4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d5faa4, type = spinlock, maxContention = 1
+lockAddr = 0x7f6817d5ff64, type = spinlock, maxContention = 1
+num sampled accesses       = 2776042
+total cache bytes accessed = 169177352
+total page bytes accessed  = 10955624768
+cache line writes          = 888759
+cache owner conflicts      = 714623 ( 0.8041%)
+avg. cache utilization     = 95.222%
+avg. page utilization      = 96.350%
