@@ -1,0 +1,19 @@
+bodytrack omalloc vs libc224
+thread contention, system calls
+>>>>>>>>>>>>>>>     DEALLOCATIONS : total (average)     <<<<<<<<<<<<<<<
+deallocation cycles avg = 26626.4 > 18959.2
+deallocation cache misses avg = 2.3 > 2.0
+num deallocation instr avg = 15679.7 > 11829.8
+>>>>>>>>>>>>>>>>>>>>>>>>>> Thread Contention <<<<<<<<<<<<<<<<<<<<<<<<<<
+mutex_waits = 2218105 > 1995414
+mutex_wait_cycles = 20048884062 >>> 157081496
+mutex_wait_cycles avg = 9038.7 >>> 78.7
+mmap_waits = 17644 >>> 46
+mmap_wait_cycles = 114874436 >> 25982586
+munmap_waits = 12765 >>> 34
+munmap_wait_cycles = 525416146 >>> 3297244
+critical_section_counter = 2067139 > 1995414
+critical_section_duration = 2382677734 >> 768907120
+critical_section_duration avg = 1152.6 >> 385.3
+>>>>>>>>>>>>>>>>>>>>>>>>> Detailed Lock Usage <<<<<<<<<<<<<<<<<<<<<<<<<
+maxContention = 41 >> 1

@@ -1,0 +1,23 @@
+swaptions omalloc vs tcmalloc
+contention, cache misses, cache conflicts
+>>>>>>>>>>>>>>>    NEW ALLOCATIONS : total (average)    <<<<<<<<<<<<<<<
+allocation cycles avg = 260740.4 > 170819.2
+allocation tlb write misses avg = 0.3 >> 0.1
+>>>>>>>>>>>>>>>  FREELIST ALLOCATIONS : total (average) <<<<<<<<<<<<<<<
+allocation cycles avg = 197656.0 >> 69777.1
+allocation tlb write misses avg = 0.4 >> 0.1
+allocation cache misses avg = 28.0 >> 7.2
+>>>>>>>>>>>>>>>     DEALLOCATIONS : total (average)     <<<<<<<<<<<<<<<
+deallocation cycles avg = 193603.7 >> 94870.7
+deallocation tlb write misses avg = 0.4 >> 0.2
+deallocation cache misses avg = 12.8 > 9.4
+>>>>>>>>>>>>>>>>>>>>>>>>>> Thread Contention <<<<<<<<<<<<<<<<<<<<<<<<<<
+mutex_waits = 206217925 >>> spinlock_waits = 3755397
+mutex_wait_cycles = 6775962915484 >>> spinlock_wait_cycles = 802797470
+mutex_wait_cycles avg = 32858.3 >>> spinlock_wait_cycles avg = 213.8
+critical_section_counter = 192384444 >>> 3752318
+critical_section_duration = 270419391212 >>> 6618491188
+>>>>>>>>>>>>>>>>>>>>>>>>> Detailed Lock Usage <<<<<<<<<<<<<<<<<<<<<<<<<
+maxContention = 40 > 31
+>>>>>>>>>>>>>>>>>>>>>>>>> Friendliness <<<<<<<<<<<<<<<<<<<<<<<<<
+cache owner conflicts = 0.0152% >>> 0.0008%

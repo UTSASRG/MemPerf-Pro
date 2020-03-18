@@ -1,0 +1,26 @@
+dedup libc224 vs tcmalloc
+cache misses, system calls, utilization
+total allocations (new) = 3166496 > 2820528
+total allocations (reused) = 907282 < 1253208
+>>>>>>>>>>>>>>>    NEW ALLOCATIONS : total (average)    <<<<<<<<<<<<<<<
+allocation cycles avg = 122077.2 >> 37374.3
+allocation tlb read misses avg = 31.5 > 27.1
+allocation cache misses avg = 45.5 > 31.1
+num allocation instr = 46577.5 > 37074.9
+>>>>>>>>>>>>>>>  FREELIST ALLOCATIONS : total (average) <<<<<<<<<<<<<<<
+allocation cycles avg = 155513.3 >> 73041.1
+allocation cache misses avg = 16.5 >> 8.2
+num allocation instr avg = 66816.9 > 63421.4
+>>>>>>>>>>>>>>>     DEALLOCATIONS : total (average)     <<<<<<<<<<<<<<<
+deallocation cycles avg = 108894.2 >> 70016.0
+num deallocation instr avg = 64649.0 > 57184.7
+>>>>>>>>>>>>>>>>>>>>>>>>>> Thread Contention <<<<<<<<<<<<<<<<<<<<<<<<<<
+mutex_waits = 11073335 >>> spinlock_waits = 459888
+mutex_wait_cycles = 1037202760 >> spinlock_wait_cycles = 403234178
+mmap_wait_cycles = 8638592 > 5800960
+critical_section_counter = 11073335 >>> 459189
+critical_section_duration = 5170381770 > 4448655134
+>>>>>>>>>>>>>>>>>>>>>>>>>> Friendliness <<<<<<<<<<<<<<<<<<<<<<<<<<
+cache owner conflicts = 0.0175% >> 0.0089%
+avg. cache utilization = 83.228% < 90.130%
+avg. page utilization = 85.322% < 95.545%
