@@ -1,6 +1,7 @@
 #ifndef __SHADOWMAP_H__
 #define __SHADOWMAP_H__
 
+#include <atomic>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -77,22 +78,24 @@ inline void * alignupPointer(void * ptr, size_t alignto) {
 
 class CacheMapEntry {
 		private:
-				unsigned char num_used_bytes;
+				//unsigned char num_used_bytes;
+                std::atomic<unsigned char> num_used_bytes;
 				pid_t owner;
 
 		public:
 				pid_t getOwner();
 				void setOwner(pid_t new_owner);
-				unsigned char getUsedBytes();
-				bool addUsedBytes(unsigned char num_bytes);
-				bool subUsedBytes(unsigned char num_bytes);
+				unsigned int getUsedBytes();
+				bool addUsedBytes(unsigned int num_bytes);
+				bool subUsedBytes(unsigned int num_bytes);
 };
 
 class PageMapEntry {
 		private:
 				bool touched;
 				unsigned classSize;
-				unsigned short num_used_bytes;
+				//unsigned short num_used_bytes;
+				std::atomic<unsigned short> num_used_bytes;
 				CacheMapEntry * cache_map_entry;
 
 		public:
@@ -104,9 +107,9 @@ class PageMapEntry {
 				bool isTouched();
 				void setTouched();
 				void clearTouched();
-				unsigned short getUsedBytes();
-				bool addUsedBytes(unsigned short num_bytes);
-				bool subUsedBytes(unsigned short num_bytes);
+				unsigned int getUsedBytes();
+				bool addUsedBytes(unsigned int num_bytes);
+				bool subUsedBytes(unsigned int num_bytes);
 				unsigned getClassSize();
 				void setClassSize(unsigned size);
 };

@@ -37,7 +37,7 @@ extern MemoryUsage max_mu;
 extern HashMap <uint64_t, MmapTuple*, spinlock> mappings;
 extern HashMap <uint64_t, LC*, spinlock> lockUsage;
 
-void checkGlobalMemoryUsageBySizes();
+//void checkGlobalMemoryUsageBySizes();
 void checkGlobalRealMemoryUsage();
 void checkGlobalAllocatedMemoryUsage();
 void checkGlobalTotalMemoryUsage();

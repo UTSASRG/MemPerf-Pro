@@ -33,7 +33,8 @@
 #define MY_METADATA_SIZE 4
 #define TEMP_MEM_SIZE 1024 * 1024 * 1024 //1GB
 #define MAX_CLASS_SIZE 1050000
-#define LOCAL_BUF_SIZE 204800000
+//#define LOCAL_BUF_SIZE 204800000
+#define LOCAL_BUF_SIZE 204800000 * 2
 
 pid_t gettid();
 
@@ -220,6 +221,8 @@ void getPerfCounts(PerfReadInfo*, bool enableCounters);
 void globalizeTAD();
 void myFree (void* ptr);
 void* myMalloc (size_t size);
+void* myMalloc_hash (size_t size);
+void myFree_hash (void* ptr);
 void readAllocatorFile();
 void writeAllocData ();
 void writeContention ();
@@ -236,17 +239,17 @@ size_t updateFreeCounters(void * address);
 short getClassSizeIndex(size_t size);
 void initGlobalFreeArray();
 void initLocalFreeArray();
-void initLocalNumAllocsBySizes ();
-void initGlobalnumAllocsBySizes ();
-void initLocalNumAllocsFFLBySizes ();
-void initGlobalnumAllocsFFLBySizes ();
+//void initLocalNumAllocsBySizes ();
+//void initGlobalnumAllocsBySizes ();
+//void initLocalNumAllocsFFLBySizes ();
+//void initGlobalnumAllocsFFLBySizes ();
 
-void initRealMemoryUsageBySizes();
-void initMemoryUsageBySizes();
-void initFreedMemoryUsageBySizes();
-void initRealMemoryUsageBySizesWhenMax();
-void initMemoryUsageBySizesWhenMax();
-void initFreedMemoryUsageBySizesWhenMax();
+//void initRealMemoryUsageBySizes();
+//void initMemoryUsageBySizes();
+//void initFreedMemoryUsageBySizes();
+//void initRealMemoryUsageBySizesWhenMax();
+//void initMemoryUsageBySizesWhenMax();
+//void initFreedMemoryUsageBySizesWhenMax();
 
 void initMyLocalMem();
 void* myLocalMalloc(size_t);

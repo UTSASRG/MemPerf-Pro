@@ -102,19 +102,19 @@ std::atomic<std::uint64_t> cycles_alloc (0);
 std::atomic<std::uint64_t> cycles_allocFFL (0);
 std::atomic<std::uint64_t> cycles_free (0);
 
-uint64_t * realMemoryUsageBySizes = nullptr;
-uint64_t * memoryUsageBySizes = nullptr;
-uint64_t * freedMemoryUsageBySizes = nullptr;
-uint64_t * realMemoryUsageBySizesWhenMax = nullptr;
-uint64_t * memoryUsageBySizesWhenMax = nullptr;
-uint64_t * freedMemoryUsageBySizesWhenMax = nullptr;
+//uint64_t * realMemoryUsageBySizes = nullptr;
+//uint64_t * memoryUsageBySizes = nullptr;
+//uint64_t * freedMemoryUsageBySizes = nullptr;
+//uint64_t * realMemoryUsageBySizesWhenMax = nullptr;
+//uint64_t * memoryUsageBySizesWhenMax = nullptr;
+//uint64_t * freedMemoryUsageBySizesWhenMax = nullptr;
 MemoryUsage mu;
 MemoryUsage max_mu;
 
 /// REQUIRED!
 std::atomic<unsigned>* globalFreeArray = nullptr;
-uint64_t * globalNumAllocsBySizes = nullptr;
-uint64_t* globalNumAllocsFFLBySizes = nullptr;
+//uint64_t * globalNumAllocsBySizes = nullptr;
+//uint64_t* globalNumAllocsFFLBySizes = nullptr;
 //Thread local variables THREAD_LOCAL
 thread_local thread_data thrData;
 thread_local bool waiting;
@@ -126,10 +126,10 @@ thread_local uint64_t timeAttempted;
 thread_local uint64_t timeWaiting;
 thread_local unsigned* localFreeArray = nullptr;
 thread_local bool localFreeArrayInitialized = false;
-thread_local uint64_t * localNumAllocsBySizes = nullptr;
-thread_local bool localNumAllocsBySizesInitialized = false;
-thread_local uint64_t * localNumAllocsFFLBySizes = nullptr;
-thread_local bool localNumAllocsFFLBySizesInitialized = false;
+//thread_local uint64_t * localNumAllocsBySizes = nullptr;
+//thread_local bool localNumAllocsBySizesInitialized = false;
+//thread_local uint64_t * localNumAllocsFFLBySizes = nullptr;
+//thread_local bool localNumAllocsFFLBySizesInitialized = false;
 thread_local uint64_t myThreadID;
 thread_local thread_alloc_data localTAD;
 thread_local bool globalized = false;
@@ -150,6 +150,13 @@ void* myMemEnd;
 uint64_t myMemPosition = 0;
 uint64_t myMemAllocations = 0;
 spinlock myMemLock;
+
+char* myMem_hash;
+void* myMemEnd_hash;
+uint64_t myMemPosition_hash = 0;
+uint64_t myMemAllocations_hash = 0;
+spinlock myMemLock_hash;
+unsigned long long HASH_SIZE = (unsigned long long)1024*1024*1024*2;
 
 friendly_data globalFriendlyData;
 
@@ -235,18 +242,25 @@ __attribute__((constructor)) initStatus initializer() {
 	if(ptrSize != EIGHT_BYTES) {
 		fprintf(stderr, "error: unsupported pointer size: %zu\n", ptrSize);
 		abort();
-	}
+    }
+    myMemEnd = (void*) (myMem + TEMP_MEM_SIZE);
+    myMemLock.init();
 
-	myMemEnd = (void*) (myMem + TEMP_MEM_SIZE);
-	myMemLock.init();
-	globalize_lck.init();
-	pid = getpid();
+    globalize_lck.init();
+    pid = getpid();
 
-	// Allocate and initialize all shadow memory-related mappings
-	ShadowMemory::initialize();
+    // Allocate and initialize all shadow memory-related mappings
+    ShadowMemory::initialize();
 
-	RealX::initializer();
+    RealX::initializer();
 
+    myMem_hash = (char*)RealX::mmap(NULL, HASH_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    myMemEnd_hash = (void*) (myMem_hash + HASH_SIZE);
+    fprintf(stderr, "myMen_hash = %p, %p\n", myMem_hash, myMemEnd_hash);
+    myMemLock_hash.init();
+
+
+    MemoryWaste::initialize();
 	lockUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 128);
 	overhead.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 256);
 	mappings.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
@@ -285,28 +299,27 @@ __attribute__((constructor)) initStatus initializer() {
 	readAllocatorFile();
 
 	//Initialize the global and free counter arrays (blowup)
-	initGlobalFreeArray();
-	initLocalFreeArray();
+	//initGlobalFreeArray();
+	//initLocalFreeArray();
 
-    initLocalNumAllocsBySizes();
-    initLocalNumAllocsFFLBySizes();
-    initGlobalnumAllocsBySizes();
-    initGlobalnumAllocsFFLBySizes();
+//    initLocalNumAllocsBySizes();
+//    initLocalNumAllocsFFLBySizes();
+//    initGlobalnumAllocsBySizes();
+//    initGlobalnumAllocsFFLBySizes();
+//
+//    initRealMemoryUsageBySizes();
+//    initMemoryUsageBySizes();
+//    initFreedMemoryUsageBySizes();
+//    initRealMemoryUsageBySizesWhenMax();
+//    initMemoryUsageBySizesWhenMax();
+//    initFreedMemoryUsageBySizesWhenMax();
 
-    initRealMemoryUsageBySizes();
-    initMemoryUsageBySizes();
-    initFreedMemoryUsageBySizes();
-    initRealMemoryUsageBySizesWhenMax();
-    initMemoryUsageBySizesWhenMax();
-    initFreedMemoryUsageBySizesWhenMax();
-
-    MemoryWaste::initialize();
 
 	// Generate the name of our output file, then open it for writing.
 	char outputFile[MAX_FILENAME_LEN];
 	snprintf(outputFile, MAX_FILENAME_LEN, "%s_libmallocprof_%d_main_thread.txt",
 			program_invocation_name, pid);
-
+    fprintf(stderr, "%s\n", outputFile);
 	// Will overwrite current file; change the fopen flag to "a" for append.
 	thrData.output = fopen(outputFile, "w");
 	if(thrData.output == NULL) {
@@ -509,7 +522,8 @@ extern "C" {
         // Also, we can't call initializer() from here, because the initializer
         // itself will call malloc().
         if((profilerInitialized != INITIALIZED) || (!selfmapInitialized)) {
-            void* ptr= myMalloc (sz);
+            void* ptr = myMalloc (sz);
+            //fprintf(stderr, "0 ptr = %p, size = %d\n", ptr, sz);
             //fprintf(stderr, "malloc0... %p %d\n", ptr, sz);
             return ptr;
             //return myMalloc (sz);
@@ -518,6 +532,7 @@ extern "C" {
         //Malloc is being called by a thread that is already in malloc
         if (inAllocation) {
             void* ptr = RealX::malloc(sz);
+            //fprintf(stderr, "1 ptr = %p, size = %d\n", ptr, sz);
             //fprintf(stderr, "malloc... %p %d\n", ptr, sz);
             return ptr;
             //return RealX::malloc(sz);
@@ -525,6 +540,7 @@ extern "C" {
 
         if (!inRealMain) {
             void* ptr = RealX::malloc(sz);
+            //fprintf(stderr, "2 ptr = %p, size = %d\n", ptr, sz);
             //fprintf(stderr, "malloc... %p %d\n", ptr, sz);
             return ptr;
             //return RealX::malloc(sz);
@@ -532,9 +548,9 @@ extern "C" {
         //thread_local
         inAllocation = true;
         PMU_init_check();
-		if (!localFreeArrayInitialized) initLocalFreeArray();
-		if (!localNumAllocsBySizesInitialized) initLocalNumAllocsBySizes();
-		if (!localNumAllocsFFLBySizesInitialized) initLocalNumAllocsFFLBySizes();
+		//if (!localFreeArrayInitialized) initLocalFreeArray();
+		//if (!localNumAllocsBySizesInitialized) initLocalNumAllocsBySizes();
+		//if (!localNumAllocsFFLBySizesInitialized) initLocalNumAllocsFFLBySizes();
 
 		//Data we need for each allocation
 		allocation_metadata allocData = init_allocation(sz, MALLOC);
@@ -546,11 +562,11 @@ extern "C" {
 		object = RealX::malloc(sz);
         //fprintf(stderr, "malloc done %d %p\n", sz, object);
 		allocData.address = (uint64_t) object;
+        allocData.reused = MemoryWaste::allocUpdate(allocData.tid, allocData.size, object);
         size_t new_touched_bytes =
             PAGESIZE * ShadowMemory::updateObject(
-            (void *)allocData.address,allocData.size, false);
-		incrementMemoryUsage(sz, new_touched_bytes, object);
-        MemoryWaste::allocUpdate(allocData.tid, allocData.size, object);
+            (void *)allocData.address, allocData.size, false);
+        incrementMemoryUsage(sz, new_touched_bytes, object);
 		//Do after
 		//fprintf(stderr, "*** malloc(%zu) -> %p\n", sz, object);
 		doAfter(&allocData);
@@ -559,9 +575,14 @@ extern "C" {
 
 		// Gets overhead, address usage, mmap usage, memHWM, and prefInfo
 		analyzeAllocation(&allocData);
+
+		//fprintf(stderr, "ptr = %p, size = %d\n\n", object, sz);
+
 		// thread_local
         inAllocation = false;
+
         return object;
+
 	}
 
 	void * yycalloc(size_t nelem, size_t elsize) {
@@ -587,15 +608,15 @@ extern "C" {
 		// thread_local
 		inAllocation = true;
 
-		if (!localFreeArrayInitialized) {
-			initLocalFreeArray();
-		}
-		if (!localNumAllocsBySizesInitialized) {
-            initLocalNumAllocsBySizes();
-		}
-		if (!localNumAllocsFFLBySizesInitialized) {
-            initLocalNumAllocsFFLBySizes();
-		}
+//		if (!localFreeArrayInitialized) {
+//			initLocalFreeArray();
+//		}
+//		if (!localNumAllocsBySizesInitialized) {
+//            initLocalNumAllocsBySizes();
+//		}
+//		if (!localNumAllocsFFLBySizesInitialized) {
+//            initLocalNumAllocsFFLBySizes();
+//		}
 
 		// Data we need for each allocation
 		allocation_metadata allocData = init_allocation(nelem * elsize, CALLOC);
@@ -610,7 +631,7 @@ extern "C" {
 
     size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject((void *)allocData.address, allocData.size, false);
     incrementMemoryUsage(nelem * elsize, new_touched_bytes, object);
-        MemoryWaste::allocUpdate(allocData.tid, allocData.size, object);
+        allocData.reused = MemoryWaste::allocUpdate(allocData.tid, allocData.size, object);
 		// Do after
 		doAfter(&allocData);
 
@@ -635,6 +656,10 @@ extern "C" {
 			myFree (ptr);
 			return;
 		}
+        if (ptr >= (void *)myMem_hash && ptr <= myMemEnd_hash) {
+            myFree_hash (ptr);
+            return;
+        }
 		if ((profilerInitialized != INITIALIZED) || !inRealMain) {
 			myFree(ptr);
 			return;
@@ -644,15 +669,15 @@ extern "C" {
 		//thread_local
 		inAllocation = true;
 
-		if (!localFreeArrayInitialized) {
-			initLocalFreeArray();
-		}
-        if (!localNumAllocsBySizesInitialized) {
-            initLocalNumAllocsBySizes();
-        }
-        if (!localNumAllocsFFLBySizesInitialized) {
-            initLocalNumAllocsFFLBySizes();
-        }
+//		if (!localFreeArrayInitialized) {
+//			initLocalFreeArray();
+//		}
+//        if (!localNumAllocsBySizesInitialized) {
+//            initLocalNumAllocsBySizes();
+//        }
+//        if (!localNumAllocsFFLBySizesInitialized) {
+//            initLocalNumAllocsFFLBySizes();
+//        }
 
 		//Data we need for each free
 		allocation_metadata allocData = init_allocation(0, FREE);
@@ -664,8 +689,8 @@ extern "C" {
 
         decrementMemoryUsage(ptr);
         uint64_t size = ShadowMemory::getObjectSize(ptr);
-        MemoryWaste::freeUpdate(allocData.tid, ptr);
 		ShadowMemory::updateObject(ptr, 0, true);
+        MemoryWaste::freeUpdate(allocData.tid, ptr);
 
 		//Update free counters
 		allocData.classSize = updateFreeCounters(ptr);
@@ -749,15 +774,15 @@ extern "C" {
 		//thread_local
 		inAllocation = true;
 
-		if(!localFreeArrayInitialized) {
-			initLocalFreeArray();
-		}
-        if (!localNumAllocsBySizesInitialized) {
-            initLocalNumAllocsBySizes();
-        }
-        if (!localNumAllocsFFLBySizesInitialized) {
-            initLocalNumAllocsFFLBySizes();
-        }
+//		if(!localFreeArrayInitialized) {
+//			initLocalFreeArray();
+//		}
+//        if (!localNumAllocsBySizesInitialized) {
+//            initLocalNumAllocsBySizes();
+//        }
+//        if (!localNumAllocsFFLBySizesInitialized) {
+//            initLocalNumAllocsFFLBySizes();
+//        }
 
 		//Do before
 		doBefore(&allocData);
@@ -777,7 +802,7 @@ extern "C" {
       if(ptr){
           MemoryWaste::freeUpdate(allocData.tid, ptr);
       }
-      MemoryWaste::allocUpdate(allocData.tid, allocData.size, object);
+     allocData.reused = MemoryWaste::allocUpdate(allocData.tid, allocData.size, object);
     }
 		doAfter(&allocData);
 
@@ -814,9 +839,9 @@ extern "C" {
 
 		PMU_init_check();
 
-    if (!localFreeArrayInitialized) initLocalFreeArray();
-    if (!localNumAllocsBySizesInitialized) initLocalNumAllocsBySizes();
-    if (!localNumAllocsFFLBySizesInitialized) initLocalNumAllocsFFLBySizes();
+ //   if (!localFreeArrayInitialized) initLocalFreeArray();
+//    if (!localNumAllocsBySizesInitialized) initLocalNumAllocsBySizes();
+//    if (!localNumAllocsFFLBySizesInitialized) initLocalNumAllocsFFLBySizes();
 
     //Data we need for each allocation
     allocation_metadata allocData = init_allocation(size, MALLOC);
@@ -841,25 +866,26 @@ extern "C" {
 	}
 
  void * yymemalign(size_t alignment, size_t size) {
-    if (!inRealMain) return RealX::memalign(alignment, size);
+    // fprintf(stderr, "yymemalign alignment %d, size %d\n", alignment, size);
+     if (!inRealMain) return RealX::memalign(alignment, size);
 
-    //thread_local
-    inAllocation = true;
+     //thread_local
+     inAllocation = true;
 
-		PMU_init_check();
+     PMU_init_check();
 
-    if (!localFreeArrayInitialized) initLocalFreeArray();
-    if (!localNumAllocsBySizesInitialized) initLocalNumAllocsBySizes();
-    if (!localNumAllocsFFLBySizesInitialized) initLocalNumAllocsFFLBySizes();
+ //    if (!localFreeArrayInitialized) initLocalFreeArray();
+//    if (!localNumAllocsBySizesInitialized) initLocalNumAllocsBySizes();
+//    if (!localNumAllocsFFLBySizesInitialized) initLocalNumAllocsFFLBySizes();
 
-    //Data we need for each allocation
-    allocation_metadata allocData = init_allocation(size, MALLOC);
+     //Data we need for each allocation
+     allocation_metadata allocData = init_allocation(size, MALLOC);
 
-    //Do allocation
-    void * object = RealX::memalign(alignment, size);
-    allocData.address = (uint64_t) object;
-
-    //Do after
+     //Do allocation
+     void * object = RealX::memalign(alignment, size);
+     allocData.address = (uint64_t) object;
+     MemoryWaste::allocUpdate(allocData.tid, allocData.size, object);
+     //Do after
     size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject((void *)allocData.address, allocData.size, false);
     incrementMemoryUsage(size, new_touched_bytes, object);
 
@@ -978,8 +1004,8 @@ size_t updateFreeCounters(void * address) {
 			size_t size = ShadowMemory::getObjectSize(address);
 			current_class_size = getClassSizeFor(size);
 			short class_size_index = getClassSizeIndex(size);
-			localFreeArray[class_size_index]++;
-			globalFreeArray[class_size_index]++;
+//			localFreeArray[class_size_index]++;
+//			globalFreeArray[class_size_index]++;
 	} else {
 		size_t size = malloc_usable_size(address);
 		current_class_size = size;
@@ -1027,7 +1053,7 @@ void getOverhead (size_t size, uint64_t address, size_t classSize, short classSi
 	getAlignment(size, classSize);
 
 	//Check for memory blowup
-	getBlowup(size, classSize, classSizeIndex, reused);
+	//getBlowup(size, classSize, classSizeIndex, reused);
 }
 
 void getMetadata (size_t classSize) {
@@ -1065,26 +1091,26 @@ void getBlowup (size_t size, size_t classSize, short class_size_index, bool* reu
 	size_t blowup = 0;
 	if (bibop) {
 		//If I have free objects on my local list
-		if (localFreeArray[class_size_index] > 0) {
-			*reused = true;
-			localFreeArray[class_size_index]--;
-			if (globalFreeArray[class_size_index] > 0)
-			    globalFreeArray[class_size_index]--;
-			return;
-		}
-
-		//I don't have free objects on my local list, check global
-		else if (globalFreeArray[class_size_index] > 0) {
-
-			//I didn't have free, but someone else did
-			//Log this as blowup. Don't return
-
-			globalFreeArray[class_size_index]--;
-		}
-		//I don't have free objects, and no one else does either
-		else return;
+//		if (localFreeArray[class_size_index] > 0) {
+//			*reused = true;
+//			localFreeArray[class_size_index]--;
+//			if (globalFreeArray[class_size_index] > 0)
+//			    globalFreeArray[class_size_index]--;
+//			return;
+//		}
+//
+//		//I don't have free objects on my local list, check global
+//		else if (globalFreeArray[class_size_index] > 0) {
+//
+//			//I didn't have free, but someone else did
+//			//Log this as blowup. Don't return
+//
+//			globalFreeArray[class_size_index]--;
+//		}
+//		//I don't have free objects, and no one else does either
+//		else return;
 	} //End if (bibop)
-
+//
 	else { //This is bumpPointer
 
 		//If I don't have enough freed bytes to satisfy this size
@@ -1214,7 +1240,6 @@ allocation_metadata init_allocation(size_t sz, enum memAllocType type) {
 }
 
 void* myMalloc (size_t size) {
-
 	if (myLocalMemInitialized) {
 		return myLocalMalloc(size);
 	}
@@ -1253,19 +1278,58 @@ void myFree (void* ptr) {
 	myMemLock.unlock();
 }
 
+void* myMalloc_hash (size_t size) {
+    if (myLocalMemInitialized) {
+        return myLocalMalloc(size);
+    }
+
+    myMemLock_hash.lock ();
+    void* p;
+    if((myMemPosition_hash + size + MY_METADATA_SIZE) < HASH_SIZE) {
+        unsigned * metadata = (unsigned *)(myMem_hash + myMemPosition_hash);
+        *metadata = size;
+        p = (void *)(myMem_hash + myMemPosition_hash + MY_METADATA_SIZE);
+        myMemPosition_hash += size + MY_METADATA_SIZE;
+        myMemAllocations_hash++;
+    }
+    else {
+        fprintf(stderr, "Error: myMem_hash out of memory\n");
+        fprintf(stderr, "requestedSize= %zu, TEMP_MEM_SIZE= %d, myMemPosition_hash= %lu, myMemAllocations_hash= %lu\n",
+                size, HASH_SIZE, myMemPosition_hash, myMemAllocations_hash);
+        dumpHashmaps();
+        abort();
+    }
+    myMemLock_hash.unlock ();
+    return p;
+}
+
+void myFree_hash (void* ptr) {
+    if (ptr == NULL) return;
+    if (ptr >= myLocalMem && ptr <= myLocalMemEnd) {
+        myLocalFree(ptr);
+        return;
+    }
+    myMemLock_hash.lock();
+    if (ptr >= (void*)myMem_hash && ptr <= myMemEnd_hash) {
+        myMemAllocations_hash--;
+        if(myMemAllocations_hash == 0) myMemPosition_hash = 0;
+    }
+    myMemLock_hash.unlock();
+}
+
 void globalizeTAD() {
     globalize_lck.lock();
     if (globalized) {
         fprintf(stderr, "The thread %lld has been globalized!\n", gettid());
     }
 
-    if (bibop) for(int i = 0; i < num_class_sizes; ++i) {
-        globalNumAllocsBySizes[i] += localNumAllocsBySizes[i];
-        globalNumAllocsFFLBySizes[i] += localNumAllocsFFLBySizes[i];
-    } else for(int i = 0; i < 2; ++i) {
-            globalNumAllocsBySizes[i] += localNumAllocsBySizes[i];
-            globalNumAllocsFFLBySizes[i] += localNumAllocsFFLBySizes[i];
-    }
+//    if (bibop) for(int i = 0; i < num_class_sizes; ++i) {
+//        globalNumAllocsBySizes[i] += localNumAllocsBySizes[i];
+//        globalNumAllocsFFLBySizes[i] += localNumAllocsFFLBySizes[i];
+//    } else for(int i = 0; i < 2; ++i) {
+//            globalNumAllocsBySizes[i] += localNumAllocsBySizes[i];
+//            globalNumAllocsFFLBySizes[i] += localNumAllocsFFLBySizes[i];
+//    }
 
     globalTAD.numAllocationFaults += localTAD.numAllocationFaults;
 	globalTAD.numAllocationTlbReadMisses += localTAD.numAllocationTlbReadMisses;
@@ -1591,32 +1655,32 @@ void decrementGlobalMemoryAllocation(size_t size, size_t classsize) {
   __atomic_sub_fetch(&mu.realAllocatedMemoryUsage, classsize, __ATOMIC_RELAXED);
 }
 
-void incrementGlobalMemoryAllocationBySizes(size_t size, size_t classsize) {
-    short classSizeIndex = getClassSizeIndex(classsize);
-    __atomic_add_fetch(&realMemoryUsageBySizes[classSizeIndex], size, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&memoryUsageBySizes[classSizeIndex], classsize, __ATOMIC_RELAXED);
-}
+//void incrementGlobalMemoryAllocationBySizes(size_t size, size_t classsize) {
+//    short classSizeIndex = getClassSizeIndex(classsize);
+//    __atomic_add_fetch(&realMemoryUsageBySizes[classSizeIndex], size, __ATOMIC_RELAXED);
+//    __atomic_add_fetch(&memoryUsageBySizes[classSizeIndex], classsize, __ATOMIC_RELAXED);
+//}
 
-void decrementGlobalMemoryAllocationBySizes(size_t size, size_t classsize) {
-    short classSizeIndex = getClassSizeIndex(classsize);
-    __atomic_sub_fetch(&realMemoryUsageBySizes[classSizeIndex], size, __ATOMIC_RELAXED);
-    __atomic_sub_fetch(&memoryUsageBySizes[classSizeIndex], classsize, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&freedMemoryUsageBySizes[classSizeIndex], classsize, __ATOMIC_RELAXED);
-}
+//void decrementGlobalMemoryAllocationBySizes(size_t size, size_t classsize) {
+//    short classSizeIndex = getClassSizeIndex(classsize);
+//    __atomic_sub_fetch(&realMemoryUsageBySizes[classSizeIndex], size, __ATOMIC_RELAXED);
+//    __atomic_sub_fetch(&memoryUsageBySizes[classSizeIndex], classsize, __ATOMIC_RELAXED);
+//    __atomic_add_fetch(&freedMemoryUsageBySizes[classSizeIndex], classsize, __ATOMIC_RELAXED);
+//}
 
-void checkGlobalMemoryUsageBySizes() {
-    if(mu.realAllocatedMemoryUsage > max_mu.realAllocatedMemoryUsage) {
-        if (bibop) {
-            memcpy(realMemoryUsageBySizesWhenMax, realMemoryUsageBySizes, num_class_sizes*sizeof(uint64_t));
-            memcpy(memoryUsageBySizesWhenMax, memoryUsageBySizes, num_class_sizes*sizeof(uint64_t));
-            memcpy(freedMemoryUsageBySizesWhenMax, freedMemoryUsageBySizes, num_class_sizes*sizeof(uint64_t));
-        } else {
-            memcpy(realMemoryUsageBySizesWhenMax, realMemoryUsageBySizes, 2*sizeof(uint64_t));
-            memcpy(memoryUsageBySizesWhenMax, memoryUsageBySizes, 2*sizeof(uint64_t));
-            memcpy(freedMemoryUsageBySizesWhenMax, freedMemoryUsageBySizes, 2*sizeof(uint64_t));
-        }
-    }
-}
+//void checkGlobalMemoryUsageBySizes() {
+//    if(mu.realAllocatedMemoryUsage > max_mu.realAllocatedMemoryUsage) {
+//        if (bibop) {
+//            memcpy(realMemoryUsageBySizesWhenMax, realMemoryUsageBySizes, num_class_sizes*sizeof(uint64_t));
+//            memcpy(memoryUsageBySizesWhenMax, memoryUsageBySizes, num_class_sizes*sizeof(uint64_t));
+//            memcpy(freedMemoryUsageBySizesWhenMax, freedMemoryUsageBySizes, num_class_sizes*sizeof(uint64_t));
+//        } else {
+//            memcpy(realMemoryUsageBySizesWhenMax, realMemoryUsageBySizes, 2*sizeof(uint64_t));
+//            memcpy(memoryUsageBySizesWhenMax, memoryUsageBySizes, 2*sizeof(uint64_t));
+//            memcpy(freedMemoryUsageBySizesWhenMax, freedMemoryUsageBySizes, 2*sizeof(uint64_t));
+//        }
+//    }
+//}
 
 void checkGlobalRealMemoryUsage() {
     if(mu.realMemoryUsage > max_mu.realMemoryUsage) {
@@ -1665,8 +1729,8 @@ void incrementMemoryUsage(
         }
 		incrementGlobalMemoryAllocation(size, classSize);
 
-        incrementGlobalMemoryAllocationBySizes(size, classSize);
-    checkGlobalMemoryUsageBySizes();
+        //incrementGlobalMemoryAllocationBySizes(size, classSize);
+    //checkGlobalMemoryUsageBySizes();
 
     checkGlobalRealMemoryUsage();
     checkGlobalAllocatedMemoryUsage();
@@ -1696,7 +1760,7 @@ void decrementMemoryUsage(void* addr) {
 	current_tc->realMemoryUsage -= size;
 
   decrementGlobalMemoryAllocation(size, classSize);
-    decrementGlobalMemoryAllocationBySizes(size, classSize);
+    //decrementGlobalMemoryAllocationBySizes(size, classSize);
 //	#warning is this call really necessary?
 //  checkGlobalMemoryUsage();
 }
@@ -1713,7 +1777,7 @@ void collectAllocMetaData(allocation_metadata *metadata) {
             localTAD.numAllocationTlbWriteMisses += metadata->after.tlb_write_misses - metadata->before.tlb_write_misses;
             localTAD.numAllocationCacheMisses += metadata->after.cache_misses - metadata->before.cache_misses;
             localTAD.numAllocationInstrs += metadata->after.instructions - metadata->before.instructions;
-            localNumAllocsBySizes[metadata->classSizeIndex]++;
+            //localNumAllocsBySizes[metadata->classSizeIndex]++;
         } else {
             cycles_allocFFL += metadata->cycles;
             localTAD.cycles_allocFFL += metadata->cycles;
@@ -1723,7 +1787,7 @@ void collectAllocMetaData(allocation_metadata *metadata) {
             localTAD.numAllocationTlbWriteMissesFFL += metadata->after.tlb_write_misses - metadata->before.tlb_write_misses;
             localTAD.numAllocationCacheMissesFFL += metadata->after.cache_misses - metadata->before.cache_misses;
             localTAD.numAllocationInstrsFFL += metadata->after.instructions - metadata->before.instructions;
-            localNumAllocsFFLBySizes[metadata->classSizeIndex]++;
+            //localNumAllocsFFLBySizes[metadata->classSizeIndex]++;
         }
     } else {
         globalize_lck.lock();
@@ -1736,7 +1800,7 @@ void collectAllocMetaData(allocation_metadata *metadata) {
             globalTAD.numAllocationTlbWriteMisses += metadata->after.tlb_write_misses - metadata->before.tlb_write_misses;
             globalTAD.numAllocationCacheMisses += metadata->after.cache_misses - metadata->before.cache_misses;
             globalTAD.numAllocationInstrs += metadata->after.instructions - metadata->before.instructions;
-            globalNumAllocsBySizes[metadata->classSizeIndex]++;
+            //globalNumAllocsBySizes[metadata->classSizeIndex]++;
         } else {
             cycles_allocFFL += metadata->cycles;
             globalTAD.cycles_allocFFL += metadata->cycles;
@@ -1746,7 +1810,7 @@ void collectAllocMetaData(allocation_metadata *metadata) {
             globalTAD.numAllocationTlbWriteMissesFFL += metadata->after.tlb_write_misses - metadata->before.tlb_write_misses;
             globalTAD.numAllocationCacheMissesFFL += metadata->after.cache_misses - metadata->before.cache_misses;
             globalTAD.numAllocationInstrsFFL += metadata->after.instructions - metadata->before.instructions;
-            globalNumAllocsFFLBySizes[metadata->classSizeIndex]++;
+            //globalNumAllocsFFLBySizes[metadata->classSizeIndex]++;
         }
         globalize_lck.unlock();
     }
@@ -1839,87 +1903,87 @@ void initGlobalFreeArray () {
 	}
 }
 
-void initLocalNumAllocsBySizes () {
-    if (bibop) {
-        localNumAllocsBySizes = (uint64_t*) myMalloc(num_class_sizes*sizeof(uint64_t));
-    } else {
-        localNumAllocsBySizes = (uint64_t*) myMalloc(2*sizeof(uint64_t));
-    }
-    localNumAllocsBySizesInitialized = true;
-}
+//void initLocalNumAllocsBySizes () {
+//    if (bibop) {
+//        localNumAllocsBySizes = (uint64_t*) myMalloc(num_class_sizes*sizeof(uint64_t));
+//    } else {
+//        localNumAllocsBySizes = (uint64_t*) myMalloc(2*sizeof(uint64_t));
+//    }
+//    localNumAllocsBySizesInitialized = true;
+//}
 
-void initGlobalnumAllocsBySizes () {
-    if (bibop) {
-        globalNumAllocsBySizes = (uint64_t*) myMalloc(num_class_sizes*sizeof(uint64_t));
-    } else {
-        globalNumAllocsBySizes = (uint64_t*) myMalloc(2*sizeof(uint64_t));
-    }
-}
+//void initGlobalnumAllocsBySizes () {
+//    if (bibop) {
+//        globalNumAllocsBySizes = (uint64_t*) myMalloc(num_class_sizes*sizeof(uint64_t));
+//    } else {
+//        globalNumAllocsBySizes = (uint64_t*) myMalloc(2*sizeof(uint64_t));
+//    }
+//}
 
-void initLocalNumAllocsFFLBySizes () {
-    if (bibop) {
-        localNumAllocsFFLBySizes = (uint64_t*) myMalloc(num_class_sizes*sizeof(uint64_t));
-    } else {
-        localNumAllocsFFLBySizes = (uint64_t*) myMalloc(2*sizeof(uint64_t));
-    }
-    localNumAllocsFFLBySizesInitialized = true;
-}
+//void initLocalNumAllocsFFLBySizes () {
+//    if (bibop) {
+//        localNumAllocsFFLBySizes = (uint64_t*) myMalloc(num_class_sizes*sizeof(uint64_t));
+//    } else {
+//        localNumAllocsFFLBySizes = (uint64_t*) myMalloc(2*sizeof(uint64_t));
+//    }
+//    localNumAllocsFFLBySizesInitialized = true;
+//}
 
-void initGlobalnumAllocsFFLBySizes () {
-    if (bibop) {
-        globalNumAllocsFFLBySizes = (uint64_t*) myMalloc(num_class_sizes*sizeof(uint64_t));
-    } else {
-        globalNumAllocsFFLBySizes = (uint64_t*) myMalloc(2*sizeof(uint64_t));
-    }
-}
+//void initGlobalnumAllocsFFLBySizes () {
+//    if (bibop) {
+//        globalNumAllocsFFLBySizes = (uint64_t*) myMalloc(num_class_sizes*sizeof(uint64_t));
+//    } else {
+//        globalNumAllocsFFLBySizes = (uint64_t*) myMalloc(2*sizeof(uint64_t));
+//    }
+//}
+//
+//void initRealMemoryUsageBySizes() {
+//    if (bibop) {
+//        realMemoryUsageBySizes = (uint64_t*) myMalloc(num_class_sizes*sizeof(uint64_t));
+//    } else {
+//        realMemoryUsageBySizes = (uint64_t*) myMalloc(2*sizeof(uint64_t));
+//    }
+//}
 
-void initRealMemoryUsageBySizes() {
-    if (bibop) {
-        realMemoryUsageBySizes = (uint64_t*) myMalloc(num_class_sizes*sizeof(uint64_t));
-    } else {
-        realMemoryUsageBySizes = (uint64_t*) myMalloc(2*sizeof(uint64_t));
-    }
-}
+//void initMemoryUsageBySizes() {
+//    if (bibop) {
+//        memoryUsageBySizes = (uint64_t*) myMalloc(num_class_sizes*sizeof(uint64_t));
+//    } else {
+//        memoryUsageBySizes = (uint64_t*) myMalloc(2*sizeof(uint64_t));
+//    }
+//}
 
-void initMemoryUsageBySizes() {
-    if (bibop) {
-        memoryUsageBySizes = (uint64_t*) myMalloc(num_class_sizes*sizeof(uint64_t));
-    } else {
-        memoryUsageBySizes = (uint64_t*) myMalloc(2*sizeof(uint64_t));
-    }
-}
+//void initFreedMemoryUsageBySizes() {
+//    if (bibop) {
+//        freedMemoryUsageBySizes = (uint64_t*) myMalloc(num_class_sizes*sizeof(uint64_t));
+//    } else {
+//        freedMemoryUsageBySizes = (uint64_t*) myMalloc(2*sizeof(uint64_t));
+//    }
+//}
 
-void initFreedMemoryUsageBySizes() {
-    if (bibop) {
-        freedMemoryUsageBySizes = (uint64_t*) myMalloc(num_class_sizes*sizeof(uint64_t));
-    } else {
-        freedMemoryUsageBySizes = (uint64_t*) myMalloc(2*sizeof(uint64_t));
-    }
-}
+//void initRealMemoryUsageBySizesWhenMax() {
+//    if (bibop) {
+//        realMemoryUsageBySizesWhenMax = (uint64_t*) myMalloc(num_class_sizes*sizeof(uint64_t));
+//    } else {
+//        realMemoryUsageBySizesWhenMax = (uint64_t*) myMalloc(2*sizeof(uint64_t));
+//    }
+//}
 
-void initRealMemoryUsageBySizesWhenMax() {
-    if (bibop) {
-        realMemoryUsageBySizesWhenMax = (uint64_t*) myMalloc(num_class_sizes*sizeof(uint64_t));
-    } else {
-        realMemoryUsageBySizesWhenMax = (uint64_t*) myMalloc(2*sizeof(uint64_t));
-    }
-}
+//void initMemoryUsageBySizesWhenMax() {
+//    if (bibop) {
+//        memoryUsageBySizesWhenMax = (uint64_t*) myMalloc(num_class_sizes*sizeof(uint64_t));
+//    } else {
+//        memoryUsageBySizesWhenMax = (uint64_t*) myMalloc(2*sizeof(uint64_t));
+//    }
+//}
 
-void initMemoryUsageBySizesWhenMax() {
-    if (bibop) {
-        memoryUsageBySizesWhenMax = (uint64_t*) myMalloc(num_class_sizes*sizeof(uint64_t));
-    } else {
-        memoryUsageBySizesWhenMax = (uint64_t*) myMalloc(2*sizeof(uint64_t));
-    }
-}
-
-void initFreedMemoryUsageBySizesWhenMax() {
-    if (bibop) {
-        freedMemoryUsageBySizesWhenMax = (uint64_t*) myMalloc(num_class_sizes*sizeof(uint64_t));
-    } else {
-        freedMemoryUsageBySizesWhenMax = (uint64_t*) myMalloc(2*sizeof(uint64_t));
-    }
-}
+//void initFreedMemoryUsageBySizesWhenMax() {
+//    if (bibop) {
+//        freedMemoryUsageBySizesWhenMax = (uint64_t*) myMalloc(num_class_sizes*sizeof(uint64_t));
+//    } else {
+//        freedMemoryUsageBySizesWhenMax = (uint64_t*) myMalloc(2*sizeof(uint64_t));
+//    }
+//}
 
 void* myLocalMalloc(size_t size) {
 

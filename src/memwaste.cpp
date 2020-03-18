@@ -6,14 +6,14 @@
 #include "memwaste.h"
 
 HashMap <void*, obj_status*, spinlock> MemoryWaste::addr_obj_status;
-HashMap <pid_t, std::atomic<uint64_t>*, spinlock> MemoryWaste::mem_alloc_real_using;
+//HashMap <pid_t, std::atomic<uint64_t>*, spinlock> MemoryWaste::mem_alloc_real_using;
 HashMap <pid_t, std::atomic<uint64_t>*, spinlock> MemoryWaste::mem_alloc_wasted;
 HashMap <pid_t, std::atomic<uint64_t>*, spinlock> MemoryWaste::mem_freelist_wasted;
 
 spinlock MemoryWaste::record_lock;
 std::atomic<uint64_t> MemoryWaste::now_max_usage;
 const uint64_t MemoryWaste::stride;
-HashMap <pid_t, uint64_t*, spinlock> MemoryWaste::mem_alloc_real_using_record;
+//HashMap <pid_t, uint64_t*, spinlock> MemoryWaste::mem_alloc_real_using_record;
 HashMap <pid_t, uint64_t*, spinlock> MemoryWaste::mem_alloc_wasted_record;
 HashMap <pid_t, uint64_t*, spinlock> MemoryWaste::mem_freelist_wasted_record;
 
@@ -29,11 +29,11 @@ void MemoryWaste::initialize() {
 
     addr_obj_status.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_OBJ_NUM);
 
-    mem_alloc_real_using.initialize(HashFuncs::hashInt, HashFuncs::compareInt, MAX_THREAD_NUMBER);
+    //mem_alloc_real_using.initialize(HashFuncs::hashInt, HashFuncs::compareInt, MAX_THREAD_NUMBER);
     mem_alloc_wasted.initialize(HashFuncs::hashInt, HashFuncs::compareInt, MAX_THREAD_NUMBER);
     mem_freelist_wasted.initialize(HashFuncs::hashInt, HashFuncs::compareInt, MAX_THREAD_NUMBER);
 
-    mem_alloc_real_using_record.initialize(HashFuncs::hashInt, HashFuncs::compareInt, MAX_THREAD_NUMBER);
+    //mem_alloc_real_using_record.initialize(HashFuncs::hashInt, HashFuncs::compareInt, MAX_THREAD_NUMBER);
     mem_alloc_wasted_record.initialize(HashFuncs::hashInt, HashFuncs::compareInt, MAX_THREAD_NUMBER);
     mem_freelist_wasted_record.initialize(HashFuncs::hashInt, HashFuncs::compareInt, MAX_THREAD_NUMBER);
 
@@ -43,12 +43,12 @@ void MemoryWaste::initialize() {
 void MemoryWaste::initForNewTid(pid_t tid) {
     std::atomic<uint64_t>* tmp_addr;
 
-    if(bibop) {
-        tmp_addr = (std::atomic<uint64_t>*) myMalloc(num_class_sizes * sizeof(std::atomic<uint64_t>));
-    } else {
-        tmp_addr = (std::atomic<uint64_t>*) myMalloc(2 * sizeof(std::atomic<uint64_t>));
-    }
-    mem_alloc_real_using.insert(tid, tmp_addr);
+//    if(bibop) {
+//        tmp_addr = (std::atomic<uint64_t>*) myMalloc(num_class_sizes * sizeof(std::atomic<uint64_t>));
+//    } else {
+//        tmp_addr = (std::atomic<uint64_t>*) myMalloc(2 * sizeof(std::atomic<uint64_t>));
+//    }
+    //mem_alloc_real_using.insert(tid, tmp_addr);
     if(bibop) {
         tmp_addr = (std::atomic<uint64_t>*) myMalloc(num_class_sizes * sizeof(std::atomic<uint64_t>));
     } else {
@@ -63,12 +63,12 @@ void MemoryWaste::initForNewTid(pid_t tid) {
     mem_freelist_wasted.insert(tid, tmp_addr);
 
     uint64_t * tmp_addr2;
-    if(bibop) {
-        tmp_addr2 = (uint64_t*) myMalloc(num_class_sizes * sizeof(uint64_t));
-    } else {
-        tmp_addr2 = (uint64_t*) myMalloc(2 * sizeof(uint64_t));
-    }
-    mem_alloc_real_using_record.insert(tid, tmp_addr2);
+//    if(bibop) {
+//        tmp_addr2 = (uint64_t*) myMalloc(num_class_sizes * sizeof(uint64_t));
+//    } else {
+//        tmp_addr2 = (uint64_t*) myMalloc(2 * sizeof(uint64_t));
+//    }
+//    mem_alloc_real_using_record.insert(tid, tmp_addr2);
     if(bibop) {
         tmp_addr2 = (uint64_t*) myMalloc(num_class_sizes * sizeof(uint64_t));
     } else {
@@ -94,18 +94,21 @@ bool MemoryWaste::allocUpdate(pid_t tid, size_t size, void * address) {
     short classSizeIndex = getClassSizeIndex(classSize);
 
     /* mem_alloc_real_using */
-    std::atomic<uint64_t>* the_mem_alloc_real_using;
-    if(! mem_alloc_real_using.find(tid, &the_mem_alloc_real_using)) {
-        initForNewTid(tid);
-    }
-    if (! mem_alloc_real_using.find(tid, &the_mem_alloc_real_using)) {
-        fprintf(stderr, "the_mem_alloc_real_using key error: %d\n", tid);
-        abort();
-    }
-    the_mem_alloc_real_using[classSizeIndex] += size;
+//    std::atomic<uint64_t>* the_mem_alloc_real_using;
+//    if(! mem_alloc_real_using.find(tid, &the_mem_alloc_real_using)) {
+//        initForNewTid(tid);
+//    }
+//    if (! mem_alloc_real_using.find(tid, &the_mem_alloc_real_using)) {
+//        fprintf(stderr, "the_mem_alloc_real_using key error: %d\n", tid);
+//        abort();
+//    }
+//    the_mem_alloc_real_using[classSizeIndex] += size;
 
     /* mem_alloc_wasted */
     std::atomic<uint64_t>* the_mem_alloc_wasted;
+    if(! mem_alloc_wasted.find(tid, &the_mem_alloc_wasted)) {
+        initForNewTid(tid);
+    }
     if (! mem_alloc_wasted.find(tid, &the_mem_alloc_wasted)) {
         fprintf(stderr, "mem_alloc_wasted key error: %d\n", tid);
         abort();
@@ -160,12 +163,12 @@ void MemoryWaste::freeUpdate(pid_t tid, void* address) {
 
 
     /* mem_alloc_real_using[oldthread] */
-    std::atomic<uint64_t>* the_mem_alloc_real_using;
-    if( ! mem_alloc_real_using.find(old_status->tid, &the_mem_alloc_real_using)) {
-        fprintf(stderr, "mem_alloc_real_using key error: %d\n", old_status->tid);
-        abort();
-    }
-    the_mem_alloc_real_using[classSizeIndex] -= size;
+//    std::atomic<uint64_t>* the_mem_alloc_real_using;
+//    if( ! mem_alloc_real_using.find(old_status->tid, &the_mem_alloc_real_using)) {
+//        fprintf(stderr, "mem_alloc_real_using key error: %d\n", old_status->tid);
+//        abort();
+//    }
+//    the_mem_alloc_real_using[classSizeIndex] -= size;
 
     /* mem_alloc_wasted */
     std::atomic<uint64_t>* the_mem_alloc_wasted;
@@ -204,31 +207,31 @@ bool MemoryWaste::recordMemory(uint64_t now_usage) {
     now_max_usage = now_usage;
 
     record_lock.lock();
-    for(auto tid_and_values : mem_alloc_real_using) {
+    for(auto tid_and_values : mem_alloc_wasted) {
 
         pid_t tid = tid_and_values.getKey();
-        std::atomic<uint64_t>* the_mem_alloc_real_using = tid_and_values.getData();
-        std::atomic<uint64_t>* the_mem_alloc_wasted;
+        //std::atomic<uint64_t>* the_mem_alloc_real_using = tid_and_values.getData();
+        std::atomic<uint64_t>* the_mem_alloc_wasted = tid_and_values.getData();
         std::atomic<uint64_t>* the_mem_freelist_wasted;
-        mem_alloc_wasted.find(tid, &the_mem_alloc_wasted);
+        //mem_alloc_wasted.find(tid, &the_mem_alloc_wasted);
         mem_freelist_wasted.find(tid, &the_mem_freelist_wasted);
 
-        uint64_t * the_mem_alloc_real_using_record;
+        //uint64_t * the_mem_alloc_real_using_record;
         uint64_t * the_mem_alloc_wasted_record;
         uint64_t * the_mem_freelist_wasted_record;
-        mem_alloc_real_using_record.find(tid, &the_mem_alloc_real_using_record);
+        //mem_alloc_real_using_record.find(tid, &the_mem_alloc_real_using_record);
         mem_alloc_wasted_record.find(tid, &the_mem_alloc_wasted_record);
         mem_freelist_wasted_record.find(tid, &the_mem_freelist_wasted_record);
 
         if(bibop) {
             for (int i = 0; i < num_class_sizes; ++i) {
-                the_mem_alloc_real_using_record[i] = (uint64_t)the_mem_alloc_real_using[i];
+                //the_mem_alloc_real_using_record[i] = (uint64_t)the_mem_alloc_real_using[i];
                 the_mem_alloc_wasted_record[i] = (uint64_t)the_mem_alloc_wasted[i];
                 the_mem_freelist_wasted_record[i] = (uint64_t)the_mem_freelist_wasted[i];
             }
         } else {
             for(int i = 0; i < 2; ++i) {
-                the_mem_alloc_real_using_record[i] = (uint64_t)the_mem_alloc_real_using[i];
+                //the_mem_alloc_real_using_record[i] = (uint64_t)the_mem_alloc_real_using[i];
                 the_mem_alloc_wasted_record[i] = (uint64_t)the_mem_alloc_wasted[i];
                 the_mem_freelist_wasted_record[i] = (uint64_t)the_mem_freelist_wasted[i];}
         }
@@ -244,26 +247,30 @@ void MemoryWaste::reportMaxMemory(FILE * output) {
     }
 
     fprintf (output, "\n>>>>>>>>>>>>>>>    Memory Distribution    <<<<<<<<<<<<<<<\n");
-    for(auto tid_and_values : mem_alloc_real_using_record) {
+    for(auto tid_and_values : mem_alloc_wasted_record) {
 
         pid_t tid = tid_and_values.getKey();
-        uint64_t* the_mem_alloc_real_using_record = tid_and_values.getData();
-        uint64_t* the_mem_alloc_wasted_record;
+        //uint64_t* the_mem_alloc_real_using_record = tid_and_values.getData();
+        uint64_t* the_mem_alloc_wasted_record = tid_and_values.getData();
         uint64_t* the_mem_freelist_wasted_record;
-        mem_alloc_wasted_record.find(tid, &the_mem_alloc_wasted_record);
+        //mem_alloc_wasted_record.find(tid, &the_mem_alloc_wasted_record);
         mem_freelist_wasted_record.find(tid, &the_mem_freelist_wasted_record);
 
         fprintf(output, "----tid = %10d----\n", tid);
         if(bibop) {
             for (int i = 0; i < num_class_sizes; ++i)
-                fprintf(output, "idx: %10d, real: %10lu, alloc wasted: %10u, freelist wasted: %10u\n",
-                        i, the_mem_alloc_real_using_record[i],
-                        the_mem_alloc_wasted_record[i], the_mem_freelist_wasted_record[i]);
+//                fprintf(output, "idx: %10d, real: %10lu, alloc wasted: %10u, freelist wasted: %10u\n",
+//                        i, the_mem_alloc_real_using_record[i],
+//                        the_mem_alloc_wasted_record[i], the_mem_freelist_wasted_record[i]);
+                fprintf(output, "idx: %10d, alloc wasted: %10u, freelist wasted: %10u\n",
+                        i, the_mem_alloc_wasted_record[i], the_mem_freelist_wasted_record[i]);
         } else {
             for(int i = 0; i < 2; ++i)
-                fprintf(output, "idx: %10d, real: %10lu, alloc wasted: %10u, freelist wasted: %10u\n",
-                        i, the_mem_alloc_real_using_record[i],
-                        the_mem_alloc_wasted_record[i], the_mem_freelist_wasted_record[i]);
+//                fprintf(output, "idx: %10d, real: %10lu, alloc wasted: %10u, freelist wasted: %10u\n",
+//                        i, the_mem_alloc_real_using_record[i],
+//                        the_mem_alloc_wasted_record[i], the_mem_freelist_wasted_record[i]);
+                fprintf(output, "idx: %10d, alloc wasted: %10u, freelist wasted: %10u\n",
+                        i, the_mem_alloc_wasted_record[i], the_mem_freelist_wasted_record[i]);
         }
     }
 }
@@ -275,26 +282,39 @@ void MemoryWaste::reportMemory(FILE * output) {
     }
 
     fprintf (output, "\n>>>>>>>>>>>>>>>    Memory Distribution    <<<<<<<<<<<<<<<\n");
-    for(auto tid_and_values : mem_alloc_real_using) {
+    for(auto tid_and_values : mem_alloc_wasted) {
 
         pid_t tid = tid_and_values.getKey();
-        std::atomic<uint64_t>* the_mem_alloc_real_using = tid_and_values.getData();
-        std::atomic<uint64_t>* the_mem_alloc_wasted;
+        //std::atomic<uint64_t>* the_mem_alloc_real_using = tid_and_values.getData();
+        std::atomic<uint64_t>* the_mem_alloc_wasted = tid_and_values.getData();
         std::atomic<uint64_t>* the_mem_freelist_wasted;
-        mem_alloc_wasted.find(tid, &the_mem_alloc_wasted);
+        //mem_alloc_wasted.find(tid, &the_mem_alloc_wasted);
         mem_freelist_wasted.find(tid, &the_mem_freelist_wasted);
 
         fprintf(output, "----tid = %10d----\n", tid);
         if(bibop) {
             for (int i = 0; i < num_class_sizes; ++i)
-                fprintf(output, "idx: %10d, real: %10lu, alloc wasted: %10u, freelist wasted: %10u\n",
-                        i, (uint64_t) the_mem_alloc_real_using[i],
-                        (uint64_t)the_mem_alloc_wasted[i], (uint64_t)the_mem_freelist_wasted[i]);
+//                fprintf(output, "idx: %10d, real: %10lu, alloc wasted: %10u, freelist wasted: %10u\n",
+//                        i, (uint64_t) the_mem_alloc_real_using[i],
+//                        (uint64_t)the_mem_alloc_wasted[i], (uint64_t)the_mem_freelist_wasted[i]);
+                fprintf(output, "idx: %10d, alloc wasted: %10u, freelist wasted: %10u\n",
+                        i, (uint64_t)the_mem_alloc_wasted[i], (uint64_t)the_mem_freelist_wasted[i]);
         } else {
             for(int i = 0; i < 2; ++i)
-                fprintf(output, "idx: %10d, real: %10lu, alloc wasted: %10u, freelist wasted: %10u\n",
-                        i, (uint64_t) the_mem_alloc_real_using[i],
-                        (uint64_t)the_mem_alloc_wasted[i], (uint64_t)the_mem_freelist_wasted[i]);
+//                fprintf(output, "idx: %10d, real: %10lu, alloc wasted: %10u, freelist wasted: %10u\n",
+//                        i, (uint64_t) the_mem_alloc_real_using[i],
+//                        (uint64_t)the_mem_alloc_wasted[i], (uint64_t)the_mem_freelist_wasted[i]);
+                fprintf(output, "idx: %10d, alloc wasted: %10u, freelist wasted: %10u\n",
+                        i, (uint64_t)the_mem_alloc_wasted[i], (uint64_t)the_mem_freelist_wasted[i]);
         }
+    }
+}
+
+size_t MemoryWaste::getSize(void * address) {
+    obj_status * status;
+    if(addr_obj_status.find(address, &status)) {
+        return status->size_using;
+    } else {
+        return 0;
     }
 }

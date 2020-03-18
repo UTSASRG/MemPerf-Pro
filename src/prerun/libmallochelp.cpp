@@ -649,11 +649,13 @@ void* find_class_sizes (void* arg) {
 			class_sizes[nextFreeClassIndex] = oldSize;
 			nextFreeClassIndex++;
 		}
-
 		oldPointer = newPointer;
 		oldSize = newSize;
 	}
-
+    if (class_sizes[nextFreeClassIndex-1] != large_object_threshold) {
+        class_sizes[nextFreeClassIndex] = large_object_threshold;
+        nextFreeClassIndex++;
+    }
 	RealX::free (newPointer);
 	return nullptr;
 }
