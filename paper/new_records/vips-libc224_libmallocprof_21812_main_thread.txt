@@ -1,0 +1,117 @@
+>>> stack start @ 0x7ffc25e900e0, stack end @ 0x7ffc25e90140
+>>> program break @ 0x556fb0fab000
+>>> malloc_mmaps                                  7
+>>> large_object_threshold                   132864
+>>> num_madvise                               83865
+>>> num_sbrk                                      0
+>>> size_sbrk                                     0
+>>> cycles_alloc                         4316018920
+>>> cycles_allocFFL                     46378207476
+>>> cycles_free                         43666119318
+>>> total_global_cycles                357959335260
+
+>>>>>>>>>>>>>>>    Memory Distribution    <<<<<<<<<<<<<<<
+----tid =      21812----
+idx:          0, alloc wasted:       6242, freelist wasted:       3504
+idx:          1, alloc wasted:       6152, freelist wasted:      24584
+----tid =      21813----
+idx:          0, alloc wasted:        720, freelist wasted:      40352
+idx:          1, alloc wasted:        231, freelist wasted:     868152
+----tid =      21814----
+idx:          0, alloc wasted:          8, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+----tid =      21815----
+idx:          0, alloc wasted:          8, freelist wasted:          0
+idx:          1, alloc wasted:          0, freelist wasted:          0
+
+>>>>>>>>>>>>>>>    NEW ALLOCATIONS : total (average)    <<<<<<<<<<<<<<<
+total allocations (new)                      516157
+total allocations (reused)                   906176
+total deallocations                         1421715
+
+
+>>>>>>>>>>>>>>>    NEW ALLOCATIONS : total (average)    <<<<<<<<<<<<<<<
+allocation cycles                        4316018920    avg = 8361.8
+allocation faults                              7479    avg = 0.0
+allocation tlb read misses                  2405680    avg = 4.7
+allocation tlb write misses                   17763    avg = 0.0
+allocation cache misses                     2883617    avg = 5.6
+num allocation instr                     2142661148    avg = 4151.2
+
+
+>>>>>>>>>>>>>>>  FREELIST ALLOCATIONS : total (average) <<<<<<<<<<<<<<<
+allocation cycles                       46378207476    avg = 51180.1
+allocation faults                             25173    avg = 0.0
+allocation tlb read misses                  2892405    avg = 3.2
+allocation tlb write misses                  116779    avg = 0.1
+allocation cache misses                      179632    avg = 0.2
+num allocation instr                    40133216617    avg = 44288.5
+
+
+>>>>>>>>>>>>>>>     DEALLOCATIONS : total (average)     <<<<<<<<<<<<<<<
+deallocation cycles                     43666119318    avg = 30713.7
+deallocation faults                            3939    avg = 0.0
+deallocation tlb read misses                3000178    avg = 2.1
+deallocation tlb write misses                 32163    avg = 0.0
+deallocation cache misses                   1371208    avg = 1.0
+num deallocation instr                  46013093877    avg = 32364.5
+
+>>>>>>>>>>>>>>>               LOCK TOTALS               <<<<<<<<<<<<<<<
+num pthread mutex locks                           6
+num pthread trylocks                              0
+num pthread spin locks                            0
+num pthread spin trylocks                         0
+
+>>>>>>>>>>>>>>>>>>>>>>>>>> Thread Contention <<<<<<<<<<<<<<<<<<<<<<<<<<
+
+>>> mutex_waits                             4977621
+>>> mutex_wait_cycles                     237647628    avg = 47.7
+>>> mutex_trylock_waits                           0
+>>> mutex_trylock_fails                           0
+>>> spinlock_waits                                0
+>>> spinlock_wait_cycles                          0    avg = 0.0
+>>> spin_trylock_waits                            0
+>>> spin_trylock_fails                            0
+>>> mmap_waits                                    7
+>>> mmap_wait_cycles                          71548    avg = 10221.1
+>>> sbrk_waits                                    0
+>>> sbrk_wait_cycles                              0    avg = 0.0
+>>> madvise_waits                             83865
+>>> madvise_wait_cycles                   322594714    avg = 3846.6
+>>> munmap_waits                                 10
+>>> munmap_wait_cycles                      1272802    avg = 127280.2
+>>> mremap_waits                                  0
+>>> mremap_wait_cycles                            0    avg = 0.0
+>>> mprotect_waits                             1471
+>>> mprotect_wait_cycle                     5832194    avg = 3964.8
+
+>>> critical_section_counter                4977621
+>>> critical_section_duration            1946153162    avg = 391.0
+
+
+>>>>>>>>>>>>>>>>>>>>>>>>>> Total Memory Usage <<<<<<<<<<<<<<<<<<<<<<<<<
+
+>>> Thread Counter:
+>>> maxRealMemoryUsage         18446744073709551368
+>>> maxRealAllocMemoryUsage    18446744073708610016
+>>> maxTotalMemoryUsage                   100356096
+
+>>> Global Counter:
+>>> realMemoryUsage                         9469448
+>>> realAllocatedMemoryUsage                9483648
+>>> totalMemoryUsage                     6225403904
+
+>>>>>>>>>>>>>>>>>>>>>>>>> Detailed Lock Usage <<<<<<<<<<<<<<<<<<<<<<<<<
+lockAddr = 0x7f1250000020, type = mutex, maxContention = 1
+lockAddr = 0x7f1258000020, type = mutex, maxContention = 1
+lockAddr = 0x7f1248000020, type = mutex, maxContention = 1
+lockAddr = 0x7f132a89b1c0, type = mutex, maxContention = 1
+lockAddr = 0x7f132a89bb00, type = mutex, maxContention = 1
+lockAddr = 0x7f132a89bb40, type = mutex, maxContention = 1
+num sampled accesses       = 723284
+total cache bytes accessed = 41480418
+total page bytes accessed  = 2238556848
+cache line writes          = 288471
+cache owner conflicts      = 11886 ( 0.0412%)
+avg. cache utilization     = 89.610%
+avg. page utilization      = 75.561%
