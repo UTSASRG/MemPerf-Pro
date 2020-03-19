@@ -1,5 +1,4 @@
-bodytrack dieharder vs libc224:
-tlb misses, thread contention, system calls
+bodytrack dieharder vs libc224 tlb misses, thread contention, system calls
 >>>>>>>>>>>>>>>    NEW ALLOCATIONS : total (average)    <<<<<<<<<<<<<<<
 allocation cycles avg = 361954.3 >> 75309.9
 allocation tlb read misses avg = 2.2 > 1.8

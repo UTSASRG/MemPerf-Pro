@@ -1,0 +1,17 @@
+vips libc224 vs hoard tlb misses, cache misses
+total allocations (new) = 516157 >>> 1430
+total allocations (reused) = 906176 < 1420906
+>>>>>>>>>>>>>>>  FREELIST ALLOCATIONS : total (average) <<<<<<<<<<<<<<<
+allocation cycles avg = 51180.1 > 31235.6
+allocation tlb read misses avg = 3.2 >> 1.4
+allocation tlb write misses avg = 0.1 >>> 0.0
+allocation cache misses avg = 0.2 >>> 0.0
+num allocation instr avg = 44288.5 > 26659.0
+>>>>>>>>>>>>>>>     DEALLOCATIONS : total (average)     <<<<<<<<<<<<<<<
+deallocation cycles avg = 30713.7 > 28181.9
+deallocation tlb read misses avg = 2.1 >> 0.5
+deallocation cache misses avg = 1.0 >>> 0.1
+num deallocation instr avg = 32364.5 > 23616.5
+>>>>>>>>>>>>>>>     Friendliness     <<<<<<<<<<<<<<<
+cache owner conflicts = 0.0412% > 0.0389%
+avg. page utilization = 75.561% < 77.63%

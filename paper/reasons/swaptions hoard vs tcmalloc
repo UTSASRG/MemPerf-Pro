@@ -1,5 +1,4 @@
-swaptions hoard vs tcmalloc
-cache misses, cache conflicts
+swaptions hoard vs tcmalloc cache misses, cache conflicts
 >>>>>>>>>>>>>>>    NEW ALLOCATIONS : total (average)    <<<<<<<<<<<<<<<
 allocation cycles avg = 174136.9 > 170819.2
 num allocation instr = 21468.4 > 20724.5

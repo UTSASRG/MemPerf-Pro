@@ -1,0 +1,20 @@
+freqmine jemalloc vs libc224 tlb read misses, cache misses, contentions
+total allocations (new) = 1268 > 1159
+total allocations (reused) = 63 < 121
+>>>>>>>>>>>>>>>    NEW ALLOCATIONS : total (average)    <<<<<<<<<<<<<<<
+allocation cycles avg = 3631763.7 > 1978257.2
+allocation tlb read misses avg = 229.6 > 155.6
+allocation cache misses avg = 825.4 >> 137.7
+num allocation instr avg = 3352994.5 > 1926896.2
+>>>>>>>>>>>>>>>     DEALLOCATIONS : total (average)     <<<<<<<<<<<<<<<
+deallocation cycles avg = 10097419.6 > 8432321.9
+deallocation cache misses = 5253.8 > 4606.7
+num deallocation instr = 8943783.0 > 7280765.1
+>>>>>>>>>>>>>>>>>>>>>>>>>> Thread Contention <<<<<<<<<<<<<<<<<<<<<<<<<<
+mutex_waits = 52953 > 32311
+mutex_wait_cycles = 186930920 >>> 6448842
+mutex_wait_cycles avg = 3532.1 >>> 199.6
+>>>>>>>>>>>>>>>>>>>>>>>>> Detailed Lock Usage <<<<<<<<<<<<<<<<<<<<<<<<<
+maxContention = 21 >>> 2
+>>>>>>>>>>>>>>>>>>>>>>>>> Friendliness <<<<<<<<<<<<<<<<<<<<<<<<<
+avg. page utilization = 95.707% < 97.417%

@@ -1,5 +1,4 @@
-canneal libc224 vs tcmalloc
-cache misses, system calls
+canneal libc224 vs tcmalloc cache misses, system calls
 total allocations (new) = 13516615 > 11926213
 total allocations (reused) = 7624926 < 9215328
 >>>>>>>>>>>>>>>    NEW ALLOCATIONS : total (average)    <<<<<<<<<<<<<<<

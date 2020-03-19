@@ -1,5 +1,4 @@
-dedup libc221 vs tcmalloc
-cache misses, system calls, utilization
+dedup libc221 vs tcmalloc cache misses, system calls, utilization
 total allocations (new) = 3152902 > 2820528
 total allocations (reused) = 918106 < 1253208
 >>>>>>>>>>>>>>>    NEW ALLOCATIONS : total (average)    <<<<<<<<<<<<<<<

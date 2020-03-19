@@ -1,5 +1,4 @@
-swaptions omalloc vs tcmalloc
-contention, cache misses, cache conflicts
+swaptions omalloc vs tcmalloc contention, cache misses, cache conflicts
 >>>>>>>>>>>>>>>    NEW ALLOCATIONS : total (average)    <<<<<<<<<<<<<<<
 allocation cycles avg = 260740.4 > 170819.2
 allocation tlb write misses avg = 0.3 >> 0.1

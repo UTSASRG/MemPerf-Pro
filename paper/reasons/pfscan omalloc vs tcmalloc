@@ -1,0 +1,6 @@
+pfscan omalloc vs tcmalloc contention
+>>>>>>>>>>>>>>>>>>>>>>>>> Detailed Lock Usage <<<<<<<<<<<<<<<<<<<<<<<<<
+maxContention = 12 >> 6
+>>>>>>>>>>>>>>>>>>>>>>>>> Friendliness <<<<<<<<<<<<<<<<<<<<<<<<<
+avg. cache utilization = 88.349% < 99.180%
+avg. page utilization < 24.755%

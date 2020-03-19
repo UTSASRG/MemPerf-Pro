@@ -1,5 +1,4 @@
-dedup omalloc vs tcmalloc
-tlb misses, cache misses, contention, system calls, utilization
+dedup omalloc vs tcmalloc tlb misses, cache misses, contention, system calls, utilization
 total allocations (new) = 2957112 > 2820528
 total allocations (reused) = 1116937 < 1253208
 >>>>>>>>>>>>>>>    NEW ALLOCATIONS : total (average)    <<<<<<<<<<<<<<<

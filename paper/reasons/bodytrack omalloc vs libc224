@@ -1,5 +1,4 @@
-bodytrack omalloc vs libc224
-thread contention, system calls
+bodytrack omalloc vs libc224 thread contention, system calls
 >>>>>>>>>>>>>>>     DEALLOCATIONS : total (average)     <<<<<<<<<<<<<<<
 deallocation cycles avg = 26626.4 > 18959.2
 deallocation cache misses avg = 2.3 > 2.0

@@ -1,5 +1,4 @@
-fluidanimate hoard vs libc224
-tlb misses, cache misses, utilization
+fluidanimate hoard vs libc224 tlb misses, cache misses, utilization
 >>>>>>>>>>>>>>>     DEALLOCATIONS : total (average)     <<<<<<<<<<<<<<<
 deallocation cycles avg = 9607.7 > 6138.3
 deallocation tlb read misses avg = 1.8 >> 0.2
