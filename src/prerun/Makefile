@@ -19,7 +19,8 @@ TARGETS =	libmallochelp.so	\
 			prerun-obsd			\
 			prerun-jemalloc     \
 			prerun-tcmalloc-minimal \
-			prerun-hoard
+			prerun-hoard \
+			prerun-hoard-spinlock
 
 LIBRARY = ./libmallochelp.so
 RUNFILE = runlib.cpp
@@ -29,6 +30,7 @@ GLIBC224 = $(HOME)/Memoryallocators/libc-2.24/libmalloc.so
 OBSD = $(HOME)/Memoryallocators/OpenBSD-6.0/libomalloc.so
 DIEHARD = $(HOME)/Memoryallocators/DieHard/src/libdieharder.so
 HOARD = $(HOME)/Memoryallocators/Hoard/src/libhoard.so
+HOARDSPIN = $(HOME)/Memoryallocators/Hoard-spinlock/src/libhoard.so
 TCMIN = /usr/local/lib/libtcmalloc_minimal.so
 JE = $(HOME)/Memoryallocators/jemalloc/lib/libjemalloc.so
 
@@ -61,6 +63,8 @@ prerun-jemalloc: libmallochelp.so $(RUNFILE)
 prerun-hoard: libmallochelp.so $(RUNFILE)
 	$(CXX) $(CFLAGS) -rdynamic $(LIBRARY) -rdynamic $(HOARD) $(RUNFILE) -o prerun-hoard
 
+prerun-hoard-spinlock: libmallochelp.so $(RUNFILE)
+	$(CXX) $(CFLAGS) -rdynamic $(LIBRARY) -rdynamic $(HOARDSPIN) $(RUNFILE) -o prerun-hoard-spinlock
 
 .PHONY: clean
 clean:

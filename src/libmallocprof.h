@@ -69,12 +69,12 @@ typedef struct {
 	ulong mprotect_waits = 0;
 	ulong mprotect_wait_cycles = 0;
 
-	size_t realMemoryUsage = 0;
-	size_t maxRealMemoryUsage = 0;
-	size_t realAllocatedMemoryUsage = 0;
-	size_t maxRealAllocatedMemoryUsage = 0;
-	size_t totalMemoryUsage = 0;
-	size_t maxTotalMemoryUsage = 0;
+	long realMemoryUsage = 0;
+    long maxRealMemoryUsage = 0;
+    long realAllocatedMemoryUsage = 0;
+    long maxRealAllocatedMemoryUsage = 0;
+    long totalMemoryUsage = 0;
+    long maxTotalMemoryUsage = 0;
 
   ulong lock_counter = 0;
   uint64_t critical_section_start = 0;

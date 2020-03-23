@@ -560,16 +560,16 @@ extern "C" {
 		//Do allocation
         //fprintf(stderr, "malloc %d\n", sz);
 		object = RealX::malloc(sz);
+        doAfter(&allocData);
         //fprintf(stderr, "malloc done %d %p\n", sz, object);
-		allocData.address = (uint64_t) object;
+        allocData.address = (uint64_t) object;
         allocData.reused = MemoryWaste::allocUpdate(allocData.tid, allocData.size, object);
         size_t new_touched_bytes =
             PAGESIZE * ShadowMemory::updateObject(
             (void *)allocData.address, allocData.size, false);
         incrementMemoryUsage(sz, new_touched_bytes, object);
-		//Do after
-		//fprintf(stderr, "*** malloc(%zu) -> %p\n", sz, object);
-		doAfter(&allocData);
+        //Do after
+        //fprintf(stderr, "*** malloc(%zu) -> %p\n", sz, object);
 
 		allocData.cycles = allocData.tsc_after - allocData.tsc_before;
 
@@ -627,13 +627,13 @@ extern "C" {
 
 		// Do allocation
 		object = RealX::calloc(nelem, elsize);
-		allocData.address = reinterpret_cast <uint64_t> (object);
+        doAfter(&allocData);
+        allocData.address = reinterpret_cast <uint64_t> (object);
 
-    size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject((void *)allocData.address, allocData.size, false);
-    incrementMemoryUsage(nelem * elsize, new_touched_bytes, object);
+        size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject((void *)allocData.address, allocData.size, false);
+        incrementMemoryUsage(nelem * elsize, new_touched_bytes, object);
         allocData.reused = MemoryWaste::allocUpdate(allocData.tid, allocData.size, object);
-		// Do after
-		doAfter(&allocData);
+        // Do after
 
 		allocData.cycles = allocData.tsc_after - allocData.tsc_before;
 
@@ -685,18 +685,18 @@ extern "C" {
 
 		//fprintf(stderr, "*** free(%p)\n", ptr);
 		//Do before free
-		doBefore(&allocData);
 
         decrementMemoryUsage(ptr);
         uint64_t size = ShadowMemory::getObjectSize(ptr);
-		ShadowMemory::updateObject(ptr, 0, true);
+        ShadowMemory::updateObject(ptr, 0, true);
         MemoryWaste::freeUpdate(allocData.tid, ptr);
 
-		//Update free counters
-		allocData.classSize = updateFreeCounters(ptr);
+        //Update free counters
+        allocData.classSize = updateFreeCounters(ptr);
         //fprintf(stderr, "free\n");
-		//Do free
-		RealX::free(ptr);
+        doBefore(&allocData);
+        //Do free
+        RealX::free(ptr);
 
 		//Do after free
 		doAfter(&allocData);
@@ -785,26 +785,26 @@ extern "C" {
 //        }
 
 		//Do before
-		doBefore(&allocData);
 
-    if(ptr) {
-        ShadowMemory::updateObject(ptr, 0, true);
-    }
+        if(ptr) {
+            ShadowMemory::updateObject(ptr, 0, true);
+        }
 
-		//Do allocation
-		object = RealX::realloc(ptr, sz);
-		allocData.address = reinterpret_cast <uint64_t> (object);
+        doBefore(&allocData);
+        //Do allocation
+        object = RealX::realloc(ptr, sz);
+        doAfter(&allocData);
+        allocData.address = reinterpret_cast <uint64_t> (object);
 
-		//Do after
-    size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject(object, sz, false);
-		if(object != ptr) {
-      incrementMemoryUsage(sz, new_touched_bytes, object);
-      if(ptr){
+        //Do after
+        size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject(object, sz, false);
+        if(object != ptr) {
+            incrementMemoryUsage(sz, new_touched_bytes, object);
+            if(ptr){
           MemoryWaste::freeUpdate(allocData.tid, ptr);
       }
-     allocData.reused = MemoryWaste::allocUpdate(allocData.tid, allocData.size, object);
-    }
-		doAfter(&allocData);
+            allocData.reused = MemoryWaste::allocUpdate(allocData.tid, allocData.size, object);
+        }
 
 		// cyclesForRealloc = tsc_after - tsc_before;
 		allocData.cycles = allocData.tsc_after - allocData.tsc_before;

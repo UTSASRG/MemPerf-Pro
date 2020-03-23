@@ -443,9 +443,9 @@ void writeThreadContention() {
     fprintf(stderr, "writing\n");
     fprintf (thrData.output, "\n>>>>>>>>>>>>>>>>>>>>>>>>>> Thread Contention <<<<<<<<<<<<<<<<<<<<<<<<<<\n\n");
 
-    size_t maxRealMemoryUsage = 0;
-    size_t maxRealAllocatedMemoryUsage = 0;
-    size_t maxTotalMemoryUsage = 0;
+    long maxRealMemoryUsage = 0;
+    long maxRealAllocatedMemoryUsage = 0;
+    long maxTotalMemoryUsage = 0;
 
     ThreadContention globalizedThreadContention;
 
