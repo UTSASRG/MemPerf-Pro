@@ -65,14 +65,11 @@ void getPerfCounts (PerfReadInfo * i, bool enableCounters) {
 	}
 
 	if(enableCounters) {
-//        ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_RESET, 0);
-//        ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_RESET, 0);
-//        ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_RESET, 0);
-//        ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_RESET, 0);
-//        ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_RESET, 0);
+#ifdef ENABLE_MORE_COUNTER    
         ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_ENABLE, 0);
         ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_ENABLE, 0);
         ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_ENABLE, 0);
+#endif
         ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_ENABLE, 0);
         ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_ENABLE, 0);
         return;
@@ -122,12 +119,14 @@ void getPerfCounts (PerfReadInfo * i, bool enableCounters) {
     if(__builtin_expect((int64_t)i->faults < 0, 0) || i->faults > 10000000000) {
 			i->faults = 0;
 	}
+#ifdef ENABLE_MORE_COUNTER    
 	if(__builtin_expect((int64_t)i->tlb_read_misses < 0, 0) || i->tlb_read_misses > 10000000000) {
 			i->tlb_read_misses = 0;
 	}
 	if(__builtin_expect((int64_t)i->tlb_write_misses < 0, 0) || i->tlb_write_misses > 10000000000) {
 			i->tlb_write_misses = 0;
 	}
+#endif  
 	if(__builtin_expect((int64_t)i->cache_misses < 0, 0) || i->cache_misses > 10000000000) {
 			i->cache_misses = 0;
 	}
@@ -138,16 +137,20 @@ void getPerfCounts (PerfReadInfo * i, bool enableCounters) {
 
 //    fprintf(stderr, "%ld, %ld, %ld, %ld, %ld\n",
 //            i->faults, i->tlb_read_misses, i->tlb_write_misses, i->cache_misses, i->instructions);
-    ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_DISABLE, 0);
-    ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_DISABLE, 0);
+#ifdef ENABLE_MORE_COUNTER    
+  ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_DISABLE, 0);
+  ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_DISABLE, 0);
 	ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_DISABLE, 0);
-	ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_DISABLE, 0);
+#endif
+  ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_DISABLE, 0);
 	ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_DISABLE, 0);
 
-    ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_RESET, 0);
-    ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_RESET, 0);
-    ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_RESET, 0);
-    ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_RESET, 0);
+#ifdef ENABLE_MORE_COUNTER    
+   ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_RESET, 0);
+   ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_RESET, 0);
+   ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_RESET, 0);
+#endif
+   ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_RESET, 0);
     ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_RESET, 0);
 }
 
@@ -158,10 +161,12 @@ void doPerfCounterRead() {
 	PerfReadInfo perf;
 	//getPerfCounts(&perf, false);
 
-	ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_DISABLE, 0);
-	ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_DISABLE, 0);
-	ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_DISABLE, 0);
-	ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_DISABLE, 0);
+#ifdef ENABLE_MORE_COUNTER    
+  ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_DISABLE, 0);
+  ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_DISABLE, 0);
+  ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_DISABLE, 0);
+#endif
+  ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_DISABLE, 0);
 	ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_DISABLE, 0);
 
 	/*
