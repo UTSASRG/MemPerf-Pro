@@ -96,12 +96,7 @@ template <class KeyType,	// What is the key? A long or string
 		_keycmp = kcmp;
 
         // Allocated predefined size.
-        if(profilerInitialized != INITIALIZED || !realInitialized) {
-            _buckets = (struct Bucket*) myMalloc_hash (size * sizeof(struct Bucket));
-        } else {
-            //_buckets = (struct Bucket*) RealX::malloc (size * sizeof(struct Bucket));
-            _buckets = (struct Bucket*) myMalloc_hash (size * sizeof(struct Bucket));
-        }
+        _buckets = (struct Bucket *) myMalloc_hash(size * sizeof(struct Bucket));
 
 		// Initialize all of these _buckets.
 		struct Bucket* entry;
@@ -146,6 +141,7 @@ template <class KeyType,	// What is the key? A long or string
 		bucket->Unlock();
 		return isFound;
 	}
+
 
 	void insert(const KeyType& key, ValueType value) {
 		assert(_initialized == true);
@@ -214,12 +210,7 @@ template <class KeyType,	// What is the key? A long or string
 	// Create a new Entry with specified key and value.
 	struct Entry* createNewEntry(const KeyType& key, size_t keylen, ValueType value) {
 	    struct Entry* entry;
-	    if (profilerInitialized != INITIALIZED || !realInitialized)  {
-	        entry = (struct Entry*)	myMalloc_hash (sizeof(struct Entry));
-	    } else {
-	        //entry = (struct Entry*)	RealX::malloc (sizeof(struct Entry));
-            entry = (struct Entry*)	myMalloc_hash (sizeof(struct Entry));
-	    }
+        entry = (struct Entry *) myMalloc_hash(sizeof(struct Entry));
         //struct Entry* entry = (struct Entry*)	RealX::malloc (sizeof(struct Entry));
 //		fprintf (stderr, "sizeof(struct Entry) is %zu\n", sizeof(struct Entry));
 

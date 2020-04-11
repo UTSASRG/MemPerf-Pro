@@ -52,6 +52,7 @@ public:
 
 //  static bool compareInt(unsigned long var1, unsigned long var2, size_t) { return var1 == var2; }
     static bool compareInt(int var1, int var2, size_t) { return var1 == var2; }
+    static bool compareUnsignedlong(unsigned long var1, unsigned long var2, size_t) { return var1 == var2; }
 
   static bool compareCallsiteId(uint64_t var1, uint64_t var2, size_t) { return var1 == var2; }
 
