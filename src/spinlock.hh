@@ -29,4 +29,17 @@ private:
   int _lock;
 };
 
+class nolock {
+public:
+    nolock() { }
+
+    void init() { }
+
+    // Lock
+    void lock() { }
+
+    void unlock() { }
+};
+
+
 #endif /* __SPINLOCK_H__ */

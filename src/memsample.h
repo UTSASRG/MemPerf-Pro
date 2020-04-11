@@ -93,9 +93,9 @@ typedef struct {
 } thread_data;
 
 typedef struct {
-  uint64_t faults = 0;
-  uint64_t tlb_read_misses = 0;
-  uint64_t tlb_write_misses = 0;
+//  uint64_t faults = 0;
+//  uint64_t tlb_read_misses = 0;
+//  uint64_t tlb_write_misses = 0;
   uint64_t cache_misses = 0;
   uint64_t instructions = 0;
 } PerfReadInfo;
@@ -104,9 +104,9 @@ typedef struct {
   int perf_fd;
   int perf_fd2;
   uint64_t prev_head;
-	int perf_fd_fault;
-	int perf_fd_tlb_reads;
-	int perf_fd_tlb_writes;
+//	int perf_fd_fault;
+//	int perf_fd_tlb_reads;
+//	int perf_fd_tlb_writes;
 	int perf_fd_cache_miss;
 	int perf_fd_cache_ref;
 	int perf_fd_instr;
@@ -183,6 +183,6 @@ void setupCounting(void);
 void setupSampling(void);
 void stopSampling(void);
 void stopCounting(void);
-void doPerfCounterRead(void);
+//void doPerfCounterRead(void);
 void doSampleRead();
 #endif

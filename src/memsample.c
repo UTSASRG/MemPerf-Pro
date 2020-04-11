@@ -11,7 +11,7 @@
 #include <sys/ioctl.h>
 #include "libmallocprof.h"
 
-#define PERF_GROUP_SIZE 5
+#define PERF_GROUP_SIZE 2
 
 long long perf_mmap_read();
 long perf_event_open(struct perf_event_attr *hw_event, pid_t pid, int cpu, int group_fd, unsigned long flags) {
@@ -64,21 +64,27 @@ void getPerfCounts (PerfReadInfo * i, bool enableCounters) {
 			return;
 	}
 
-	if(enableCounters) {
-#ifdef ENABLE_MORE_COUNTER    
-        ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_ENABLE, 0);
-        ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_ENABLE, 0);
-        ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_ENABLE, 0);
-#endif
-        ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_ENABLE, 0);
-        ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_ENABLE, 0);
-        return;
-	}
+//	if(enableCounters) {
+////        ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_RESET, 0);
+////        ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_RESET, 0);
+////        ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_RESET, 0);
+//
+////        ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_RESET, 0);
+////        ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_RESET, 0);
+//
+////        ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_ENABLE, 0);
+////        ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_ENABLE, 0);
+////        ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_ENABLE, 0);
+//
+////        ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_ENABLE, 0);
+////        ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_ENABLE, 0);
+//        return;
+//	}
 
 	struct read_format buffer;
 
 
-	if(read(perfInfo.perf_fd_fault, &buffer, sizeof(struct read_format)) == -1) {
+	if(read(perfInfo.perf_fd_cache_miss, &buffer, sizeof(struct read_format)) == -1) {
 				perror("perf read failed");
 	}
 
@@ -116,76 +122,69 @@ void getPerfCounts (PerfReadInfo * i, bool enableCounters) {
     */
 
     memcpy(i, &(buffer.values), sizeof(buffer.values));
-    if(__builtin_expect((int64_t)i->faults < 0, 0) || i->faults > 10000000000) {
-			i->faults = 0;
-	}
-#ifdef ENABLE_MORE_COUNTER    
-	if(__builtin_expect((int64_t)i->tlb_read_misses < 0, 0) || i->tlb_read_misses > 10000000000) {
-			i->tlb_read_misses = 0;
-	}
-	if(__builtin_expect((int64_t)i->tlb_write_misses < 0, 0) || i->tlb_write_misses > 10000000000) {
-			i->tlb_write_misses = 0;
-	}
-#endif  
-	if(__builtin_expect((int64_t)i->cache_misses < 0, 0) || i->cache_misses > 10000000000) {
-			i->cache_misses = 0;
-	}
-	if(__builtin_expect((int64_t)i->instructions < 0, 0) || i->instructions > 10000000000) {
-			i->instructions = 0;
-	}
+//    if(__builtin_expect((int64_t)i->faults < 0 || i->faults > 10000000000, 0)) {
+//			i->faults = 0;
+//	}
+//	if(__builtin_expect((int64_t)i->tlb_read_misses < 0 || i->tlb_read_misses > 10000000000, 0)) {
+//			i->tlb_read_misses = 0;
+//	}
+//	if(__builtin_expect((int64_t)i->tlb_write_misses < 0 || i->tlb_write_misses > 10000000000, 0)) {
+//			i->tlb_write_misses = 0;
+//	}
 
+//	if(__builtin_expect((int64_t)i->cache_misses < 0 || i->cache_misses > 10000000000, 0)) {
+//			i->cache_misses = 0;
+//	}
+//	if(__builtin_expect((int64_t)i->instructions < 0 || i->instructions > 10000000000, 0)) {
+//			i->instructions = 0;
+//	}
 
 //    fprintf(stderr, "%ld, %ld, %ld, %ld, %ld\n",
 //            i->faults, i->tlb_read_misses, i->tlb_write_misses, i->cache_misses, i->instructions);
-#ifdef ENABLE_MORE_COUNTER    
-  ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_DISABLE, 0);
-  ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_DISABLE, 0);
-	ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_DISABLE, 0);
-#endif
-  ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_DISABLE, 0);
-	ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_DISABLE, 0);
+//    ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_DISABLE, 0);
+//    ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_DISABLE, 0);
+//	ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_DISABLE, 0);
 
-#ifdef ENABLE_MORE_COUNTER    
-   ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_RESET, 0);
-   ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_RESET, 0);
-   ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_RESET, 0);
-#endif
-   ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_RESET, 0);
-    ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_RESET, 0);
+//	ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_DISABLE, 0);
+//	ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_DISABLE, 0);
+
+//    ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_RESET, 0);
+//    ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_RESET, 0);
+//    ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_RESET, 0);
+//    ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_RESET, 0);
+//    ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_RESET, 0);
 }
 
-void doPerfCounterRead() {
-	#ifdef NO_PMU
-	return;
-	#endif
-	PerfReadInfo perf;
-	//getPerfCounts(&perf, false);
-
-#ifdef ENABLE_MORE_COUNTER    
-  ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_DISABLE, 0);
-  ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_DISABLE, 0);
-  ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_DISABLE, 0);
-#endif
-  ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_DISABLE, 0);
-	ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_DISABLE, 0);
-
-	/*
-	// Commented this out because it doesn't work, particularly now that we are resetting/enabling/disabling
-	// the PMU counters between function calls, and thus we can no longer obtain a grand total of events
-	// from reading their counter values. Even prior to this changeover, only the main thread is producing an
-	// output file (at least with our default settings), and thus these totals would only apply to the core
-	// the main thread is running on. In fact, there is no reason to call this function anymore at all,
-	// other than to disable the counters (which should already be disabled at the time this is called).	-- SAS
-	if(thrData.output) {
-			fprintf(thrData.output, "\n");
-			fprintf(thrData.output, ">>> total page faults        %ld\n", perf.faults);
-			fprintf(thrData.output, ">>> total TLB read misses    %ld\n", perf.tlb_read_misses);
-			fprintf(thrData.output, ">>> total TLB write misses   %ld\n", perf.tlb_write_misses);
-			fprintf(thrData.output, ">>> total cache misses       %ld\n", perf.cache_misses);
-			fprintf(thrData.output, ">>> total instructions       %ld\n", perf.instructions);
-	}
-	*/
-}
+//void doPerfCounterRead() {
+//	#ifdef NO_PMU
+//	return;
+//	#endif
+//	PerfReadInfo perf;
+//	//getPerfCounts(&perf, false);
+//
+//	ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_DISABLE, 0);
+//	ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_DISABLE, 0);
+//	ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_DISABLE, 0);
+//	ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_DISABLE, 0);
+//	ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_DISABLE, 0);
+//
+//	/*
+//	// Commented this out because it doesn't work, particularly now that we are resetting/enabling/disabling
+//	// the PMU counters between function calls, and thus we can no longer obtain a grand total of events
+//	// from reading their counter values. Even prior to this changeover, only the main thread is producing an
+//	// output file (at least with our default settings), and thus these totals would only apply to the core
+//	// the main thread is running on. In fact, there is no reason to call this function anymore at all,
+//	// other than to disable the counters (which should already be disabled at the time this is called).	-- SAS
+//	if(thrData.output) {
+//			fprintf(thrData.output, "\n");
+//			fprintf(thrData.output, ">>> total page faults        %ld\n", perf.faults);
+//			fprintf(thrData.output, ">>> total TLB read misses    %ld\n", perf.tlb_read_misses);
+//			fprintf(thrData.output, ">>> total TLB write misses   %ld\n", perf.tlb_write_misses);
+//			fprintf(thrData.output, ">>> total cache misses       %ld\n", perf.cache_misses);
+//			fprintf(thrData.output, ">>> total instructions       %ld\n", perf.instructions);
+//	}
+//	*/
+//}
 
 void setupCounting(void) {
 	#ifdef NO_PMU
@@ -197,19 +196,20 @@ void setupCounting(void) {
 	}
 	isCountingInit = true;
 
-	struct perf_event_attr pe_fault, pe_tlb_reads, pe_tlb_writes, pe_cache_miss, pe_instr;
-	memset(&pe_fault, 0, sizeof(struct perf_event_attr));
+	//struct perf_event_attr pe_fault, pe_tlb_reads, pe_tlb_writes, pe_cache_miss, pe_instr;
+    struct perf_event_attr pe_cache_miss, pe_instr;
+	memset(&pe_cache_miss, 0, sizeof(struct perf_event_attr));
 
-	pe_fault.type = PERF_TYPE_SOFTWARE;
-	pe_fault.size = sizeof(struct perf_event_attr);
-    pe_fault.config = PERF_COUNT_SW_PAGE_FAULTS;
+    pe_cache_miss.type = PERF_TYPE_HARDWARE;
+    pe_cache_miss.size = sizeof(struct perf_event_attr);
+    pe_cache_miss.config = PERF_COUNT_HW_CACHE_MISSES;
 
 	//This field specifies the format of the data returned by
 	//read() on a perf_event_open() file descriptor.
-	pe_fault.read_format = PERF_FORMAT_GROUP;
+    pe_cache_miss.read_format = PERF_FORMAT_GROUP;
 
 	//Disabled: whether the counter starts with disabled/enabled status.
-	pe_fault.disabled = 1;
+    pe_cache_miss.disabled = 0;
 	// Make an exact copy of the pe_fault attributes to be used for the
     // corresponding store events' attributes.
 
@@ -231,51 +231,46 @@ void setupCounting(void) {
 	//Exclude_xxx: Do not sample a specified side of events,
 	//user, kernel, or hypevisor
 
-    pe_fault.exclude_user = 0;
-    pe_fault.exclude_kernel = 1;
-    pe_fault.exclude_hv = 1;
+    pe_cache_miss.exclude_user = 0;
+    pe_cache_miss.exclude_kernel = 1;
+    pe_cache_miss.exclude_hv = 1;
 
     //Precise_ip: This controls the amount of skid. See perf_event.h
 
-    pe_fault.precise_ip = 1;
+    pe_cache_miss.precise_ip = 1;
 
-    pe_fault.freq = 1;
-    pe_fault.sample_freq = 1;
+    pe_cache_miss.freq = 1;
+    pe_cache_miss.sample_freq = 1;
 //
 //    pe_fault.freq = 0;
 //    pe_fault.sample_period = 1;
 
     //Sample_id_all: TID, TIME, ID, STREAM_ID, and CPU added to every sample.
-    pe_fault.sample_id_all = 0;
+    pe_cache_miss.sample_id_all = 0;
 
     //Exclude_xxx: Sample guest/host instances or not.
-    pe_fault.exclude_host = 0;
-    pe_fault.exclude_guest = 1;
+    pe_cache_miss.exclude_host = 0;
+    pe_cache_miss.exclude_guest = 1;
 
-    memcpy(&pe_tlb_reads, &pe_fault, sizeof(struct perf_event_attr));
-    memcpy(&pe_tlb_writes, &pe_fault, sizeof(struct perf_event_attr));
-	memcpy(&pe_cache_miss, &pe_fault, sizeof(struct perf_event_attr));
-	memcpy(&pe_instr, &pe_fault, sizeof(struct perf_event_attr));
+//    memcpy(&pe_tlb_reads, &pe_fault, sizeof(struct perf_event_attr));
+//    memcpy(&pe_tlb_writes, &pe_fault, sizeof(struct perf_event_attr));
+	memcpy(&pe_instr, &pe_cache_miss, sizeof(struct perf_event_attr));
 
-	pe_tlb_reads.type = PERF_TYPE_HW_CACHE;
-	pe_tlb_reads.config = PERF_COUNT_HW_CACHE_DTLB |
-	                      (PERF_COUNT_HW_CACHE_OP_READ << 8) |
-						  (PERF_COUNT_HW_CACHE_RESULT_MISS << 16);
-	pe_tlb_reads.disabled = 0;
+//	pe_tlb_reads.type = PERF_TYPE_HW_CACHE;
+//	pe_tlb_reads.config = PERF_COUNT_HW_CACHE_DTLB |
+//	                      (PERF_COUNT_HW_CACHE_OP_READ << 8) |
+//						  (PERF_COUNT_HW_CACHE_RESULT_MISS << 16);
+//	pe_tlb_reads.disabled = 0;
+//
+//	pe_tlb_writes.type = PERF_TYPE_HW_CACHE;
+//	pe_tlb_writes.config = PERF_COUNT_HW_CACHE_DTLB |
+//		                   (PERF_COUNT_HW_CACHE_OP_WRITE << 8) |
+//						   (PERF_COUNT_HW_CACHE_RESULT_MISS << 16);
+//	pe_tlb_writes.disabled = 0;
 
-	pe_tlb_writes.type = PERF_TYPE_HW_CACHE;
-	pe_tlb_writes.config = PERF_COUNT_HW_CACHE_DTLB |
-		                   (PERF_COUNT_HW_CACHE_OP_WRITE << 8) |
-						   (PERF_COUNT_HW_CACHE_RESULT_MISS << 16);
-	pe_tlb_writes.disabled = 0;
-
-	pe_cache_miss.type = PERF_TYPE_HARDWARE;
-	pe_cache_miss.config = PERF_COUNT_HW_CACHE_MISSES;
-	pe_cache_miss.disabled = 0;
-
-	pe_instr.type = PERF_TYPE_HARDWARE;
+//	pe_instr.type = PERF_TYPE_HARDWARE;
 	pe_instr.config = PERF_COUNT_HW_INSTRUCTIONS;
-	pe_instr.disabled = 0;
+//	pe_instr.disabled = 1;
 
 	// *** WARNING ***
 	// DO NOT change the order of the following create_perf_event system calls!
@@ -283,23 +278,24 @@ void setupCounting(void) {
 	// leader's FD, which occurs elsewhere, and will thus be incorrect unless
 	// similarly reordered.
 	// *** *** *** ***
-	perfInfo.perf_fd_fault = create_perf_event(&pe_fault, -1);
-	perfInfo.perf_fd_tlb_reads = create_perf_event(&pe_tlb_reads, perfInfo.perf_fd_fault);
-	perfInfo.perf_fd_tlb_writes = create_perf_event(&pe_tlb_writes, perfInfo.perf_fd_fault);
-	perfInfo.perf_fd_cache_miss = create_perf_event(&pe_cache_miss, perfInfo.perf_fd_fault);
-	perfInfo.perf_fd_instr = create_perf_event(&pe_instr, perfInfo.perf_fd_fault);
+//	perfInfo.perf_fd_fault = create_perf_event(&pe_fault, -1);
+//	perfInfo.perf_fd_tlb_reads = create_perf_event(&pe_tlb_reads, perfInfo.perf_fd_fault);
+//	perfInfo.perf_fd_tlb_writes = create_perf_event(&pe_tlb_writes, perfInfo.perf_fd_fault);
+	perfInfo.perf_fd_cache_miss = create_perf_event(&pe_cache_miss, -1);
+	perfInfo.perf_fd_instr = create_perf_event(&pe_instr, perfInfo.perf_fd_cache_miss);
 
-	ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_RESET, 0);
-	ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_RESET, 0);
-	ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_RESET, 0);
-	ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_RESET, 0);
-	ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_RESET, 0);
+//	ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_RESET, 0);
+//	ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_RESET, 0);
+//	ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_RESET, 0);
+//	ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_RESET, 0);
+//	ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_RESET, 0);
 
 //	ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_ENABLE, 0);
 //	ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_ENABLE, 0);
 //	ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_ENABLE, 0);
 //	ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_ENABLE, 0);
 //	ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_ENABLE, 0);
+
 }
 
 void sampleHandler(int signum, siginfo_t *info, void *p) {
@@ -475,9 +471,9 @@ void stopCounting(void) {
 
 		isCountingInit = false;
 
-    close(perfInfo.perf_fd_fault);
-    close(perfInfo.perf_fd_tlb_reads);
-    close(perfInfo.perf_fd_tlb_writes);
+//    close(perfInfo.perf_fd_fault);
+//    close(perfInfo.perf_fd_tlb_reads);
+//    close(perfInfo.perf_fd_tlb_writes);
     close(perfInfo.perf_fd_cache_miss);
     close(perfInfo.perf_fd_instr);
 }

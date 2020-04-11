@@ -108,7 +108,7 @@ unsigned ShadowMemory::updateObject(void * address, size_t size, bool isFree) {
 //    } else if(isFree) {
 //        // If this is a free operation, we will need the object's size (which is passed in as 0,
 //        // and is thus useless to us).
-        size = getObjectSize(uintaddr, mega_index, firstPageIdx);
+//        size = getObjectSize(uintaddr, mega_index, firstPageIdx);
 //    } else if((classSize - size) < OBJECT_SIZE_SENTINEL_SIZE) {
 //        // If we are allocating an object that does not have enough internal capacity to store
 //        // our object size sentinel value, we will bump up the size value to equal the
@@ -131,12 +131,12 @@ unsigned ShadowMemory::updateObject(void * address, size_t size, bool isFree) {
 unsigned ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_index, unsigned page_index, unsigned size, bool isFree) {
 		// If this is an allocation request, we will also need the object's class size so that we may
 		// store it in each PageMapEntry associated with each page of this object.
-		unsigned classSize;
-		if(bibop) {
-				classSize = getClassSizeFor(size);
-		} else {
-				classSize = malloc_usable_size((void *)uintaddr);
-		}
+//		unsigned classSize;
+//		if(bibop) {
+//				classSize = getClassSizeFor(size);
+//		} else {
+//				classSize = malloc_usable_size((void *)uintaddr);
+//		}
 
 		unsigned curPageIdx;
 		unsigned firstPageOffset = (uintaddr & PAGESIZE_MASK);
@@ -172,7 +172,7 @@ unsigned ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_index,
 						// when the pages are re-utilized for use by a new object.
 						//fprintf(stderr, ">   obj 0x%lx sz %u : first page : current=%p, mega_index=%lu, page index=%u, set class size=%u\n",
 						//				uintaddr, size, current, mega_index, curPageIdx, classSize);
-						current->setClassSize(classSize);
+						//current->setClassSize(classSize);
 				}
 				size_remain -= curPageBytes;
 				curPageIdx++;
@@ -199,7 +199,7 @@ unsigned ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_index,
 						}
 						// Do not clear the page's class size on free -- this will be cleared
 						// when the pages are re-utilized for use by a new object or mapping.
-						current->setClassSize(classSize);
+						//current->setClassSize(classSize);
 				}
 				size_remain -= curPageBytes;
 				curPageIdx++;
@@ -208,118 +208,118 @@ unsigned ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_index,
 		return numNewPagesTouched;
 }
 
-unsigned ShadowMemory::getPageClassSize(void * address) {
-		uintptr_t uintaddr = (uintptr_t)address;
-
-		unsigned long mega_index = (uintaddr >> LOG2_MEGABYTE_SIZE);
-		if(mega_index > NUM_MEGABYTE_MAP_ENTRIES) {
-				fprintf(stderr, "ERROR: mega index of 0x%lx is too large: %lu > %u\n",
-								uintaddr, mega_index, NUM_MEGABYTE_MAP_ENTRIES);
-				abort();
-		}
-
-		unsigned page_index = ((uintaddr & MEGABYTE_MASK) >> LOG2_PAGESIZE);
-
-		return getPageClassSize(mega_index, page_index);
-}
-
-unsigned ShadowMemory::getPageClassSize(unsigned long mega_index, unsigned page_index) {
-		PageMapEntry * current = getPageMapEntry(mega_index, page_index);
-		return current->getClassSize();
-}
-
-unsigned ShadowMemory::getObjectSize(uintptr_t uintaddr, unsigned long mega_index, unsigned page_index) {
-//		unsigned classSize;
-//		if(isLibc) {
-//				classSize = malloc_usable_size((void *)uintaddr);
-//		} else {
-//				classSize = getPageClassSize(mega_index, page_index);
-//				//fprintf(stderr, "page_index = %d, classsize = %d\n", page_index, classSize);
-//		}
+//unsigned ShadowMemory::getPageClassSize(void * address) {
+//		uintptr_t uintaddr = (uintptr_t)address;
 //
-//		// Check to see if this is a large object (as we define the term) -- we will have no size class info if it is.
-//		if(classSize > MAX_OBJECT_SIZE) {
-//				return classSize;
-//		} else if(classSize == 0) {
-//				fprintf(stderr, "ERROR: object %#lx has zero class size\n", uintaddr);
+//		unsigned long mega_index = (uintaddr >> LOG2_MEGABYTE_SIZE);
+//		if(mega_index > NUM_MEGABYTE_MAP_ENTRIES) {
+//				fprintf(stderr, "ERROR: mega index of 0x%lx is too large: %lu > %u\n",
+//								uintaddr, mega_index, NUM_MEGABYTE_MAP_ENTRIES);
 //				abort();
 //		}
+//
+//		unsigned page_index = ((uintaddr & MEGABYTE_MASK) >> LOG2_PAGESIZE);
+//
+//		return getPageClassSize(mega_index, page_index);
+//}
 
-    size_t size = MemoryWaste::getSize((void *)uintaddr);
-	//	if(size) {
-		    return (unsigned)size;
+//unsigned ShadowMemory::getPageClassSize(unsigned long mega_index, unsigned page_index) {
+//		PageMapEntry * current = getPageMapEntry(mega_index, page_index);
+//		return current->getClassSize();
+//}
 
-	//	}
-		//uint32_t * ptrToSentinel = (uint32_t *)(uintaddr + classSize - OBJECT_SIZE_SENTINEL_SIZE);
+//unsigned ShadowMemory::getObjectSize(uintptr_t uintaddr, unsigned long mega_index, unsigned page_index) {
+////		unsigned classSize;
+////		if(isLibc) {
+////				classSize = malloc_usable_size((void *)uintaddr);
+////		} else {
+////				classSize = getPageClassSize(mega_index, page_index);
+////				//fprintf(stderr, "page_index = %d, classsize = %d\n", page_index, classSize);
+////		}
+////
+////		// Check to see if this is a large object (as we define the term) -- we will have no size class info if it is.
+////		if(classSize > MAX_OBJECT_SIZE) {
+////				return classSize;
+////		} else if(classSize == 0) {
+////				fprintf(stderr, "ERROR: object %#lx has zero class size\n", uintaddr);
+////				abort();
+////		}
+//
+//    size_t size = MemoryWaste::getSize((void *)uintaddr);
+//	//	if(size) {
+//		    return (unsigned)size;
+//
+//	//	}
+//		//uint32_t * ptrToSentinel = (uint32_t *)(uintaddr + classSize - OBJECT_SIZE_SENTINEL_SIZE);
+//
+////		if(((*ptrToSentinel) & OBJECT_SIZE_SENTINEL_MASK) == OBJECT_SIZE_SENTINEL) {
+////				//unsigned retval = (*ptrToSentinel) & OBJECT_SIZE_MASK;
+////				//fprintf(stderr, "***** retrieved %#lx %u\n", uintaddr, retval);
+////				//fprintf(stderr, ">> object %#lx sentinel found at %p (val = 0x%x, enc size = %d)\n",
+////				//        uintaddr, ptrToSentinel, *ptrToSentinel, ((*ptrToSentinel) & OBJECT_SIZE_MASK));
+////				//return retval;
+////				return (*ptrToSentinel) & OBJECT_SIZE_MASK;
+////		} else {
+//				//fprintf(stderr, ">> object %#lx no sentinel found at %p (val = 0x%x, enc size = %d), classSize = %zu\n",
+//				//        uintaddr, ptrToSentinel, *ptrToSentinel, ((*ptrToSentinel) & OBJECT_SIZE_MASK), classSize);
+//				//return classSize;
+//		//}
+//}
 
-//		if(((*ptrToSentinel) & OBJECT_SIZE_SENTINEL_MASK) == OBJECT_SIZE_SENTINEL) {
-//				//unsigned retval = (*ptrToSentinel) & OBJECT_SIZE_MASK;
-//				//fprintf(stderr, "***** retrieved %#lx %u\n", uintaddr, retval);
-//				//fprintf(stderr, ">> object %#lx sentinel found at %p (val = 0x%x, enc size = %d)\n",
-//				//        uintaddr, ptrToSentinel, *ptrToSentinel, ((*ptrToSentinel) & OBJECT_SIZE_MASK));
-//				//return retval;
-//				return (*ptrToSentinel) & OBJECT_SIZE_MASK;
-//		} else {
-				//fprintf(stderr, ">> object %#lx no sentinel found at %p (val = 0x%x, enc size = %d), classSize = %zu\n",
-				//        uintaddr, ptrToSentinel, *ptrToSentinel, ((*ptrToSentinel) & OBJECT_SIZE_MASK), classSize);
-				//return classSize;
-		//}
-}
+//unsigned ShadowMemory::getObjectSize(void * address) {
+//
+//		uintptr_t uintaddr = (uintptr_t)address;
+//
+//		// First compute the megabyte number of the given address.
+//		unsigned long mega_index = (uintaddr >> LOG2_MEGABYTE_SIZE);
+//		if(mega_index > NUM_MEGABYTE_MAP_ENTRIES) {
+//				fprintf(stderr, "ERROR: mega index of 0x%lx too large: %lu > %u\n",
+//								uintaddr, mega_index, NUM_MEGABYTE_MAP_ENTRIES);
+//				abort();
+//		}
+//
+//		unsigned page_index = ((uintaddr & MEGABYTE_MASK) >> LOG2_PAGESIZE);
+//
+//		return getObjectSize(uintaddr, mega_index, page_index);
+//}
 
-unsigned ShadowMemory::getObjectSize(void * address) {
-
-		uintptr_t uintaddr = (uintptr_t)address;
-
-		// First compute the megabyte number of the given address.
-		unsigned long mega_index = (uintaddr >> LOG2_MEGABYTE_SIZE);
-		if(mega_index > NUM_MEGABYTE_MAP_ENTRIES) {
-				fprintf(stderr, "ERROR: mega index of 0x%lx too large: %lu > %u\n",
-								uintaddr, mega_index, NUM_MEGABYTE_MAP_ENTRIES);
-				abort();
-		}
-
-		unsigned page_index = ((uintaddr & MEGABYTE_MASK) >> LOG2_PAGESIZE);
-
-		return getObjectSize(uintaddr, mega_index, page_index);
-}
-
-bool ShadowMemory::updateObjectSize(uintptr_t uintaddr, unsigned size) {
-    //fprintf(stderr, "updateObjectSize uintaddr %p, size %d\n", uintaddr, size);
-    unsigned classSize;
-
-    if(bibop) {
-        classSize = getClassSizeFor(size);
-    } else {
-        classSize = malloc_usable_size((void *)uintaddr);
-    }
-
-//    uint32_t * ptrToSentinel = (uint32_t *)(uintaddr + classSize - OBJECT_SIZE_SENTINEL_SIZE);
-//    fprintf(stderr, "classsize = %d ptrToSentinel = %p\n", classSize, ptrToSentinel);
-//    if((size <= MAX_OBJECT_SIZE) && (classSize - size >= OBJECT_SIZE_SENTINEL_SIZE)) {
-//        *ptrToSentinel = (OBJECT_SIZE_SENTINEL | size);
+//bool ShadowMemory::updateObjectSize(uintptr_t uintaddr, unsigned size) {
+//    //fprintf(stderr, "updateObjectSize uintaddr %p, size %d\n", uintaddr, size);
+//    unsigned classSize;
+//
+//    if(bibop) {
+//        classSize = getClassSizeFor(size);
 //    } else {
-//        *ptrToSentinel = 0;
+//        classSize = malloc_usable_size((void *)uintaddr);
 //    }
-    fprintf(stderr, "Here\n");
-    return true;
-}
+//
+////    uint32_t * ptrToSentinel = (uint32_t *)(uintaddr + classSize - OBJECT_SIZE_SENTINEL_SIZE);
+////    fprintf(stderr, "classsize = %d ptrToSentinel = %p\n", classSize, ptrToSentinel);
+////    if((size <= MAX_OBJECT_SIZE) && (classSize - size >= OBJECT_SIZE_SENTINEL_SIZE)) {
+////        *ptrToSentinel = (OBJECT_SIZE_SENTINEL | size);
+////    } else {
+////        *ptrToSentinel = 0;
+////    }
+//    fprintf(stderr, "Here\n");
+//    return true;
+//}
 
 // Warning: the logic of this implementation is flawed -- occassionally, glibc will produce
 // an object with a usable size 16 bytes greater than what is expected or calculated by
 // this routine.
-size_t ShadowMemory::libc_malloc_usable_size(size_t size) {
-		if(size <= LIBC_MIN_OBJECT_SIZE) {
-				return LIBC_MIN_OBJECT_SIZE;
-		} else if(size >= large_object_threshold) {
-				return alignup(size, PAGESIZE);
-		}
-		unsigned next_mult_16 = ((~size & 0xf) + size + 1);
-		if(next_mult_16 - size >= LIBC_METADATA_SIZE) {
-				return (next_mult_16 - LIBC_METADATA_SIZE);
-		} else {
-				return (next_mult_16 + LIBC_METADATA_SIZE);
-		}
-}
+//size_t ShadowMemory::libc_malloc_usable_size(size_t size) {
+//		if(size <= LIBC_MIN_OBJECT_SIZE) {
+//				return LIBC_MIN_OBJECT_SIZE;
+//		} else if(size >= large_object_threshold) {
+//				return alignup(size, PAGESIZE);
+//		}
+//		unsigned next_mult_16 = ((~size & 0xf) + size + 1);
+//		if(next_mult_16 - size >= LIBC_METADATA_SIZE) {
+//				return (next_mult_16 - LIBC_METADATA_SIZE);
+//		} else {
+//				return (next_mult_16 + LIBC_METADATA_SIZE);
+//		}
+//}
 
 unsigned ShadowMemory::cleanupPages(uintptr_t uintaddr, size_t length) {
 		unsigned numTouchedPages = 0;
@@ -535,7 +535,7 @@ void PageMapEntry::clear() {
 		}
 		touched = false;
 		num_used_bytes = 0;
-		classSize = 0;
+		//classSize = 0;
 }
 
 unsigned int CacheMapEntry::getUsedBytes() {
@@ -546,13 +546,13 @@ unsigned int PageMapEntry::getUsedBytes() {
 		return num_used_bytes;
 }
 
-unsigned PageMapEntry::getClassSize() {
-		return __atomic_load_n(&classSize, __ATOMIC_RELAXED);
-}
+//unsigned PageMapEntry::getClassSize() {
+//		return __atomic_load_n(&classSize, __ATOMIC_RELAXED);
+//}
 
-void PageMapEntry::setClassSize(unsigned size) {
-		__atomic_store_n(&classSize, size, __ATOMIC_RELAXED);
-}
+//void PageMapEntry::setClassSize(unsigned size) {
+//		__atomic_store_n(&classSize, size, __ATOMIC_RELAXED);
+//}
 
 bool PageMapEntry::isTouched() {
 		return touched;
@@ -638,6 +638,9 @@ bool PageMapEntry::addUsedBytes(unsigned int num_bytes) {
 bool PageMapEntry::subUsedBytes(unsigned int num_bytes) {
 		//__atomic_sub_fetch(&num_used_bytes, num_bytes, __ATOMIC_RELAXED);
     num_used_bytes -= num_bytes;
+//    if(num_used_bytes > PAGESIZE) {
+//        num_used_bytes = 0;
+//    }
 		return true;
 }
 
@@ -724,6 +727,9 @@ bool CacheMapEntry::addUsedBytes(unsigned int num_bytes) {
 bool CacheMapEntry::subUsedBytes(unsigned int num_bytes) {
 		//__atomic_sub_fetch(&num_used_bytes, num_bytes, __ATOMIC_RELAXED);
     num_used_bytes -= num_bytes;
+//    if(num_used_bytes > CACHELINE_SIZE) {
+//        num_used_bytes = 0;
+//    }
 		return true;
 }
 

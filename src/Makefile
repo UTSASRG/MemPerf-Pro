@@ -28,7 +28,8 @@ CXX = g++
 #CXX = clang++ 
 
 CFLAGS += -pipe -g3 -ggdb3 -Wall -DNDEBUG --std=c++11 -fPIC -I$(ROOT)/include -fno-omit-frame-pointer
-CFLAGS2 += -O0 -pipe -g3 -ggdb3 -Wall -DNDEBUG --std=c++11 -fPIC -I$(ROOT)/include -Wno-unused-result -fno-omit-frame-pointer -Wl,--no-as-needed -lrt
+#CFLAGS2 += -O0 -pipe -g3 -ggdb3 -Wall -DNDEBUG --std=c++11 -fPIC -I$(ROOT)/include -Wno-unused-result -fno-omit-frame-pointer -Wl,--no-as-needed -lrt
+CFLAGS2 += -O2 -pipe -Wall -DNDEBUG --std=c++11 -fPIC -I$(ROOT)/include -Wno-unused-result -fno-omit-frame-pointer -Wl,--no-as-needed -lrt
 #CFLAGS2 += -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free
 
 #THREADTEST_FILE = threadTest.cpp
@@ -36,7 +37,7 @@ CFLAGS2 += -O0 -pipe -g3 -ggdb3 -Wall -DNDEBUG --std=c++11 -fPIC -I$(ROOT)/inclu
 # TEST_FILE = malloc-and-free.cpp
 
 THREADTEST_FILE = malloc-and-free.cpp
-TEST_FILE = alloc.cpp
+TEST_FILE = alloc.cpp 
 
 NUM_THREADS = 20
 NUM_MALLOCS = 80000
@@ -146,6 +147,13 @@ test/test-xlibc: libmallocprof.so test/$(TEST_FILE)
 
 test/test-xlibc-thread: libmallocprof.so test/$(THREADTEST_FILE)
 	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic ../Memoryallocators/libc-2.24/libmalloc.so -o test/test-xlibc-thread test/$(THREADTEST_FILE) -pthread
+
+# Libc2281
+test/test-libc2281: libmallocprof.so test/$(TEST_FILE)
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic ../Memoryallocators/libc-2.28/libmalloc.so -o test/test-libc2281 test/$(TEST_FILE)
+
+test/test-libc2281-thread: libmallocprof.so test/$(THREADTEST_FILE)
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic ../Memoryallocators/libc-2.28/libmalloc.so -o test/test-libc2281-thread test/$(THREADTEST_FILE) -pthread
 
 # Hoard
 test/test-hoard: libmallocprof.so test/$(TEST_FILE)

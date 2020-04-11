@@ -110,7 +110,7 @@ class xthreadx {
   static void threadExit() {
     #ifndef NO_PMU
     stopSampling();
-    doPerfCounterRead();
+    //doPerfCounterRead();
     stopCounting();
     #endif
 

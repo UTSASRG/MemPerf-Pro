@@ -34,7 +34,7 @@ extern initStatus profilerInitialized;
 
 extern MemoryUsage max_mu;
 
-extern HashMap <uint64_t, MmapTuple*, spinlock> mappings;
+//extern HashMap <uint64_t, MmapTuple*, spinlock> mappings;
 extern HashMap <uint64_t, LC*, spinlock> lockUsage;
 
 //void checkGlobalMemoryUsageBySizes();
@@ -295,12 +295,12 @@ void * yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offs
     current_tc->mmap_waits++;
     current_tc->mmap_wait_cycles += (timeStop - timeStart);
 
-    mappings.insert(address, newMmapTuple(address, length, prot, 'a'));
+    //mappings.insert(address, newMmapTuple(address, length, prot, 'a'));
 
 	// Need to check if selfmap.getInstance().getTextRegions() has
 	// ran. If it hasn't, we can't call isAllocatorInCallStack()
   } else if(selfmapInitialized && isAllocatorInCallStack()) {
-    mappings.insert(address, newMmapTuple(address, length, prot, 's'));
+    //mappings.insert(address, newMmapTuple(address, length, prot, 's'));
   }
 
   inMmap = false;
@@ -397,7 +397,7 @@ int munmap(void *addr, size_t length) {
   current_tc->munmap_waits++;
   current_tc->munmap_wait_cycles += (timeStop - timeStart);
 
-  mappings.erase((intptr_t)addr);
+  //mappings.erase((intptr_t)addr);
 
   return ret;
 }
@@ -423,15 +423,15 @@ void *mremap(void *old_address, size_t old_size, size_t new_size,
   current_tc->mremap_waits++;
   current_tc->mremap_wait_cycles += (timeStop - timeStart);
 
-  MmapTuple* t;
-  if (mappings.find((intptr_t)old_address, &t)) {
-    if(ret == old_address) {
-      t->length = new_size;
-    } else {
-      mappings.erase((intptr_t)old_address);
-      mappings.insert((intptr_t)ret, newMmapTuple((intptr_t)ret, new_size, PROT_READ | PROT_WRITE, 'a'));
-    }
-  }
+//  MmapTuple* t;
+//  if (mappings.find((intptr_t)old_address, &t)) {
+//    if(ret == old_address) {
+//      t->length = new_size;
+//    } else {
+//      mappings.erase((intptr_t)old_address);
+//      mappings.insert((intptr_t)ret, newMmapTuple((intptr_t)ret, new_size, PROT_READ | PROT_WRITE, 'a'));
+//    }
+//  }
 
   return ret;
 }

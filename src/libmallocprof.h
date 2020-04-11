@@ -27,7 +27,7 @@
 #define BUMP_POINTER_KEY 0
 
 //Bump-pointer key to overhead hashmap
-#define BP_OVERHEAD 0
+//#define BP_OVERHEAD 0
 
 #define PAGE_BITS 12 
 #define MY_METADATA_SIZE 4
@@ -42,7 +42,8 @@ typedef enum {
 		MUTEX,
 		SPINLOCK,
 		TRYLOCK,
-		SPIN_TRYLOCK
+		SPIN_TRYLOCK,
+		NOLOCK
 } LockType;
 
 //Structures
@@ -104,31 +105,31 @@ typedef struct {
 	std::atomic_uint allocations;
 } MmapTuple;
 
-typedef struct {
-	std::atomic_size_t metadata;
-	std::atomic_size_t blowup;
-	std::atomic_size_t alignment;
-	void addMetadata(size_t size) {metadata.fetch_add(size, relaxed);}
-	void addBlowup(size_t size) {blowup.fetch_add(size, relaxed);}
-	void addAlignment(size_t size) {alignment.fetch_add(size, relaxed);}
-	size_t getMetadata() {
-		size_t temp = metadata.load();
-		return temp;
-	}
-	size_t getBlowup() {
-		size_t temp = blowup.load();
-		return temp;
-	}
-	size_t getAlignment() {
-		size_t temp = alignment.load();
-		return temp;
-	}
-	void init() {
-		metadata = 0;
-		blowup = 0;
-		alignment = 0;
-	}
-} Overhead;
+//typedef struct {
+//	std::atomic_size_t metadata;
+//	std::atomic_size_t blowup;
+//	std::atomic_size_t alignment;
+//	void addMetadata(size_t size) {metadata.fetch_add(size, relaxed);}
+//	void addBlowup(size_t size) {blowup.fetch_add(size, relaxed);}
+//	void addAlignment(size_t size) {alignment.fetch_add(size, relaxed);}
+//	size_t getMetadata() {
+//		size_t temp = metadata.load();
+//		return temp;
+//	}
+//	size_t getBlowup() {
+//		size_t temp = blowup.load();
+//		return temp;
+//	}
+//	size_t getAlignment() {
+//		size_t temp = alignment.load();
+//		return temp;
+//	}
+//	void init() {
+//		metadata = 0;
+//		blowup = 0;
+//		alignment = 0;
+//	}
+//} Overhead;
 
 typedef struct {
 	unsigned long numAccesses = 0;
@@ -170,14 +171,14 @@ enum memAllocType {
 
 typedef struct  {
 	bool reused;
-	pid_t tid;
+	//pid_t tid;
 	PerfReadInfo before;
 	PerfReadInfo after;
 	size_t size;
 	size_t classSize;
 	short classSizeIndex;
 	uint64_t cycles;
-	uint64_t address;
+//	uint64_t address;
 	uint64_t tsc_before;
 	uint64_t tsc_after;
 	enum memAllocType type;
@@ -190,33 +191,33 @@ typedef struct {
 	unsigned kb;
 } SMapEntry;
 
-typedef struct {
-	uint64_t kb;
-	uint64_t alignment;
-	uint64_t blowup;
-	float efficiency;
-} OverheadSample;
+//typedef struct {
+//	uint64_t kb;
+//	uint64_t alignment;
+//	uint64_t blowup;
+//	float efficiency;
+//} OverheadSample;
 
 // Functions 
-#ifdef MAPPINGS
-bool mappingEditor (void* addr, size_t len, int prot);
-#endif
+//#ifdef MAPPINGS
+//bool mappingEditor (void* addr, size_t len, int prot);
+//#endif
 inline bool isAllocatorInCallStack();
 size_t getClassSizeFor(size_t size);
 int num_used_pages(uintptr_t vstart, uintptr_t vend);
-void analyzePerfInfo(allocation_metadata *metadata);
-void analyzeAllocation(allocation_metadata *metadata);
-void calculateMemOverhead();
+//void analyzePerfInfo(allocation_metadata *metadata);
+//void analyzeAllocation(allocation_metadata *metadata);
+//void calculateMemOverhead();
 void doBefore(allocation_metadata *metadata);
 void doAfter(allocation_metadata *metadata);
-void incrementMemoryUsage(size_t size, size_t new_touched_bytes, void * object);
-void decrementMemoryUsage(void* addr);
+void incrementMemoryUsage(size_t size, size_t classSize, size_t new_touched_bytes, void * object);
+void decrementMemoryUsage(size_t size, size_t classSize, void * addr);
 void getAddressUsage(size_t size, uint64_t address, uint64_t cycles);
-void getAlignment(size_t, size_t);
-void getBlowup(size_t size, size_t classSize, short class_size_index, bool*);
+//void getAlignment(size_t, size_t);
+//void getBlowup(size_t size, size_t classSize, short class_size_index, bool*);
 void getMappingsUsage(size_t size, uint64_t address, size_t classSize);
 void getMetadata(size_t classSize);
-void getOverhead(size_t size, uint64_t address, size_t classSize, short classSizeIndex, bool*);
+//void getOverhead(size_t size, uint64_t address, size_t classSize, short classSizeIndex, bool*);
 void getPerfCounts(PerfReadInfo*, bool enableCounters);
 void globalizeTAD();
 void myFree (void* ptr);
@@ -227,16 +228,16 @@ void readAllocatorFile();
 void writeAllocData ();
 void writeContention ();
 void writeMappings();
-void writeOverhead();
+//void writeOverhead();
 void writeThreadContention();
 void writeThreadMaps();
 LC* newLC(LockType lockType, int contention = 1);
-MmapTuple* newMmapTuple (uint64_t address, size_t length, int prot, char origin);
+//MmapTuple* newMmapTuple (uint64_t address, size_t length, int prot, char origin);
 ObjectTuple* newObjectTuple (uint64_t address, size_t size);
-Overhead* newOverhead();
+//Overhead* newOverhead();
 allocation_metadata init_allocation(size_t sz, enum memAllocType type);
-size_t updateFreeCounters(void * address);
-short getClassSizeIndex(size_t size);
+//size_t updateFreeCounters(void * address);
+//short getClassSizeIndex(size_t size);
 void initGlobalFreeArray();
 void initLocalFreeArray();
 //void initLocalNumAllocsBySizes ();
@@ -257,8 +258,8 @@ void myLocalFree(void*);
 void printMyMemUtilization();
 void initGlobalCSM();
 SMapEntry* newSMapEntry();
-void start_smaps();
-void sampleMemoryOverhead(int, siginfo_t*, void*);
+//void start_smaps();
+//void sampleMemoryOverhead(int, siginfo_t*, void*);
 void updateGlobalFriendlinessData();
 void calcAppFriendliness();
 const char * LockTypeToString(LockType type);

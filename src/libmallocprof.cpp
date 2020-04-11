@@ -32,42 +32,42 @@ bool mapsInitialized = false;
 bool opening_maps_file = false;
 bool realInitialized = false;
 bool selfmapInitialized = false;
-std::atomic<bool> creatingThread (false);
+//std::atomic<bool> creatingThread (false);
 bool inConstructor = false;
 char* allocator_name;
 char* allocatorFileName;
 char smaps_fileName[30];
-extern char data_start;
-extern char _etext;
+//extern char data_start;
+//extern char _etext;
 extern char * program_invocation_name;
 extern void * __libc_stack_end;
-float memEfficiency = 0;
+//float memEfficiency = 0;
 initStatus profilerInitialized = NOT_INITIALIZED;
 pid_t pid;
 //size_t alignment = 0;
 size_t large_object_threshold = 0;
-size_t metadata_object = 0;
-size_t metadata_overhead = 0;
-size_t total_blowup = 0;
-size_t totalSizeAlloc = 0;
-size_t totalSizeFree = 0;
-size_t totalSizeDiff = 0;
-size_t totalMemOverhead = 0;
+//size_t metadata_object = 0;
+//size_t metadata_overhead = 0;
+//size_t total_blowup = 0;
+//size_t totalSizeAlloc = 0;
+//size_t totalSizeFree = 0;
+//size_t totalSizeDiff = 0;
+//size_t totalMemOverhead = 0;
 
 //Smaps Sampling-------------//
-void setupSignalHandler();
-void startSignalTimer();
+//void setupSignalHandler();
+//void startSignalTimer();
 size_t smaps_bufferSize = 1024;
-FILE* smaps_infile = nullptr;
+//FILE* smaps_infile = nullptr;
 char* smaps_buffer;
-OverheadSample worstCaseOverhead;
-OverheadSample currentCaseOverhead;
-SMapEntry* smapsDontCheck[100];
-short smapsDontCheckIndex = 0;
-short smapsDontCheckNumEntries = 0;
-timer_t smap_timer;
-uint64_t smap_samples = 0;
-uint64_t smap_sample_cycles = 0;
+//OverheadSample worstCaseOverhead;
+//OverheadSample currentCaseOverhead;
+//SMapEntry* smapsDontCheck[100];
+//short smapsDontCheckIndex = 0;
+//short smapsDontCheckNumEntries = 0;
+//timer_t smap_timer;
+//uint64_t smap_samples = 0;
+//uint64_t smap_sample_cycles = 0;
 struct itimerspec stopTimer;
 struct itimerspec resumeTimer;
 //unsigned timer_nsec = 333000000;
@@ -81,21 +81,21 @@ int num_class_sizes;
 size_t* class_sizes;
 
 //Atomic Globals ATOMIC
-std::atomic_bool mmap_active(false);
-std::atomic_bool sbrk_active(false);
-std::atomic_bool madvise_active(false);
-std::atomic<std::size_t> freed_bytes (0);
-std::atomic<std::size_t> blowup_bytes (0);
-std::atomic<std::size_t> alignment_bytes (0);
-
-thread_local uint64_t total_time_wait = 0;
+//std::atomic_bool mmap_active(false);
+//std::atomic_bool sbrk_active(false);
+//std::atomic_bool madvise_active(false);
+//std::atomic<std::size_t> freed_bytes (0);
+//std::atomic<std::size_t> blowup_bytes (0);
+//std::atomic<std::size_t> alignment_bytes (0);
+//
+//thread_local uint64_t total_time_wait = 0;
 
 std::atomic<uint> num_sbrk (0);
 std::atomic<uint> num_madvise (0);
 std::atomic<uint> malloc_mmaps (0);
 std::atomic<std::size_t> size_sbrk (0);
 
-thread_local uint blowup_allocations = 0;
+//thread_local uint blowup_allocations = 0;
 thread_local unsigned long long total_cycles_start = 0;
 std::atomic<std::uint64_t> total_global_cycles (0);
 std::atomic<std::uint64_t> cycles_alloc (0);
@@ -112,20 +112,20 @@ MemoryUsage mu;
 MemoryUsage max_mu;
 
 /// REQUIRED!
-std::atomic<unsigned>* globalFreeArray = nullptr;
+//std::atomic<unsigned>* globalFreeArray = nullptr;
 //uint64_t * globalNumAllocsBySizes = nullptr;
 //uint64_t* globalNumAllocsFFLBySizes = nullptr;
 //Thread local variables THREAD_LOCAL
 thread_local thread_data thrData;
-thread_local bool waiting;
+//thread_local bool waiting;
 thread_local bool inAllocation;
-thread_local bool inDeallocation;
+//thread_local bool inDeallocation;
 thread_local bool inMmap;
 thread_local bool PMUinit = false;
-thread_local uint64_t timeAttempted;
-thread_local uint64_t timeWaiting;
-thread_local unsigned* localFreeArray = nullptr;
-thread_local bool localFreeArrayInitialized = false;
+//thread_local uint64_t timeAttempted;
+//thread_local uint64_t timeWaiting;
+//thread_local unsigned* localFreeArray = nullptr;
+//thread_local bool localFreeArrayInitialized = false;
 //thread_local uint64_t * localNumAllocsBySizes = nullptr;
 //thread_local bool localNumAllocsBySizesInitialized = false;
 //thread_local uint64_t * localNumAllocsFFLBySizes = nullptr;
@@ -140,7 +140,11 @@ thread_local void* myLocalMemEnd;
 thread_local uint64_t myLocalPosition;
 thread_local uint64_t myLocalAllocations;
 thread_local bool myLocalMemInitialized = false;
-thread_local PerfAppFriendly friendliness;
+//thread_local PerfAppFriendly friendliness;
+
+thread_local size_t the_old_size;
+thread_local size_t the_old_classSize;
+thread_local short the_old_classSizeIndex;
 
 spinlock globalize_lck;
 
@@ -177,16 +181,16 @@ friendly_data globalFriendlyData;
 HashMap <uint64_t, LC*, spinlock> lockUsage;
 
 //Hashmap of mmap addrs to tuple:
-HashMap <uint64_t, MmapTuple*, spinlock> mappings;
+//HashMap <uint64_t, MmapTuple*, spinlock> mappings;
 
 //Hashmap of Overhead objects
-HashMap <size_t, Overhead*, spinlock> overhead;
-
+//
+//HashMap <size_t, Overhead*, spinlock> overhead;
 //Hashmap of tid to ThreadContention*
 //HashMap <uint64_t, ThreadContention*, spinlock> threadContention;
 
 //Spinlocks
-spinlock temp_mem_lock;
+//spinlock temp_mem_lock;
 
 // pre-init private allocator memory
 char myBuffer[TEMP_MEM_SIZE];
@@ -256,14 +260,14 @@ __attribute__((constructor)) initStatus initializer() {
 
     myMem_hash = (char*)RealX::mmap(NULL, HASH_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     myMemEnd_hash = (void*) (myMem_hash + HASH_SIZE);
-    fprintf(stderr, "myMen_hash = %p, %p\n", myMem_hash, myMemEnd_hash);
+    //fprintf(stderr, "myMen_hash = %p, %p\n", myMem_hash, myMemEnd_hash);
     myMemLock_hash.init();
 
 
     MemoryWaste::initialize();
 	lockUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 128);
-	overhead.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 256);
-	mappings.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
+	//overhead.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 256);
+	//mappings.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
 	mapsInitialized = true;
 
 	void * program_break = RealX::sbrk(0);
@@ -341,7 +345,7 @@ __attribute__((constructor)) initStatus initializer() {
 			size_t cs = class_sizes[i];
 
 			fprintf (thrData.output, "%zu ", cs);
-			overhead.insert(cs, newOverhead());
+			//overhead.insert(cs, newOverhead());
 		}
 
 		fprintf (thrData.output, "\n");
@@ -350,7 +354,7 @@ __attribute__((constructor)) initStatus initializer() {
 	else {
 		num_class_sizes = 0;
 		//Create an entry in the overhead hashmap with key 0
-		overhead.insert(BP_OVERHEAD, newOverhead());
+		//overhead.insert(BP_OVERHEAD, newOverhead());
 	}
 
 	profilerInitialized = INITIALIZED;
@@ -369,7 +373,7 @@ __attribute__((constructor)) initStatus initializer() {
 	stopTimer.it_interval.tv_sec = 0;
 	stopTimer.it_interval.tv_nsec = 0;
 
-	worstCaseOverhead.efficiency = 100.00;
+	//worstCaseOverhead.efficiency = 100.00;
 
 	#warning Disabled smaps functionality (timer, signal handler)
 	/*
@@ -390,8 +394,8 @@ void dumpHashmaps() {
 	// fprintf(stderr, "addressUsage.printUtilization():\n");
 	// addressUsage.printUtilization();
 
-	fprintf(stderr, "overhead.printUtilization():\n");
-	overhead.printUtilization();
+//	fprintf(stderr, "overhead.printUtilization():\n");
+//	overhead.printUtilization();
 
 	fprintf(stderr, "lockUsage.printUtilization():\n");
 	lockUsage.printUtilization();
@@ -420,7 +424,7 @@ void exitHandler() {
 	#ifndef NO_PMU
 	stopSampling();
 
-	doPerfCounterRead();
+	//doPerfCounterRead();
 	#endif
 
 	#warning Disabled smaps functionality (timer, file handle cleanup)
@@ -500,6 +504,8 @@ extern "C" int libmallocprof_libc_start_main(main_fn_t main_fn, int argc,
 			rtld_fini, stack_end);
 }
 
+void collectAllocMetaData(allocation_metadata *metadata);
+
 // Memory management functions
 extern "C" {
 	void * yymalloc(size_t sz) {
@@ -548,9 +554,9 @@ extern "C" {
         //thread_local
         inAllocation = true;
         PMU_init_check();
-		//if (!localFreeArrayInitialized) initLocalFreeArray();
-		//if (!localNumAllocsBySizesInitialized) initLocalNumAllocsBySizes();
-		//if (!localNumAllocsFFLBySizesInitialized) initLocalNumAllocsFFLBySizes();
+        //if (!localFreeArrayInitialized) initLocalFreeArray();
+        //if (!localNumAllocsBySizesInitialized) initLocalNumAllocsBySizes();
+        //if (!localNumAllocsFFLBySizesInitialized) initLocalNumAllocsFFLBySizes();
 
 		//Data we need for each allocation
 		allocation_metadata allocData = init_allocation(sz, MALLOC);
@@ -558,23 +564,23 @@ extern "C" {
 		//Do before
 		doBefore(&allocData);
 		//Do allocation
-        //fprintf(stderr, "malloc %d\n", sz);
+//        fprintf(stderr, "malloc %d\n", sz);
 		object = RealX::malloc(sz);
         doAfter(&allocData);
         //fprintf(stderr, "malloc done %d %p\n", sz, object);
-        allocData.address = (uint64_t) object;
-        allocData.reused = MemoryWaste::allocUpdate(allocData.tid, allocData.size, object);
-        size_t new_touched_bytes =
-            PAGESIZE * ShadowMemory::updateObject(
-            (void *)allocData.address, allocData.size, false);
-        incrementMemoryUsage(sz, new_touched_bytes, object);
+//        allocData.address = (uint64_t) object;
+        allocData.reused = MemoryWaste::allocUpdate(allocData.size, &allocData.classSize, &allocData.classSizeIndex, object);
+        size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject(object, allocData.size, false);
+        incrementMemoryUsage(sz, allocData.classSize, new_touched_bytes, object);
         //Do after
         //fprintf(stderr, "*** malloc(%zu) -> %p\n", sz, object);
 
 		allocData.cycles = allocData.tsc_after - allocData.tsc_before;
 
 		// Gets overhead, address usage, mmap usage, memHWM, and prefInfo
-		analyzeAllocation(&allocData);
+		//analyzeAllocation(&allocData);
+        //analyzePerfInfo(&allocData);
+        collectAllocMetaData(&allocData);
 
 		//fprintf(stderr, "ptr = %p, size = %d\n\n", object, sz);
 
@@ -586,7 +592,7 @@ extern "C" {
 	}
 
 	void * yycalloc(size_t nelem, size_t elsize) {
-	    //fprintf(stderr, "yycalloc... %d %d\n", nelem, elsize);
+//	    fprintf(stderr, "yycalloc... %d %d\n", nelem, elsize);
 		if((nelem * elsize) == 0) {
 				return NULL;
 		}
@@ -628,17 +634,17 @@ extern "C" {
 		// Do allocation
 		object = RealX::calloc(nelem, elsize);
         doAfter(&allocData);
-        allocData.address = reinterpret_cast <uint64_t> (object);
-
-        size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject((void *)allocData.address, allocData.size, false);
-        incrementMemoryUsage(nelem * elsize, new_touched_bytes, object);
-        allocData.reused = MemoryWaste::allocUpdate(allocData.tid, allocData.size, object);
+        allocData.reused = MemoryWaste::allocUpdate(allocData.size, &allocData.classSize, &allocData.classSizeIndex, object);
+        size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject(object, allocData.size, false);
+        incrementMemoryUsage(nelem * elsize, allocData.classSize, new_touched_bytes, object);
         // Do after
 
 		allocData.cycles = allocData.tsc_after - allocData.tsc_before;
 
 		// Gets overhead, address usage, mmap usage, memHWM, and perfInfo
-		analyzeAllocation(&allocData);
+		//analyzeAllocation(&allocData);
+        //analyzePerfInfo(&allocData);
+        collectAllocMetaData(&allocData);
 
 		//thread_local
 		inAllocation = false;
@@ -647,27 +653,27 @@ extern "C" {
 	}
 
 	void yyfree(void * ptr) {
-        //fprintf(stderr, "free...%p\n", ptr);
 		if (!realInitialized) RealX::initializer();
-		if(ptr == NULL) return;
-		// Determine whether the specified object came from our global memory;
-		// only call RealX::free() if the object did not come from here.
-		if (ptr >= (void *)myMem && ptr <= myMemEnd) {
-			myFree (ptr);
-			return;
-		}
+        if(ptr == NULL) return;
+        // Determine whether the specified object came from our global memory;
+        // only call RealX::free() if the object did not come from here.
+        if (ptr >= (void *)myMem && ptr <= myMemEnd) {
+            myFree (ptr);
+            return;
+        }
         if (ptr >= (void *)myMem_hash && ptr <= myMemEnd_hash) {
             myFree_hash (ptr);
             return;
         }
-		if ((profilerInitialized != INITIALIZED) || !inRealMain) {
-			myFree(ptr);
-			return;
-		}
-		PMU_init_check();
+        if ((profilerInitialized != INITIALIZED) || !inRealMain) {
+            myFree(ptr);
+            return;
+        }
+        //fprintf(stderr, "free...%p\n", ptr);
+        PMU_init_check();
 
-		//thread_local
-		inAllocation = true;
+        //thread_local
+        inAllocation = true;
 
 //		if (!localFreeArrayInitialized) {
 //			initLocalFreeArray();
@@ -681,18 +687,19 @@ extern "C" {
 
 		//Data we need for each free
 		allocation_metadata allocData = init_allocation(0, FREE);
-		allocData.address = reinterpret_cast <uint64_t> (ptr);
-
+		allocData.size = MemoryWaste::getSize(ptr);
+        allocData.classSize = MemoryWaste::getClassSize(ptr);
+//        allocData.classSizeIndex = getClassSizeIndex(allocData.classSize);
 		//fprintf(stderr, "*** free(%p)\n", ptr);
 		//Do before free
 
-        decrementMemoryUsage(ptr);
-        uint64_t size = ShadowMemory::getObjectSize(ptr);
-        ShadowMemory::updateObject(ptr, 0, true);
-        MemoryWaste::freeUpdate(allocData.tid, ptr);
+        decrementMemoryUsage(allocData.size, allocData.classSize, ptr);
+        //uint64_t size = ShadowMemory::getObjectSize(ptr);
+        ShadowMemory::updateObject(ptr, allocData.size, true);
+        MemoryWaste::freeUpdate(ptr);
 
         //Update free counters
-        allocData.classSize = updateFreeCounters(ptr);
+        //allocData.classSize = updateFreeCounters(ptr);
         //fprintf(stderr, "free\n");
         doBefore(&allocData);
         //Do free
@@ -703,21 +710,22 @@ extern "C" {
 
         //thread_local
         cycles_free += (allocData.tsc_after - allocData.tsc_before);
-        if (!globalized) {
+        ///below
+        if (__builtin_expect(!globalized, true)) {
             localTAD.numFrees++;
             localTAD.cycles_free += (allocData.tsc_after - allocData.tsc_before);
-            localTAD.numDeallocationFaults += allocData.after.faults - allocData.before.faults;
-            localTAD.numDeallocationTlbReadMisses += allocData.after.tlb_read_misses - allocData.before.tlb_read_misses;
-            localTAD.numDeallocationTlbWriteMisses += allocData.after.tlb_write_misses - allocData.before.tlb_write_misses;
+//            localTAD.numDeallocationFaults += allocData.after.faults - allocData.before.faults;
+//            localTAD.numDeallocationTlbReadMisses += allocData.after.tlb_read_misses - allocData.before.tlb_read_misses;
+//            localTAD.numDeallocationTlbWriteMisses += allocData.after.tlb_write_misses - allocData.before.tlb_write_misses;
             localTAD.numDeallocationCacheMisses += allocData.after.cache_misses - allocData.before.cache_misses;
             localTAD.numDeallocationInstrs += allocData.after.instructions - allocData.before.instructions;
         } else {
             globalize_lck.lock();
             globalTAD.numFrees++;
             globalTAD.cycles_free += (allocData.tsc_after - allocData.tsc_before);
-            globalTAD.numDeallocationFaults += allocData.after.faults - allocData.before.faults;
-            globalTAD.numDeallocationTlbReadMisses += allocData.after.tlb_read_misses - allocData.before.tlb_read_misses;
-            globalTAD.numDeallocationTlbWriteMisses += allocData.after.tlb_write_misses - allocData.before.tlb_write_misses;
+//            globalTAD.numDeallocationFaults += allocData.after.faults - allocData.before.faults;
+//            globalTAD.numDeallocationTlbReadMisses += allocData.after.tlb_read_misses - allocData.before.tlb_read_misses;
+//            globalTAD.numDeallocationTlbWriteMisses += allocData.after.tlb_write_misses - allocData.before.tlb_write_misses;
             globalTAD.numDeallocationCacheMisses += allocData.after.cache_misses - allocData.before.cache_misses;
             globalTAD.numDeallocationInstrs += allocData.after.instructions - allocData.before.instructions;
             globalize_lck.unlock();
@@ -787,34 +795,30 @@ extern "C" {
 		//Do before
 
         if(ptr) {
-            ShadowMemory::updateObject(ptr, 0, true);
+            size_t old_size = MemoryWaste::getSize(ptr);
+            size_t old_classSize = MemoryWaste::getClassSize(ptr);
+            ShadowMemory::updateObject(ptr, old_size, true);
+            decrementMemoryUsage(old_size, old_classSize, ptr);
+            MemoryWaste::freeUpdate(ptr);
         }
 
         doBefore(&allocData);
         //Do allocation
         object = RealX::realloc(ptr, sz);
-        doAfter(&allocData);
-        allocData.address = reinterpret_cast <uint64_t> (object);
-
         //Do after
+        doAfter(&allocData);
+        allocData.reused = MemoryWaste::allocUpdate(allocData.size, &allocData.classSize, &allocData.classSizeIndex, object);
         size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject(object, sz, false);
-        if(object != ptr) {
-            incrementMemoryUsage(sz, new_touched_bytes, object);
-            if(ptr){
-          MemoryWaste::freeUpdate(allocData.tid, ptr);
-      }
-            allocData.reused = MemoryWaste::allocUpdate(allocData.tid, allocData.size, object);
-        }
+        incrementMemoryUsage(sz, allocData.classSize, new_touched_bytes, object);
+
 
 		// cyclesForRealloc = tsc_after - tsc_before;
 		allocData.cycles = allocData.tsc_after - allocData.tsc_before;
 
 		//Gets overhead, address usage, mmap usage
-		// analyzeAllocation(sz, address, cyclesForRealloc, classSize, &reused);
-		analyzeAllocation(&allocData);
-
-		//Get perf info
-		//analyzePerfInfo(&before, &after, classSize, &reused, tid);
+		//analyzeAllocation(&allocData);
+        //analyzePerfInfo(&allocData);
+        collectAllocMetaData(&allocData);
 
 		//thread_local
 		inAllocation = false;
@@ -849,11 +853,10 @@ extern "C" {
     //Do allocation
     int retval = RealX::posix_memalign(memptr, alignment, size);
     void * object = *memptr;
-    allocData.address = (uint64_t) object;
-
+    allocData.reused = MemoryWaste::allocUpdate(allocData.size, &allocData.classSize, &allocData.classSizeIndex, object);
     //Do after
-    size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject((void *)allocData.address, allocData.size, false);
-    incrementMemoryUsage(size, new_touched_bytes, object);
+    size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject(object, allocData.size, false);
+    incrementMemoryUsage(size, allocData.classSize, new_touched_bytes, object);
 
     // thread_local
     inAllocation = false;
@@ -883,11 +886,10 @@ extern "C" {
 
      //Do allocation
      void * object = RealX::memalign(alignment, size);
-     allocData.address = (uint64_t) object;
-     MemoryWaste::allocUpdate(allocData.tid, allocData.size, object);
+     MemoryWaste::allocUpdate(allocData.size, &allocData.classSize, &allocData.classSizeIndex, object);
      //Do after
-    size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject((void *)allocData.address, allocData.size, false);
-    incrementMemoryUsage(size, new_touched_bytes, object);
+    size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject(object, allocData.size, false);
+    incrementMemoryUsage(size, allocData.classSize, new_touched_bytes, object);
 
     // thread_local
     inAllocation = false;
@@ -981,13 +983,13 @@ void operator delete[] (void * ptr) __THROW {
 	yyfree (ptr);
 }
 
-void analyzeAllocation(allocation_metadata *metadata) {
-	//Analyzes for alignment and blowup
-	getOverhead(metadata->size, metadata->address, metadata->classSize, metadata->classSizeIndex, &(metadata->reused));
-
-	// Analyze perfinfo
-	analyzePerfInfo(metadata);
-}
+//void analyzeAllocation(allocation_metadata *metadata) {
+//	//Analyzes for alignment and blowup
+//	///getOverhead(metadata->size, metadata->address, metadata->classSize, metadata->classSizeIndex, &(metadata->reused));
+//
+//	// Analyze perfinfo
+//	analyzePerfInfo(metadata);
+//}
 
 /*
 	updateFreeCounters
@@ -996,24 +998,24 @@ void analyzeAllocation(allocation_metadata *metadata) {
 	needed for determing blowup. If libc, increment a global "freed_bytes"
 	variable
 */
-size_t updateFreeCounters(void * address) {
-
-	size_t current_class_size = 0;
-
-	if (bibop){
-			size_t size = ShadowMemory::getObjectSize(address);
-			current_class_size = getClassSizeFor(size);
-			short class_size_index = getClassSizeIndex(size);
-//			localFreeArray[class_size_index]++;
-//			globalFreeArray[class_size_index]++;
-	} else {
-		size_t size = malloc_usable_size(address);
-		current_class_size = size;
-		freed_bytes += size;
-	}
-
-	return current_class_size;
-}
+//size_t updateFreeCounters(void * address) {
+//
+//	size_t current_class_size = 0;
+//
+//	if (bibop){
+//			size_t size = ShadowMemory::getObjectSize(address);
+//			current_class_size = getClassSizeFor(size);
+//			short class_size_index = getClassSizeIndex(size);
+////			localFreeArray[class_size_index]++;
+////			globalFreeArray[class_size_index]++;
+//	} else {
+//		size_t size = malloc_usable_size(address);
+//		current_class_size = size;
+//		freed_bytes += size;
+//	}
+//
+//	return current_class_size;
+//}
 
 /*
 	getClassSizeIndex
@@ -1026,157 +1028,95 @@ size_t updateFreeCounters(void * address) {
 	counter arrays are "identical" to the class_sizes array.
 	So we can call localFreeArray[index] and globalFreeArray[index]
 */
-short getClassSizeIndex(size_t size) {
-	if (bumpPointer) {
-		if (size < LARGE_OBJECT) return 0;
-		else return 1;
-	}
-
-	short class_size_index = 0;
-	for (int i = 0; i < num_class_sizes; i++) {
-		if (size > class_sizes[i]) continue;
-		class_size_index = i;
-		break;
-	}
-	return class_size_index;
-}
-
-/*
-	getOverhead
-
-	Calculates alignment due to class size
-*/
-void getOverhead (size_t size, uint64_t address, size_t classSize, short classSizeIndex, bool* reused) {
-
-	//Check for classSize alignment bytes
-	// if (bibop) getAlignment(size, classSize);
-	getAlignment(size, classSize);
-
-	//Check for memory blowup
-	//getBlowup(size, classSize, classSizeIndex, reused);
-}
-
-void getMetadata (size_t classSize) {
-
-	Overhead* o;
-	if (overhead.find(classSize, &o)) {
-		o->addMetadata(metadata_object);
-	}
-}
-
-void getAlignment (size_t size, size_t classSize) {
-
-		Overhead* o;
-		short alignmentBytes = classSize - size;
-		if (overhead.find(classSize, &o)) {
-				if (bibop) {
-						o->addAlignment(alignmentBytes);
-						alignment_bytes += alignmentBytes;
-				}
-				else {
-						unsigned y = size + (~(size & 0xf) & 0xf) + 1;
-						unsigned alignment;
-						if ((y - size) >= 8) alignment = (y - size - 8);
-						else alignment = (y - size + 8);
-
-						o->addAlignment(alignment);
-						alignment_bytes += alignment;
-				}
-
-		}
-}
-
-void getBlowup (size_t size, size_t classSize, short class_size_index, bool* reused) {
-
-	size_t blowup = 0;
-	if (bibop) {
-		//If I have free objects on my local list
-//		if (localFreeArray[class_size_index] > 0) {
-//			*reused = true;
-//			localFreeArray[class_size_index]--;
-//			if (globalFreeArray[class_size_index] > 0)
-//			    globalFreeArray[class_size_index]--;
-//			return;
+//short getClassSizeIndex(size_t size) {
+//	if (bumpPointer) {
+//		if (size < LARGE_OBJECT) return 0;
+//		else return 1;
+//	}
+//
+//	short class_size_index = 0;
+//	for (int i = 0; i < num_class_sizes; i++) {
+//		if (size > class_sizes[i]) continue;
+//		class_size_index = i;
+//		break;
+//	}
+//	return class_size_index;
+//}
+//
+//size_t getClassSizeFor (size_t size) {
+//
+//	if(size > large_object_threshold) {
+//			return size;
+//	}
+//
+//	size_t sizeToReturn = 0;
+//	if (bibop) {
+//		if (__builtin_expect(num_class_sizes == 0, false)) {
+//			fprintf (stderr, "num_class_sizes == 0. Figure out why. Abort()\n");
+//			abort();
 //		}
 //
-//		//I don't have free objects on my local list, check global
-//		else if (globalFreeArray[class_size_index] > 0) {
+//		for (int i = 0; i < num_class_sizes; i++) {
 //
-//			//I didn't have free, but someone else did
-//			//Log this as blowup. Don't return
-//
-//			globalFreeArray[class_size_index]--;
+//			size_t tempSize = class_sizes[i];;
+//			if (size > tempSize) continue;
+//			else if (size <= tempSize) {
+//				sizeToReturn = tempSize;
+//				break;
+//			}
 //		}
-//		//I don't have free objects, and no one else does either
-//		else return;
-	} //End if (bibop)
-//
-	else { //This is bumpPointer
+//	}
+//	return sizeToReturn;
+//}
 
-		//If I don't have enough freed bytes to satisfy this size
-		//set blowup
-		if (size > freed_bytes) {
-				blowup = size - freed_bytes;
-				freed_bytes = 0;
-		}
+void getClassSizeForStyles(size_t size, void* uintaddr, size_t * classSize, short * classSizeIndex) {
 
-		//I do have enough bytes
-		//Decrement my free bytes, and return
-		//Don't "log" a blowup allocation
-		else {
-			*reused = true;
-			freed_bytes -= size;
-			return;
-		}
-	}
+    if(size == the_old_size) {
+        * classSize = the_old_classSize;
+        * classSizeIndex = the_old_classSizeIndex;
+        return;
+    }
 
-	//If we've made it here, this is a blowup allocation
-	//Increment the blowup for this class size
-	Overhead* o;
-	if (overhead.find(classSize, &o)) {
-			if (bibop) {
-					o->addBlowup(classSize);
-					blowup_bytes += classSize;
-			}
-			else {
-					o->addBlowup(blowup);
-					blowup_bytes += blowup;
-			}
-	} else {
-			blowup_bytes += classSize;
-			if(classSize < large_object_threshold) {
-					fprintf(stderr, "ERROR: could not find size class %zu in overhead hashmap\n", classSize);
-					abort();
-			}
-	}
+    the_old_size = size;
+
+    if(bibop) {
+        if(size > large_object_threshold) {
+            * classSize = size;
+            * classSizeIndex = num_class_sizes -1;
+
+            the_old_classSize = * classSize;
+            the_old_classSizeIndex = * classSizeIndex;
+
+            return;
+        }
+        for (int i = 0; i < num_class_sizes; i++) {
+            size_t tempSize = class_sizes[i];
+            if (size <= tempSize) {
+                * classSize = tempSize;
+                * classSizeIndex = i;
+
+                the_old_classSize = * classSize;
+                the_old_classSizeIndex = * classSizeIndex;
+
+                return;
+            }
+        }
+    } else {
+        if (size < LARGE_OBJECT) *classSizeIndex = 0;
+        else *classSizeIndex = 1;
+        * classSize = malloc_usable_size(uintaddr);
+
+//        the_old_classSize = * classSize;
+//        the_old_classSizeIndex = * classSizeIndex;
+
+    }
 }
 
-//Return the appropriate class size that this object should be in
-size_t getClassSizeFor (size_t size) {
-
-	if(size > large_object_threshold) {
-			return size;
-	}
-
-	size_t sizeToReturn = 0;
-	if (bibop) {
-		if (num_class_sizes == 0) {
-			fprintf (stderr, "num_class_sizes == 0. Figure out why. Abort()\n");
-			abort();
-		}
-
-		for (int i = 0; i < num_class_sizes; i++) {
-
-			size_t tempSize = class_sizes[i];;
-			if (size > tempSize) continue;
-			else if (size <= tempSize) {
-				sizeToReturn = tempSize;
-				break;
-			}
-		}
-	}
-	return sizeToReturn;
-}
+//size_t getClassSizeForStyles(size_t size, uintptr_t uintaddr) {
+//    if(bibop)
+//        return(getClassSizeFor(size));
+//    return(malloc_usable_size((void *)uintaddr));
+//}
 
 // Create tuple for hashmap
 ObjectTuple* newObjectTuple (uint64_t address, size_t size) {
@@ -1187,22 +1127,22 @@ ObjectTuple* newObjectTuple (uint64_t address, size_t size) {
 	return t;
 }
 
-MmapTuple* newMmapTuple (uint64_t address, size_t length, int prot, char origin) {
-
-	MmapTuple* t = (MmapTuple*) myMalloc (sizeof (MmapTuple));
-
-	uint64_t end = (address + length) - 1;
-	t->start = address;
-	t->end = end;
-	t->length = length;
-	t->rw = 0;
-	t->origin = origin;
-	if (prot == (PROT_READ | PROT_WRITE)) t->rw += length;
-	else if (prot == (PROT_READ | PROT_WRITE | PROT_EXEC)) t->rw += length;
-	t->tid = gettid();
-	t->allocations = 0;
-	return t;
-}
+//MmapTuple* newMmapTuple (uint64_t address, size_t length, int prot, char origin) {
+//
+//	MmapTuple* t = (MmapTuple*) myMalloc (sizeof (MmapTuple));
+//
+//	uint64_t end = (address + length) - 1;
+//	t->start = address;
+//	t->end = end;
+//	t->length = length;
+//	t->rw = 0;
+//	t->origin = origin;
+//	if (prot == (PROT_READ | PROT_WRITE)) t->rw += length;
+//	else if (prot == (PROT_READ | PROT_WRITE | PROT_EXEC)) t->rw += length;
+//	t->tid = gettid();
+//	t->allocations = 0;
+//	return t;
+//}
 
 LC* newLC (LockType lockType, int contention) {
 	LC* lc = (LC*) myMalloc(sizeof(LC));
@@ -1212,25 +1152,28 @@ LC* newLC (LockType lockType, int contention) {
 	return lc;
 }
 
-Overhead* newOverhead () {
-
-	Overhead* o = (Overhead*) myMalloc(sizeof(Overhead));
-	o->init();
-	return o;
-}
+//Overhead* newOverhead () {
+//
+//	Overhead* o = (Overhead*) myMalloc(sizeof(Overhead));
+//	o->init();
+//	return o;
+//}
 
 allocation_metadata init_allocation(size_t sz, enum memAllocType type) {
 	PerfReadInfo empty;
 	allocation_metadata new_metadata = {
 		reused : false,
-		tid : gettid(),
+		//tid : gettid(),
+		//tid: thrData.tid,
 		before : empty,
 		after : empty,
 		size : sz,
-		classSize : getClassSizeFor(sz),
-		classSizeIndex : getClassSizeIndex(getClassSizeFor(sz)),
+		//classSize : getClassSizeFor(sz),
+		classSize : 0,
+		//classSizeIndex : getClassSizeIndex(getClassSizeForStyles(sz)),
+		classSizeIndex : 0,
 		cycles : 0,
-		address : 0,
+//		address : 0,
 		tsc_before : 0,
 		tsc_after : 0,
 		type : type,
@@ -1319,7 +1262,7 @@ void myFree_hash (void* ptr) {
 
 void globalizeTAD() {
     globalize_lck.lock();
-    if (globalized) {
+    if (__builtin_expect(globalized, false)) {
         fprintf(stderr, "The thread %lld has been globalized!\n", gettid());
     }
 
@@ -1331,23 +1274,23 @@ void globalizeTAD() {
 //            globalNumAllocsFFLBySizes[i] += localNumAllocsFFLBySizes[i];
 //    }
 
-    globalTAD.numAllocationFaults += localTAD.numAllocationFaults;
-	globalTAD.numAllocationTlbReadMisses += localTAD.numAllocationTlbReadMisses;
-	globalTAD.numAllocationTlbWriteMisses += localTAD.numAllocationTlbWriteMisses;
+//    globalTAD.numAllocationFaults += localTAD.numAllocationFaults;
+//	globalTAD.numAllocationTlbReadMisses += localTAD.numAllocationTlbReadMisses;
+//	globalTAD.numAllocationTlbWriteMisses += localTAD.numAllocationTlbWriteMisses;
 	globalTAD.numAllocationCacheMisses += localTAD.numAllocationCacheMisses;
 	globalTAD.numAllocationInstrs += localTAD.numAllocationInstrs;
 
-	globalTAD.numAllocationFaultsFFL += localTAD.numAllocationFaultsFFL;
-	globalTAD.numAllocationTlbReadMissesFFL += localTAD.numAllocationTlbReadMissesFFL;
-	globalTAD.numAllocationTlbWriteMissesFFL += localTAD.numAllocationTlbWriteMissesFFL;
+//	globalTAD.numAllocationFaultsFFL += localTAD.numAllocationFaultsFFL;
+//	globalTAD.numAllocationTlbReadMissesFFL += localTAD.numAllocationTlbReadMissesFFL;
+//	globalTAD.numAllocationTlbWriteMissesFFL += localTAD.numAllocationTlbWriteMissesFFL;
 	globalTAD.numAllocationCacheMissesFFL += localTAD.numAllocationCacheMissesFFL;
 	globalTAD.numAllocationInstrsFFL += localTAD.numAllocationInstrsFFL;
 
-	globalTAD.numDeallocationFaults += localTAD.numDeallocationFaults;
+//	globalTAD.numDeallocationFaults += localTAD.numDeallocationFaults;
 	globalTAD.numDeallocationCacheMisses += localTAD.numDeallocationCacheMisses;
 	globalTAD.numDeallocationInstrs += localTAD.numDeallocationInstrs;
-	globalTAD.numDeallocationTlbReadMisses += localTAD.numDeallocationTlbReadMisses;
-	globalTAD.numDeallocationTlbWriteMisses += localTAD.numDeallocationTlbWriteMisses;
+//	globalTAD.numDeallocationTlbReadMisses += localTAD.numDeallocationTlbReadMisses;
+//	globalTAD.numDeallocationTlbWriteMisses += localTAD.numDeallocationTlbWriteMisses;
 
 	globalTAD.num_mutex_locks += localTAD.num_mutex_locks;
 	globalTAD.num_try_locks += localTAD.num_try_locks;
@@ -1395,7 +1338,7 @@ void writeAllocData () {
 }
 
 void writeThreadMaps () {
-
+///Here
     MemoryWaste::reportMaxMemory(thrData.output);
 
 	double numAllocs = safeDivisor(globalTAD.numAllocs);
@@ -1427,27 +1370,27 @@ void writeThreadMaps () {
 	fprintf (thrData.output, "\n");
   fprintf (thrData.output, "\n>>>>>>>>>>>>>>>    NEW ALLOCATIONS : total (average)    <<<<<<<<<<<<<<<\n");
 	fprintf (thrData.output, "allocation cycles              %20lu    avg = %0.1lf\n", globalTAD.cycles_alloc, (globalTAD.cycles_alloc / numAllocs));
-	fprintf (thrData.output, "allocation faults              %20lu    avg = %0.1lf\n", globalTAD.numAllocationFaults, (globalTAD.numAllocationFaults / numAllocs));
-	fprintf (thrData.output, "allocation tlb read misses     %20lu    avg = %0.1lf\n", globalTAD.numAllocationTlbReadMisses, (globalTAD.numAllocationTlbReadMisses / numAllocs));
-	fprintf (thrData.output, "allocation tlb write misses    %20lu    avg = %0.1lf\n", globalTAD.numAllocationTlbWriteMisses, (globalTAD.numAllocationTlbWriteMisses / numAllocs));
+//	fprintf (thrData.output, "allocation faults              %20lu    avg = %0.1lf\n", globalTAD.numAllocationFaults, (globalTAD.numAllocationFaults / numAllocs));
+//	fprintf (thrData.output, "allocation tlb read misses     %20lu    avg = %0.1lf\n", globalTAD.numAllocationTlbReadMisses, (globalTAD.numAllocationTlbReadMisses / numAllocs));
+//	fprintf (thrData.output, "allocation tlb write misses    %20lu    avg = %0.1lf\n", globalTAD.numAllocationTlbWriteMisses, (globalTAD.numAllocationTlbWriteMisses / numAllocs));
 	fprintf (thrData.output, "allocation cache misses        %20lu    avg = %0.1lf\n", globalTAD.numAllocationCacheMisses, (globalTAD.numAllocationCacheMisses / numAllocs));
 	fprintf (thrData.output, "num allocation instr           %20lu    avg = %0.1lf\n", globalTAD.numAllocationInstrs, (globalTAD.numAllocationInstrs / numAllocs));
 	fprintf (thrData.output, "\n");
 
 	fprintf (thrData.output, "\n>>>>>>>>>>>>>>>  FREELIST ALLOCATIONS : total (average) <<<<<<<<<<<<<<<\n");
 	fprintf (thrData.output, "allocation cycles              %20lu    avg = %0.1lf\n", globalTAD.cycles_allocFFL, (globalTAD.cycles_allocFFL / numAllocsFFL));
-	fprintf (thrData.output, "allocation faults              %20lu    avg = %0.1lf\n", globalTAD.numAllocationFaultsFFL, (globalTAD.numAllocationFaultsFFL / numAllocsFFL));
-	fprintf (thrData.output, "allocation tlb read misses     %20lu    avg = %0.1lf\n", globalTAD.numAllocationTlbReadMissesFFL, (globalTAD.numAllocationTlbReadMissesFFL / numAllocsFFL));
-	fprintf (thrData.output, "allocation tlb write misses    %20lu    avg = %0.1lf\n", globalTAD.numAllocationTlbWriteMissesFFL, (globalTAD.numAllocationTlbWriteMissesFFL / numAllocsFFL));
+//	fprintf (thrData.output, "allocation faults              %20lu    avg = %0.1lf\n", globalTAD.numAllocationFaultsFFL, (globalTAD.numAllocationFaultsFFL / numAllocsFFL));
+//	fprintf (thrData.output, "allocation tlb read misses     %20lu    avg = %0.1lf\n", globalTAD.numAllocationTlbReadMissesFFL, (globalTAD.numAllocationTlbReadMissesFFL / numAllocsFFL));
+//	fprintf (thrData.output, "allocation tlb write misses    %20lu    avg = %0.1lf\n", globalTAD.numAllocationTlbWriteMissesFFL, (globalTAD.numAllocationTlbWriteMissesFFL / numAllocsFFL));
 	fprintf (thrData.output, "allocation cache misses        %20lu    avg = %0.1lf\n", globalTAD.numAllocationCacheMissesFFL, (globalTAD.numAllocationCacheMissesFFL / numAllocsFFL));
 	fprintf (thrData.output, "num allocation instr           %20lu    avg = %0.1lf\n", globalTAD.numAllocationInstrsFFL, (globalTAD.numAllocationInstrsFFL / numAllocsFFL));
 	fprintf (thrData.output, "\n");
 
 	fprintf (thrData.output, "\n>>>>>>>>>>>>>>>     DEALLOCATIONS : total (average)     <<<<<<<<<<<<<<<\n");
 	fprintf (thrData.output, "deallocation cycles            %20lu    avg = %0.1lf\n", globalTAD.cycles_free, (globalTAD.cycles_free / numFrees));
-	fprintf (thrData.output, "deallocation faults            %20lu    avg = %0.1lf\n", globalTAD.numDeallocationFaults, (globalTAD.numDeallocationFaults / numFrees));
-	fprintf (thrData.output, "deallocation tlb read misses   %20lu    avg = %0.1lf\n", globalTAD.numDeallocationTlbReadMisses, (globalTAD.numDeallocationTlbReadMisses / numFrees));
-	fprintf (thrData.output, "deallocation tlb write misses  %20lu    avg = %0.1lf\n", globalTAD.numDeallocationTlbWriteMisses, (globalTAD.numDeallocationTlbWriteMisses / numFrees));
+//	fprintf (thrData.output, "deallocation faults            %20lu    avg = %0.1lf\n", globalTAD.numDeallocationFaults, (globalTAD.numDeallocationFaults / numFrees));
+//	fprintf (thrData.output, "deallocation tlb read misses   %20lu    avg = %0.1lf\n", globalTAD.numDeallocationTlbReadMisses, (globalTAD.numDeallocationTlbReadMisses / numFrees));
+//	fprintf (thrData.output, "deallocation tlb write misses  %20lu    avg = %0.1lf\n", globalTAD.numDeallocationTlbWriteMisses, (globalTAD.numDeallocationTlbWriteMisses / numFrees));
 	fprintf (thrData.output, "deallocation cache misses      %20lu    avg = %0.1lf\n", globalTAD.numDeallocationCacheMisses, (globalTAD.numDeallocationCacheMisses / numFrees));
 	fprintf (thrData.output, "num deallocation instr         %20lu    avg = %0.1lf\n", globalTAD.numDeallocationInstrs, (globalTAD.numDeallocationInstrs / numFrees));
 
@@ -1458,19 +1401,19 @@ void writeThreadMaps () {
 	fprintf (thrData.output, "num pthread spin trylocks      %20u\n", globalTAD.num_spin_trylocks);
 }
 
-void writeOverhead () {
-
-	fprintf (thrData.output, "\n-------------Overhead-------------\n");
-	for (auto o : overhead) {
-
-		auto key = o.getKey();
-		auto data = o.getData();
-		char size[10];
-		sprintf (size, "%zu", key);
-		fprintf (thrData.output, "classSize %s:\nmetadata %zu\nblowup %zu\nalignment %zu\n\n",
-				key ? size : "BumpPointer", data->getMetadata(), data->getBlowup(), data->getAlignment());
-	}
-}
+//void writeOverhead () {
+//
+//	fprintf (thrData.output, "\n-------------Overhead-------------\n");
+//	for (auto o : overhead) {
+//
+//		auto key = o.getKey();
+//		auto data = o.getData();
+//		char size[10];
+//		sprintf (size, "%zu", key);
+//		fprintf (thrData.output, "classSize %s:\nmetadata %zu\nblowup %zu\nalignment %zu\n\n",
+//				key ? size : "BumpPointer", data->getMetadata(), data->getBlowup(), data->getAlignment());
+//	}
+//}
 
 void writeContention () {
 
@@ -1484,41 +1427,41 @@ void writeContention () {
 		fflush(thrData.output);
 }
 
-void writeMappings () {
+//void writeMappings () {
+//
+//	int i = 0;
+//	fprintf (thrData.output, "\n------------mappings------------\n");
+//	for (auto r : mappings) {
+//		auto data = r.getData();
+//		fprintf (thrData.output,
+//				"Region[%d]: origin= %c, start= %#lx, end= %#lx, length= %zu, "
+//				"tid= %d, rw= %lu, allocations= %u\n",
+//				i, data->origin, data->start, data->end, data->length,
+//				data->tid, data->rw, data->allocations.load(relaxed));
+//		i++;
+//	}
+//}
 
-	int i = 0;
-	fprintf (thrData.output, "\n------------mappings------------\n");
-	for (auto r : mappings) {
-		auto data = r.getData();
-		fprintf (thrData.output,
-				"Region[%d]: origin= %c, start= %#lx, end= %#lx, length= %zu, "
-				"tid= %d, rw= %lu, allocations= %u\n",
-				i, data->origin, data->start, data->end, data->length,
-				data->tid, data->rw, data->allocations.load(relaxed));
-		i++;
-	}
-}
-
-void calculateMemOverhead () {
-
-	for (auto o : overhead) {
-
-		auto data = o.getData();
-		//alignment += data->getAlignment();
-		total_blowup += data->getBlowup();
-	}
-
-	// totalMemOverhead += alignment;
-	// totalMemOverhead += total_blowup;
-
-	// totalSizeAlloc = totalMemAllocated.load();
-	//Calculate metadata_overhead by using the per-object value
-	// uint64_t allocations = (num_malloc.load() + num_calloc.load() + num_realloc.load());
-	// metadata_overhead = (allocations * metadata_object);
-
-	// totalMemOverhead += metadata_overhead;
-	// memEfficiency = ((float) totalSizeAlloc / (totalSizeAlloc + totalMemOverhead)) * 100;
-}
+//void calculateMemOverhead () {
+//
+//	for (auto o : overhead) {
+//
+//		auto data = o.getData();
+//		//alignment += data->getAlignment();
+//		total_blowup += data->getBlowup();
+//	}
+//
+//	// totalMemOverhead += alignment;
+//	// totalMemOverhead += total_blowup;
+//
+//	// totalSizeAlloc = totalMemAllocated.load();
+//	//Calculate metadata_overhead by using the per-object value
+//	// uint64_t allocations = (num_malloc.load() + num_calloc.load() + num_realloc.load());
+//	// metadata_overhead = (allocations * metadata_object);
+//
+//	// totalMemOverhead += metadata_overhead;
+//	// memEfficiency = ((float) totalSizeAlloc / (totalSizeAlloc + totalMemOverhead)) * 100;
+//}
 
 /*
  * Returns the number of virtual pages that are backed by physical frames
@@ -1612,24 +1555,24 @@ inline bool isAllocatorInCallStack() {
 	return false;
 }
 
-bool mappingEditor (void* addr, size_t len, int prot) {
-
-	bool found = false;
-	for (auto mapping : mappings) {
-		auto tuple = mapping.getData();
-		uint64_t address = (uint64_t) addr;
-		if ((tuple->start <= address) && (address <= tuple->end)) {
-			found = true;
-			if (prot == (PROT_READ | PROT_WRITE)) {
-				tuple->rw += len;
-			}
-			else if (prot == PROT_NONE) {
-				tuple->rw -= len;
-			}
-		}
-	}
-	return found;
-}
+//bool mappingEditor (void* addr, size_t len, int prot) {
+//
+//	bool found = false;
+//	for (auto mapping : mappings) {
+//		auto tuple = mapping.getData();
+//		uint64_t address = (uint64_t) addr;
+//		if ((tuple->start <= address) && (address <= tuple->end)) {
+//			found = true;
+//			if (prot == (PROT_READ | PROT_WRITE)) {
+//				tuple->rw += len;
+//			}
+//			else if (prot == PROT_NONE) {
+//				tuple->rw -= len;
+//			}
+//		}
+//	}
+//	return found;
+//}
 
 void doBefore (allocation_metadata *metadata) {
     //fprintf(stderr, "Dobefore, %d, %d\n", metadata->size, metadata->type);
@@ -1647,6 +1590,7 @@ void doAfter (allocation_metadata *metadata) {
 void incrementGlobalMemoryAllocation(size_t size, size_t classsize) {
   __atomic_add_fetch(&mu.realMemoryUsage, size, __ATOMIC_RELAXED);
   __atomic_add_fetch(&mu.realAllocatedMemoryUsage, classsize, __ATOMIC_RELAXED);
+    ///Here
   MemoryWaste::recordMemory((uint64_t)mu.realAllocatedMemoryUsage);
 }
 
@@ -1710,14 +1654,13 @@ void checkGlobalMemoryUsage() {
   }
 }
 
-void incrementMemoryUsage(
-        size_t size, size_t new_touched_bytes, void * object) {
-		size_t classSize = 0;
-		if(bibop) {
-				classSize = getClassSizeFor(size);
-		} else {
-				classSize = malloc_usable_size(object);
-		}
+void incrementMemoryUsage(size_t size, size_t classSize, size_t new_touched_bytes, void * object) {
+//		size_t classSize = 0;
+//		if(bibop) {
+//				classSize = getClassSizeFor(size);
+//		} else {
+//				classSize = malloc_usable_size(object);
+//		}
 
 		current_tc->realMemoryUsage += size;
 		current_tc->realAllocatedMemoryUsage += classSize;
@@ -1745,17 +1688,17 @@ void incrementMemoryUsage(
 		}
 }
 
-void decrementMemoryUsage(void* addr) {
+void decrementMemoryUsage(size_t size, size_t classSize, void * addr) {
   if(addr == NULL) return;
   
-  unsigned classSize;
-  if(isLibc) {
-			classSize = malloc_usable_size(addr);
-  } else {
-			classSize = ShadowMemory::getPageClassSize(addr);
-	}
+  //unsigned classSize;
+//  if(isLibc) {
+//			classSize = malloc_usable_size(addr);
+//  } else {
+//			classSize = ShadowMemory::getPageClassSize(addr);
+//	}
 
-  size_t size = ShadowMemory::getObjectSize(addr);
+  //size_t size = ShadowMemory::getObjectSize(addr);
 	current_tc->realAllocatedMemoryUsage -= classSize;
 	current_tc->realMemoryUsage -= size;
 
@@ -1767,14 +1710,14 @@ void decrementMemoryUsage(void* addr) {
 
 void collectAllocMetaData(allocation_metadata *metadata) {
     //fprintf(stderr, "classSizeIndex = %d, reused = %d\n", metadata->classSizeIndex, metadata->reused);
-    if (!globalized) {
+    if (__builtin_expect(!globalized, true)) {
         if (!metadata->reused) {
             cycles_alloc += metadata->cycles;
             localTAD.cycles_alloc += metadata->cycles;
             localTAD.numAllocs++;
-            localTAD.numAllocationFaults += metadata->after.faults - metadata->before.faults;
-            localTAD.numAllocationTlbReadMisses += metadata->after.tlb_read_misses - metadata->before.tlb_read_misses;
-            localTAD.numAllocationTlbWriteMisses += metadata->after.tlb_write_misses - metadata->before.tlb_write_misses;
+//            localTAD.numAllocationFaults += metadata->after.faults - metadata->before.faults;
+//            localTAD.numAllocationTlbReadMisses += metadata->after.tlb_read_misses - metadata->before.tlb_read_misses;
+//            localTAD.numAllocationTlbWriteMisses += metadata->after.tlb_write_misses - metadata->before.tlb_write_misses;
             localTAD.numAllocationCacheMisses += metadata->after.cache_misses - metadata->before.cache_misses;
             localTAD.numAllocationInstrs += metadata->after.instructions - metadata->before.instructions;
             //localNumAllocsBySizes[metadata->classSizeIndex]++;
@@ -1782,9 +1725,9 @@ void collectAllocMetaData(allocation_metadata *metadata) {
             cycles_allocFFL += metadata->cycles;
             localTAD.cycles_allocFFL += metadata->cycles;
             localTAD.numAllocsFFL++;
-            localTAD.numAllocationFaultsFFL += metadata->after.faults - metadata->before.faults;
-            localTAD.numAllocationTlbReadMissesFFL += metadata->after.tlb_read_misses - metadata->before.tlb_read_misses;
-            localTAD.numAllocationTlbWriteMissesFFL += metadata->after.tlb_write_misses - metadata->before.tlb_write_misses;
+//            localTAD.numAllocationFaultsFFL += metadata->after.faults - metadata->before.faults;
+//            localTAD.numAllocationTlbReadMissesFFL += metadata->after.tlb_read_misses - metadata->before.tlb_read_misses;
+//            localTAD.numAllocationTlbWriteMissesFFL += metadata->after.tlb_write_misses - metadata->before.tlb_write_misses;
             localTAD.numAllocationCacheMissesFFL += metadata->after.cache_misses - metadata->before.cache_misses;
             localTAD.numAllocationInstrsFFL += metadata->after.instructions - metadata->before.instructions;
             //localNumAllocsFFLBySizes[metadata->classSizeIndex]++;
@@ -1795,9 +1738,9 @@ void collectAllocMetaData(allocation_metadata *metadata) {
             cycles_alloc += metadata->cycles;
             globalTAD.cycles_alloc += metadata->cycles;
             globalTAD.numAllocs++;
-            globalTAD.numAllocationFaults += metadata->after.faults - metadata->before.faults;
-            globalTAD.numAllocationTlbReadMisses += metadata->after.tlb_read_misses - metadata->before.tlb_read_misses;
-            globalTAD.numAllocationTlbWriteMisses += metadata->after.tlb_write_misses - metadata->before.tlb_write_misses;
+//            globalTAD.numAllocationFaults += metadata->after.faults - metadata->before.faults;
+//            globalTAD.numAllocationTlbReadMisses += metadata->after.tlb_read_misses - metadata->before.tlb_read_misses;
+//            globalTAD.numAllocationTlbWriteMisses += metadata->after.tlb_write_misses - metadata->before.tlb_write_misses;
             globalTAD.numAllocationCacheMisses += metadata->after.cache_misses - metadata->before.cache_misses;
             globalTAD.numAllocationInstrs += metadata->after.instructions - metadata->before.instructions;
             //globalNumAllocsBySizes[metadata->classSizeIndex]++;
@@ -1805,9 +1748,9 @@ void collectAllocMetaData(allocation_metadata *metadata) {
             cycles_allocFFL += metadata->cycles;
             globalTAD.cycles_allocFFL += metadata->cycles;
             globalTAD.numAllocsFFL++;
-            globalTAD.numAllocationFaultsFFL += metadata->after.faults - metadata->before.faults;
-            globalTAD.numAllocationTlbReadMissesFFL += metadata->after.tlb_read_misses - metadata->before.tlb_read_misses;
-            globalTAD.numAllocationTlbWriteMissesFFL += metadata->after.tlb_write_misses - metadata->before.tlb_write_misses;
+//            globalTAD.numAllocationFaultsFFL += metadata->after.faults - metadata->before.faults;
+//            globalTAD.numAllocationTlbReadMissesFFL += metadata->after.tlb_read_misses - metadata->before.tlb_read_misses;
+//            globalTAD.numAllocationTlbWriteMissesFFL += metadata->after.tlb_write_misses - metadata->before.tlb_write_misses;
             globalTAD.numAllocationCacheMissesFFL += metadata->after.cache_misses - metadata->before.cache_misses;
             globalTAD.numAllocationInstrsFFL += metadata->after.instructions - metadata->before.instructions;
             //globalNumAllocsFFLBySizes[metadata->classSizeIndex]++;
@@ -1815,29 +1758,29 @@ void collectAllocMetaData(allocation_metadata *metadata) {
         globalize_lck.unlock();
     }
 }
-
-void analyzePerfInfo(allocation_metadata *metadata) {
-	collectAllocMetaData(metadata);
-
-/*
-	// DEBUG BLOCK
-	if((metadata->after.instructions - metadata->before.instructions) != 0) {
-		fprintf(stderr, "Malloc from thread       %d\n"
-				"From free list:          %s\n"
-				"Num faults:              %ld\n"
-				"Num TLB read misses:     %ld\n"
-				"Num TLB write misses:    %ld\n"
-				"Num cache misses:        %ld\n"
-				"Num instructions:        %ld\n\n",
-				metadata->tid, metadata->reused ? "true" : "false",
-				metadata->after.faults - metadata->before.faults,
-				metadata->after.tlb_read_misses - metadata->before.tlb_read_misses,
-				metadata->after.tlb_write_misses - metadata->before.tlb_write_misses,
-				metadata->after.cache_misses - metadata->before.cache_misses,
-				metadata->after.instructions - metadata->before.instructions);
-	}
-*/
-}
+//
+//void analyzePerfInfo(allocation_metadata *metadata) {
+//	collectAllocMetaData(metadata);
+//
+///*
+//	// DEBUG BLOCK
+//	if((metadata->after.instructions - metadata->before.instructions) != 0) {
+//		fprintf(stderr, "Malloc from thread       %d\n"
+//				"From free list:          %s\n"
+//				"Num faults:              %ld\n"
+//				"Num TLB read misses:     %ld\n"
+//				"Num TLB write misses:    %ld\n"
+//				"Num cache misses:        %ld\n"
+//				"Num instructions:        %ld\n\n",
+//				metadata->tid, metadata->reused ? "true" : "false",
+//				metadata->after.faults - metadata->before.faults,
+//				metadata->after.tlb_read_misses - metadata->before.tlb_read_misses,
+//				metadata->after.tlb_write_misses - metadata->before.tlb_write_misses,
+//				metadata->after.cache_misses - metadata->before.cache_misses,
+//				metadata->after.instructions - metadata->before.instructions);
+//	}
+//*/
+//}
 
 void readAllocatorFile() {
 
@@ -1886,22 +1829,22 @@ void readAllocatorFile() {
 	myFree(buffer);
 }
 
-void initLocalFreeArray () {
-	if (bibop) {
-		localFreeArray = (unsigned*) myMalloc(num_class_sizes*sizeof(unsigned));
-	} else {
-		localFreeArray = (unsigned*) myMalloc(2*sizeof(unsigned));
-	}
-	localFreeArrayInitialized = true;
-}
+//void initLocalFreeArray () {
+//	if (bibop) {
+//		localFreeArray = (unsigned*) myMalloc(num_class_sizes*sizeof(unsigned));
+//	} else {
+//		localFreeArray = (unsigned*) myMalloc(2*sizeof(unsigned));
+//	}
+//	localFreeArrayInitialized = true;
+//}
 
-void initGlobalFreeArray () {
-	if (bibop) {
-		globalFreeArray = (std::atomic<unsigned>*) myMalloc(num_class_sizes*sizeof(unsigned));
-	} else {
-		globalFreeArray = (std::atomic<unsigned>*) myMalloc(2*sizeof(unsigned));
-	}
-}
+//void initGlobalFreeArray () {
+//	if (bibop) {
+//		globalFreeArray = (std::atomic<unsigned>*) myMalloc(num_class_sizes*sizeof(unsigned));
+//	} else {
+//		globalFreeArray = (std::atomic<unsigned>*) myMalloc(2*sizeof(unsigned));
+//	}
+//}
 
 //void initLocalNumAllocsBySizes () {
 //    if (bibop) {
@@ -2021,201 +1964,201 @@ void initMyLocalMem() {
 	myLocalMemInitialized = true;
 }
 
-void sampleMemoryOverhead(int i, siginfo_t* s, void* p) {
+//void sampleMemoryOverhead(int i, siginfo_t* s, void* p) {
+//
+//	size_t alignBytes = alignment_bytes.load();
+//	size_t blowupBytes = blowup_bytes.load();
+//
+//	/*
+//	if (timer_settime(smap_timer, 0, &stopTimer, NULL) == -1) {
+//		perror("timer_settime failed");
+//		abort();
+//	}
+//	*/
+//
+//	uint64_t startTime = rdtscp();
+//	smap_samples++;
+//	int numSmapEntries = 0;
+//	int numSkips = 0;
+//	int numHeapMatches = 0;
+//	bool dontCheck = false;
+//	bool isStack = false;
+//	void* start;
+//	void* end;
+//	unsigned kb = 0;
+//	smapsDontCheckIndex = 0;
+//	char stack[] = "stack";
+//
+//	currentCaseOverhead.kb = 0;
+//	currentCaseOverhead.efficiency = 0;
+//
+//	fseek(smaps_infile, 0, SEEK_SET);
+//
+//	while ((getline(&smaps_buffer, &smaps_bufferSize, smaps_infile)) > 0) {
+//
+//		dontCheck = false;
+//		numSmapEntries++;
+//		if (strstr(smaps_buffer, (const char*)&stack) != NULL) isStack = true;
+//
+//		//Get addresses
+//		sscanf(smaps_buffer, "%p-%p", &start, &end);
+//
+//		SMapEntry* entry;
+//		short index = smapsDontCheckIndex;
+//
+//		//Compare against smapsDontCheck
+//		while (index < smapsDontCheckNumEntries) {
+//
+//			entry = smapsDontCheck[index];
+//
+//			//If it's in smapsDontCheck, skip to next entry in smaps
+//			if (start == entry->start) {
+//				dontCheck = true;
+//				numSkips++;
+//				smapsDontCheckIndex++;
+//				for (int j = 0; j < 15; j++)
+//					getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
+//				break;
+//			}
+//			index++;
+//		}
+//
+//		if (dontCheck) continue;
+//
+//		bool match = false;
+//
+//		if (isStack) {
+//			for (int j = 0; j < 2; j++)
+//				getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
+//
+//			//Grab RSS
+//			sscanf(smaps_buffer, "Rss:%u", &kb);
+//
+//			//This is a heap segment
+//			currentCaseOverhead.kb += kb;
+//			numHeapMatches++;
+//			match = true;
+//			goto skipSearchMappings;
+//		}
+//
+//		//Compare against known heaps
+//		for (auto entry : mappings) {
+//			auto data = entry.getData();
+//			if ((data->start >= (uint64_t)start) && (data->start <= (uint64_t)end)) {
+//				//Skip two lines
+//				for (int j = 0; j < 2; j++)
+//					getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
+//
+//				//Grab RSS
+//				sscanf(smaps_buffer, "Rss:%u", &kb);
+//
+//				//This is a heap segment
+//				currentCaseOverhead.kb += kb;
+//				numHeapMatches++;
+//				match = true;
+//				break;
+//			}
+//			else continue;
+//		}
+//
+//		skipSearchMappings:
+//		if (match) {
+//			for (int j = 0; j < 13; j++)
+//				getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
+//			continue;
+//		}
+//		else {
+//			//This is an unknown entry, skip it
+//			for (int j = 0; j < 15; j++)
+//				getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
+//		}
+//	}
+//
+//	//Get current efficiency
+//	uint64_t bytes = currentCaseOverhead.kb*1024;
+//	double e = ((bytes - blowupBytes - alignBytes) / (float)bytes);
+//
+//	//Compare to current worst case
+//	if (!(e >= 1) && e < worstCaseOverhead.efficiency) {
+//		worstCaseOverhead.kb = bytes;
+//		worstCaseOverhead.alignment = alignBytes;
+//		worstCaseOverhead.blowup = blowupBytes;
+//		worstCaseOverhead.efficiency = e;
+//	}
+//	uint64_t endTime = rdtscp();
+//
+//	smap_sample_cycles += (endTime - startTime);
+//
+//	/*
+//	fprintf(stderr, "leaving sample, %d smap entries\n"
+//	                "bytes= %lu, blowup= %zu, alignment= %zu\n"
+//	                "skips= %d, hits= %d, cycles: %lu\nefficiency= %.5f\n",
+//	                numSmapEntries, bytes, blowupBytes, alignBytes,
+//	                numSkips, numHeapMatches, (endTime-startTime), e);
+//	*/
+//
+//	/*
+//	if (timer_settime(smap_timer, 0, &resumeTimer, NULL) == -1) {
+//		perror("timer_settime failed");
+//		abort();
+//	}
+//	*/
+//}
 
-	size_t alignBytes = alignment_bytes.load();
-	size_t blowupBytes = blowup_bytes.load();
-
-	/*
-	if (timer_settime(smap_timer, 0, &stopTimer, NULL) == -1) {
-		perror("timer_settime failed");
-		abort();
-	}
-	*/
-
-	uint64_t startTime = rdtscp();
-	smap_samples++;
-	int numSmapEntries = 0;
-	int numSkips = 0;
-	int numHeapMatches = 0;
-	bool dontCheck = false;
-	bool isStack = false;
-	void* start;
-	void* end;
-	unsigned kb = 0;
-	smapsDontCheckIndex = 0;
-	char stack[] = "stack";
-
-	currentCaseOverhead.kb = 0;
-	currentCaseOverhead.efficiency = 0;
-
-	fseek(smaps_infile, 0, SEEK_SET);
-
-	while ((getline(&smaps_buffer, &smaps_bufferSize, smaps_infile)) > 0) {
-
-		dontCheck = false;
-		numSmapEntries++;
-		if (strstr(smaps_buffer, (const char*)&stack) != NULL) isStack = true;
-
-		//Get addresses
-		sscanf(smaps_buffer, "%p-%p", &start, &end);
-
-		SMapEntry* entry;
-		short index = smapsDontCheckIndex;
-
-		//Compare against smapsDontCheck
-		while (index < smapsDontCheckNumEntries) {
-
-			entry = smapsDontCheck[index];
-
-			//If it's in smapsDontCheck, skip to next entry in smaps
-			if (start == entry->start) {
-				dontCheck = true;
-				numSkips++;
-				smapsDontCheckIndex++;
-				for (int j = 0; j < 15; j++)
-					getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
-				break;
-			}
-			index++;
-		}
-
-		if (dontCheck) continue;
-
-		bool match = false;
-
-		if (isStack) {
-			for (int j = 0; j < 2; j++)
-				getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
-
-			//Grab RSS
-			sscanf(smaps_buffer, "Rss:%u", &kb);
-
-			//This is a heap segment
-			currentCaseOverhead.kb += kb;
-			numHeapMatches++;
-			match = true;
-			goto skipSearchMappings;
-		}
-
-		//Compare against known heaps
-		for (auto entry : mappings) {
-			auto data = entry.getData();
-			if ((data->start >= (uint64_t)start) && (data->start <= (uint64_t)end)) {
-				//Skip two lines
-				for (int j = 0; j < 2; j++)
-					getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
-
-				//Grab RSS
-				sscanf(smaps_buffer, "Rss:%u", &kb);
-
-				//This is a heap segment
-				currentCaseOverhead.kb += kb;
-				numHeapMatches++;
-				match = true;
-				break;
-			}
-			else continue;
-		}
-
-		skipSearchMappings:
-		if (match) {
-			for (int j = 0; j < 13; j++)
-				getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
-			continue;
-		}
-		else {
-			//This is an unknown entry, skip it
-			for (int j = 0; j < 15; j++)
-				getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
-		}
-	}
-
-	//Get current efficiency
-	uint64_t bytes = currentCaseOverhead.kb*1024;
-	double e = ((bytes - blowupBytes - alignBytes) / (float)bytes);
-
-	//Compare to current worst case
-	if (!(e >= 1) && e < worstCaseOverhead.efficiency) {
-		worstCaseOverhead.kb = bytes;
-		worstCaseOverhead.alignment = alignBytes;
-		worstCaseOverhead.blowup = blowupBytes;
-		worstCaseOverhead.efficiency = e;
-	}
-	uint64_t endTime = rdtscp();
-
-	smap_sample_cycles += (endTime - startTime);
-
-	/*
-	fprintf(stderr, "leaving sample, %d smap entries\n"
-	                "bytes= %lu, blowup= %zu, alignment= %zu\n"
-	                "skips= %d, hits= %d, cycles: %lu\nefficiency= %.5f\n",
-	                numSmapEntries, bytes, blowupBytes, alignBytes,
-	                numSkips, numHeapMatches, (endTime-startTime), e);
-	*/
-
-	/*
-	if (timer_settime(smap_timer, 0, &resumeTimer, NULL) == -1) {
-		perror("timer_settime failed");
-		abort();
-	}
-	*/
-}
-
-void start_smaps() {
-
-	bool debug = false;
-	if (debug) fprintf(stderr, "Reading smaps on startup, pid %d\n", pid);
-	void* start;
-	void* end;
-	unsigned kb;
-	char heap[] = "heap";
-	bool keep = false;
-
-	if ((smaps_infile = fopen (smaps_fileName, "r")) == NULL) {
-		fprintf(stderr, "failed to open smaps\n");
-		return;
-	}
-
-	while ((getline(&smaps_buffer, &smaps_bufferSize, smaps_infile)) > 0) {
-		keep = false;
-		if (strstr(smaps_buffer, (const char*)&heap) != NULL) {
-			keep = true;
-		}
-		sscanf(smaps_buffer, "%p-%p", &start, &end);
-		if (keep) mappings.insert((uint64_t)start, (newMmapTuple((uint64_t)start, 0, PROT_READ | PROT_WRITE, 'a')));
-
-		//Skip next line
-		getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
-
-		getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
-		sscanf(smaps_buffer, "%*s%u", &kb);
-
-		//Skip next 13 Lines
-		for (int i = 0; i < 13; i++)
-			getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
-
-		SMapEntry* entry = newSMapEntry();
-		entry->start = start;
-		entry->end = end;
-		entry->kb = kb;
-		if (!keep) {
-			smapsDontCheck[smapsDontCheckIndex] = entry;
-			smapsDontCheckIndex++;
-		}
-	}
-
-	smapsDontCheckNumEntries = smapsDontCheckIndex;
-	smapsDontCheckIndex = 0;
-
-	if (debug) for (int i = 0; i < smapsDontCheckNumEntries; i++) {
-		fprintf(stderr, "\nSMAP ENTRIES\n");
-		fprintf(stderr, "[%d]->start   %p\n", i, smapsDontCheck[i]->start);
-		fprintf(stderr, "[%d]->end     %p\n", i, smapsDontCheck[i]->end);
-		fprintf(stderr, "[%d]->kb      %u\n", i, smapsDontCheck[i]->kb);
-	}
-//	fclose(smaps_infile);
-}
+//void start_smaps() {
+//
+//	bool debug = false;
+//	if (debug) fprintf(stderr, "Reading smaps on startup, pid %d\n", pid);
+//	void* start;
+//	void* end;
+//	unsigned kb;
+//	char heap[] = "heap";
+//	bool keep = false;
+//
+//	if ((smaps_infile = fopen (smaps_fileName, "r")) == NULL) {
+//		fprintf(stderr, "failed to open smaps\n");
+//		return;
+//	}
+//
+//	while ((getline(&smaps_buffer, &smaps_bufferSize, smaps_infile)) > 0) {
+//		keep = false;
+//		if (strstr(smaps_buffer, (const char*)&heap) != NULL) {
+//			keep = true;
+//		}
+//		sscanf(smaps_buffer, "%p-%p", &start, &end);
+//		//if (keep) mappings.insert((uint64_t)start, (newMmapTuple((uint64_t)start, 0, PROT_READ | PROT_WRITE, 'a')));
+//
+//		//Skip next line
+//		getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
+//
+//		getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
+//		sscanf(smaps_buffer, "%*s%u", &kb);
+//
+//		//Skip next 13 Lines
+//		for (int i = 0; i < 13; i++)
+//			getline(&smaps_buffer, &smaps_bufferSize, smaps_infile);
+//
+//		SMapEntry* entry = newSMapEntry();
+//		entry->start = start;
+//		entry->end = end;
+//		entry->kb = kb;
+//		if (!keep) {
+//			smapsDontCheck[smapsDontCheckIndex] = entry;
+//			smapsDontCheckIndex++;
+//		}
+//	}
+//
+//	smapsDontCheckNumEntries = smapsDontCheckIndex;
+//	smapsDontCheckIndex = 0;
+//
+//	if (debug) for (int i = 0; i < smapsDontCheckNumEntries; i++) {
+//		fprintf(stderr, "\nSMAP ENTRIES\n");
+//		fprintf(stderr, "[%d]->start   %p\n", i, smapsDontCheck[i]->start);
+//		fprintf(stderr, "[%d]->end     %p\n", i, smapsDontCheck[i]->end);
+//		fprintf(stderr, "[%d]->kb      %u\n", i, smapsDontCheck[i]->kb);
+//	}
+////	fclose(smaps_infile);
+//}
 
 SMapEntry* newSMapEntry() {
 		SMapEntry* chaka;
@@ -2226,34 +2169,34 @@ SMapEntry* newSMapEntry() {
 		return chaka;
 }
 
-void setupSignalHandler() {
-		struct sigaction sa;
-		sa.sa_flags = SA_SIGINFO;
-		sigemptyset(&sa.sa_mask);
-		sigaddset(&sa.sa_mask, SIGIO);
-		sa.sa_sigaction = sampleMemoryOverhead;
-		if (sigaction(SIGRTMIN, &sa, NULL) == -1) {
-				perror("sigaction(SIGRTMIN, &sa, NULL) failed.");
-				abort();
-		}
-}
+//void setupSignalHandler() {
+//		struct sigaction sa;
+//		sa.sa_flags = SA_SIGINFO;
+//		sigemptyset(&sa.sa_mask);
+//		sigaddset(&sa.sa_mask, SIGIO);
+//		sa.sa_sigaction = sampleMemoryOverhead;
+//		if (sigaction(SIGRTMIN, &sa, NULL) == -1) {
+//				perror("sigaction(SIGRTMIN, &sa, NULL) failed.");
+//				abort();
+//		}
+//}
 
-void startSignalTimer() {
-		struct sigevent event;
-		event.sigev_notify = SIGEV_THREAD_ID;
-		event._sigev_un._tid = gettid();
-		event.sigev_signo = SIGRTMIN;
-
-		if (timer_create(CLOCK_MONOTONIC, &event, &smap_timer) == -1) {
-				perror("timer_create failed");
-				abort();
-		}
-
-		if (timer_settime(smap_timer, 0, &resumeTimer, NULL) == -1) {
-				perror("timer_settime failed");
-				abort();
-		}
-}
+//void startSignalTimer() {
+//		struct sigevent event;
+//		event.sigev_notify = SIGEV_THREAD_ID;
+//		event._sigev_un._tid = gettid();
+//		event.sigev_signo = SIGRTMIN;
+//
+//		if (timer_create(CLOCK_MONOTONIC, &event, &smap_timer) == -1) {
+//				perror("timer_create failed");
+//				abort();
+//		}
+//
+//		if (timer_settime(smap_timer, 0, &resumeTimer, NULL) == -1) {
+//				perror("timer_settime failed");
+//				abort();
+//		}
+//}
 
 pid_t gettid() {
     return syscall(__NR_gettid);
@@ -2315,16 +2258,19 @@ const char * LockTypeToString(LockType type) {
 		switch(type) {
 				case MUTEX:
 					return "mutex";
-					break;
+
 				case SPINLOCK:
 					return "spinlock";
-					break;
+
 				case TRYLOCK:
 					return "trylock";
-					break;
+
 				case SPIN_TRYLOCK:
 					return "spin_trylock";
-					break;
+
+		    case NOLOCK:
+		        return "nolock";
+
 				default:
 					return "unknown";
 		}
