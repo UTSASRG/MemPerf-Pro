@@ -1,156 +1,64 @@
-% \documentclass[10pt,preprint,nocopyrightspace]{sigplanconf}
-% \documentclass{acm_proc_article-sp}
+\documentclass[acmsmall,review,anonymous]{acmart}
+\settopmatter{printfolios=true,printccs=false,printacmref=false}
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\documentclass[preprint,10pt]{sigplanconf}
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% Load basic packages
+\usepackage{times}
+\usepackage{datetime}
 \usepackage{balance}  % to better equalize the last page
-\usepackage{graphics} % for EPS, load graphicx instead 
-%\usepackage[T1]{fontenc}
+\usepackage{graphics} % for EPS, load graphicx instead
+\usepackage{url}
+\usepackage{hyperref}
 \usepackage{txfonts}
-\usepackage{pslatex}    % comment if you want LaTeX's default font
-%\usepackage[pdftex]{hyperref}
-\usepackage{dingbat}
-% \usepackage{url}      % llt: nicely formatted URLs
-\usepackage{color}
-\usepackage{textcomp}
-\usepackage{booktabs}
-\usepackage{ccicons}
-\usepackage{subfigure}
-\usepackage{authblk}
-\usepackage[shortlabels]{enumitem}
-%\usepackage{todonotes}
-\usepackage[hyphens]{url}
-\usepackage[draft]{hyperref}
+\usepackage{pslatex}    
 \usepackage{pifont}
-\newcommand{\numcircled}[1]{\ding{\numexpr191+#1\relax}}
+%\usepackage{bbding}
 \usepackage{multirow}
-\usepackage{comment} 
-\usepackage{listings}
+\usepackage{makecell}
+\usepackage[justification=centering]{caption}
 \usepackage{xspace}
-\usepackage{fourier}
-
+\usepackage{comment}
+\usepackage{listings}
+%\usepackage[section]{placeins}
 \usepackage{tikz}
 \usepackage{calc}
-\def\checkmark{\tikz\fill[scale=0.4](0,.35) -- (.25,0) -- (1,.7) -- (.25,.15) -- cycle;} 
-\def\scalecheck{\resizebox{\widthof{\checkmark}*\ratio{\widthof{x}}{\widthof{\normalsize x}}}{!}{\checkmark}}
-
-%that'
-% llt: Define a global style for URLs, rather that the default one
-\makeatletter
-\def\url@leostyle{%
-  \@ifundefined{selectfont}{\def\UrlFont{\sf}}{\def\UrlFont{\small\bf\ttfamily}}}
-\makeatother
-\urlstyle{leo}
-
-% To make various LaTeX processors do the right thing with page size.
-\def\pprw{8.5in}
-\def\pprh{11in}
-\special{papersize=\pprw,\pprh}
-\setlength{\paperwidth}{\pprw}
-\setlength{\paperheight}{\pprh}
-\setlength{\pdfpagewidth}{\pprw}
-\setlength{\pdfpageheight}{\pprh}
-\def \theequation {\arabic{equation}}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Useful reviewing/feedback annotations
-%\input{annotations}
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
+\usepackage{fancyvrb}
 \usepackage{xcolor}
+\usepackage{flushend}
+\usepackage{wrapfig}
 
+\newcommand{\cmark}{\ding{51}}%
+\newcommand{\xmark}{\ding{55}}%
+
+\newcommand{\eurosyssubmissionnumber}{\#147, 12 pages}
 \newcommand{\todo}[1]{{\color{red}\bfseries [[#1]]}}
-\newcommand{\alam}[1]{{\color{red}\bfseries [[#1]]}}
 \newcommand{\TP}[1]{{\color{red}\bfseries [[#1]]}}
-\newcommand{\AM}[1]{{\color{red}\bfseries [[#1]]}}
-\newcommand{\rpm}{\raisebox{.2ex}{$\scriptstyle\pm$}}
 
-% create a shortcut to typeset table headings
-% \newcommand\tabhead[1]{\small\textbf{#1}}
-
-\newcommand{\permitbreak}{\discretionary{}{}{}}
-\DeclareMathAlphabet{\mathcal}{OMS}{cmsy}{m}{n}
-\SetMathAlphabet{\mathcal}{bold}{OMS}{cmsy}{b}{n}
-\newcommand{\bigO}{\mathcal{O}}
-
-% Make sure hyperref comes last of your loaded packages, to give it a
-% fighting chance of not being over-written, since its job is to
-% redefine many LaTeX commands.
-\definecolor{linkColor}{RGB}{6,125,233}
-\hypersetup{%
-  pdftitle={Syncperf},
-  pdfauthor={},
-  pdfkeywords={},
-  bookmarksnumbered,
-  pdfstartview={FitH},
-  colorlinks,
-  citecolor=black,
-  filecolor=black,
-  linkcolor=black,
-  urlcolor=linkColor,
-  breaklinks=true,
-}
-
-\newcommand{\spaceneedle}{\raisebox{3pt}{\includegraphics[width=6pt]{spaceneedle}}}
-\newcommand{\mass}{\raisebox{5pt}{\includegraphics[width=8pt]{mass}}}
-\newcommand{\texas}{\raisebox{5pt}{\includegraphics[width=8pt]{texas-orange}}}
-\newcommand{\maple}{\raisebox{4pt}{\includegraphics[width=5.5pt]{maple}}}
-
-\newcommand{\punt}[1]{}
-
-\newcommand{\MallocProfiler}{{\texttt{mmprof}}}
-\newcommand{\MP}{{\texttt{mmprof}}}
-\newcommand{\Heapperf}{{\texttt{mmprof}}}
-\newcommand{\pthread}{\texttt{pthread}}
-\newcommand{\pthreads}{\texttt{pthreads}}
 \newcommand{\specialcell}[2][c]{%
   \begin{tabular}[#1]{@{}c@{}}#2\end{tabular}}
-
-%\newcommand{\specificthanks}[1]{\@fnsymbol{#1}}
-
-% \newcommand{\todox}[1]{\textcolor{red}{TODO: {#1}}}
-
-\definecolor{lightgray}{rgb}{.9,.9,.9}
-\definecolor{darkgray}{rgb}{.4,.4,.4}
-\definecolor{purple}{rgb}{0.65, 0.12, 0.82}
+\newcommand{\OB}{\texttt{OpenBSD}}
+\newcommand{\DieHarder}{\texttt{DieHarder}}
+\newcommand{\DL}{\texttt{DLmalloc}}
+\newcommand{\JE}{\texttt{jemalloc}}
+\newcommand{\MP}{\texttt{mmprof}}
 
 
-
-\makeatletter
-\let\@copyrightspace\relax
-\makeatletter
 
 \begin{document}
 
-\special{papersize=8.5in,11in}
-\setlength{\pdfpageheight}{\paperheight}
-\setlength{\pdfpagewidth}{\paperwidth}
-
 \title{mmprof: A General Profiler for Different Memory Allocators}
+\author{Anonymous}
 
-\authorinfo{}
-%\date{}
-
-% Guangming Zeng will be one of the authors. 
+\input{abstract}
 
 \maketitle
 
-\subsection*{Abstract}
-\input{abstract}
-
-%\category{D.1.3}{Programming Techniques}{Concurrent Programming--Parallel Programming} \category{D.2.5}{Software Engineering}{Testing and Debugging--Debugging Aids, Monitors, Tracing}\category{D.3.4}{Programming Languages}{Run-time environments}
-
-\keywords
-Performance, Synchronization, Multithreaded Programs, Profiling, Instrumentation
+\keywords{
+Performance, Synchronization, Multithreaded Programs, Profiling, Instrumentation}
 
 
 %\input{outline}
 \input{introduction}
-\input{perfimpact}
-\input{overview}
+\input{background}
+\input{basicidea}
 \input{implementation}
 \input{evaluation}
 \input{relatedwork}

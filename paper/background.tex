@@ -1,0 +1,52 @@
+\section{Background}
+
+This section presents the background of memory allocators, and important factors of allocators. 
+
+\subsection{Memory Allocators}
+
+\label{sec:allocator}
+Memory allocators are typically responsible for managing virtual memory inside the user space by satisfying memory requests from applications. Typically, the number of requests for small objects is significantly larger than the number for big objects. Therefore, most allocators utilize different mechanisms to manage ``small'' and ``big'' objects. For big objects, allocators may obtain a block of memory from the OS directly during the allocation, and then return it to the OS upon the deallocation~\cite{Hoard}. For small objects,  allocators may utilize freelists to track freed objects upon deallocations. In order to reduce external fragmentation and encourage memory utilization, memory blocks are managed by size classes, and every allocation will be rounded to its next largest size class.  
+
+Based on the management of small objects, allocators can be further classified into multiple types, such as sequential, BiBOP, and region-based allocators~\cite{DieHarder, Gay:1998:MME:277650.277748}. Region-based allocators are suitable for special situations where all allocated objects within the same region can be deallocated at once~\cite{Gay:1998:MME:277650.277748}, which does not belong to general allocators. Therefore, \MP{} mainly focuses on the other two types of allocators. 
+
+For sequential allocators, subsequent memory allocations are satisfied in the continuous memory area. Typically, a pointer is utilized to track the starting position of available space~\cite{Cling}. After an allocation, the pointer is bumped to the end of the current object to satisfy the subsequent allocations, which is also called as \texttt{bump allocators}. For such allocators, objects with different sizes can be placed continuously. Upon deallocations, freed objects are typically placed into different free lists based on their size classes. In order to get the size information, these allocators typically place the size information just before actual objects. Examples of this type include the Linux allocator (originating from dlmalloc~\cite{dlmalloc}) and Windows allocator~\cite{DieHarder}.  
+
+BiBOP stands for ''Big Bag of Pages''~\cite{hanson1980}. For BiBOP-style allocators, one or multiple continuous pages are treated as a ``bag'', holding objects with the same size class. The metadata of heap objects, such as its size and availability information, is typically stored in a separate area. Thus, BIBOP-style allocators improve the security and reliability, by avoiding metadata corruption caused by buffer overflows. Many performance-oriented allocators, such as TCMalloc~\cite{TCMalloc}, \texttt{jemalloc}~\cite{jemalloc}, Hord~\cite{Hoard}, Scalloc~\cite{Scalloc}, and most secure allocators, such as OpenBSD~\cite{OpenBSD} and DieHarder~\cite{DieHarder}, belong to this type. BiBOP allocators may utilize free lists or bitmaps to manage the availability of objects. When using the bitmap, only one bit is sufficient to track the availability of an object, which may impose less memory overhead for the metadata but with possibly a higher performance overhead.  
+
+
+\subsection{Important Factors of Memory Allocators}
+
+\label{sec:factors}
+
+Memory allocators have their design choices with respect to the performance, scalability, and memory consumption. In this Section, we describe some common factors for designing a well-performed allocator with low memory overhead, which consists of the basis for \MP{}'s design. In this paper, we focus on allocators for the uniform-memory access (UMA) architecture and allocators supporting multi-threaded applications. 
+
+%\MP{} aims to identify particular design/implement issues of a memory allocator supporting multi-threaded applications.  
+
+\subsubsection{Performance}
+\label{sec:performance}
+
+The performance with different allocators depends on two aspects: the performance overhead of memory management itself, and the friendliness to a specific application. 
+
+Memory management overhead mainly includes the allocation and deallocation overhead, which could be measured by the runtime for each allocation and deallocation. The most direct reasons for the runtime is the number of instructions and the contention, where the contention is further described in Section~\ref{sec:scalability}. In addition, hardware events (e.g., cache misses and TLB misses), or OS-related events(e.g., page faults), may also significantly affect the runtime of each allocation and deallocation. Based on our evaluation, the DieHarder allocator traverses all possible bags to place a freed object back, causing up to 10$\times$ slowdown. %\todo{Maybe we could show the per-deallocation overhead of DieHarder to other allocators}.    
+
+Application friendliness indicates whether allocations could actually benefit or worse the performance of applications. Based on our understanding, multiple factors, such as cache utilization rate, page utilization rate, and false sharing effect, will significantly impact the performance (and therefore should be measured). Cache utilization rate is the percentage of each cache line that are holding the actual data. For instance, an allocator with a low cache utilization rate may lead to more cache misses, since more cache lines are required to hold the same amount of data. Due to this reason, it could further introduce more page faults and more TLB misses. 
+
+\subsubsection{Scalability} 
+\label{sec:scalability}
+
+The scalability of an allocator can be affected by both hardware and software contention. Hardware contention is mostly related to cache contention, which has been discussed above. Software contention includes user space contention and kernel contention. 
+
+Modern allocators supporting multithreaded applications typically utilize multiple arenas~\cite{dlmalloc} or per-thread heaps~\cite{Hoard}, in order to reduce user space contention. For instance, allocations will be satisfied from per-thread heaps and deallocations will be placed into per-thread freelists, without requiring a lock~\cite{TcMalloc, jemalloc}. In order to reduce memory blowup caused by multiple heaps~\cite{Hoard}, allocators also maintain a central heap to balance the memory usage: when the number of freed objects in a per-thread heap is larger than a threshold, objects will be moved to a central heap; when a per-thread heap is running out of memory, it obtains freed objects from the central heap before obtaining from the OS directly. However, using the central heap may introduce lock contention, impacting the scalability.  
+
+ 
+ Allocators may introduce kernel contention by invoking memory-related system calls, such as \texttt{mmap}, \texttt{munmap}, \texttt{madvise}, \texttt{mprotect}. These system calls will be  conflicted with each other and with the page fault handler.  In Linux, these system calls will acquire a per-process lock when manipulating the page table or virtual memory, which is also required for the page fault handler. During our experiments, we have discovered that one version of Linux kernel slows down an application by more than 40\% due to extensive invocations of system calls. Therefore, it is also important to measure the kernel space contention for memory allocators.
+ 
+\subsubsection{Memory Consumption}
+
+Memory consumption is a very important factor to evaluate a memory allocator. Memory consumption will come from multiple aspects. First, it may come from the metadata consumption. Allocators like the Linux allocator may use multiple words to manage each object, while a BiBOP allocator may only use one bit for each object. Second, it may come from the internal fragmentation caused by using coarse-grained size classes. For instance, Hoard manage objects with power-of-2 sizes, which may waste the memory if the required size is less than its class size. Third, memory allocators may come from \textit{memory blowup}, when objects freed by one thread cannot be utilized by a different thread. The memory blowup is the most serious factor of memory consumption, based on our evaluation. 
+
+%Almost all allocators manage heap objects by size classes, instead of using exact sizes, but with different size classes: some only support power-of-2 sizes, such as Hoard~\cite{Hoard}, DieHarder~\cite{DieHarder} or the OpenBSD allocator~\cite{OpenBSD}, while some utilize more fine-grained size classes, such as TcMalloc~\cite{TCMalloc} and jemalloc~\cite{jemalloc}. For each allocation request, the allocator will round up the requested size to the nearest size class. Upon each deallocation, the deallocated object will be threaded into the corresponding free list (for the freelist design) or the corresponded bit will be cleared (for the bitmap design). Although size classes reduce the external fragmentation, they may introduce \textit{internal fragmentation}, wasting the space between the actual allocated size and the size class. 
+
+
+
+
