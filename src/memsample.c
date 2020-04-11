@@ -47,144 +47,31 @@ inline int create_perf_event(perf_event_attr * attr, int group) {
 	int fd = perf_event_open(attr, 0, -1, group, 0);
 	if(fd == -1) {
 		fprintf(stderr, "Failed to open perf event %s\n", strerror(errno));
-    while(1) { ; }
-  abort();
+        abort();
 	}
 	return fd;
 }
 
 //get data from PMU and store it into the PerfReadInfo struct
 void getPerfCounts (PerfReadInfo * i, bool enableCounters) {
-	#ifdef NO_PMU
-	#warning NO_PMU flag set -> sampling will be disabled
-	return;
-	#endif
+#ifdef NO_PMU
+#warning NO_PMU flag set -> sampling will be disabled
+    return;
+#endif
 
-	if(!isCountingInit) {
-			return;
-	}
+    if (!isCountingInit) {
+        return;
+    }
 
-//	if(enableCounters) {
-////        ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_RESET, 0);
-////        ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_RESET, 0);
-////        ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_RESET, 0);
-//
-////        ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_RESET, 0);
-////        ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_RESET, 0);
-//
-////        ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_ENABLE, 0);
-////        ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_ENABLE, 0);
-////        ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_ENABLE, 0);
-//
-////        ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_ENABLE, 0);
-////        ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_ENABLE, 0);
-//        return;
-//	}
+    struct read_format buffer;
 
-	struct read_format buffer;
-
-
-	if(read(perfInfo.perf_fd_cache_miss, &buffer, sizeof(struct read_format)) == -1) {
-				perror("perf read failed");
-	}
-
-	/*
-	#warning DEBUG CHECK FOR NEGATIVE PMU COUNTERS IN USE
-	thread_local static int bad_occurrences = 0;
-	thread_local static int good_occurrences = 0;
-	if(((int64_t)i->faults < 0) ||
-					((int64_t)i->tlb_read_misses < 0) ||
-					((int64_t)i->tlb_write_misses < 0) ||
-					((int64_t)i->cache_misses < 0) ||
-					((int64_t)i->instructions < 0)) {
-			fprintf(stderr, "negative PMU counter encountered (tid=%d, good=%d, bad=%d)\n", gettid(), good_occurrences, bad_occurrences);
-			fprintf(stderr, "   faults=%ld, tlb_readm=%ld, tlb_writem=%ld, cachem=%ld, instr=%ld\n", 
-							(int64_t)i->faults, (int64_t)i->tlb_read_misses,
-							(int64_t)i->tlb_write_misses, 
-							(int64_t)i->cache_misses, (int64_t)i->instructions);
-			bad_occurrences++;
-	} else {
-			good_occurrences++;
-	}
-	*/
-
-	// From experimental data, approximately 0.1% to 2.7% of these calls will
-	// result in a negative value (i.e., a very large unsigned value). The
-    // following block checks for this condition and eliminates this count,
-    // effectively pretending the read never happened, as the counter will
-    // not be contributed to the total count.
-    /*
-    int64_t faults = (int64_t)i->faults;
-    int64_t tlb_read_misses = (int64_t)i->tlb_read_misses;
-    int64_t tlb_write_misses = (int64_t)i->tlb_write_misses;
-    int64_t cache_misses = (int64_t)i->cache_misses;
-    int64_t instructions = (int64_t)i->instructions;
-    */
+    if (read(perfInfo.perf_fd_cache_miss, &buffer, sizeof(struct read_format)) == -1) {
+        perror("perf read failed");
+    }
 
     memcpy(i, &(buffer.values), sizeof(buffer.values));
-//    if(__builtin_expect((int64_t)i->faults < 0 || i->faults > 10000000000, 0)) {
-//			i->faults = 0;
-//	}
-//	if(__builtin_expect((int64_t)i->tlb_read_misses < 0 || i->tlb_read_misses > 10000000000, 0)) {
-//			i->tlb_read_misses = 0;
-//	}
-//	if(__builtin_expect((int64_t)i->tlb_write_misses < 0 || i->tlb_write_misses > 10000000000, 0)) {
-//			i->tlb_write_misses = 0;
-//	}
 
-//	if(__builtin_expect((int64_t)i->cache_misses < 0 || i->cache_misses > 10000000000, 0)) {
-//			i->cache_misses = 0;
-//	}
-//	if(__builtin_expect((int64_t)i->instructions < 0 || i->instructions > 10000000000, 0)) {
-//			i->instructions = 0;
-//	}
-
-//    fprintf(stderr, "%ld, %ld, %ld, %ld, %ld\n",
-//            i->faults, i->tlb_read_misses, i->tlb_write_misses, i->cache_misses, i->instructions);
-//    ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_DISABLE, 0);
-//    ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_DISABLE, 0);
-//	ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_DISABLE, 0);
-
-//	ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_DISABLE, 0);
-//	ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_DISABLE, 0);
-
-//    ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_RESET, 0);
-//    ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_RESET, 0);
-//    ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_RESET, 0);
-//    ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_RESET, 0);
-//    ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_RESET, 0);
 }
-
-//void doPerfCounterRead() {
-//	#ifdef NO_PMU
-//	return;
-//	#endif
-//	PerfReadInfo perf;
-//	//getPerfCounts(&perf, false);
-//
-//	ioctl(perfInfo.perf_fd_fault, PERF_EVENT_IOC_DISABLE, 0);
-//	ioctl(perfInfo.perf_fd_tlb_reads, PERF_EVENT_IOC_DISABLE, 0);
-//	ioctl(perfInfo.perf_fd_tlb_writes, PERF_EVENT_IOC_DISABLE, 0);
-//	ioctl(perfInfo.perf_fd_cache_miss, PERF_EVENT_IOC_DISABLE, 0);
-//	ioctl(perfInfo.perf_fd_instr, PERF_EVENT_IOC_DISABLE, 0);
-//
-//	/*
-//	// Commented this out because it doesn't work, particularly now that we are resetting/enabling/disabling
-//	// the PMU counters between function calls, and thus we can no longer obtain a grand total of events
-//	// from reading their counter values. Even prior to this changeover, only the main thread is producing an
-//	// output file (at least with our default settings), and thus these totals would only apply to the core
-//	// the main thread is running on. In fact, there is no reason to call this function anymore at all,
-//	// other than to disable the counters (which should already be disabled at the time this is called).	-- SAS
-//	if(thrData.output) {
-//			fprintf(thrData.output, "\n");
-//			fprintf(thrData.output, ">>> total page faults        %ld\n", perf.faults);
-//			fprintf(thrData.output, ">>> total TLB read misses    %ld\n", perf.tlb_read_misses);
-//			fprintf(thrData.output, ">>> total TLB write misses   %ld\n", perf.tlb_write_misses);
-//			fprintf(thrData.output, ">>> total cache misses       %ld\n", perf.cache_misses);
-//			fprintf(thrData.output, ">>> total instructions       %ld\n", perf.instructions);
-//	}
-//	*/
-//}
 
 void setupCounting(void) {
 	#ifdef NO_PMU
@@ -347,8 +234,8 @@ void setupSampling() {
 
     //pe_load.sample_period = fuzzed_period;
     //pe_load.freq = 1;
-    pe_load.sample_freq = 10000;
-    pe_load.freq = 1;
+    pe_load.sample_freq = 100000;
+    pe_load.freq = 0;
 	pe_load.sample_type = sample_type;
 	pe_load.read_format = read_format;
 	pe_load.disabled = 1;

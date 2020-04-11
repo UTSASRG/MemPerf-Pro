@@ -265,6 +265,7 @@ __attribute__((constructor)) initStatus initializer() {
 
 
     MemoryWaste::initialize();
+    MemoryWaste::initForNewTid();
 	lockUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 128);
 	//overhead.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 256);
 	//mappings.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
@@ -1261,18 +1262,11 @@ void myFree_hash (void* ptr) {
 }
 
 void globalizeTAD() {
-    globalize_lck.lock();
+
     if (__builtin_expect(globalized, false)) {
         fprintf(stderr, "The thread %lld has been globalized!\n", gettid());
     }
-
-//    if (bibop) for(int i = 0; i < num_class_sizes; ++i) {
-//        globalNumAllocsBySizes[i] += localNumAllocsBySizes[i];
-//        globalNumAllocsFFLBySizes[i] += localNumAllocsFFLBySizes[i];
-//    } else for(int i = 0; i < 2; ++i) {
-//            globalNumAllocsBySizes[i] += localNumAllocsBySizes[i];
-//            globalNumAllocsFFLBySizes[i] += localNumAllocsFFLBySizes[i];
-//    }
+    globalize_lck.lock();
 
 //    globalTAD.numAllocationFaults += localTAD.numAllocationFaults;
 //	globalTAD.numAllocationTlbReadMisses += localTAD.numAllocationTlbReadMisses;
@@ -1310,8 +1304,11 @@ void globalizeTAD() {
 	globalTAD.numAllocs += localTAD.numAllocs;
 	globalTAD.numAllocsFFL += localTAD.numAllocsFFL;
 	globalTAD.numFrees += localTAD.numFrees;
-    globalized = true;
 	globalize_lck.unlock();
+
+    globalized = true;
+
+    MemoryWaste::globalizeMemory();
 }
 
 void writeAllocData () {

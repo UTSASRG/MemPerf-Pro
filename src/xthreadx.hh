@@ -5,6 +5,7 @@
 #include "libmallocprof.h"
 #include "memsample.h"
 #include "real.hh"
+#include "memwaste.h"
 
 extern thread_local thread_data thrData;
 extern thread_local unsigned long long total_cycles_start;
@@ -56,6 +57,7 @@ class xthreadx {
         setThreadContention();
 
 		initMyLocalMem();
+        MemoryWaste::initForNewTid();
 
 		void * result = NULL;
 		size_t stackSize;

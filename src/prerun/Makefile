@@ -15,6 +15,7 @@ INCLUDE_DIRS = -I. -I/usr/include/x86_64-linux-gnu/c++/4.8/ -I$(MP_SRC)
 TARGETS =	libmallochelp.so	\
 			prerun-glibc221		\
 			prerun-glibc224		\
+			prerun-glibc228     \
 			prerun-diehard		\
 			prerun-obsd			\
 			prerun-jemalloc     \
@@ -27,6 +28,7 @@ RUNFILE = runlib.cpp
 
 GLIBC221 = $(HOME)/Memoryallocators/libc-2.21/libmalloc.so
 GLIBC224 = $(HOME)/Memoryallocators/libc-2.24/libmalloc.so
+GLIBC228 = $(HOME)/Memoryallocators/libc-2.28/libmalloc.so
 OBSD = $(HOME)/Memoryallocators/OpenBSD-6.0/libomalloc.so
 DIEHARD = $(HOME)/Memoryallocators/DieHard/src/libdieharder.so
 HOARD = $(HOME)/Memoryallocators/Hoard/src/libhoard.so
@@ -45,6 +47,9 @@ prerun-glibc221: libmallochelp.so $(RUNFILE)
 
 prerun-glibc224: libmallochelp.so $(RUNFILE)
 	$(CXX) $(CFLAGS) -rdynamic $(LIBRARY) -rdynamic $(GLIBC224) $(RUNFILE) -o prerun-glibc224
+
+prerun-glibc228: libmallochelp.so $(RUNFILE)
+	$(CXX) $(CFLAGS) -rdynamic $(LIBRARY) -rdynamic $(GLIBC228) $(RUNFILE) -o prerun-glibc228
 
 prerun-diehard: libmallochelp.so $(RUNFILE)
 	$(CXX) $(CFLAGS) -rdynamic $(LIBRARY) -rdynamic $(DIEHARD) $(RUNFILE) -o prerun-diehard

@@ -79,7 +79,7 @@ int find_pages (uintptr_t vstart, uintptr_t vend, unsigned long pagesFound[]);
 void* find_large_object(void*);
 void* find_class_sizes(void*);
 
-spinlock temp_mem_lock;
+//spinlock temp_mem_lock;
 
 //Aliases
 extern "C" {
@@ -104,7 +104,7 @@ __attribute__((constructor)) void libmallochelp_initializer () {
 	if (libInitialized) return;
 	allocator_name = (char*)myMalloc(128);
 	initReal();
-	temp_mem_lock.init();
+	//temp_mem_lock.init();
 	pid = getpid();
 	libInitialized = true;
 }
