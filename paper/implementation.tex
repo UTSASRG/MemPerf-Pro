@@ -1,8 +1,8 @@
 \label{sec:implement}
 
-\input{implement-Richard}
-\input{implement-stefen}
-\input{implement-sam}
+
+\section{Design and Implementation}
+\label{sec:implementation}
 
 \subsection{Understanding Different Allocators}
 
@@ -19,6 +19,8 @@ For bump-pointer-based allocators, such as the glibc allocator, we confirm size 
 %Another huge challenge in the profiler is globally storing data that is thread specific in a way that is quickly accessed and synchronized between threads. There's no getting around all threads needing to access some type of global data. Doing this efficiently is a priority for the profiler. Detecting memory blowup requires the allocating thread to be aware of other threads free object status. An internal global free list of objects has too much contention from threads simultaneously inserting, deleting, and searching the free list. We employ a semi-thread local approach. Each thread has a thread local count of free objects (by class size for bibop) and the profiler maintains one global count (again by class size for bibop). When a thread allocates, there are three possibilities that we check in determining memory blowup, always starting with the thread checking it's thread local free count. If the thread has free objects it can reuse, the profiler assumes that the thread will reuse one of it's free objects, and decrements its local and global counter. If the thread does not have free objects, it checks to see if there are free objects globally. If there are, the profiler accounts for that one occurrence of memory blowup and decrements the global counter. The last situation is that the thread does not have any free objects, and the global counter is at zero. There is no memory blowup in this situation. The global counter is synchronized using atomic accesses. This is accurate and fast method the profiler uses in detecting memory blowup. Balancing the profiler with accurate synchronized global data and performance is a huge challenge.
 
 \subsection{Profiling Performance Overhead}
+
+\label{sec:performanceimplement}
 
 Performance overhead is profiled using several measures which, when viewed together, help to describe the performance profile of a particular allocator/application pairing.
 

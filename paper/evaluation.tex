@@ -1,28 +1,36 @@
 \section{Experimental Evaluation}
 \label{sec:evaluation}
 
-We will investigate the following allocators. We choose three general purpose allocators, e.g. jemalloc, TCMalloc, and Hoard; and two secure allocators, i.e. DieHarder and OpenBSD; in addition to the default allocator of the Linux system (in versions 2.21 and 2.24). Secure allocators will employ the randomization for memory allocations, which will increase runtime overhead due to decreased cache locality and increased instruction counts.
-%For the default allocator, we actually have to 
+The experimental evaluation will answer the following questions:
+\begin{itemize}
+\item How is the effectiveness of \MP{}? (Section~\ref{sec:effectiveness}) 	
+\item What is the performance overhead of \MP{}? (Section~\ref{})
+\item What is the memory overhead of \MP{}? (Section~\ref{})
+\end{itemize}
 
-\subsection{Performance Overhead}
-We will evaluate the performance overhead of the profiler itself. 
+Experiments were performed on a two-processor machine, where each processor is Intel(R) Xeon(R) Gold 6230. Each processor has 20 cores in total. This machine has 256GB of main memory, 20MB of L2 cache, and 1280KB L1 cache. The underlying OS is Ubuntu 18.04.3 LTS, installed with the Linux-5.3.0-40. All applications were compiled using GCC-7.5.0, with -O2 and -g flags.
 
-\subsection{Memory Overhead}
-We will evaluate the performance overhead of the profiler itself. 
+\subsection{Effectiveness}
+\label{sec:effectiveness}
 
-\subsection{Comparison of Different Allocators}
+In order to evaluate the effectiveness, we evaluate \MP{} with four general purpose allocators, e.g. Linux allocator (version 2.21 and 2.28), TCMalloc~\cite{tcmalloc}, jemalloc, and Hoard, and two secure allocators, i.e. DieHarder and OpenBSD. These allocators include both sequential and BiBOP-style allocators. Secure allocators were included, since they will increase runtime overhead due to decreased cache locality and increased instruction counts. That is, they represent some unique possibilities for \MP{} to show its effectiveness. 
 
-\subsubsection{Performance Overhead}
-
+For the evaluation, we use the default configuration for these allocators. But we also does some changes as discussed in the following. In order to evaluate the Linux allocators, they are compiled separately as a stand-alone library, and their synchronizations were changed to use the standard synchronizations provided by the \texttt{pthread} library (instead of using the internal implementation as \texttt{lll\_lock}). Since Hoard are using \texttt{std::lock\_guard} for its synchronization, we replaced it for the standard synchronization in order to track its synchronization behavior. 
 
 
-\subsubsection{Memory Overhead}
+
+\subsubsection{Performance Issues}
+
+
+
+\subsubsection{Memory Issues}
 
 \subsubsection{Scalability}
 
 
 
 \subsubsection{Application Friendliness}
+
 
 \subsubsection{Conclusions}
 
@@ -36,11 +44,9 @@ It seems that BIBOP style allocators are the trend of allocators, which not only
 \subsection{Issues Identified in Different Allocators}
 
 \paragraph{glibc-2.21:}
-This version of the default Linux allocator has a known bug which causes it to make excessively large number of \texttt{madvise} systems calls under certain memory use patterns. This is exhibited clearly under the dedup test of the PARSEC suite.
-	Using a non-buggy version of glibc (2.24), the allocator typically makes around $280$ calls to \texttt{madvise}, whereas the affected version (2.21) makes about $505,233$.
+This allocator of glibc-2.21 has a known bug that invokes excessively large number of \texttt{madvise} systems calls under certain memory use patterns. This is exhibited clearly under the dedup application of the PARSEC suite.
+Using a non-buggy version of glibc (2.24), the allocator typically makes around $280$ calls to \texttt{madvise}, whereas the affected version (2.21) makes about $505,233$.
 	This phenomenon is seen clearly in the \texttt{num\_advise} and \texttt{madvise\_wait\_cycles} output fields in the log produced by \MP{}.
-
-%\paragraph{glibc-2.24:}
 
 \paragraph{DieHarder:}
 DieHarder often performs much slower than other secure allocators, with some cases as high as $8x$ runtime overhead compared to the default Linux allocator. This can been attributed to several design elements of DieHarder, including its use of bitmaps to track heap objects, and the specific implementation details regarding how randomization is performed. Upon allocation, objects are chosen from a potentially large number of ``miniheaps'', without regard for the temporal locality of previously freed objects. Additionally, if the chosen object is currently in-use, the allocator will then continue to repeat this random selection process until it is success in locating an available object. These design decisions result in higher cache misses, as well as an increase in instruction count along allocation/deallocation pathways.
@@ -58,5 +64,13 @@ Next, in the case of freqmine, DieHarder performs $8.8x$ slower than glibc 2.24.
 During evaluation, the \texttt{reverse\_index} benchmark was found to perform approximately 21\% slower when paired with \texttt{jemalloc} versus the default Linux allocator. Upon inspection, we find that, with \texttt{jemalloc}, the program exhibited over $2x$ the number of CPU cycles associated with the deallocation execution path, as well as a 34\% increase in critical section duration (i.e., the cycles spent within outermost critical sections).
 
 \paragraph{TCMalloc:}
-Despite its BIBOP-style memory layout, \texttt{tcmalloc} typically performs very well, often performing as well or better than the default Linux allocator. However, in the case of \texttt{swaptions}, it produces a 21\% runtime overhead compared to glibc. Using \MP{}, we find that, in this instance the number of new allocation cycles, is $2.6x$ greater than that of glibc. We additionally see (albeit smaller) increases in the number of reused object allocation cycles as well as deallocation cycles.
+Despite its BIBOP-style memory layout, \texttt{tcmalloc} typically performs very well, often performing as well or better than the default Linux allocator. However, in the case of \texttt{swaptions}, it produces a 21\% runtime overhead compared to the default Linux alocator. Using \MP{}, we find that the runtime of new allocations  is $2.6x$ greater than that of \texttt{glibc}. We additionally see (albeit smaller) increases in the number of reused object allocation cycles as well as deallocation cycles.
+
+
+
+\subsection{Performance Overhead}
+We will evaluate the performance overhead of the profiler itself. 
+
+\subsection{Memory Overhead}
+We will evaluate the performance overhead of the profiler itself. 
 
