@@ -1,17 +1,25 @@
-\label{sec:implement}
-
-
 \section{Design and Implementation}
 \label{sec:implementation}
 
-\subsection{Understanding Different Allocators}
+\subsection{Adapting To Different Allocators}
 
 \label{sec:understandingallocators}
 
-\MP{} relies on a ``prerun'' program to understand the details of different allocators, such as the allocator's style (BIBOP versus bump-pointer-based), class sizes, the threshold separating small objects from large objects, and an approximate size of metadata per object. 
+As described above, one challenge is to adapt \MP{} to different allocators. \MP{} relies on a prerun program to understand the difference of different allocators, including the allocator's style (BiBOP-style versus sequential), class sizes, the threshold of separating small objects from large objects. These details will be employed to differentiate small objects from large objects (with different performance overhead), and to compute the memory overhead. Programmers could also provide these details explicitly, without resorting to the prerun program.  
 
-In order to identify the various class sizes, the prerun routine begins by allocating an object of 8 bytes, and continues to allocate  additional objects using a stepped increase of 8 bytes each time. For BIBOP-style allocators, we confirm whether objects are allocated from within different pages to detect when the allocation of an object has been moved to a different location (i.e., another bag). 
-For bump-pointer-based allocators, such as the glibc allocator, we confirm size classes by checking the proximity of contiguously allocated objects of distinct sizes, and observing whether a significant address difference exists between the placement of these objects. For example, if an 8 byte object is located immediately adjacent to a 512 byte object, this is typically a strong indication that the allocator utilizes a bump-pointer-based object management style.
+In order to identify the style of allocator, the prerun routine will check whether two subsequent allocations with different sizes (apparently from different size classes) are allocated from the same page or not. If yes, then the allocator is a sequential-style allocator, which is similar to the default Linux allocator. Otherwise, we will check whether two subsequent allocations with the same size are allocated from the same page. If the answer to this question is yes, then the allocator is a BiBOP-style allocator. \MP{} only deals with sequential and BiBOP-style allocators, which covers most popular allocators.  
+
+\begin{figure}[!ht]
+\centering
+\includegraphics[width=5in]{figures/sequentialclasssize}
+\caption{Determining the size class of a sequential allocator. \\The boxes with 10\% dotted pattern are the metadata, and the boxes with diagonal stripes\\ are actual heap objects. The number above every box is the size of the corresponding object. \label{fig:sizeclass}}
+\end{figure}
+
+The second step is to identify various size classes. The prerun routine begins by allocating an object of 8 bytes, and continues to allocate additional objects using a stride increase of 8 bytes each time. The determination of size classes depends on the style of an allocator. For BiBOP-style allocators, an allocation with a different size class will be satisfied from a different bag, locating in a different page. For sequential allocators, such as the Linux allocator, the distance between two  contiguously-allocated objects (with distinct sizes) is utilized to determine the size class. As shown in Fig.~\ref{fig:sizeclass}, since the distance of $Obj_1$ and $Obj_2$ is the same as the distance of $Obj_2$ and $Obj_3$, then $obj_1$ and $obj_2$ belong to the same size class. For the same reason, we could determine that $Obj_3$ belongs to a different size class.  
+
+The threshold for big objects are typically detected by checking whether there is an explicit \texttt{mmap} system calls upon the allocation. Typically, most allocators utilize a direct \texttt{mmap} system call to satisfy the allocation for a big object. However, this threshold requires the manual confirmation. 
+% , and observing whether a significant address difference exists between the placement of these objects. 
+
 %Open BSD's allocator ``reverse aligns'' objects that are between 2Kb and 4Kb in size. The allocator aligns the objects last byte to the end of the page in which it resides, so that the object starting byte is somewhere in the middle. The prerun would see the address change and believe it has found a new class size. Open BSD provides a flag to turn this behavior off, however this is one example of the challenges of making the profiler general purpose.
 
 %There are many challenges in searching for metadata. Different allocators employ completely different methods in storing metadata for it's internal use. There are a number of ways we attempt to get metadata size for each object. For a bibop allocator, it's metadata has a good chance of being located in a private memory region returned from mmap. The prerun detects the mmap and checks to see if it was used to fulfill a memory request. If it wasn't we will search it for metadata. The prerun library utilizes the /proc/pid/pagemap file to identify the virtual pages which are backed by physical frames. The prerun searches the entire mmap region for physically backed virtual pages, remembering their page numbers in relation to the mmap region starting address. Finally, the prerun counts the number of non-zero bytes on all physically-backed virtual pages, using the minimum of all these values as an estimated metadata size. This method works with the assumption that the bibop-style allocator \emph{is} placing it's metadata in mmap memory. One of the allocators we tested, Dieharder, does mmap memory that was not used for allocations nor metadata, however the prerun includes these regions in it's search for metadata incorrectly. Additionally, the actual metadata is interpreted differently for different allocators. One allocator can store primitive data types in it's metadata, while another allocator uses bitmaps or byte values that have specific meaning only to that allocator. The numerous ways of storing and interpreting metadata is a huge challenge for us.
