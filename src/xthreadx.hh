@@ -57,7 +57,7 @@ class xthreadx {
         setThreadContention();
 
 		initMyLocalMem();
-        MemoryWaste::initForNewTid();
+
 
 		void * result = NULL;
 		size_t stackSize;
@@ -65,6 +65,9 @@ class xthreadx {
 
 		pid_t tid = gettid();
 		thrData.tid = tid;
+        //MemoryWaste::initForNewTid();
+        MemoryWaste::checkGlobalInit();
+        MemoryWaste::checkThreadInit();
 
 		#ifdef THREAD_OUTPUT
 		pid_t pid = getpid();

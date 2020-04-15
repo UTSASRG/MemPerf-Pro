@@ -105,31 +105,6 @@ typedef struct {
 	std::atomic_uint allocations;
 } MmapTuple;
 
-//typedef struct {
-//	std::atomic_size_t metadata;
-//	std::atomic_size_t blowup;
-//	std::atomic_size_t alignment;
-//	void addMetadata(size_t size) {metadata.fetch_add(size, relaxed);}
-//	void addBlowup(size_t size) {blowup.fetch_add(size, relaxed);}
-//	void addAlignment(size_t size) {alignment.fetch_add(size, relaxed);}
-//	size_t getMetadata() {
-//		size_t temp = metadata.load();
-//		return temp;
-//	}
-//	size_t getBlowup() {
-//		size_t temp = blowup.load();
-//		return temp;
-//	}
-//	size_t getAlignment() {
-//		size_t temp = alignment.load();
-//		return temp;
-//	}
-//	void init() {
-//		metadata = 0;
-//		blowup = 0;
-//		alignment = 0;
-//	}
-//} Overhead;
 
 typedef struct {
 	unsigned long numAccesses = 0;
@@ -140,6 +115,8 @@ typedef struct {
 typedef struct LockContention {
 	std::atomic<int> contention;
 	std::atomic<int> maxContention;
+    unsigned int times;
+    unsigned int contention_times;
 	LockType lockType;
 } LC;
 
