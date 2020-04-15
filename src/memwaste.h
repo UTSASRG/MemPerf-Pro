@@ -56,7 +56,7 @@ public:
     static void initialize();
 ///Here
     static void initForNewTid();
-    static bool allocUpdate(size_t size, size_t* out_classSize, short* out_classSizeIndex, void * address);
+    static bool allocUpdate(allocation_metadata * allocData, void * address);
     static void freeUpdate(void* address);
     ///Here
     static bool recordMemory(uint64_t now_usage);

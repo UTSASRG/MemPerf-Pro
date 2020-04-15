@@ -80,11 +80,11 @@ class CacheMapEntry {
 		private:
 				//unsigned char num_used_bytes;
                 std::atomic<unsigned char> num_used_bytes;
-				pid_t owner;
+				//pid_t owner;
 
 		public:
-				pid_t getOwner();
-				void setOwner(pid_t new_owner);
+				//pid_t getOwner();
+				//void setOwner(pid_t new_owner);
 				unsigned int getUsedBytes();
 				bool addUsedBytes(unsigned int num_bytes);
 				bool subUsedBytes(unsigned int num_bytes);

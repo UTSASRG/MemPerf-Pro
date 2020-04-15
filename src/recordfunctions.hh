@@ -69,31 +69,49 @@ int pthread_mutex_lock(pthread_mutex_t *mutex) {
   // Have we encountered this lock before?
   LC* thisLock;
   uint64_t lockAddr = (uint64_t) mutex;
+    uint64_t timeStart, timeStop;
+    int result;
+
+    current_tc->mutex_waits++;
+
+
   if(lockUsage.find(lockAddr, &thisLock)) {
+
     thisLock->contention++;
-    if(thisLock->contention.load(relaxed) > thisLock->maxContention.load(relaxed)) {
-				thisLock->maxContention.exchange(thisLock->contention.load(relaxed));
+
+      // Time the aquisition of the lock
+      timeStart = rdtscp();
+      result = RealX::pthread_mutex_lock(mutex);
+      timeStop = rdtscp();
+
+    if(thisLock->contention.load(relaxed) > thisLock->maxContention) {
+				thisLock->maxContention = thisLock->contention.load(relaxed);
 		}
+
   } else {
 			// Add lock to lockUsage hashmap
 			thisLock = newLC(MUTEX);
 			lockUsage.insertIfAbsent(lockAddr, thisLock);
 			localTAD.num_mutex_locks++;
+
+      // Time the aquisition of the lock
+      timeStart = rdtscp();
+      result = RealX::pthread_mutex_lock(mutex);
+      timeStop = rdtscp();
+
   }
-  // Time the aquisition of the lock
-  uint64_t timeStart = rdtscp();
-  int result = RealX::pthread_mutex_lock(mutex);
-  uint64_t timeStop = rdtscp();
+
+    current_tc->mutex_wait_cycles += (timeStop - timeStart);
+    if(current_tc->lock_counter == 0) {
+        current_tc->critical_section_start = timeStop;
+    }
 
   thisLock->contention--;
     if(thisLock->contention.load(relaxed) != 0) {
         thisLock->contention_times++;
     }
-  current_tc->mutex_waits++;
-  current_tc->mutex_wait_cycles += (timeStop - timeStart);
-  if(current_tc->lock_counter == 0) {
-    current_tc->critical_section_start = timeStop;
-  }
+
+
   current_tc->lock_counter++;
     thisLock->times++;
   return result;
@@ -112,24 +130,20 @@ int pthread_spin_trylock(pthread_spinlock_t *lock) {
 
   // Have we encountered this lock before?
   LC* thisLock;
-	uint64_t lockAddr = reinterpret_cast<uint64_t>(lock);
-  if(lockUsage.find(lockAddr, &thisLock)) {
-			/*
-			thisLock->contention++;
+    uint64_t lockAddr = reinterpret_cast<uint64_t>(lock);
 
-			if(thisLock->contention.load(relaxed) > thisLock->maxContention.load(relaxed)) {
-					thisLock->maxContention.exchange(thisLock->contention.load(relaxed));
-			}
-			*/
+    current_tc->spin_trylock_waits++;
+
+    if(lockUsage.find(lockAddr, &thisLock)) {
+
   } else {
-			// Add lock to lockUsage hashmap
-			thisLock = newLC(SPIN_TRYLOCK, -1);
-			lockUsage.insertIfAbsent(lockAddr, thisLock);
-			localTAD.num_spin_trylocks++;
+      // Add lock to lockUsage hashmap
+      thisLock = newLC(SPIN_TRYLOCK, -1);
+      lockUsage.insertIfAbsent(lockAddr, thisLock);
+      localTAD.num_spin_trylocks++;
   }
 
-  // Try to aquire the lock
-  current_tc->spin_trylock_waits++;
+    // Try to aquire the lock
   int result = RealX::pthread_spin_trylock(lock);
 	uint64_t timeStop = rdtscp();
   if(result == 0) {
@@ -137,12 +151,10 @@ int pthread_spin_trylock(pthread_spinlock_t *lock) {
 				current_tc->critical_section_start = timeStop;
 		}
 		current_tc->lock_counter++;
-		//thisLock->contention--;
+      thisLock->times++;
   } else {
     current_tc->spin_trylock_fails++;
-    thisLock->contention_times++;
   }
-    thisLock->times++;
   return result;
 }
 
@@ -159,33 +171,47 @@ int pthread_spin_lock(pthread_spinlock_t *lock) {
   //Have we encountered this lock before?
   LC* thisLock;
   uint64_t lockAddr = (uint64_t)lock;
+  uint64_t timeStart, timeStop;
+  int result;
+
+    current_tc->spinlock_waits++;
+
   if(lockUsage.find(lockAddr, &thisLock)) {
+
     thisLock->contention++;
 
-    if(thisLock->contention.load(relaxed) > thisLock->maxContention.load(relaxed)) {
-				thisLock->maxContention.exchange(thisLock->contention.load(relaxed));
+      // Time the aquisition of the lock
+      timeStart = rdtscp();
+      result = RealX::pthread_spin_lock(lock);
+      timeStop = rdtscp();
+
+    if(thisLock->contention.load(relaxed) > thisLock->maxContention) {
+				thisLock->maxContention = thisLock->contention.load(relaxed);
+
 		}
   } else {
 			// Add lock to lockUsage hashmap
 			thisLock = newLC(SPINLOCK);
 			lockUsage.insertIfAbsent(lockAddr, thisLock);
 			localTAD.num_spin_locks++;
+
+      // Time the aquisition of the lock
+      timeStart = rdtscp();
+      result = RealX::pthread_spin_lock(lock);
+      timeStop = rdtscp();
   }
 
-  // Time the aquisition of the lock
-  uint64_t timeStart = rdtscp();
-  int result = RealX::pthread_spin_lock(lock);
-  uint64_t timeStop = rdtscp();
+    current_tc->spinlock_wait_cycles += (timeStop - timeStart);
 
 	thisLock->contention--;
     if(thisLock->contention.load(relaxed) != 0) {
         thisLock->contention_times++;
     }
-  current_tc->spinlock_waits++;
-  current_tc->spinlock_wait_cycles += (timeStop - timeStart);
+
   if(current_tc->lock_counter == 0) {
     current_tc->critical_section_start = timeStop;
   }
+
   current_tc->lock_counter++;
     thisLock->times++;
   return result;
@@ -204,14 +230,10 @@ int pthread_mutex_trylock(pthread_mutex_t *mutex) {
   // Have we encountered this lock before?
   LC* thisLock;
 	uint64_t lockAddr = reinterpret_cast<uint64_t>(mutex);
-  if(lockUsage.find(lockAddr, &thisLock)) {
-			/*
-			thisLock->contention++;
 
-			if(thisLock->contention.load(relaxed) > thisLock->maxContention.load(relaxed)) {
-					thisLock->maxContention.exchange(thisLock->contention.load(relaxed));
-			}
-			*/
+    current_tc->mutex_trylock_waits++;
+
+  if(lockUsage.find(lockAddr, &thisLock)) {
   } else {
 			// Add lock to lockUsage hashmap
 			thisLock = newLC(TRYLOCK, -1);
@@ -220,20 +242,20 @@ int pthread_mutex_trylock(pthread_mutex_t *mutex) {
   }
 
   // Try to aquire the lock
-  current_tc->mutex_trylock_waits++;
+
   int result = RealX::pthread_mutex_trylock(mutex);
 	uint64_t timeStop = rdtscp();
+
   if(result == 0) {
 		if(current_tc->lock_counter == 0) {
 				current_tc->critical_section_start = timeStop;
 		}
 		current_tc->lock_counter++;
-		//thisLock->contention--;
+      thisLock->times++;
+
   } else {
-    current_tc->mutex_trylock_fails++;
-    thisLock->contention_times++;
+      current_tc->mutex_trylock_fails++;
   }
-    thisLock->times++;
   return result;
 }
 

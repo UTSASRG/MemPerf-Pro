@@ -347,9 +347,9 @@ void stopCounting(void) {
 
 		isCountingInit = false;
 
-//    close(perfInfo.perf_fd_fault);
-//    close(perfInfo.perf_fd_tlb_reads);
-//    close(perfInfo.perf_fd_tlb_writes);
+    close(perfInfo.perf_fd_fault);
+    close(perfInfo.perf_fd_tlb_reads);
+    close(perfInfo.perf_fd_tlb_writes);
     close(perfInfo.perf_fd_cache_miss);
     close(perfInfo.perf_fd_instr);
 }
