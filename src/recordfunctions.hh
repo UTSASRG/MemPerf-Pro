@@ -71,7 +71,6 @@ int pthread_mutex_lock(pthread_mutex_t *mutex) {
   uint64_t lockAddr = (uint64_t) mutex;
   if(lockUsage.find(lockAddr, &thisLock)) {
     thisLock->contention++;
-
     if(thisLock->contention.load(relaxed) > thisLock->maxContention.load(relaxed)) {
 				thisLock->maxContention.exchange(thisLock->contention.load(relaxed));
 		}
@@ -81,20 +80,22 @@ int pthread_mutex_lock(pthread_mutex_t *mutex) {
 			lockUsage.insertIfAbsent(lockAddr, thisLock);
 			localTAD.num_mutex_locks++;
   }
-
   // Time the aquisition of the lock
   uint64_t timeStart = rdtscp();
   int result = RealX::pthread_mutex_lock(mutex);
   uint64_t timeStop = rdtscp();
 
-	thisLock->contention--;
+  thisLock->contention--;
+    if(thisLock->contention.load(relaxed) != 0) {
+        thisLock->contention_times++;
+    }
   current_tc->mutex_waits++;
   current_tc->mutex_wait_cycles += (timeStop - timeStart);
   if(current_tc->lock_counter == 0) {
     current_tc->critical_section_start = timeStop;
   }
   current_tc->lock_counter++;
-
+    thisLock->times++;
   return result;
 }
 
@@ -139,8 +140,9 @@ int pthread_spin_trylock(pthread_spinlock_t *lock) {
 		//thisLock->contention--;
   } else {
     current_tc->spin_trylock_fails++;
+    thisLock->contention_times++;
   }
-
+    thisLock->times++;
   return result;
 }
 
@@ -176,13 +178,16 @@ int pthread_spin_lock(pthread_spinlock_t *lock) {
   uint64_t timeStop = rdtscp();
 
 	thisLock->contention--;
+    if(thisLock->contention.load(relaxed) != 0) {
+        thisLock->contention_times++;
+    }
   current_tc->spinlock_waits++;
   current_tc->spinlock_wait_cycles += (timeStop - timeStart);
   if(current_tc->lock_counter == 0) {
     current_tc->critical_section_start = timeStop;
   }
   current_tc->lock_counter++;
-
+    thisLock->times++;
   return result;
 }
 
@@ -226,8 +231,9 @@ int pthread_mutex_trylock(pthread_mutex_t *mutex) {
 		//thisLock->contention--;
   } else {
     current_tc->mutex_trylock_fails++;
+    thisLock->contention_times++;
   }
-
+    thisLock->times++;
   return result;
 }
 
@@ -441,7 +447,7 @@ void *mremap(void *old_address, size_t old_size, size_t new_size,
 
 void writeThreadContention() {
     fprintf(stderr, "writing\n");
-    fprintf (thrData.output, "\n>>>>>>>>>>>>>>>>>>>>>>>>>> Thread Contention <<<<<<<<<<<<<<<<<<<<<<<<<<\n\n");
+    fprintf (thrData.output, "\n>>>>>>>>>>>>>>>>>>>>>>>>>> THREAD CONTENTIONS <<<<<<<<<<<<<<<<<<<<<<<<<<\n\n");
 
     long maxRealMemoryUsage = 0;
     long maxRealAllocatedMemoryUsage = 0;
@@ -485,69 +491,70 @@ void writeThreadContention() {
 		maxRealAllocatedMemoryUsage = globalizedThreadContention.maxRealAllocatedMemoryUsage;
 		maxTotalMemoryUsage = globalizedThreadContention.maxTotalMemoryUsage;
 
-		fprintf (thrData.output, ">>> mutex_waits                %20lu\n",
+		fprintf (thrData.output, ">>> mutex\t\t\t%20lu\n",
 						globalizedThreadContention.mutex_waits);
-		fprintf (thrData.output, ">>> mutex_wait_cycles          %20lu    avg = %.1f\n",
+		fprintf (thrData.output, ">>> mutex_wait_cycles\t\t%20lu\tavg = %.1f\n",
 						globalizedThreadContention.mutex_wait_cycles,
 						((double)globalizedThreadContention.mutex_wait_cycles / safeDivisor(globalizedThreadContention.mutex_waits)));
-		fprintf (thrData.output, ">>> mutex_trylock_waits        %20lu\n",
+		fprintf (thrData.output, ">>> mutex_trylock\t\t%20lu\n",
 						globalizedThreadContention.mutex_trylock_waits);
-		fprintf (thrData.output, ">>> mutex_trylock_fails        %20lu\n",
+		fprintf (thrData.output, ">>> mutex_trylock_fails\t\t%20lu\n",
 						globalizedThreadContention.mutex_trylock_fails);
-		fprintf (thrData.output, ">>> spinlock_waits             %20lu\n",
+		fprintf (thrData.output, ">>> spinlock\t\t\t%20lu\n",
 						globalizedThreadContention.spinlock_waits);
-		fprintf (thrData.output, ">>> spinlock_wait_cycles       %20lu    avg = %.1f\n",
+		fprintf (thrData.output, ">>> spinlock_wait_cycles\t%20lu\tavg = %.1f\n",
 						globalizedThreadContention.spinlock_wait_cycles,
 						((double)globalizedThreadContention.spinlock_wait_cycles / safeDivisor(globalizedThreadContention.spinlock_waits)));
-		fprintf (thrData.output, ">>> spin_trylock_waits         %20lu\n",
+		fprintf (thrData.output, ">>> spin_trylock\t\t%20lu\n",
 						globalizedThreadContention.spin_trylock_waits);
-		fprintf (thrData.output, ">>> spin_trylock_fails         %20lu\n",
+		fprintf (thrData.output, ">>> spin_trylock_fails\t\t%20lu\n",
 						globalizedThreadContention.spin_trylock_fails);
-		fprintf (thrData.output, ">>> mmap_waits                 %20lu\n",
+		fprintf (thrData.output, ">>> mmap\t\t\t%20lu\n",
 						globalizedThreadContention.mmap_waits);
-		fprintf (thrData.output, ">>> mmap_wait_cycles           %20lu    avg = %.1f\n",
+		fprintf (thrData.output, ">>> mmap_wait_cycles\t\t%20lu\tavg = %.1f\n",
 						globalizedThreadContention.mmap_wait_cycles,
 						((double)globalizedThreadContention.mmap_wait_cycles / safeDivisor(globalizedThreadContention.mmap_waits)));
-		fprintf (thrData.output, ">>> sbrk_waits                 %20lu\n",
+		fprintf (thrData.output, ">>> sbrk\t\t\t%20lu\n",
 						globalizedThreadContention.sbrk_waits);
-		fprintf (thrData.output, ">>> sbrk_wait_cycles           %20lu    avg = %.1f\n",
+		fprintf (thrData.output, ">>> sbrk_wait_cycles\t\t%20lu\tavg = %.1f\n",
 						globalizedThreadContention.sbrk_wait_cycles,
 						((double)globalizedThreadContention.sbrk_wait_cycles / safeDivisor(globalizedThreadContention.sbrk_waits)));
-		fprintf (thrData.output, ">>> madvise_waits              %20lu\n",
+		fprintf (thrData.output, ">>> madvise\t\t\t%20lu\n",
 						globalizedThreadContention.madvise_waits);
-		fprintf (thrData.output, ">>> madvise_wait_cycles        %20lu    avg = %.1f\n",
+		fprintf (thrData.output, ">>> madvise_wait_cycles\t\t%20lu\tavg = %.1f\n",
 						globalizedThreadContention.madvise_wait_cycles,
 						((double)globalizedThreadContention.madvise_wait_cycles / safeDivisor(globalizedThreadContention.madvise_waits)));
-		fprintf (thrData.output, ">>> munmap_waits               %20lu\n",
+		fprintf (thrData.output, ">>> munmap\t\t\t%20lu\n",
 						globalizedThreadContention.munmap_waits);
-		fprintf (thrData.output, ">>> munmap_wait_cycles         %20lu    avg = %.1f\n",
+		fprintf (thrData.output, ">>> munmap_wait_cycles\t\t%20lu\tavg = %.1f\n",
 						globalizedThreadContention.munmap_wait_cycles,
 						((double)globalizedThreadContention.munmap_wait_cycles / safeDivisor(globalizedThreadContention.munmap_waits)));
-		fprintf (thrData.output, ">>> mremap_waits               %20lu\n",
+		fprintf (thrData.output, ">>> mremap\t\t\t%20lu\n",
 						globalizedThreadContention.mremap_waits);
-		fprintf (thrData.output, ">>> mremap_wait_cycles         %20lu    avg = %.1f\n",
+		fprintf (thrData.output, ">>> mremap_wait_cycles\t\t%20lu\tavg = %.1f\n",
 						globalizedThreadContention.mremap_wait_cycles,
 						((double)globalizedThreadContention.mremap_wait_cycles / safeDivisor(globalizedThreadContention.mremap_waits)));
-		fprintf (thrData.output, ">>> mprotect_waits             %20lu\n",
+		fprintf (thrData.output, ">>> mprotect\t\t\t%20lu\n",
 						globalizedThreadContention.mprotect_waits);
-		fprintf (thrData.output, ">>> mprotect_wait_cycle        %20lu    avg = %.1f\n\n",
+		fprintf (thrData.output, ">>> mprotect_wait_cycles\t%20lu\tavg = %.1f\n\n",
 						globalizedThreadContention.mprotect_wait_cycles,
 						((double)globalizedThreadContention.mprotect_wait_cycles / safeDivisor(globalizedThreadContention.mprotect_waits)));
-		fprintf (thrData.output, ">>> critical_section_counter   %20lu\n",
+		fprintf (thrData.output, ">>> critical_section\t\t%20lu\n",
 						globalizedThreadContention.critical_section_counter);
-		fprintf (thrData.output, ">>> critical_section_duration  %20lu    avg = %.1f\n\n",
+		fprintf (thrData.output, ">>> critical_section_cycles\t%20lu\tavg = %.1f\n\n",
 						globalizedThreadContention.critical_section_duration,
 						((double)globalizedThreadContention.critical_section_duration / safeDivisor(globalizedThreadContention.critical_section_counter)));
 
 		fprintf (thrData.output, "\n>>>>>>>>>>>>>>>>>>>>>>>>>> Total Memory Usage <<<<<<<<<<<<<<<<<<<<<<<<<\n\n");
-    fprintf (thrData.output, ">>> Thread Counter:\n");
-    fprintf (thrData.output, ">>> maxRealMemoryUsage         %20zu\n", maxRealMemoryUsage);
-    fprintf (thrData.output, ">>> maxRealAllocMemoryUsage    %20zu\n", maxRealAllocatedMemoryUsage);
-    fprintf (thrData.output, ">>> maxTotalMemoryUsage        %20zu\n\n", maxTotalMemoryUsage);
-    fprintf (thrData.output, ">>> Global Counter:\n");
-    fprintf (thrData.output, ">>> realMemoryUsage            %20zu\n", max_mu.realMemoryUsage);
-    fprintf (thrData.output, ">>> realAllocatedMemoryUsage   %20zu\n", max_mu.realAllocatedMemoryUsage);
-    fprintf (thrData.output, ">>> totalMemoryUsage           %20zu\n", max_mu.totalMemoryUsage);
+    fprintf (thrData.output, ">>> Max Memory Usage in Threads:\n");
+    fprintf (thrData.output, ">>> maxRealMemoryUsage\t\t%20zuM\n", maxRealMemoryUsage/1024/1024);
+    fprintf (thrData.output, ">>> maxRealAllocMemoryUsage\t%20zuM\n", maxRealAllocatedMemoryUsage/1024/1024);
+    fprintf (thrData.output, ">>> maxTotalMemoryUsage\t\t%20zuM\n\n", maxTotalMemoryUsage/1024/1024);
+    fprintf (thrData.output, ">>> Global Memory Usage:\n");
+    fprintf (thrData.output, ">>> realMemoryUsage\t\t%20zuM\n", max_mu.realMemoryUsage/1024/1024);
+    fprintf (thrData.output, ">>> realAllocatedMemoryUsage\t%20zuM\n", max_mu.realAllocatedMemoryUsage/1024/1024);
+    fprintf (thrData.output, ">>> totalMemoryUsage\t\t%20zuM\n", max_mu.totalMemoryUsage/1024/1024);
+    MemoryWaste::reportMaxMemory(thrData.output);
 }
 
 #endif

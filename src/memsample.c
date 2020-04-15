@@ -223,7 +223,7 @@ void setupSampling() {
 
     //pe_load.sample_period = fuzzed_period;
     //pe_load.freq = 1;
-    pe_load.sample_freq = 100000;
+    pe_load.sample_freq = 10000;
     pe_load.freq = 0;
 	pe_load.sample_type = sample_type;
 	pe_load.read_format = read_format;
