@@ -180,14 +180,14 @@ I guess that the memory will be freed before the next allocation. If not, then t
 Overall, this paper makes the following contributions. 
 
 \begin{itemize}
-\item It designs and implements \textbf{the first general profiler}--\MP{}--to profile different aspects of different memory allocators, without changing allocators themselves.  
+\item It designs and implements \textbf{the first general profiler}--\MP{}--to profile important aspects of different memory allocators, without changing allocators themselves.  
 
-\item \MP{} employs advanced hardware, such as Performance Monitoring Units (PMU) or Read Time-Stamp Counter (RDTSC), and simple counters together to profile allocators quantitatively. \MP{} attributes the data to each allocation and deallocation, helps discover some issues that cannot be discovered with general profilers.  
+\item \MP{} employs advanced hardware, such as Performance Monitoring Units (PMU), Read Time-Stamp Counter (RDTSC), and simple counters together to profile allocators quantitatively. \MP{} attributes the data to each allocation and deallocation, helps discover designing issues that cannot be discovered with general profilers.   
 %Overall, it can not only pinpoint the major issues inside the implementation of memory allocators, such as performance, memory, and scalability issues, but also could quantitively pinpoint cache or page utilization issues of allocators.  
 
 %\item \MP{} proposes the employment of hardware PMUs to evaluate performa metrics efficiently and effectively. 
 
-\item This paper performs extensive experiments on multiple memory allocators. It pinpoints some performance or memory issues latent in existing allocators. It also provides the first quantitative comparison of different factors of multiple widely-used allocators.  
+\item This paper performs extensive experiments on multiple memory allocators. It pinpoints  performance or memory issues latent in existing allocators. It also provides the first quantitative comparison and metrics for important factors based on the study of multiple widely-used allocators.  
 
 \end{itemize} 
 

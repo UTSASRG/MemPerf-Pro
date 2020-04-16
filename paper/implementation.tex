@@ -1,6 +1,10 @@
 \section{Design and Implementation}
 \label{sec:implementation}
 
+This section describes how \MP{} profiles different aspects of memory allocators, such as performance overhead, memory overhead, scalability issue, and application friendliness. It also describes some common issues, such as adapting to different allocators, and the performance issue of collecting data. 
+
+\MP{} is implemented as a library that can be preloaded before a memory allocator, other libraries, and applications. Therefore, \MP{} is able to intercept memory allocations/deallocations, memory-related system calls, and synchronizations, in order to profile an allocator. That is, an allocator should utilize standard APIs in order to be profiled. For instance, the Linux allocator should invoke explicit POSIX-APIs for synchronizations, instead of some internal synchronization APIs. Fortunately, most allocators do not need any change or the recompilation for the profiling.    
+
 \subsection{Adapting To Different Allocators}
 
 \label{sec:understandingallocators}
@@ -30,39 +34,38 @@ The threshold for big objects are typically detected by checking whether there i
 
 \label{sec:performanceimplement}
 
-Performance overhead is profiled using several measures which, when viewed together, help to describe the performance profile of a particular allocator/application pairing.
+\MP{} profiles the performance overhead of every allocation and deallocation, as discussed in Section~\ref{sec:performanceimplement}. It also utilizes the PMUs to collect hardware events, such as cache misses, page faults, TLB misses, and instructions. For allocations, since each allocator has different execution paths for different scenarios, such as new or re-used allocation, small or big objects, \MP{} further collects the information for each scenario. The differentiation is mandatory to identify an issue inside a specific scenario. For instance, even if the average runtime of every allocation is normal, the allocator may still have an issue in dealing with one specific scenario, such as new allocation. \todo{Do we have some examples?} For deallocations, \MP{} tracks the data for small and big objects, due to the same reason. For instance, DieHarder has an issue for deallocating small objects, but it has the normal performance for deallocations of big objects.  
 
-First, as virtually all allocators treat new and reused objects differently, we differentiate between these execution paths in order to understand how each allocator differs with regard to allocation efficiency when reusing a previously freed object versus a new one. Timestamps taken both before and after each such execution pathway are compared in order to determine the total number of cycles spent within each path.
+\MP{} easily differentiates large objects from small objects based on the threshold,  as described in Section~\ref{sec:understandingallocators}. In order to differentiate a new object from a re-used object, \MP{} utilizes a global hash map to track the status of each object. An object not in the hashmap is treated as a new object. 
 
-We differentiate between used and new objects differently for BIBOP-style allocators and bump-pointer-based ones. For the former, counter arrays are used to track the number of free objects for each class size used by the allocator. In this way, if the given class size free-object-counter is non-zero, we will count the executed cycles toward the ``reused object'' pathway.
+%how each allocator differs with regard to allocation efficiency when reusing a previously freed object versus a new one. Timestamps taken both before and after each such execution pathway are compared in order to determine the total number of cycles spent within each path.
 
-Similarly for bump-pointer-based allocators, a simple running total is maintained for freed objects, and this total is compared to the size of the current allocation request.
-
-%We differentiate the big objects and small objects. 
+%We differentiate between used and new objects differently for BiBOP-style allocators and bump-pointer-based ones. For the former, counter arrays are used to track the number of free objects for each class size used by the allocator. In this way, if the given class size free-object-counter is non-zero, we will count the executed cycles toward the ``reused object'' pathway. Similarly for bump-pointer-based allocators, a simple running total is maintained for freed objects, and this total is compared to the size of the current allocation request.
 
 \subsection{Profiling Memory Overhead}
-\MP{} profiles allocator memory overhead using three measures, each tracked both on both a global and per-thread basis. These measures are: maximum real memory usage, maximum real allocated memory usage, and maximum total memory usage.
+\MP{} profiles the maximum memory data, including real memory usage, real allocated memory, and total memory. Real memory usage is the amount of memory actually requested  by the application, where real allocated memory is the sum of real memory usage and internal fragmentation caused by size-class based allocation. For example, if an application requests the memory by \texttt{malloc(454)}, then real memory usage is incremented by $454$, but real allocated memory will be incremented by $512$ (when the corresponding size class is $512$ bytes). For this case, total memory will be  be incremented by the page size (e.g., 4096 bytes), provided that the page was previously unused. 
+%In order to track the maximum memory data, \MP{} will update the global data 
 
-\subsubsection{Real Memory Usage}
-This value represents the amount of memory actually requested (and presumably being used) by the application. This is adjusted throughout runtime using the direct values provided to the allocator from the application itself. For example, if the application performs a call to \texttt{malloc(454)}, then the ``real memory usage'' parameter is correspondingly incremented by $454$.
+\MP{} reports different types of memory overhead when the total memory usage reaches its maximum value, such as internal fragmentation, external fragmentation, and memory blowup. It could also reports the available memory of each size class and the available memory for big objects.  Therefore, it helps programmers to pinpoint the memory overhead issue of a specific allocator. For instance, if the memory overhead mainly comes from the internal fragmentation, then the allocator should utilize more fine-grained size class. If the memory overhead mainly comes from the memory blowup, the allocator may require to adjust its synchronization frequency or take a more aggressive method for its synchronization~\cite{DBLP:conf/iwmm/LiLD19}. 
 
-\subsubsection{Real Allocated Memory Usage}
-``Real allocated memory usage'' refers to the memory usage of the allocator, given that the user-requested size will often be placed in the nearest-fitting container, and thus will often also contain some unused slack space. For example, given a call to \texttt{malloc(454)}, a power-of-two-style BIBOP allocator will utilize a 512-byte bag from which to satisfy this request. In this instance, the class size of the requested object, $512$, will be used to increment the ``real allocated memory usage'' counter.
+In order to track different types of memory overhead, \MP{} typically increments the corresponding counter upon each allocation and decrements it upon each deallocation. \MP{} utilizes a global hash table to track the status information of each object, which is the same table for determining new or re-used object. Therefore, \MP{} could adjust corresponding counters upon deallocation. 
 
-\subsubsection{Total Memory Usage}
-``Total memory usage'' refers to the total actual physical memory dedicated to backing the objects served from the heap. To continue with the previous example, given a call to \texttt{malloc(454)}, the ``total memory usage'' counter will be incremented by the system page size (e.g. 4096 bytes), provided that the page was previously unused. Tracking of page and cache line usage is described in more detail in Section~\ref{sec:fastlookup}.
+ In order to reduce the contention issue, \MP{} typically maintains a per-thread counter for internal fragmentation, and updates the global counter periodically.  Based on the definition, external fragmentation occurs when an allocator has sufficient memory but in a non-continuous way. Therefore, \MP{} keeps a global counter for the available memory, so that it could determine whether an allocation causes the external fragmentation issue or not.  The counter for the memory blowup will be incremented, if the current per-thread heap has no freed objects but there exit freed objects with the requested size class in other per-thread heaps. Therefore, \MP{} maintains a global counter for each size class. 
 
-Finally, in order to track their maximal values, each time any of these measures is incremented, \MP{} will simply perform a check to determine whether the newly adjusted value exceeds its respective previously stored maximal value.
+% Upon an allocation request, if the current thread does not possess any freed objects of the given size class -- but if the global counter does -- we record this event as an allocation responsible for increasing the allocator's memory blowup.
+
+  
+  \todo{Based on the definitions of memory blowup and external fragmentation, an allocation will be counted as a memory blowup if there exists freed objects with the same size class. However, it is difficult to evaluate the external fragmentation. For instance, if freed objects with smaller class sizes exist, with the total size larger than the requested size, then the current allocation should be counted as external fragmentation. However, if freed objects with larger class sizes exist, it should not count as external fragmentation. But the overhead is caused by the issue of size class or without-splitting. Maybe we should make it clear in Section 3.3. }     
+ 
 
 \subsection{Profiling Scalability}
-Allocator scalability is evaluated by \MP{} using a variety of metrics to indicate its ability to scale well. The tracked parameters include the number various lock types (i.e., pthread mutex locks, spin locks, and try locks), as well as the maximum contention observed on each individual lock.
-Further, both the number and wait cycles associated with common allocator-related system calls are tracked, including \texttt{mmap}, \texttt{munmap}, \texttt{mremap}, \texttt{sbrk}, \texttt{madvise}, and \texttt{mprotect}.
+\MP{} also reports a variety of metrics to  evaluate the scalability of a memory allocator. As described in Section~\ref{sec:scaleidea}, \MP{} evaluates the scalability for both user space and kernel space. 
 
-Lastly, memory blowup also has an effect on an allocator's scalability (e.g., an allocator that exhausts physical memory will not be considered to scale as well as others that do not). To this end, \MP{} tracks allocator memory blowup, but does so slightly differently for both BIBOP-style and bump-pointer-style allocators.
+For user-space scalability, \MP{} focuses on different types of locks, such as mutex locks, spin locks, and try locks. For each lock, \MP{} collects the number of acquisitions, the runtime of each acquisition (with RDTSC timestamp), the number of contentions, and the number of maximum contending threads. \todo{\MP{} dynamically maintains the contention state of each lock. Upon the acquisition, \MP{}  increments the contention threads of the corresponding lock, which will be decremented upon the release of this lock.} 
 
-For BIBOP-style allocators, thread local counts of freed objects for each supported size class are maintained, as well as corresponding global counters as well. Upon an allocation request, if the current thread does not possess any freed objects of the given size class -- but if the global counter does -- we record this event as an allocation responsible for increasing the allocator's memory blowup.
+For the kernel-space scalability, \MP{} focuses on memory-related system calls inside the allocation and deallocation, including \texttt{mmap}, \texttt{munmap}, \texttt{mremap}, \texttt{sbrk}, \texttt{madvise}, and \texttt{mprotect}. The system calls outside memory management operations are excluded, since they are specific to applications. \MP{} collects the runtime of each invocation, and the number of invocations for each system call. In fact, the simple data could actually uncover  serious scalability issues of a memory allocator. For instance, the Linux allocator of \texttt{glibc-2.21} slows down an application by 40\%, which can be uncovered by the excessive number of \texttt{madvise} system calls and a higher runtime for the corresponding \texttt{mmap} and \texttt{mprotect} system call.   
 
-Similarly, for bump-pointer-style allocators, a global counter is used to track the number of freed bytes, rather than freed objects. If the current allocation request cannot be fully satisfied from the available freed bytes, the allocator will thus utilize unused memory from the top of the heap in order to fulfill the allocation request, therefore increasing memory blowup as well.
+\todo{We should collect the data for each type of allocations and deallocations, similar to the overhead. }
 
 
 \subsection{Application Friendliness}
