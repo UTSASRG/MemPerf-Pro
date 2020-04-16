@@ -577,7 +577,7 @@ extern "C" {
         doAfter(&allocData);
         //fprintf(stderr, "malloc done %d %p\n", sz, object);
 //        allocData.address = (uint64_t) object;
-        allocData.reused = MemoryWaste::allocUpdate(allocData.size, &allocData.classSize, &allocData.classSizeIndex, object);
+        allocData.reused = MemoryWaste::allocUpdate(&allocData, object);
         size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject(object, allocData.size, false);
         incrementMemoryUsage(sz, allocData.classSize, new_touched_bytes, object);
         //Do after
@@ -622,16 +622,6 @@ extern "C" {
 		// thread_local
 		inAllocation = true;
 
-//		if (!localFreeArrayInitialized) {
-//			initLocalFreeArray();
-//		}
-//		if (!localNumAllocsBySizesInitialized) {
-//            initLocalNumAllocsBySizes();
-//		}
-//		if (!localNumAllocsFFLBySizesInitialized) {
-//            initLocalNumAllocsFFLBySizes();
-//		}
-
 		// Data we need for each allocation
 		allocation_metadata allocData = init_allocation(nelem * elsize, CALLOC);
 		void* object;
@@ -642,16 +632,13 @@ extern "C" {
 		// Do allocation
 		object = RealX::calloc(nelem, elsize);
         doAfter(&allocData);
-        allocData.reused = MemoryWaste::allocUpdate(allocData.size, &allocData.classSize, &allocData.classSizeIndex, object);
+        allocData.reused = MemoryWaste::allocUpdate(&allocData, object);
         size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject(object, allocData.size, false);
         incrementMemoryUsage(nelem * elsize, allocData.classSize, new_touched_bytes, object);
         // Do after
 
 		allocData.cycles = allocData.tsc_after;
 
-		// Gets overhead, address usage, mmap usage, memHWM, and perfInfo
-		//analyzeAllocation(&allocData);
-        //analyzePerfInfo(&allocData);
         collectAllocMetaData(&allocData);
 
 		//thread_local
@@ -800,7 +787,7 @@ extern "C" {
         object = RealX::realloc(ptr, sz);
         //Do after
         doAfter(&allocData);
-        allocData.reused = MemoryWaste::allocUpdate(allocData.size, &allocData.classSize, &allocData.classSizeIndex, object);
+        allocData.reused = MemoryWaste::allocUpdate(&allocData, object);
         size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject(object, sz, false);
         incrementMemoryUsage(sz, allocData.classSize, new_touched_bytes, object);
 
@@ -846,7 +833,7 @@ extern "C" {
     //Do allocation
     int retval = RealX::posix_memalign(memptr, alignment, size);
     void * object = *memptr;
-    allocData.reused = MemoryWaste::allocUpdate(allocData.size, &allocData.classSize, &allocData.classSizeIndex, object);
+    allocData.reused = MemoryWaste::allocUpdate(&allocData, object);
     //Do after
     size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject(object, allocData.size, false);
     incrementMemoryUsage(size, allocData.classSize, new_touched_bytes, object);
@@ -879,7 +866,7 @@ extern "C" {
 
      //Do allocation
      void * object = RealX::memalign(alignment, size);
-     MemoryWaste::allocUpdate(allocData.size, &allocData.classSize, &allocData.classSizeIndex, object);
+     MemoryWaste::allocUpdate(&allocData, object);
      //Do after
     size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject(object, allocData.size, false);
     incrementMemoryUsage(size, allocData.classSize, new_touched_bytes, object);
@@ -1062,47 +1049,45 @@ void operator delete[] (void * ptr) __THROW {
 //	return sizeToReturn;
 //}
 
-void getClassSizeForStyles(size_t size, void* uintaddr, size_t * classSize, short * classSizeIndex) {
+void getClassSizeForStyles(void* uintaddr, allocation_metadata * allocData) {
 
-    if(size == the_old_size) {
-        * classSize = the_old_classSize;
-        * classSizeIndex = the_old_classSizeIndex;
+    if(allocData->size == the_old_size) {
+        allocData->classSize = the_old_classSize;
+        allocData->classSizeIndex = the_old_classSizeIndex;
         return;
     }
 
-    the_old_size = size;
+    the_old_size = allocData->size;
 
     if(bibop) {
-        if(size > large_object_threshold) {
-            * classSize = size;
-            * classSizeIndex = num_class_sizes -1;
+        if(allocData->size > large_object_threshold) {
+            allocData->classSize = allocData->size;
+            allocData->classSizeIndex = num_class_sizes -1;
 
-            the_old_classSize = * classSize;
-            the_old_classSizeIndex = * classSizeIndex;
+            the_old_classSize = allocData->classSize;
+            the_old_classSizeIndex = allocData->classSizeIndex;
 
             return;
         }
         for (int i = 0; i < num_class_sizes; i++) {
             size_t tempSize = class_sizes[i];
-            if (size <= tempSize) {
-                * classSize = tempSize;
-                * classSizeIndex = i;
+            if (allocData->size <= tempSize) {
+                allocData->classSize = tempSize;
+                allocData->classSizeIndex = i;
 
-                the_old_classSize = * classSize;
-                the_old_classSizeIndex = * classSizeIndex;
+                the_old_classSize = allocData->classSize;
+                the_old_classSizeIndex = allocData->classSizeIndex;
 
                 return;
             }
         }
     } else {
-        if (size < LARGE_OBJECT) *classSizeIndex = 0;
-        else *classSizeIndex = 1;
-        * classSize = malloc_usable_size(uintaddr);
-
-//        the_old_classSize = * classSize;
-//        the_old_classSizeIndex = * classSizeIndex;
-
+        if (allocData->size < LARGE_OBJECT) allocData->classSizeIndex = 0;
+        else allocData->classSizeIndex = 1;
+        allocData->classSize = malloc_usable_size(uintaddr);
     }
+    the_old_classSize = allocData->classSize;
+    the_old_classSizeIndex = allocData->classSizeIndex;
 }
 
 //size_t getClassSizeForStyles(size_t size, uintptr_t uintaddr) {
@@ -1367,12 +1352,12 @@ void writeContention () {
 		fprintf(thrData.output, "\n>>>>>>>>>>>>>>>>>>>>>>>>> DETAILED LOCK USAGE <<<<<<<<<<<<<<<<<<<<<<<<<\n");
 		for(auto lock : lockUsage) {
 				LC * data = lock.getData();
-				fprintf(thrData.output, "lockAddr = %#lx\ttype = %s\tmax contention thread = %10u\ttimes = %10u\t",
-								lock.getKey(), LockTypeToString(data->lockType), data->maxContention.load(relaxed), data->times);
+				fprintf(thrData.output, "lockAddr = %#lx\ttype = %s\tmax contention thread = %5u\t",
+								lock.getKey(), LockTypeToString(data->lockType), data->maxContention);
 				if(data->lockType == SPIN_TRYLOCK || data->lockType == TRYLOCK) {
-				    fprintf(thrData.output, "fail times = %10u\tfail rate = %10u%%\n", data->contention_times, data->contention_times*100/data->times);
-				} else {
-                    fprintf(thrData.output, "contention times = %10u\tcontention rate = %10u%%\n", data->contention_times, data->contention_times*100/data->times);
+                    fprintf(thrData.output, "success = %10u\n", data->times);
+                } else {
+                    fprintf(thrData.output, "times = %10u\tcontention times = %10u\tcontention rate = %5u%%\n", data->times, data->contention_times, data->contention_times*100/data->times);
                 }
 		}
         fprintf(thrData.output, "\n");
@@ -1744,7 +1729,7 @@ void updateGlobalFriendlinessData() {
 
 		__atomic_add_fetch(&globalFriendlyData.numAccesses, thrFriendlyData->numAccesses, __ATOMIC_SEQ_CST);
 		__atomic_add_fetch(&globalFriendlyData.numCacheWrites, thrFriendlyData->numCacheWrites, __ATOMIC_SEQ_CST);
-		__atomic_add_fetch(&globalFriendlyData.numCacheOwnerConflicts, thrFriendlyData->numCacheOwnerConflicts, __ATOMIC_SEQ_CST);
+		//__atomic_add_fetch(&globalFriendlyData.numCacheOwnerConflicts, thrFriendlyData->numCacheOwnerConflicts, __ATOMIC_SEQ_CST);
 		__atomic_add_fetch(&globalFriendlyData.numCacheBytes, thrFriendlyData->numCacheBytes, __ATOMIC_SEQ_CST);
 		__atomic_add_fetch(&globalFriendlyData.numPageBytes, thrFriendlyData->numPageBytes, __ATOMIC_SEQ_CST);
 
@@ -1759,7 +1744,7 @@ void updateGlobalFriendlinessData() {
 				fprintf(outfd, "tid %d : total cache bytes accessed = %ld\n", tid, thrFriendlyData->numCacheBytes);
 				fprintf(outfd, "tid %d : total page bytes accessed  = %ld\n", tid, thrFriendlyData->numPageBytes);
 				fprintf(outfd, "tid %d : num cache line writes      = %ld\n", tid, thrFriendlyData->numCacheWrites);
-				fprintf(outfd, "tid %d : num cache owner conflicts  = %ld\n", tid, thrFriendlyData->numCacheOwnerConflicts);
+				//fprintf(outfd, "tid %d : num cache owner conflicts  = %ld\n", tid, thrFriendlyData->numCacheOwnerConflicts);
 				fprintf(outfd, "tid %d : avg. cache util = %0.4f\n", tid, avgCacheUtil);
 				fprintf(outfd, "tid %d : avg. page util  = %0.4f\n", tid, avgPageUtil);
 		}
@@ -1775,7 +1760,7 @@ void calcAppFriendliness() {
 
 		unsigned long totalAccesses = __atomic_load_n(&globalFriendlyData.numAccesses, __ATOMIC_SEQ_CST);
 		unsigned long totalCacheWrites = __atomic_load_n(&globalFriendlyData.numCacheWrites, __ATOMIC_SEQ_CST);
-		unsigned long totalCacheOwnerConflicts = __atomic_load_n(&globalFriendlyData.numCacheOwnerConflicts, __ATOMIC_SEQ_CST);
+		//unsigned long totalCacheOwnerConflicts = __atomic_load_n(&globalFriendlyData.numCacheOwnerConflicts, __ATOMIC_SEQ_CST);
 		unsigned long totalCacheBytes = __atomic_load_n(&globalFriendlyData.numCacheBytes, __ATOMIC_SEQ_CST);
 		unsigned long totalPageBytes = __atomic_load_n(&globalFriendlyData.numPageBytes, __ATOMIC_SEQ_CST);
 
@@ -1787,7 +1772,7 @@ void calcAppFriendliness() {
 		//FILE * outfd = stderr;
 		fprintf(outfd, "sampled accesses\t\t= %ld\n", totalAccesses);
 		fprintf(outfd, "storing instructions\t\t= %ld\n", totalCacheWrites);
-		fprintf(outfd, "cache owner conflicts\t\t= %ld (%7.4lf%%)\n", totalCacheOwnerConflicts, (totalCacheOwnerConflicts / safeDivisor(totalCacheWrites)));
+		//fprintf(outfd, "cache owner conflicts\t\t= %ld (%7.4lf%%)\n", totalCacheOwnerConflicts, (totalCacheOwnerConflicts / safeDivisor(totalCacheWrites)));
 		fprintf(outfd, "avg. cache utilization\t\t= %6.3f%%\n", (avgTotalCacheUtil * 100.0));
 		fprintf(outfd, "avg. page utilization\t\t= %6.3f%%\n", (avgTotalPageUtil * 100.0));
 }

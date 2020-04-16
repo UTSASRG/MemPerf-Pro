@@ -113,8 +113,8 @@ typedef struct {
 } PerfAppFriendly;
 
 typedef struct LockContention {
-	std::atomic<int> contention;
-	std::atomic<int> maxContention;
+	std::atomic<unsigned int> contention;
+	unsigned int maxContention;
     unsigned int times;
     unsigned int contention_times;
 	LockType lockType;

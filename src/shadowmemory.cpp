@@ -420,8 +420,8 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType)
     unsigned int curPageUsage = pme->getUsedBytes();
     unsigned int curCacheUsage = cme->getUsedBytes();
     //fprintf(stderr, "curPageUsage %d, curCacheUsage %d\n", curPageUsage, curCacheUsage);
-    pid_t curThread = thrData.tid;
-    pid_t lineOwner = cme->getOwner();
+//    pid_t curThread = thrData.tid;
+//    pid_t lineOwner = cme->getOwner();
 
     friendly_data * usageData = &thrData.friendlyData;
     /*
@@ -437,16 +437,16 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType)
 		usageData->numCacheBytes += curCacheUsage;
 		usageData->numPageBytes += curPageUsage;
 
-		bool isCacheOwnerConflict = false;
+//		bool isCacheOwnerConflict = false;
 
 		if(accessType == E_MEM_STORE) {
 				usageData->numCacheWrites++;
-				if(lineOwner != curThread) {
-						isCacheOwnerConflict = true;
-						usageData->numCacheOwnerConflicts++;
-				}
+//				if(lineOwner != curThread) {
+//						isCacheOwnerConflict = true;
+//						usageData->numCacheOwnerConflicts++;
+//				}
 				// change cache line owner
-				cme->setOwner(curThread);
+				//cme->setOwner(curThread);
 		}
 
 		// DEBUG OUTPUT
@@ -668,7 +668,7 @@ bool PageMapEntry::updateCacheLines(uintptr_t uintaddr, unsigned long mega_index
 						current->addUsedBytes(curCacheLineBytes);
 				}
 				size_remain -= curCacheLineBytes;
-				current->setOwner(thrData.tid);
+				//current->setOwner(thrData.tid);
 				curCacheLineIdx++;
 		}
 		while(size_remain > 0) {
@@ -687,20 +687,20 @@ bool PageMapEntry::updateCacheLines(uintptr_t uintaddr, unsigned long mega_index
 				}
 
 				size_remain -= curCacheLineBytes;
-				current->setOwner(thrData.tid);
+				//current->setOwner(thrData.tid);
 				curCacheLineIdx++;
 		}
 
 		return true;
 }
 
-pid_t CacheMapEntry::getOwner() {
-		return owner;
-}
+//pid_t CacheMapEntry::getOwner() {
+//		return owner;
+//}
 
-void CacheMapEntry::setOwner(pid_t new_owner) {
-		owner = new_owner;
-}
+//void CacheMapEntry::setOwner(pid_t new_owner) {
+//		owner = new_owner;
+//}
 
 CacheMapEntry * PageMapEntry::getCacheMapEntry(bool mvBumpPtr) {
 		if(mvBumpPtr && __builtin_expect(__atomic_load_n(&cache_map_entry, __ATOMIC_RELAXED) == NULL, 0)) {

@@ -82,9 +82,9 @@ void MemoryWaste::initForNewTid() {
 }
 
 
-void getClassSizeForStyles(size_t size, void* uintaddr, size_t * classSize, short * classSizeIndex);
+void getClassSizeForStyles(void* uintaddr, allocation_metadata * allocData);
 
-bool MemoryWaste::allocUpdate(size_t size, size_t* out_classSize, short* out_classSizeIndex, void * address) {
+bool MemoryWaste::allocUpdate(allocation_metadata * allocData, void * address) {
     bool reused;
     size_t classSize;
     short classSizeIndex;
@@ -93,40 +93,37 @@ bool MemoryWaste::allocUpdate(size_t size, size_t* out_classSize, short* out_cla
     if(! addr_obj_status.find(address, &old_status)) {
         reused = false;
         /* new status */
-        getClassSizeForStyles(size, address, out_classSize, out_classSizeIndex);
-        classSize = *out_classSize;
-        classSizeIndex = *out_classSizeIndex;
-        addr_obj_status.insert(address, newObjStatus(size, classSize, classSizeIndex));
+        getClassSizeForStyles(address, allocData);
+        classSize = allocData->classSize;
+        classSizeIndex = allocData->classSizeIndex;
+        addr_obj_status.insert(address, newObjStatus(allocData->size, classSize, classSizeIndex));
     } else {
         reused = true;
         ///Here
-        if(old_status->size_using == size) {
-            *out_classSize = old_status->classSize;
-            *out_classSizeIndex = old_status->classSizeIndex;
+        if(old_status->size_using == allocData->size) {
+            allocData->classSize = old_status->classSize;
+            allocData->classSizeIndex = old_status->classSizeIndex;
         } else {
-            getClassSizeForStyles(size, address, out_classSize, out_classSizeIndex);
+            getClassSizeForStyles(address, allocData);
         }
 
-        classSize = *out_classSize;
-        classSizeIndex = *out_classSizeIndex;
+        classSize = allocData->classSize;
+        classSizeIndex = allocData->classSizeIndex;
 ///www
         mem_freelist_wasted_minus[old_status->classSizeIndex] += classSize;
 
-        old_status->size_using = size;
+        old_status->size_using = allocData->size;
         old_status->classSize = classSize;
         old_status->classSizeIndex = classSizeIndex;
     }
 ///www
-    if(classSize-size >= PAGESIZE) {
+    if(classSize-allocData->size >= PAGESIZE) {
         mem_alloc_wasted[classSizeIndex] += (classSize/PAGESIZE)*PAGESIZE;
     } else {
         mem_alloc_wasted[classSizeIndex] += classSize;
     }
-    mem_alloc_wasted_minus[classSizeIndex] += size;
+    mem_alloc_wasted_minus[classSizeIndex] += allocData->size;
 
-//    fprintf(stderr,"alloc %d %d, %d, %llu, %llu, %llu, %llu\n", thrData.tid, size, classSizeIndex,
-//            mem_alloc_wasted[classSizeIndex], mem_alloc_wasted_minus[classSizeIndex],
-//            mem_freelist_wasted[classSizeIndex], mem_freelist_wasted_minus[classSizeIndex]);
     return reused;
 }
 
