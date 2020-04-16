@@ -20,7 +20,7 @@
 #include "selfmap.hh"
 #include "spinlock.hh"
 #include "xthreadx.hh"
-#include "recordfunctions.hh"
+#include "recordscale.hh"
 #include "memwaste.h"
 
 
@@ -91,10 +91,10 @@ size_t* class_sizes;
 //
 //thread_local uint64_t total_time_wait = 0;
 
-std::atomic<uint> num_sbrk (0);
-std::atomic<uint> num_madvise (0);
-std::atomic<uint> malloc_mmaps (0);
-std::atomic<std::size_t> size_sbrk (0);
+uint num_sbrk = 0;
+uint num_madvise = 0;
+uint malloc_mmaps = 0;
+std::size_t size_sbrk = 0;
 
 //thread_local uint blowup_allocations = 0;
 thread_local unsigned long long total_cycles_start = 0;
@@ -178,8 +178,8 @@ friendly_data globalFriendlyData;
 //Hashmap of malloc'd addresses to a ObjectTuple
 //HashMap <uint64_t, ObjectTuple*, spinlock> addressUsage;
 
-//Hashmap of lock addr to LC
-HashMap <uint64_t, LC*, spinlock> lockUsage;
+//Hashmap of lock addr to LockInfo
+HashMap <uint64_t, LockInfo*, spinlock> lockUsage;
 
 //Hashmap of mmap addrs to tuple:
 //HashMap <uint64_t, MmapTuple*, spinlock> mappings;
@@ -1122,8 +1122,8 @@ ObjectTuple* newObjectTuple (uint64_t address, size_t size) {
 //	return t;
 //}
 
-LC* newLC (LockType lockType, int contention) {
-	LC* lc = (LC*) myMalloc(sizeof(LC));
+LockInfo* newLockInfo (LockType lockType, int contention) {
+	LockInfo* lc = (LockInfo*) myMalloc(sizeof(LockInfo));
 	lc->contention = contention;
 	lc->maxContention = contention;
 	lc->lockType = lockType;
@@ -1351,7 +1351,7 @@ void writeContention () {
 
 		fprintf(thrData.output, "\n>>>>>>>>>>>>>>>>>>>>>>>>> DETAILED LOCK USAGE <<<<<<<<<<<<<<<<<<<<<<<<<\n");
 		for(auto lock : lockUsage) {
-				LC * data = lock.getData();
+				LockInfo * data = lock.getData();
 				fprintf(thrData.output, "lockAddr = %#lx\ttype = %s\tmax contention thread = %5u\t",
 								lock.getKey(), LockTypeToString(data->lockType), data->maxContention);
 				if(data->lockType == SPIN_TRYLOCK || data->lockType == TRYLOCK) {
@@ -1535,13 +1535,13 @@ void checkGlobalMemoryUsage() {
 
 void incrementMemoryUsage(size_t size, size_t classSize, size_t new_touched_bytes, void * object) {
 
-		current_tc->realMemoryUsage += size;
-		current_tc->realAllocatedMemoryUsage += classSize;
-        if(current_tc->realAllocatedMemoryUsage > current_tc->maxRealAllocatedMemoryUsage) {
-            current_tc->maxRealAllocatedMemoryUsage = current_tc->realAllocatedMemoryUsage;
+		threadContention->realMemoryUsage += size;
+		threadContention->realAllocatedMemoryUsage += classSize;
+        if(threadContention->realAllocatedMemoryUsage > threadContention->maxRealAllocatedMemoryUsage) {
+            threadContention->maxRealAllocatedMemoryUsage = threadContention->realAllocatedMemoryUsage;
         }
-        if(current_tc->realMemoryUsage > current_tc->maxRealMemoryUsage) {
-            current_tc->maxRealMemoryUsage = current_tc->realMemoryUsage;
+        if(threadContention->realMemoryUsage > threadContention->maxRealMemoryUsage) {
+            threadContention->maxRealMemoryUsage = threadContention->realMemoryUsage;
         }
 		incrementGlobalMemoryAllocation(size, classSize);
 
@@ -1549,10 +1549,10 @@ void incrementMemoryUsage(size_t size, size_t classSize, size_t new_touched_byte
     checkGlobalAllocatedMemoryUsage();
 
 		if(new_touched_bytes > 0) {
-				current_tc->totalMemoryUsage += new_touched_bytes;
+				threadContention->totalMemoryUsage += new_touched_bytes;
 				__atomic_add_fetch(&mu.totalMemoryUsage, new_touched_bytes, __ATOMIC_RELAXED);
-				if(current_tc->totalMemoryUsage > current_tc->maxTotalMemoryUsage) {
-				    current_tc->maxTotalMemoryUsage = current_tc->totalMemoryUsage;
+				if(threadContention->totalMemoryUsage > threadContention->maxTotalMemoryUsage) {
+				    threadContention->maxTotalMemoryUsage = threadContention->totalMemoryUsage;
 				}
                 checkGlobalTotalMemoryUsage();
 		}
@@ -1561,8 +1561,8 @@ void incrementMemoryUsage(size_t size, size_t classSize, size_t new_touched_byte
 void decrementMemoryUsage(size_t size, size_t classSize, void * addr) {
   if(addr == NULL) return;
 
-	current_tc->realAllocatedMemoryUsage -= classSize;
-	current_tc->realMemoryUsage -= size;
+	threadContention->realAllocatedMemoryUsage -= classSize;
+	threadContention->realMemoryUsage -= size;
 
   decrementGlobalMemoryAllocation(size, classSize);
 

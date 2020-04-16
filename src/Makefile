@@ -13,7 +13,7 @@ INCS =	xthreadx.hh			\
 				hashfuncs.hh		\
 				interval.hh			\
 				selfmap.hh			\
-				recordfunctions.hh\
+				recordscale.hh\
 				spinlock.hh			\
 				shadowmemory.hh	\
 				memwaste.h          \
@@ -28,8 +28,8 @@ CXX = g++
 #CXX = clang++ 
 
 CFLAGS += -pipe -g3 -ggdb3 -Wall -DNDEBUG --std=c++11 -fPIC -I$(ROOT)/include -fno-omit-frame-pointer
-#CFLAGS2 += -O0 -pipe -g3 -ggdb3 -Wall -DNDEBUG --std=c++11 -fPIC -I$(ROOT)/include -Wno-unused-result -fno-omit-frame-pointer -Wl,--no-as-needed -lrt
-CFLAGS2 += -O2 -pipe -Wall -DNDEBUG --std=c++11 -fPIC -I$(ROOT)/include -Wno-unused-result -fno-omit-frame-pointer -Wl,--no-as-needed -lrt
+CFLAGS2 += -O2 -pipe -g3 -ggdb3 -Wall -DNDEBUG --std=c++11 -fPIC -I$(ROOT)/include -Wno-unused-result -fno-omit-frame-pointer -Wl,--no-as-needed -lrt
+#CFLAGS2 += -DENABLE_MORE_COUNTER -O2 -pipe -g3 -ggdb3 -Wall -DNDEBUG --std=c++11 -fPIC -I$(ROOT)/include -Wno-unused-result -fno-omit-frame-pointer -Wl,--no-as-needed -lrt
 #CFLAGS2 += -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free
 
 #THREADTEST_FILE = threadTest.cpp
@@ -37,7 +37,7 @@ CFLAGS2 += -O2 -pipe -Wall -DNDEBUG --std=c++11 -fPIC -I$(ROOT)/include -Wno-unu
 # TEST_FILE = malloc-and-free.cpp
 
 THREADTEST_FILE = malloc-and-free.cpp
-TEST_FILE = alloc.cpp 
+TEST_FILE = alloc.cpp
 
 NUM_THREADS = 20
 NUM_MALLOCS = 80000
@@ -48,9 +48,12 @@ NUM_MALLOCS = 80000
 INCLUDE_DIRS = -I. -I/usr/include/x86_64-linux-gnu/c++/4.8/
 LIBS     := dl pthread
 
-TARGETS =	libmallocprof.so 			\
-			test/test-clean 			\
-			test/test-hoard 			\
+TARGETS =	libmallocprof.so 			
+#\
+#			test/test-clean 			\
+			test/test-obsd
+
+#test/test-hoard 			\
 			test/test-xlibc 			\
 			test/test-obsd 				\
 			test/test-freeguard 		\
@@ -87,11 +90,12 @@ single:		libmallocprof.so \
 			test/test-tcmalloc-noprof
 
 threads:	libmallocprof.so \
-			test/test-hoard-thread \
+			test/test-obsd-thread 
+			
+#			test/test-hoard-thread \
 			test/test-xlibc-thread \
 			test/test-dieharder-thread \
 			test/test-freeguard-thread \
-			test/test-obsd-thread \
 			test/test-jemalloc-thread \
 			test/test-tcmalloc-thread
 
@@ -122,10 +126,10 @@ test/test-tcmalloc-minimal-thread: libmallocprof.so test/$(THREADTEST_FILE)
 
 # OpenBSD
 test/test-obsd: libmallocprof.so test/$(TEST_FILE)
-	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic ../Memoryallocators/OpenBSD-6.0/libomalloc.so -o test/test-obsd test/$(TEST_FILE)
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic ~/Memoryallocators/OpenBSD-6.0/libomalloc.so -o test/test-obsd test/$(TEST_FILE)
 
 test/test-obsd-thread: libmallocprof.so test/$(THREADTEST_FILE)
-	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic ../Memoryallocators/OpenBSD-6.0/libomalloc.so -o test/test-obsd-thread test/$(THREADTEST_FILE) -lpthread
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic ~/Memoryallocators/OpenBSD-6.0/libomalloc.so -o test/test-obsd-thread test/$(THREADTEST_FILE) -lpthread
 
 # FreeGuard
 test/test-freeguard: libmallocprof.so test/$(TEST_FILE)
@@ -147,13 +151,6 @@ test/test-xlibc: libmallocprof.so test/$(TEST_FILE)
 
 test/test-xlibc-thread: libmallocprof.so test/$(THREADTEST_FILE)
 	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic ../Memoryallocators/libc-2.24/libmalloc.so -o test/test-xlibc-thread test/$(THREADTEST_FILE) -pthread
-
-# Libc2281
-test/test-libc2281: libmallocprof.so test/$(TEST_FILE)
-	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic ../Memoryallocators/libc-2.28/libmalloc.so -o test/test-libc2281 test/$(TEST_FILE)
-
-test/test-libc2281-thread: libmallocprof.so test/$(THREADTEST_FILE)
-	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic ../Memoryallocators/libc-2.28/libmalloc.so -o test/test-libc2281-thread test/$(THREADTEST_FILE) -pthread
 
 # Hoard
 test/test-hoard: libmallocprof.so test/$(TEST_FILE)
