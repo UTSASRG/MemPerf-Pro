@@ -131,7 +131,7 @@ bool MemoryWaste::allocUpdate(allocation_metadata * allocData, void * address) {
 void MemoryWaste::freeUpdate(void* address) {
 
     /* Get old status */
-    objStatus* status = objStatusMap.find(address, sizeof(void *));
+    objStatus* status = objStatusMap.find((uint64_t)address, sizeof(void *));
     if (!status) {
         fprintf(stderr, "objStatusMap key error: %p\n", address);
         abort();

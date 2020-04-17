@@ -24,11 +24,11 @@ typedef struct {
     size_t size_using;
     size_t classSize;
     short classSizeIndex;
-} obj_status;
+} objStatus;
 
 class MemoryWaste{
 private:
-    static HashMap <void*, obj_status*, spinlock> addr_obj_status;
+    static HashMap <void*, objStatus, spinlock, PrivateHeap> objStatusMap;
     static thread_local uint64_t* mem_alloc_wasted;
     static thread_local uint64_t* mem_alloc_wasted_minus;
     static thread_local uint64_t* mem_freelist_wasted;
@@ -50,7 +50,6 @@ private:
     static uint64_t * mem_alloc_wasted_record_global_minus;
     static uint64_t * mem_freelist_wasted_record_global_minus;
 
-    static obj_status * newObjStatus(size_t size_using, size_t classSize, short classSizeIndex);
 public:
 
     static void initialize();
