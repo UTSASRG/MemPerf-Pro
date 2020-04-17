@@ -6,9 +6,9 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <unistd.h>
-
-#include "xdefines.hh"
+#include "spinlock.hh"
 #include "hashlist.hh"
+#include "privateheap.hh"
 
 #define LOCK_PROTECTION 1
 
@@ -66,7 +66,7 @@ class HashMap {
 
     struct Entry* nextEntry() { return (struct Entry*)list.next; }
 
-    ValueType getValue() { return value; }
+    ValueType * getValue() { return &value; }
 
     KeyType getKey() { return key; }
   };
@@ -199,9 +199,13 @@ public:
     return ret;
   }
 
-  void insert(const KeyType& key, size_t keylen, ValueType value) {
+  ValueType * insert(const KeyType& key, size_t keylen, ValueType value) {
+    ValueType* ret = NULL;
+    struct Entry * entry; 
     if(_initialized != true) {
       fprintf(stderr, "process %d: initialized at  %p hashmap is not true\n", getpid(), &_initialized);
+      exit(0);
+      //  while(1) { ; }
     }
 
     assert(_initialized == true);
@@ -213,11 +217,13 @@ public:
     // PRINF("Insert entry: key %p\n", key);
 #if LOCK_PROTECTION
     first->Lock();
-    insertEntry(first, key, keylen, value);
-    first->Unlock();
-#else 
-    insertEntry(first, key, keylen, value);
 #endif
+    entry = insertEntry(first, key, keylen, value);
+    ret = &entry->value;
+#if LOCK_PROTECTION
+    first->Unlock();
+#endif
+    return ret;
   }
 
   // Insert a hash table entry if it is not existing.
@@ -289,7 +295,10 @@ private:
   struct Entry* createNewEntry(const KeyType& key, size_t keylen, ValueType value) {
     struct Entry* entry = (struct Entry*)SourceHeap::allocate(sizeof(struct Entry));
     //struct Entry* entry = (struct Entry*)Real::malloc(sizeof(struct Entry));
-
+    if(entry == NULL) {
+      fprintf(stderr, "fail to create entry\n");
+      exit(0);
+    }
     // Initialize this new entry.
     entry->initialize(key, keylen, value);
     return entry;
@@ -350,12 +359,19 @@ public:
 
     ~iterator() {}
 
+    struct Entry operator*() { return *(this->_entry); }
+    iterator& operator++() {
+      (*this)++;
+      return *this;
+    }
+
     iterator& operator++(int) // in postfix ++  /* parameter? */
     {
       struct HashBucket* hashentry = _hashmap->getHashBucket(_pos);
 
       // Check whether this entry is the last entry in current hash entry.
-      if(!isListTail(&_entry->list, &hashentry->list)) {
+      //if(!isListTail(&hashentry->list)) {
+      if(!isListTail(&hashentry->list, &_entry->list)) {
         // If not, then we simply get next entry. No need to change pos.
         _entry = _entry->nextEntry();
       } else {
@@ -415,6 +431,36 @@ public:
   }
 
   iterator end() { return iterator(NULL, 0, this); }
+
+  void printUtilization() {
+    size_t pos = 0;
+    struct HashBucket* head = NULL;
+    size_t numEntries = 0;
+    size_t bucketsUsed = 0;
+    size_t emptyBuckets = 0;
+    size_t firstBucket = 0;
+
+    while(pos < _bucketsTotal) {
+      head = getHashBucket(pos);
+      if(head->count == 0) {
+        emptyBuckets++;
+      } else {
+        if(firstBucket == 0) {
+          firstBucket = pos;
+        }
+        bucketsUsed++;
+        numEntries += head->count;
+      }
+      //fprintf(stderr, "map %p -> bucket %04zu -> count = %zu\n", this, pos, head->count);
+      //entry = (struct Entry*)head->getFirstEntry();
+      //return iterator(entry, pos, this);
+      pos++;
+    }
+
+    fprintf(stderr, "map %p -> bucketsUsed = %zu , firstBucket = %zu, emptyBuckets = %zu, total entries = %zu\n",
+          this, bucketsUsed, firstBucket, emptyBuckets, numEntries);
+  }
+
 };
 
 #endif

@@ -165,33 +165,7 @@ unsigned long long HASH_SIZE = (unsigned long long)1024*1024*1024*2;
 
 friendly_data globalFriendlyData;
 
-//Hashmap of class size to TAD*
-// typedef HashMap <uint64_t, thread_alloc_data*, spinlock> Class_Size_TAD;
-
-//Hashmap of thread ID to Class_Size_TAD
-// HashMap <uint64_t, thread_alloc_data*, spinlock> threadToCSM;
-
-//Hashmap of class size to tad struct, for all thread data summed up
-// HashMap<uint64_t, thread_alloc_data*, spinlock> globalCSM;
-// HashMap<uint64_t, thread_alloc_data*, spinlock> globalCSM;
-
-//Hashmap of malloc'd addresses to a ObjectTuple
-//HashMap <uint64_t, ObjectTuple*, spinlock> addressUsage;
-
-//Hashmap of lock addr to LockInfo
-HashMap <uint64_t, LockInfo*, spinlock> lockUsage;
-
-//Hashmap of mmap addrs to tuple:
-//HashMap <uint64_t, MmapTuple*, spinlock> mappings;
-
-//Hashmap of Overhead objects
-//
-//HashMap <size_t, Overhead*, spinlock> overhead;
-//Hashmap of tid to ThreadContention*
-//HashMap <uint64_t, ThreadContention*, spinlock> threadContention;
-
-//Spinlocks
-//spinlock temp_mem_lock;
+HashMap <uint64_t, PerLockData, spinlock, PrivateHeap> lockUsage;
 
 // pre-init private allocator memory
 char myBuffer[TEMP_MEM_SIZE];
@@ -265,13 +239,6 @@ __attribute__((constructor)) initStatus initializer() {
     myMemLock_hash.init();
 
 
-
-
-	lockUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 128*32);
-	//overhead.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 256);
-	//mappings.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
-	mapsInitialized = true;
-
 	void * program_break = RealX::sbrk(0);
 	thrData.tid = syscall(__NR_gettid);
 
@@ -304,12 +271,7 @@ __attribute__((constructor)) initStatus initializer() {
 	snprintf ((allocatorFileName+path_bytes+name_bytes), ext_bytes, ".info");
     fprintf(stderr, "name: %s\n", allocatorFileName);
 	readAllocatorFile();
-
-//    MemoryWaste::initialize();
-//    MemoryWaste::initForNewTid();
-    MemoryWaste::checkGlobalInit();
-    MemoryWaste::checkThreadInit();
-
+    
 	//Initialize the global and free counter arrays (blowup)
 	//initGlobalFreeArray();
 	//initLocalFreeArray();
@@ -406,7 +368,7 @@ void dumpHashmaps() {
 //	overhead.printUtilization();
 
 	fprintf(stderr, "lockUsage.printUtilization():\n");
-	lockUsage.printUtilization();
+  lockUsage.printUtilization();
 
 	//fprintf(stderr, "threadContention.printUtilization():\n");
 	//threadContention.printUtilization();
@@ -491,10 +453,17 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
 	atexit(exitHandler);
 
 	PMU_init_check();
+	lockUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 128*32);
+	mapsInitialized = true;
+
+  MemoryWaste::initialize();
+  MemoryWaste::initForNewTid();
+  MemoryWaste::checkGlobalInit();
+  MemoryWaste::checkThreadInit();
+  fprintf(stderr, "in real main");
 
 	inRealMain = true;
 	int result = real_main_mallocprof (argc, argv, envp);
-	//    fprintf(stderr, "real main has returned");
 	return result;
 }
 
@@ -654,10 +623,6 @@ extern "C" {
         // only call RealX::free() if the object did not come from here.
         if (ptr >= (void *)myMem && ptr <= myMemEnd) {
             myFree (ptr);
-            return;
-        }
-        if (ptr >= (void *)myMem_hash && ptr <= myMemEnd_hash) {
-            myFree_hash (ptr);
             return;
         }
         if ((profilerInitialized != INITIALIZED) || !inRealMain) {
@@ -1122,14 +1087,6 @@ ObjectTuple* newObjectTuple (uint64_t address, size_t size) {
 //	return t;
 //}
 
-LockInfo* newLockInfo (LockType lockType, int contention) {
-	LockInfo* lc = (LockInfo*) myMalloc(sizeof(LockInfo));
-	lc->contention = contention;
-	lc->maxContention = contention;
-	lc->lockType = lockType;
-	return lc;
-}
-
 //Overhead* newOverhead () {
 //
 //	Overhead* o = (Overhead*) myMalloc(sizeof(Overhead));
@@ -1197,45 +1154,6 @@ void myFree (void* ptr) {
 		if(myMemAllocations == 0) myMemPosition = 0;
 	}
 	myMemLock.unlock();
-}
-
-void* myMalloc_hash (size_t size) {
-    if (myLocalMemInitialized) {
-        return myLocalMalloc(size);
-    }
-
-    myMemLock_hash.lock ();
-    void* p;
-    if((myMemPosition_hash + size + MY_METADATA_SIZE) < HASH_SIZE) {
-        unsigned * metadata = (unsigned *)(myMem_hash + myMemPosition_hash);
-        *metadata = size;
-        p = (void *)(myMem_hash + myMemPosition_hash + MY_METADATA_SIZE);
-        myMemPosition_hash += size + MY_METADATA_SIZE;
-        myMemAllocations_hash++;
-    }
-    else {
-        fprintf(stderr, "Error: myMem_hash out of memory\n");
-        fprintf(stderr, "requestedSize= %zu, TEMP_MEM_SIZE= %d, myMemPosition_hash= %lu, myMemAllocations_hash= %lu\n",
-                size, HASH_SIZE, myMemPosition_hash, myMemAllocations_hash);
-        dumpHashmaps();
-        abort();
-    }
-    myMemLock_hash.unlock ();
-    return p;
-}
-
-void myFree_hash (void* ptr) {
-    if (ptr == NULL) return;
-    if (ptr >= myLocalMem && ptr <= myLocalMemEnd) {
-        myLocalFree(ptr);
-        return;
-    }
-    myMemLock_hash.lock();
-    if (ptr >= (void*)myMem_hash && ptr <= myMemEnd_hash) {
-        myMemAllocations_hash--;
-        if(myMemAllocations_hash == 0) myMemPosition_hash = 0;
-    }
-    myMemLock_hash.unlock();
 }
 
 void globalizeTAD() {
@@ -1351,14 +1269,10 @@ void writeContention () {
 
 		fprintf(thrData.output, "\n>>>>>>>>>>>>>>>>>>>>>>>>> DETAILED LOCK USAGE <<<<<<<<<<<<<<<<<<<<<<<<<\n");
 		for(auto lock : lockUsage) {
-				LockInfo * data = lock.getData();
+				PerLockData * data = lock.getValue();
 				fprintf(thrData.output, "lockAddr = %#lx\ttype = %s\tmax contention thread = %5u\t",
-								lock.getKey(), LockTypeToString(data->lockType), data->maxContention);
-				if(data->lockType == SPIN_TRYLOCK || data->lockType == TRYLOCK) {
-                    fprintf(thrData.output, "success = %10u\n", data->times);
-                } else {
-                    fprintf(thrData.output, "times = %10u\tcontention times = %10u\tcontention rate = %5u%%\n", data->times, data->contention_times, data->contention_times*100/data->times);
-                }
+								lock.getKey(), LockTypeToString(data->type), data->maxContendThreads);
+                fprintf(thrData.output, "invocations = %10u\tcontention times = %10u\tcontention rate = %5u%%\n", data->calls, data->contendCalls, data->contendCalls*100/data->calls);
 		}
         fprintf(thrData.output, "\n");
 		fflush(thrData.output);
@@ -1779,20 +1693,17 @@ void calcAppFriendliness() {
 
 const char * LockTypeToString(LockType type) {
 		switch(type) {
-				case MUTEX:
+				case LOCK_TYPE_MUTEX:
 					return "mutex";
 
-				case SPINLOCK:
+				case LOCK_TYPE_SPINLOCK:
 					return "spinlock";
 
-				case TRYLOCK:
+				case LOCK_TYPE_TRYLOCK:
 					return "trylock";
 
-				case SPIN_TRYLOCK:
+				case LOCK_TYPE_SPIN_TRYLOCK:
 					return "spin_trylock";
-
-		    case NOLOCK:
-		        return "nolock";
 
 				default:
 					return "unknown";
