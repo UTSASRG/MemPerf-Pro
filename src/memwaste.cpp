@@ -5,8 +5,6 @@
 #include <stdio.h>
 #include "memwaste.h"
 
-#include "privateheap.hh"
-
 HashMap <void*, objStatus, spinlock, PrivateHeap> MemoryWaste::objStatusMap;
 thread_local uint64_t* MemoryWaste::mem_alloc_wasted;
 thread_local uint64_t* MemoryWaste::mem_alloc_wasted_minus;
@@ -36,16 +34,16 @@ void MemoryWaste::initialize() {
     fprintf(stderr, "memorywaste initialization done\n");
 
     if(bibop) {
-        mem_alloc_wasted_record_global = (uint64_t*) dlmalloc(num_class_sizes * sizeof(uint64_t));
-        mem_alloc_wasted_record_global_minus = (uint64_t*) dlmalloc(num_class_sizes * sizeof(uint64_t));
-        mem_freelist_wasted_record_global = (uint64_t*) dlmalloc(num_class_sizes * sizeof(uint64_t));
-        mem_freelist_wasted_record_global_minus = (uint64_t*) dlmalloc(num_class_sizes * sizeof(uint64_t));
+        mem_alloc_wasted_record_global = (uint64_t*) myMalloc(num_class_sizes * sizeof(uint64_t));
+        mem_alloc_wasted_record_global_minus = (uint64_t*) myMalloc(num_class_sizes * sizeof(uint64_t));
+        mem_freelist_wasted_record_global = (uint64_t*) myMalloc(num_class_sizes * sizeof(uint64_t));
+        mem_freelist_wasted_record_global_minus = (uint64_t*) myMalloc(num_class_sizes * sizeof(uint64_t));
 
     } else {
-        mem_alloc_wasted_record_global = (uint64_t*) dlmalloc(2 * sizeof(uint64_t));
-        mem_alloc_wasted_record_global_minus = (uint64_t*) dlmalloc(2 * sizeof(uint64_t));
-        mem_freelist_wasted_record_global = (uint64_t*) dlmalloc(2 * sizeof(uint64_t));
-        mem_freelist_wasted_record_global_minus = (uint64_t*) dlmalloc(2 * sizeof(uint64_t));
+        mem_alloc_wasted_record_global = (uint64_t*) myMalloc(2 * sizeof(uint64_t));
+        mem_alloc_wasted_record_global_minus = (uint64_t*) myMalloc(2 * sizeof(uint64_t));
+        mem_freelist_wasted_record_global = (uint64_t*) myMalloc(2 * sizeof(uint64_t));
+        mem_freelist_wasted_record_global_minus = (uint64_t*) myMalloc(2 * sizeof(uint64_t));
     }
     record_lock.init();
     global_init = true;
@@ -54,24 +52,24 @@ void MemoryWaste::initialize() {
 void MemoryWaste::initForNewTid() {
 
     if(bibop) {
-        mem_alloc_wasted = (uint64_t*) dlmalloc(num_class_sizes * sizeof(uint64_t));
-        mem_alloc_wasted_minus = (uint64_t*) dlmalloc(num_class_sizes * sizeof(uint64_t));
-        mem_freelist_wasted = (uint64_t*) dlmalloc(num_class_sizes * sizeof(uint64_t));
-        mem_freelist_wasted_minus = (uint64_t*) dlmalloc(num_class_sizes * sizeof(uint64_t));
-        mem_alloc_wasted_record = (uint64_t*) dlmalloc(num_class_sizes * sizeof(uint64_t));
-        mem_alloc_wasted_record_minus = (uint64_t*) dlmalloc(num_class_sizes * sizeof(uint64_t));
-        mem_freelist_wasted_record = (uint64_t*) dlmalloc(num_class_sizes * sizeof(uint64_t));
-        mem_freelist_wasted_record_minus = (uint64_t*) dlmalloc(num_class_sizes * sizeof(uint64_t));
+        mem_alloc_wasted = (uint64_t*) myMalloc(num_class_sizes * sizeof(uint64_t));
+        mem_alloc_wasted_minus = (uint64_t*) myMalloc(num_class_sizes * sizeof(uint64_t));
+        mem_freelist_wasted = (uint64_t*) myMalloc(num_class_sizes * sizeof(uint64_t));
+        mem_freelist_wasted_minus = (uint64_t*) myMalloc(num_class_sizes * sizeof(uint64_t));
+        mem_alloc_wasted_record = (uint64_t*) myMalloc(num_class_sizes * sizeof(uint64_t));
+        mem_alloc_wasted_record_minus = (uint64_t*) myMalloc(num_class_sizes * sizeof(uint64_t));
+        mem_freelist_wasted_record = (uint64_t*) myMalloc(num_class_sizes * sizeof(uint64_t));
+        mem_freelist_wasted_record_minus = (uint64_t*) myMalloc(num_class_sizes * sizeof(uint64_t));
 
     } else {
-        mem_alloc_wasted = (uint64_t*) dlmalloc(2 * sizeof(uint64_t));
-        mem_alloc_wasted_minus = (uint64_t*) dlmalloc(2 * sizeof(uint64_t));
-        mem_freelist_wasted = (uint64_t*) dlmalloc(2 * sizeof(uint64_t));
-        mem_freelist_wasted_minus = (uint64_t*) dlmalloc(2 * sizeof(uint64_t));
-        mem_alloc_wasted_record = (uint64_t*) dlmalloc(2 * sizeof(uint64_t));
-        mem_alloc_wasted_record_minus = (uint64_t*) dlmalloc(2 * sizeof(uint64_t));
-        mem_freelist_wasted_record = (uint64_t*) dlmalloc(2 * sizeof(uint64_t));
-        mem_freelist_wasted_record_minus = (uint64_t*) dlmalloc(2 * sizeof(uint64_t));
+        mem_alloc_wasted = (uint64_t*) myMalloc(2 * sizeof(uint64_t));
+        mem_alloc_wasted_minus = (uint64_t*) myMalloc(2 * sizeof(uint64_t));
+        mem_freelist_wasted = (uint64_t*) myMalloc(2 * sizeof(uint64_t));
+        mem_freelist_wasted_minus = (uint64_t*) myMalloc(2 * sizeof(uint64_t));
+        mem_alloc_wasted_record = (uint64_t*) myMalloc(2 * sizeof(uint64_t));
+        mem_alloc_wasted_record_minus = (uint64_t*) myMalloc(2 * sizeof(uint64_t));
+        mem_freelist_wasted_record = (uint64_t*) myMalloc(2 * sizeof(uint64_t));
+        mem_freelist_wasted_record_minus = (uint64_t*) myMalloc(2 * sizeof(uint64_t));
     }
 
     thread_init = true;
@@ -93,7 +91,7 @@ bool MemoryWaste::allocUpdate(allocation_metadata * allocData, void * address) {
         classSize = allocData->classSize;
         classSizeIndex = allocData->classSizeIndex;
         objStatus newObj; 
-        fprintf(stderr, "insert address %p\n", address);
+        //fprintf(stderr, "insert address %p\n", address);
         newObj.size_using = allocData->size;
         newObj.classSize = classSize;
         newObj.classSizeIndex = classSizeIndex;

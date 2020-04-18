@@ -7,10 +7,25 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include "spinlock.hh"
+#include "real.hh"
 #include "hashlist.hh"
-#include "privateheap.hh"
 
 #define LOCK_PROTECTION 1
+extern void* myMalloc_hash (size_t size);
+extern void myFree_hash(void *ptr);
+
+class PrivateHeap {
+public:
+  static void * allocate (size_t sz) {
+    fprintf(stderr, "sz is %d\n", sz);
+    return myMalloc_hash (sz);
+  }
+
+  static void deallocate (void * ptr) {
+    myFree_hash (ptr);
+  }
+
+};
 
 #if LOCK_PROTECTION
 template <class KeyType,                    
@@ -87,6 +102,11 @@ public:
   HashMap() : _initialized(false) {
   }
 
+  size_t alignup(size_t size, size_t alignto) {
+    return (size % alignto == 0) ? size : ((size + (alignto - 1)) & ~(alignto - 1));
+  }
+
+
   void initialize(hashFuncPtr hfunc, keycmpFuncPtr kcmp, const size_t size = 4096) {
     _buckets = NULL;
     _bucketsTotalUsed = 0;
@@ -102,7 +122,14 @@ public:
     _keycmp = kcmp;
 
     // Allocated predefined size.
-    _buckets = (struct HashBucket*)SourceHeap::allocate(size * sizeof(struct HashBucket));
+    unsigned long mapsize = size * sizeof(struct HashBucket);
+    mapsize = alignup(mapsize, 4096);
+
+    _buckets = (struct HashBucket*)RealX::mmap(NULL, mapsize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if(_buckets == NULL) { 
+      fprintf(stderr, "Fail to initialize the hash map\n");
+      exit(-1);
+    }
 
     // Initialize all of these _buckets.
     struct HashBucket* bucket;

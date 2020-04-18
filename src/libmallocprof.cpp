@@ -625,6 +625,9 @@ extern "C" {
             myFree (ptr);
             return;
         }
+        if (ptr >= (void *)myMem_hash && ptr <= myMemEnd_hash) {
+            return;
+        }
         if ((profilerInitialized != INITIALIZED) || !inRealMain) {
             myFree(ptr);
             return;
@@ -1154,6 +1157,45 @@ void myFree (void* ptr) {
 		if(myMemAllocations == 0) myMemPosition = 0;
 	}
 	myMemLock.unlock();
+}
+
+void* myMalloc_hash (size_t size) {
+    if (myLocalMemInitialized) {
+        return myLocalMalloc(size);
+    }
+
+    myMemLock_hash.lock ();
+    void* p;
+    if((myMemPosition_hash + size + MY_METADATA_SIZE) < HASH_SIZE) {
+        unsigned * metadata = (unsigned *)(myMem_hash + myMemPosition_hash);
+        *metadata = size;
+        p = (void *)(myMem_hash + myMemPosition_hash + MY_METADATA_SIZE);
+        myMemPosition_hash += size + MY_METADATA_SIZE;
+        myMemAllocations_hash++;
+    }
+    else {
+        fprintf(stderr, "Error: myMem_hash out of memory\n");
+        fprintf(stderr, "requestedSize= %zu, TEMP_MEM_SIZE= %d, myMemPosition_hash= %lu, myMemAllocations_hash= %lu\n",
+                size, HASH_SIZE, myMemPosition_hash, myMemAllocations_hash);
+        dumpHashmaps();
+        abort();
+    }
+    myMemLock_hash.unlock ();
+    return p;
+}
+
+void myFree_hash (void* ptr) {
+    if (ptr == NULL) return;
+    if (ptr >= myLocalMem && ptr <= myLocalMemEnd) {
+        myLocalFree(ptr);
+        return;
+    }
+    myMemLock_hash.lock();
+    if (ptr >= (void*)myMem_hash && ptr <= myMemEnd_hash) {
+        myMemAllocations_hash--;
+        if(myMemAllocations_hash == 0) myMemPosition_hash = 0;
+    }
+    myMemLock_hash.unlock();
 }
 
 void globalizeTAD() {
