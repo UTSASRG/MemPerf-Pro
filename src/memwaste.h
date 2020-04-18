@@ -50,19 +50,21 @@ private:
     static uint64_t * mem_alloc_wasted_record_global_minus;
     static uint64_t * mem_freelist_wasted_record_global_minus;
 
+    static uint64_t * mem_blowup;
+    static uint64_t * mem_blowup_global;
+    static int64_t * free_nums;
+
 public:
 
     static void initialize();
 ///Here
     static void initForNewTid();
     static bool allocUpdate(allocation_metadata * allocData, void * address);
-    static void freeUpdate(void* address);
+    static void freeUpdate(allocation_metadata * allocData, void* address);
     ///Here
     static bool recordMemory(uint64_t now_usage);
     static void globalizeMemory();
     static void reportMaxMemory(FILE * output);
-    static size_t getSize(void * address);
-    static size_t getClassSize(void * address);
     static void checkGlobalInit();
     static void checkThreadInit();
 };

@@ -480,54 +480,6 @@ map_tuple ShadowMemory::getMapTupleByAddress(uintptr_t uintaddr) {
     return {mega_index, page_index, cache_index};
 }
 
-/*
-unsigned ShadowMemory::getCacheUsage(uintptr_t uintaddr) {
-		if(uintaddr == (uintptr_t)NULL) {
-				fprintf(stderr, "ERROR: null pointer passed into %s at %s:%d\n",
-								__FUNCTION__, __FILE__, __LINE__);
-				abort();
-		}
-
-		// First compute the megabyte number of the given address.
-		unsigned long mega_index = (uintaddr >> LOG2_MEGABYTE_SIZE);
-		if(mega_index > NUM_MEGABYTE_MAP_ENTRIES) {
-				fprintf(stderr, "ERROR: mega index of 0x%lx too large: %lu > %u\n",
-								uintaddr, mega_index, NUM_MEGABYTE_MAP_ENTRIES);
-				abort();
-		}
-
-		unsigned page_index = ((uintaddr & MEGABYTE_MASK) >> LOG2_PAGESIZE);
-		unsigned cache_index = ((uintaddr & PAGESIZE_MASK) >> LOG2_CACHELINE_SIZE);
-
-		PageMapEntry * targetPage = ShadowMemory::getPageMapEntry(mega_index, page_index);
-		CacheMapEntry * targetCache = targetPage->getCacheMapEntry(mega_index, page_index, cache_index);
-
-		return targetCache->getUsedBytes();
-}
-
-unsigned ShadowMemory::getPageUsage(uintptr_t uintaddr) {
-		if(uintaddr == (uintptr_t)NULL) {
-				fprintf(stderr, "ERROR: null pointer passed into %s at %s:%d\n",
-								__FUNCTION__, __FILE__, __LINE__);
-				//abort();
-		}
-
-		// First compute the megabyte number of the given address.
-		unsigned long mega_index = (uintaddr >> LOG2_MEGABYTE_SIZE);
-		if(mega_index > NUM_MEGABYTE_MAP_ENTRIES) {
-				fprintf(stderr, "ERROR: mega index of 0x%lx too large: %lu > %u\n",
-								uintaddr, mega_index, NUM_MEGABYTE_MAP_ENTRIES);
-				//abort();
-		}
-
-		unsigned page_index = ((uintaddr & MEGABYTE_MASK) >> LOG2_PAGESIZE);
-
-		PageMapEntry * targetPage = ShadowMemory::getPageMapEntry(mega_index, page_index);
-
-		return targetPage->getUsedBytes();
-}
-*/
-
 void PageMapEntry::clear() {
 		if(cache_map_entry) {
 				size_t cache_entries_size = NUM_CACHELINES_PER_PAGE * sizeof(CacheMapEntry);
@@ -545,14 +497,6 @@ unsigned int CacheMapEntry::getUsedBytes() {
 unsigned int PageMapEntry::getUsedBytes() {
 		return num_used_bytes;
 }
-
-//unsigned PageMapEntry::getClassSize() {
-//		return __atomic_load_n(&classSize, __ATOMIC_RELAXED);
-//}
-
-//void PageMapEntry::setClassSize(unsigned size) {
-//		__atomic_store_n(&classSize, size, __ATOMIC_RELAXED);
-//}
 
 bool PageMapEntry::isTouched() {
 		return touched;
@@ -638,9 +582,9 @@ bool PageMapEntry::addUsedBytes(unsigned int num_bytes) {
 bool PageMapEntry::subUsedBytes(unsigned int num_bytes) {
 		//__atomic_sub_fetch(&num_used_bytes, num_bytes, __ATOMIC_RELAXED);
     num_used_bytes -= num_bytes;
-//    if(num_used_bytes > PAGESIZE) {
-//        num_used_bytes = 0;
-//    }
+    if(num_used_bytes > PAGESIZE) {
+        num_used_bytes = 0;
+    }
 		return true;
 }
 
@@ -694,14 +638,6 @@ bool PageMapEntry::updateCacheLines(uintptr_t uintaddr, unsigned long mega_index
 		return true;
 }
 
-//pid_t CacheMapEntry::getOwner() {
-//		return owner;
-//}
-
-//void CacheMapEntry::setOwner(pid_t new_owner) {
-//		owner = new_owner;
-//}
-
 CacheMapEntry * PageMapEntry::getCacheMapEntry(bool mvBumpPtr) {
 		if(mvBumpPtr && __builtin_expect(__atomic_load_n(&cache_map_entry, __ATOMIC_RELAXED) == NULL, 0)) {
 				// Create a new entries
@@ -727,9 +663,9 @@ bool CacheMapEntry::addUsedBytes(unsigned int num_bytes) {
 bool CacheMapEntry::subUsedBytes(unsigned int num_bytes) {
 		//__atomic_sub_fetch(&num_used_bytes, num_bytes, __ATOMIC_RELAXED);
     num_used_bytes -= num_bytes;
-//    if(num_used_bytes > CACHELINE_SIZE) {
-//        num_used_bytes = 0;
-//    }
+    if(num_used_bytes > CACHELINE_SIZE) {
+        num_used_bytes = 0;
+    }
 		return true;
 }
 

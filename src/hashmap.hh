@@ -17,7 +17,7 @@ extern void myFree_hash(void *ptr);
 class PrivateHeap {
 public:
   static void * allocate (size_t sz) {
-    fprintf(stderr, "sz is %d\n", sz);
+    //fprintf(stderr, "sz is %d\n", sz);
     return myMalloc_hash (sz);
   }
 
