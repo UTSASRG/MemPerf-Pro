@@ -90,10 +90,13 @@ void setThreadContention() {
 /* ************************Synchronization******************************** */
 // In the PTHREAD_LOCK_HANDLE, we will pretend the initialization
 #define PTHREAD_LOCK_HANDLE(LOCK_TYPE, LOCK) \
-  PerPrimitiveData *pmdata = &threadContention->pmdata[LOCK_TYPE]; \
+  if(!mapsInitialized) { \
+    return 0; \
+  } \
   if (!inAllocation) { \
     return lockfuncs[LOCK_TYPE].realLock((void *)LOCK); \
   } \
+  PerPrimitiveData *pmdata = &threadContention->pmdata[LOCK_TYPE]; \
   pmdata->calls++; \
   PerLockData * thisLock = lockUsage.find((uint64_t)LOCK, sizeof(uint64_t)); \
   if(thisLock == NULL)  { \
@@ -139,6 +142,9 @@ int pthread_mutex_trylock(pthread_mutex_t *mutex) {
 }
 
 #define PTHREAD_UNLOCK_HANDLE(LOCK_TYPE, lock) \
+  if(!mapsInitialized) { \
+    return 0; \
+  } \
   if (inAllocation) { \
     PerLockData * thisLock = lockUsage.find((uint64_t)lock, sizeof(uint64_t)); \
     thisLock->contendThreads--; \

@@ -11,7 +11,6 @@ thread_local uint64_t* MemoryWaste::mem_alloc_wasted_minus;
 thread_local uint64_t* MemoryWaste::mem_freelist_wasted;
 thread_local uint64_t* MemoryWaste::mem_freelist_wasted_minus;
 
-bool MemoryWaste::global_init = false;
 thread_local bool MemoryWaste::thread_init = false;
 
 spinlock MemoryWaste::record_lock;
@@ -44,7 +43,6 @@ void MemoryWaste::initialize() {
     free_nums = (int64_t*) myMalloc(num_class_sizes * sizeof(int64_t));
 
     record_lock.init();
-    global_init = true;
 }
 
 void MemoryWaste::initForNewTid() {
@@ -232,15 +230,3 @@ void MemoryWaste::reportMaxMemory(FILE * output) {
 
 }
 
-
-void MemoryWaste::checkGlobalInit() {
-    if(!global_init) {
-        initialize();
-    }
-}
-
-void MemoryWaste::checkThreadInit() {
-    if(!thread_init) {
-        initForNewTid();
-    }
-}

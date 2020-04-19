@@ -34,7 +34,6 @@ private:
     static thread_local uint64_t* mem_freelist_wasted;
     static thread_local uint64_t* mem_freelist_wasted_minus;
     static thread_local bool thread_init;
-    static bool global_init;
 ///Here
     static spinlock record_lock;
     static thread_local uint64_t now_max_usage;

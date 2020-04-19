@@ -29,7 +29,7 @@ CXX = g++
 #CXX = clang++ 
 
 CFLAGS += -pipe -g3 -ggdb3 -Wall -DNDEBUG --std=c++11 -fPIC -I$(ROOT)/include -fno-omit-frame-pointer
-CFLAGS2 += -mcmodel=medium -O2 -pipe -g3 -ggdb3 -Wall -DNDEBUG --std=c++11 -fPIC -I$(ROOT)/include -Wno-unused-result -fno-omit-frame-pointer -Wl,--no-as-needed -lrt
+CFLAGS2 += -O2 -pipe -g3 -ggdb3 -Wall -DNDEBUG --std=c++11 -fPIC -I$(ROOT)/include -Wno-unused-result -fno-omit-frame-pointer -Wl,--no-as-needed -lrt
 #CFLAGS2 += -DENABLE_MORE_COUNTER -O2 -pipe -g3 -ggdb3 -Wall -DNDEBUG --std=c++11 -fPIC -I$(ROOT)/include -Wno-unused-result -fno-omit-frame-pointer -Wl,--no-as-needed -lrt
 #CFLAGS2 += -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free
 

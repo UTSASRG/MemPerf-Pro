@@ -437,10 +437,9 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
 
 	PMU_init_check();
 	lockUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 128*32);
+  MemoryWaste::initialize();
+  MemoryWaste::initForNewTid();
 	mapsInitialized = true;
-
-    MemoryWaste::checkGlobalInit();
-    MemoryWaste::checkThreadInit();
 
 	inRealMain = true;
 	int result = real_main_mallocprof (argc, argv, envp);
