@@ -1,6 +1,5 @@
 SRCS =	libmallocprof.cpp	\
             memwaste.cpp \
-						dlmalloc.c \
 				real.cpp					\
 				selfmap.cpp				\
 				shadowmemory.cpp	\
