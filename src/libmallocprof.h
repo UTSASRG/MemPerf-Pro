@@ -37,18 +37,39 @@
 #define LOCAL_BUF_SIZE 204800000 * 2
 
 pid_t gettid();
-
+// TP BEGIN
 typedef enum {
-		MUTEX,
-		SPINLOCK,
-		TRYLOCK,
-		SPIN_TRYLOCK,
-		NOLOCK
+		LOCK_TYPE_MUTEX,  // 0
+		LOCK_TYPE_SPINLOCK, // 1
+		LOCK_TYPE_TRYLOCK,  // 2
+		LOCK_TYPE_SPIN_TRYLOCK, //3
+		LOCK_TYPE_TOTAL // 4
 } LockType;
 
-//Structures
+#define MEM_SYS_START LOCK_TYPE_TOTAL
+typedef enum {
+  MEM_SYSCALL_MMAP = MEM_SYS_START,
+  MEM_SYSCALL_SBRK, 
+  MEM_SYSCALL_MADVISE,
+  MEM_SYSCALL_MUNMAP,
+  MEM_SYSCALL_MREMAP,
+  MEM_SYSCALL_MPROTECT,
+  MEM_SYSCALL_TOTAL
+} MemSyscallType; 
+
+typedef struct {
+  ulong calls; 
+  ulong cycles; 
+} PerPrimitiveData;
+
+//Structure for perthread contention
 typedef struct {
 	pid_t tid = 0;
+ 
+  // Instead for different types. Let's use an array here. 
+  PerPrimitiveData pmdata[LOCK_TYPE_TOTAL];
+
+#if 0 
 	ulong mutex_waits = 0;
 	ulong mutex_wait_cycles = 0;
 	ulong spinlock_waits = 0;
@@ -57,6 +78,7 @@ typedef struct {
 	ulong mutex_trylock_fails = 0;
 	ulong spin_trylock_waits = 0;
 	ulong spin_trylock_fails = 0;
+#endif
 	ulong mmap_waits = 0;
 	ulong mmap_wait_cycles = 0;
 	ulong sbrk_waits = 0;
@@ -70,6 +92,7 @@ typedef struct {
 	ulong mprotect_waits = 0;
 	ulong mprotect_wait_cycles = 0;
 
+// TP END
 	long realMemoryUsage = 0;
     long maxRealMemoryUsage = 0;
     long realAllocatedMemoryUsage = 0;
@@ -111,14 +134,6 @@ typedef struct {
 	unsigned long pageUtilTotal = 0;
 	unsigned long cacheUtilTotal = 0;
 } PerfAppFriendly;
-
-typedef struct LockContention {
-	std::atomic<unsigned int> contention;
-	unsigned int maxContention;
-    unsigned int times;
-    unsigned int contention_times;
-	LockType lockType;
-} LC;
 
 struct stack_frame {
 	struct stack_frame * prev;	// pointing to previous stack_frame
@@ -199,8 +214,6 @@ void getPerfCounts(PerfReadInfo*, bool enableCounters);
 void globalizeTAD();
 void myFree (void* ptr);
 void* myMalloc (size_t size);
-void* myMalloc_hash (size_t size);
-void myFree_hash (void* ptr);
 void readAllocatorFile();
 void writeAllocData ();
 void writeContention ();
@@ -208,7 +221,6 @@ void writeMappings();
 //void writeOverhead();
 void writeThreadContention();
 void writeThreadMaps();
-LC* newLC(LockType lockType, int contention = 1);
 //MmapTuple* newMmapTuple (uint64_t address, size_t length, int prot, char origin);
 ObjectTuple* newObjectTuple (uint64_t address, size_t size);
 //Overhead* newOverhead();

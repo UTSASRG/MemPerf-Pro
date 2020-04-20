@@ -1,10 +1,10 @@
-#if !defined(MEASUREMENT_HH)
-#define MEASUREMENT_HH
+#if !defined(__RECORD_SCALE_HH__)
+#define __RECORD_SCALE_HH__
 
 /*
- * @file   measurement.h
- * @brief  measure scalability issues
- * @author Hongyu Liu
+ * @file   recordscale.h
+ * @brief  record some issues related to the scalability
+ * @author Tongping Liu
  */
 
 #include <stddef.h>
@@ -13,18 +13,17 @@
 #include <unistd.h>
 #include <stdarg.h>
 
-#define MAX_THREAD_NUMBER 2048
 
+#define MAX_THREAD_NUMBER 1024
 int threadcontention_index = -1;
 ThreadContention all_threadcontention_array[MAX_THREAD_NUMBER];
 extern thread_local thread_alloc_data localTAD;
-extern std::atomic<uint> num_sbrk;
-extern std::atomic<uint> num_madvise;
-extern std::atomic<uint> malloc_mmaps;
-extern std::atomic<std::size_t> size_sbrk;
-thread_local ThreadContention* current_tc;
+extern uint num_sbrk;
+extern uint num_madvise;
+extern uint malloc_mmaps;
+extern size_t size_sbrk;
+thread_local ThreadContention* threadContention;
 
-//__thread thread_data thrData;
 extern thread_local bool inAllocation;
 extern thread_local bool inMmap;
 extern bool realInitialized;
@@ -34,8 +33,40 @@ extern initStatus profilerInitialized;
 
 extern MemoryUsage max_mu;
 
+typedef struct {
+  LockType     type;  // What is the lock type 
+  unsigned int calls;        // How many invocations
+  unsigned int contendCalls; // How many of them have the contention
+  unsigned int contendThreads;    // How many are waiting
+  unsigned int maxContendThreads; // How many threads are contending on this lock
+  unsigned int cycles; // Total cycles  
+} PerLockData;
+
+
 //extern HashMap <uint64_t, MmapTuple*, spinlock> mappings;
-extern HashMap <uint64_t, LC*, spinlock> lockUsage;
+extern HashMap <uint64_t, PerLockData, spinlock, PrivateHeap> lockUsage;
+typedef int (*myLockType) (void *);
+typedef int (*myUnlockType) (void *);
+
+typedef struct {
+  int (*realLock)(void *); 
+} LockFuncs; 
+
+LockFuncs lockfuncs[LOCK_TYPE_TOTAL] = 
+  { (myLockType)RealX::pthread_mutex_lock,
+    (myLockType)RealX::pthread_spin_lock,
+    (myLockType)RealX::pthread_mutex_trylock,
+    (myLockType)RealX::pthread_spin_trylock };
+
+typedef struct {
+  int (*realUnlock)(void *); 
+} UnlockFuncs; 
+
+UnlockFuncs unlockfuncs [LOCK_TYPE_TOTAL] =
+  { (myUnlockType)RealX::pthread_mutex_unlock,
+    (myUnlockType)RealX::pthread_spin_unlock,
+    (myUnlockType)RealX::pthread_mutex_unlock,
+    (myUnlockType)RealX::pthread_spin_unlock };
 
 //void checkGlobalMemoryUsageBySizes();
 void checkGlobalRealMemoryUsage();
@@ -51,248 +82,90 @@ void setThreadContention() {
     fprintf(stderr, "Please increase thread number: MAX_THREAD_NUMBER, %d\n", MAX_THREAD_NUMBER);
     abort();
   }
-  current_tc = &all_threadcontention_array[current_index];
-  current_tc->tid = gettid();
+  threadContention = &all_threadcontention_array[current_index];
+  threadContention->tid = gettid();
 }
 
+
 /* ************************Synchronization******************************** */
-
-// PTHREAD_MUTEX_LOCK
-int pthread_mutex_lock(pthread_mutex_t *mutex) {
-  if (!realInitialized) RealX::initializer();
-
-  // if it is not used by allocation
-  if (!inAllocation) {
-    return RealX::pthread_mutex_lock(mutex);
-  }
-
-  // Have we encountered this lock before?
-  LC* thisLock;
-  uint64_t lockAddr = (uint64_t) mutex;
-    uint64_t timeStart, timeStop;
-    int result;
-
-    current_tc->mutex_waits++;
-
-
-  if(lockUsage.find(lockAddr, &thisLock)) {
-
-    thisLock->contention++;
-
-      // Time the aquisition of the lock
-      timeStart = rdtscp();
-      result = RealX::pthread_mutex_lock(mutex);
-      timeStop = rdtscp();
-
-    if(thisLock->contention.load(relaxed) > thisLock->maxContention) {
-				thisLock->maxContention = thisLock->contention.load(relaxed);
-		}
-
-  } else {
-			// Add lock to lockUsage hashmap
-			thisLock = newLC(MUTEX);
-			lockUsage.insertIfAbsent(lockAddr, thisLock);
-			localTAD.num_mutex_locks++;
-
-      // Time the aquisition of the lock
-      timeStart = rdtscp();
-      result = RealX::pthread_mutex_lock(mutex);
-      timeStop = rdtscp();
-
-  }
-
-    current_tc->mutex_wait_cycles += (timeStop - timeStart);
-    if(current_tc->lock_counter == 0) {
-        current_tc->critical_section_start = timeStop;
-    }
-
-  thisLock->contention--;
-    if(thisLock->contention.load(relaxed) != 0) {
-        thisLock->contention_times++;
-    }
-
-
-  current_tc->lock_counter++;
-    thisLock->times++;
+// In the PTHREAD_LOCK_HANDLE, we will pretend the initialization
+#define PTHREAD_LOCK_HANDLE(LOCK_TYPE, LOCK) \
+  if(!mapsInitialized) { \
+    return 0; \
+  } \
+  if (!inAllocation) { \
+    return lockfuncs[LOCK_TYPE].realLock((void *)LOCK); \
+  } \
+  PerPrimitiveData *pmdata = &threadContention->pmdata[LOCK_TYPE]; \
+  pmdata->calls++; \
+  PerLockData * thisLock = lockUsage.find((uint64_t)LOCK, sizeof(uint64_t)); \
+  if(thisLock == NULL)  { \
+    PerLockData  newLock; \
+    memset(&newLock, 0, sizeof(PerLockData)); \
+    newLock.type = LOCK_TYPE;  \
+    thisLock = lockUsage.insert((uint64_t)LOCK, sizeof(uint64_t), newLock); \
+  } \
+  thisLock->calls++;  \
+  unsigned int contendThreads = ++(thisLock->contendThreads); \
+  if(contendThreads > 1) { \
+    thisLock->contendCalls ++; \
+  } \
+  if(contendThreads > thisLock->maxContendThreads) { \
+    thisLock->maxContendThreads = contendThreads; \
+  }\
+  uint64_t timeStart = rdtscp();\
+  int result = lockfuncs[LOCK_TYPE].realLock((void *)LOCK); \
+  uint64_t timeStop = rdtscp(); \
+  pmdata->cycles += (timeStop - timeStart); \
+  if(threadContention->lock_counter == 0) { \
+    threadContention->critical_section_start = timeStop; \
+  } \
+  threadContention->lock_counter++; \
   return result;
+
+int pthread_mutex_lock(pthread_mutex_t *mutex) {
+  PTHREAD_LOCK_HANDLE(LOCK_TYPE_MUTEX, mutex);
+}
+// PTHREAD_SPIN_LOCK
+int pthread_spin_lock(pthread_spinlock_t *lock) {
+  PTHREAD_LOCK_HANDLE(LOCK_TYPE_SPINLOCK, lock);
 }
 
 // PTHREAD_SPIN_TRYLOCK
 int pthread_spin_trylock(pthread_spinlock_t *lock) {
-
-  if(!realInitialized) {
-			RealX::initializer();
-	}
-
-  if(!mapsInitialized || !inAllocation) {
-    return RealX::pthread_spin_trylock(lock);
-	}
-
-  // Have we encountered this lock before?
-  LC* thisLock;
-    uint64_t lockAddr = reinterpret_cast<uint64_t>(lock);
-
-    current_tc->spin_trylock_waits++;
-
-    if(lockUsage.find(lockAddr, &thisLock)) {
-
-  } else {
-      // Add lock to lockUsage hashmap
-      thisLock = newLC(SPIN_TRYLOCK, -1);
-      lockUsage.insertIfAbsent(lockAddr, thisLock);
-      localTAD.num_spin_trylocks++;
-  }
-
-    // Try to aquire the lock
-  int result = RealX::pthread_spin_trylock(lock);
-	uint64_t timeStop = rdtscp();
-  if(result == 0) {
-		if(current_tc->lock_counter == 0) {
-				current_tc->critical_section_start = timeStop;
-		}
-		current_tc->lock_counter++;
-      thisLock->times++;
-  } else {
-    current_tc->spin_trylock_fails++;
-  }
-  return result;
-}
-
-// PTHREAD_SPIN_LOCK
-int pthread_spin_lock(pthread_spinlock_t *lock) {
-
-  if(!realInitialized) RealX::initializer();
-
-  // If we are not currently in an allocation then simply return
-  if(!inAllocation) {
-    return RealX::pthread_spin_lock(lock);
-  }
-
-  //Have we encountered this lock before?
-  LC* thisLock;
-  uint64_t lockAddr = (uint64_t)lock;
-  uint64_t timeStart, timeStop;
-  int result;
-
-    current_tc->spinlock_waits++;
-
-  if(lockUsage.find(lockAddr, &thisLock)) {
-
-    thisLock->contention++;
-
-      // Time the aquisition of the lock
-      timeStart = rdtscp();
-      result = RealX::pthread_spin_lock(lock);
-      timeStop = rdtscp();
-
-    if(thisLock->contention.load(relaxed) > thisLock->maxContention) {
-				thisLock->maxContention = thisLock->contention.load(relaxed);
-
-		}
-  } else {
-			// Add lock to lockUsage hashmap
-			thisLock = newLC(SPINLOCK);
-			lockUsage.insertIfAbsent(lockAddr, thisLock);
-			localTAD.num_spin_locks++;
-
-      // Time the aquisition of the lock
-      timeStart = rdtscp();
-      result = RealX::pthread_spin_lock(lock);
-      timeStop = rdtscp();
-  }
-
-    current_tc->spinlock_wait_cycles += (timeStop - timeStart);
-
-	thisLock->contention--;
-    if(thisLock->contention.load(relaxed) != 0) {
-        thisLock->contention_times++;
-    }
-
-  if(current_tc->lock_counter == 0) {
-    current_tc->critical_section_start = timeStop;
-  }
-
-  current_tc->lock_counter++;
-    thisLock->times++;
-  return result;
+  PTHREAD_LOCK_HANDLE(LOCK_TYPE_SPIN_TRYLOCK, lock);
 }
 
 // PTHREAD_MUTEX_TRYLOCK
 int pthread_mutex_trylock(pthread_mutex_t *mutex) {
-  if(!realInitialized) {
-			RealX::initializer();
-	}
-
-  if(!mapsInitialized || !inAllocation) {
-    return RealX::pthread_mutex_trylock(mutex);
-	}
-
-  // Have we encountered this lock before?
-  LC* thisLock;
-	uint64_t lockAddr = reinterpret_cast<uint64_t>(mutex);
-
-    current_tc->mutex_trylock_waits++;
-
-  if(lockUsage.find(lockAddr, &thisLock)) {
-  } else {
-			// Add lock to lockUsage hashmap
-			thisLock = newLC(TRYLOCK, -1);
-			lockUsage.insertIfAbsent(lockAddr, thisLock);
-			localTAD.num_try_locks++;
-  }
-
-  // Try to aquire the lock
-
-  int result = RealX::pthread_mutex_trylock(mutex);
-	uint64_t timeStop = rdtscp();
-
-  if(result == 0) {
-		if(current_tc->lock_counter == 0) {
-				current_tc->critical_section_start = timeStop;
-		}
-		current_tc->lock_counter++;
-      thisLock->times++;
-
-  } else {
-      current_tc->mutex_trylock_fails++;
-  }
-  return result;
+  PTHREAD_LOCK_HANDLE(LOCK_TYPE_TRYLOCK, mutex);
 }
+
+#define PTHREAD_UNLOCK_HANDLE(LOCK_TYPE, lock) \
+  if(!mapsInitialized) { \
+    return 0; \
+  } \
+  if (inAllocation) { \
+    PerLockData * thisLock = lockUsage.find((uint64_t)lock, sizeof(uint64_t)); \
+    thisLock->contendThreads--; \
+    threadContention->lock_counter--; \
+    if(threadContention->lock_counter == 0) { \
+      uint64_t duration = rdtscp() - threadContention->critical_section_start; \
+      threadContention->critical_section_duration += duration; \
+      threadContention->critical_section_counter++; \
+    } \
+  } \
+  int result = unlockfuncs[LOCK_TYPE].realUnlock((void *)lock); \
+  return result; 
 
 // PTHREAD_MUTEX_UNLOCK
 int pthread_mutex_unlock(pthread_mutex_t *mutex) {
-  if (!realInitialized) RealX::initializer();
-
-	// if it is  used by allocation
-	if (inAllocation) {
-			current_tc->lock_counter--;
-			if(current_tc->lock_counter == 0) {
-					uint64_t duration = rdtscp() - current_tc->critical_section_start;
-					current_tc->critical_section_duration += duration;
-          current_tc->critical_section_counter++;
-			}
-	}
-
-  return RealX::pthread_mutex_unlock (mutex);
+  PTHREAD_UNLOCK_HANDLE(LOCK_TYPE_MUTEX, mutex);
 }
 
-// PTHREAD_SPIN_UNLOCK
 int pthread_spin_unlock(pthread_spinlock_t *lock) {
-  if(!realInitialized) RealX::initializer();
-
-	// if it is  used by allocation
-	if(inAllocation) {
-			current_tc->lock_counter--;
-			if(current_tc->lock_counter == 0) {
-					uint64_t duration = rdtscp() - current_tc->critical_section_start;
-					current_tc->critical_section_duration += duration;
-          current_tc->critical_section_counter++;
-			}
-	}
-
-  return RealX::pthread_spin_unlock(lock);
+  PTHREAD_UNLOCK_HANDLE(LOCK_TYPE_SPINLOCK, lock);
 }
-
 
 /* ************************Synchronization End******************************** */
 
@@ -320,8 +193,8 @@ void * yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offs
   if (inAllocation) {
     malloc_mmaps++;
     localTAD.malloc_mmaps++;
-    current_tc->mmap_waits++;
-    current_tc->mmap_wait_cycles += (timeStop - timeStart);
+    threadContention->mmap_waits++;
+    threadContention->mmap_wait_cycles += (timeStop - timeStart);
 
     //mappings.insert(address, newMmapTuple(address, length, prot, 'a'));
 
@@ -345,8 +218,8 @@ int madvise(void *addr, size_t length, int advice){
 
   if (advice == MADV_DONTNEED) {
     uint returned = PAGESIZE * ShadowMemory::cleanupPages((uintptr_t)addr, length);
-    if(current_tc->totalMemoryUsage > returned) {
-      current_tc->totalMemoryUsage -= returned;
+    if(threadContention->totalMemoryUsage > returned) {
+      threadContention->totalMemoryUsage -= returned;
     }
   }
 
@@ -356,8 +229,8 @@ int madvise(void *addr, size_t length, int advice){
 
 	num_madvise++;
 	localTAD.num_madvise++;
-  current_tc->madvise_waits++;
-  current_tc->madvise_wait_cycles += (timeStop - timeStart);
+  threadContention->madvise_waits++;
+  threadContention->madvise_wait_cycles += (timeStop - timeStart);
 
   return result;
 }
@@ -372,8 +245,8 @@ void *sbrk(intptr_t increment){
   void *retptr = RealX::sbrk(increment);
   uint64_t timeStop = rdtscp();
 
-  current_tc->sbrk_waits++;
-  current_tc->sbrk_wait_cycles += (timeStop - timeStart);
+  threadContention->sbrk_waits++;
+  threadContention->sbrk_wait_cycles += (timeStop - timeStart);
 
   localTAD.num_sbrk++;
   localTAD.size_sbrk += increment;
@@ -396,8 +269,8 @@ int mprotect(void* addr, size_t len, int prot) {
   int ret =  RealX::mprotect(addr, len, prot);
   uint64_t timeStop = rdtscp();
 
-  current_tc->mprotect_waits++;
-  current_tc->mprotect_wait_cycles += (timeStop - timeStart);
+  threadContention->mprotect_waits++;
+  threadContention->mprotect_wait_cycles += (timeStop - timeStart);
 
   return ret;
 }
@@ -414,16 +287,16 @@ int munmap(void *addr, size_t length) {
   // another thread to reallocate the unmapped region *while* the current thread is
   // still performing the cleanupPages() call, thus clearing the other thread's pages.
   ulong returned = PAGESIZE * ShadowMemory::cleanupPages((intptr_t)addr, length);
-  if(current_tc->totalMemoryUsage > returned) {
-      current_tc->totalMemoryUsage -= returned;
+  if(threadContention->totalMemoryUsage > returned) {
+      threadContention->totalMemoryUsage -= returned;
   }
 
   uint64_t timeStart = rdtscp();
   int ret =  RealX::munmap(addr, length);
   uint64_t timeStop = rdtscp();
 
-  current_tc->munmap_waits++;
-  current_tc->munmap_wait_cycles += (timeStop - timeStart);
+  threadContention->munmap_waits++;
+  threadContention->munmap_wait_cycles += (timeStop - timeStart);
 
   //mappings.erase((intptr_t)addr);
 
@@ -448,8 +321,8 @@ void *mremap(void *old_address, size_t old_size, size_t new_size,
   void* ret =  RealX::mremap(old_address, old_size, new_size, flags, new_address);
   uint64_t timeStop = rdtscp();
 
-  current_tc->mremap_waits++;
-  current_tc->mremap_wait_cycles += (timeStop - timeStart);
+  threadContention->mremap_waits++;
+  threadContention->mremap_wait_cycles += (timeStop - timeStart);
 
 //  MmapTuple* t;
 //  if (mappings.find((intptr_t)old_address, &t)) {
@@ -481,14 +354,10 @@ void writeThreadContention() {
         ThreadContention* data = &all_threadcontention_array[i];
 
         globalizedThreadContention.tid += data->tid;
-        globalizedThreadContention.mutex_waits += data->mutex_waits;
-        globalizedThreadContention.mutex_wait_cycles += data->mutex_wait_cycles;
-        globalizedThreadContention.spinlock_waits += data->spinlock_waits;
-        globalizedThreadContention.spinlock_wait_cycles += data->spinlock_wait_cycles;
-        globalizedThreadContention.mutex_trylock_waits += data->mutex_trylock_waits;
-        globalizedThreadContention.mutex_trylock_fails += data->mutex_trylock_fails;
-        globalizedThreadContention.spin_trylock_waits += data->spin_trylock_waits;
-        globalizedThreadContention.spin_trylock_fails += data->spin_trylock_fails;
+        for(int j = LOCK_TYPE_MUTEX; j < LOCK_TYPE_TOTAL; j++) {
+          globalizedThreadContention.pmdata[j].calls += data->pmdata[j].calls;
+          globalizedThreadContention.pmdata[j].cycles += data->pmdata[j].cycles;
+        }
         globalizedThreadContention.mmap_waits += data->mmap_waits;
         globalizedThreadContention.mmap_wait_cycles += data->mmap_wait_cycles;
         globalizedThreadContention.sbrk_waits += data->sbrk_waits;
@@ -513,6 +382,7 @@ void writeThreadContention() {
 		maxRealAllocatedMemoryUsage = globalizedThreadContention.maxRealAllocatedMemoryUsage;
 		maxTotalMemoryUsage = globalizedThreadContention.maxTotalMemoryUsage;
 
+#if 0
 		fprintf (thrData.output, ">>> mutex\t\t\t%20lu\n",
 						globalizedThreadContention.mutex_waits);
 		fprintf (thrData.output, ">>> mutex_wait_cycles\t\t%20lu\tavg = %.1f\n",
@@ -531,7 +401,8 @@ void writeThreadContention() {
 						globalizedThreadContention.spin_trylock_waits);
 		fprintf (thrData.output, ">>> spin_trylock_fails\t\t%20lu\n",
 						globalizedThreadContention.spin_trylock_fails);
-		fprintf (thrData.output, ">>> mmap\t\t\t%20lu\n",
+#endif
+    fprintf (thrData.output, ">>> mmap\t\t\t%20lu\n",
 						globalizedThreadContention.mmap_waits);
 		fprintf (thrData.output, ">>> mmap_wait_cycles\t\t%20lu\tavg = %.1f\n",
 						globalizedThreadContention.mmap_wait_cycles,

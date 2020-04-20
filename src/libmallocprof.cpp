@@ -20,7 +20,7 @@
 #include "selfmap.hh"
 #include "spinlock.hh"
 #include "xthreadx.hh"
-#include "recordfunctions.hh"
+#include "recordscale.hh"
 #include "memwaste.h"
 
 
@@ -91,17 +91,17 @@ size_t* class_sizes;
 //
 //thread_local uint64_t total_time_wait = 0;
 
-std::atomic<uint> num_sbrk (0);
-std::atomic<uint> num_madvise (0);
-std::atomic<uint> malloc_mmaps (0);
-std::atomic<std::size_t> size_sbrk (0);
+uint num_sbrk = 0;
+uint num_madvise = 0;
+uint malloc_mmaps = 0;
+std::size_t size_sbrk = 0;
 
 //thread_local uint blowup_allocations = 0;
 thread_local unsigned long long total_cycles_start = 0;
 std::atomic<std::uint64_t> total_global_cycles (0);
-std::atomic<std::uint64_t> cycles_alloc (0);
-std::atomic<std::uint64_t> cycles_allocFFL (0);
-std::atomic<std::uint64_t> cycles_free (0);
+//std::atomic<std::uint64_t> cycles_alloc (0);
+//std::atomic<std::uint64_t> cycles_allocFFL (0);
+//std::atomic<std::uint64_t> cycles_free (0);
 
 //uint64_t * realMemoryUsageBySizes = nullptr;
 //uint64_t * memoryUsageBySizes = nullptr;
@@ -165,33 +165,7 @@ unsigned long long HASH_SIZE = (unsigned long long)1024*1024*1024*2;
 
 friendly_data globalFriendlyData;
 
-//Hashmap of class size to TAD*
-// typedef HashMap <uint64_t, thread_alloc_data*, spinlock> Class_Size_TAD;
-
-//Hashmap of thread ID to Class_Size_TAD
-// HashMap <uint64_t, thread_alloc_data*, spinlock> threadToCSM;
-
-//Hashmap of class size to tad struct, for all thread data summed up
-// HashMap<uint64_t, thread_alloc_data*, spinlock> globalCSM;
-// HashMap<uint64_t, thread_alloc_data*, spinlock> globalCSM;
-
-//Hashmap of malloc'd addresses to a ObjectTuple
-//HashMap <uint64_t, ObjectTuple*, spinlock> addressUsage;
-
-//Hashmap of lock addr to LC
-HashMap <uint64_t, LC*, spinlock> lockUsage;
-
-//Hashmap of mmap addrs to tuple:
-//HashMap <uint64_t, MmapTuple*, spinlock> mappings;
-
-//Hashmap of Overhead objects
-//
-//HashMap <size_t, Overhead*, spinlock> overhead;
-//Hashmap of tid to ThreadContention*
-//HashMap <uint64_t, ThreadContention*, spinlock> threadContention;
-
-//Spinlocks
-//spinlock temp_mem_lock;
+HashMap <uint64_t, PerLockData, spinlock, PrivateHeap> lockUsage;
 
 // pre-init private allocator memory
 char myBuffer[TEMP_MEM_SIZE];
@@ -265,13 +239,6 @@ __attribute__((constructor)) initStatus initializer() {
     myMemLock_hash.init();
 
 
-
-
-	lockUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 128*32);
-	//overhead.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 256);
-	//mappings.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 4096);
-	mapsInitialized = true;
-
 	void * program_break = RealX::sbrk(0);
 	thrData.tid = syscall(__NR_gettid);
 
@@ -304,28 +271,6 @@ __attribute__((constructor)) initStatus initializer() {
 	snprintf ((allocatorFileName+path_bytes+name_bytes), ext_bytes, ".info");
     fprintf(stderr, "name: %s\n", allocatorFileName);
 	readAllocatorFile();
-
-//    MemoryWaste::initialize();
-//    MemoryWaste::initForNewTid();
-    MemoryWaste::checkGlobalInit();
-    MemoryWaste::checkThreadInit();
-
-	//Initialize the global and free counter arrays (blowup)
-	//initGlobalFreeArray();
-	//initLocalFreeArray();
-
-//    initLocalNumAllocsBySizes();
-//    initLocalNumAllocsFFLBySizes();
-//    initGlobalnumAllocsBySizes();
-//    initGlobalnumAllocsFFLBySizes();
-//
-//    initRealMemoryUsageBySizes();
-//    initMemoryUsageBySizes();
-//    initFreedMemoryUsageBySizes();
-//    initRealMemoryUsageBySizesWhenMax();
-//    initMemoryUsageBySizesWhenMax();
-//    initFreedMemoryUsageBySizesWhenMax();
-
 
 	// Generate the name of our output file, then open it for writing.
 	char outputFile[MAX_FILENAME_LEN];
@@ -360,7 +305,7 @@ __attribute__((constructor)) initStatus initializer() {
 		fflush(thrData.output);
 	}
 	else {
-		num_class_sizes = 0;
+		num_class_sizes = 2;
 		//Create an entry in the overhead hashmap with key 0
 		//overhead.insert(BP_OVERHEAD, newOverhead());
 	}
@@ -406,7 +351,7 @@ void dumpHashmaps() {
 //	overhead.printUtilization();
 
 	fprintf(stderr, "lockUsage.printUtilization():\n");
-	lockUsage.printUtilization();
+  lockUsage.printUtilization();
 
 	//fprintf(stderr, "threadContention.printUtilization():\n");
 	//threadContention.printUtilization();
@@ -491,10 +436,13 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
 	atexit(exitHandler);
 
 	PMU_init_check();
+	lockUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 128*32);
+  MemoryWaste::initialize();
+  MemoryWaste::initForNewTid();
+	mapsInitialized = true;
 
 	inRealMain = true;
 	int result = real_main_mallocprof (argc, argv, envp);
-	//    fprintf(stderr, "real main has returned");
 	return result;
 }
 
@@ -538,7 +486,6 @@ extern "C" {
         if((profilerInitialized != INITIALIZED) || (!selfmapInitialized)) {
             void* ptr = myMalloc (sz);
             //fprintf(stderr, "0 ptr = %p, size = %d\n", ptr, sz);
-            //fprintf(stderr, "malloc0... %p %d\n", ptr, sz);
             return ptr;
             //return myMalloc (sz);
         }
@@ -547,7 +494,6 @@ extern "C" {
         if (inAllocation) {
             void* ptr = RealX::malloc(sz);
             //fprintf(stderr, "1 ptr = %p, size = %d\n", ptr, sz);
-            //fprintf(stderr, "malloc... %p %d\n", ptr, sz);
             return ptr;
             //return RealX::malloc(sz);
         }
@@ -555,16 +501,12 @@ extern "C" {
         if (!inRealMain) {
             void* ptr = RealX::malloc(sz);
             //fprintf(stderr, "2 ptr = %p, size = %d\n", ptr, sz);
-            //fprintf(stderr, "malloc... %p %d\n", ptr, sz);
             return ptr;
             //return RealX::malloc(sz);
         }
         //thread_local
         inAllocation = true;
         PMU_init_check();
-        //if (!localFreeArrayInitialized) initLocalFreeArray();
-        //if (!localNumAllocsBySizesInitialized) initLocalNumAllocsBySizes();
-        //if (!localNumAllocsFFLBySizesInitialized) initLocalNumAllocsFFLBySizes();
 
 		//Data we need for each allocation
 		allocation_metadata allocData = init_allocation(sz, MALLOC);
@@ -657,7 +599,6 @@ extern "C" {
             return;
         }
         if (ptr >= (void *)myMem_hash && ptr <= myMemEnd_hash) {
-            myFree_hash (ptr);
             return;
         }
         if ((profilerInitialized != INITIALIZED) || !inRealMain) {
@@ -670,32 +611,15 @@ extern "C" {
         //thread_local
         inAllocation = true;
 
-//		if (!localFreeArrayInitialized) {
-//			initLocalFreeArray();
-//		}
-//        if (!localNumAllocsBySizesInitialized) {
-//            initLocalNumAllocsBySizes();
-//        }
-//        if (!localNumAllocsFFLBySizesInitialized) {
-//            initLocalNumAllocsFFLBySizes();
-//        }
-
 		//Data we need for each free
 		allocation_metadata allocData = init_allocation(0, FREE);
-		allocData.size = MemoryWaste::getSize(ptr);
-        allocData.classSize = MemoryWaste::getClassSize(ptr);
-//        allocData.classSizeIndex = getClassSizeIndex(allocData.classSize);
-		//fprintf(stderr, "*** free(%p)\n", ptr);
 		//Do before free
 
+        MemoryWaste::freeUpdate(&allocData, ptr);
         decrementMemoryUsage(allocData.size, allocData.classSize, ptr);
-        //uint64_t size = ShadowMemory::getObjectSize(ptr);
         ShadowMemory::updateObject(ptr, allocData.size, true);
-        MemoryWaste::freeUpdate(ptr);
 
         //Update free counters
-        //allocData.classSize = updateFreeCounters(ptr);
-        //fprintf(stderr, "free\n");
         doBefore(&allocData);
         //Do free
         RealX::free(ptr);
@@ -704,7 +628,7 @@ extern "C" {
 		doAfter(&allocData);
 
         //thread_local
-        cycles_free += allocData.tsc_after;
+//        cycles_free += allocData.tsc_after;
         ///below
             if (__builtin_expect(!globalized, true)) {
                 localTAD.numFrees++;
@@ -762,24 +686,12 @@ extern "C" {
 		//thread_local
 		inAllocation = true;
 
-//		if(!localFreeArrayInitialized) {
-//			initLocalFreeArray();
-//		}
-//        if (!localNumAllocsBySizesInitialized) {
-//            initLocalNumAllocsBySizes();
-//        }
-//        if (!localNumAllocsFFLBySizesInitialized) {
-//            initLocalNumAllocsFFLBySizes();
-//        }
-
 		//Do before
 
         if(ptr) {
-            size_t old_size = MemoryWaste::getSize(ptr);
-            size_t old_classSize = MemoryWaste::getClassSize(ptr);
-            ShadowMemory::updateObject(ptr, old_size, true);
-            decrementMemoryUsage(old_size, old_classSize, ptr);
-            MemoryWaste::freeUpdate(ptr);
+            MemoryWaste::freeUpdate(&allocData, ptr);
+            ShadowMemory::updateObject(ptr, allocData.size, true);
+            decrementMemoryUsage(allocData.size, allocData.classSize, ptr);
         }
 
         doBefore(&allocData);
@@ -787,6 +699,7 @@ extern "C" {
         object = RealX::realloc(ptr, sz);
         //Do after
         doAfter(&allocData);
+        allocData.size = sz;
         allocData.reused = MemoryWaste::allocUpdate(&allocData, object);
         size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject(object, sz, false);
         incrementMemoryUsage(sz, allocData.classSize, new_touched_bytes, object);
@@ -823,10 +736,6 @@ extern "C" {
 
 		PMU_init_check();
 
- //   if (!localFreeArrayInitialized) initLocalFreeArray();
-//    if (!localNumAllocsBySizesInitialized) initLocalNumAllocsBySizes();
-//    if (!localNumAllocsFFLBySizesInitialized) initLocalNumAllocsFFLBySizes();
-
     //Data we need for each allocation
     allocation_metadata allocData = init_allocation(size, MALLOC);
 
@@ -856,10 +765,6 @@ extern "C" {
      inAllocation = true;
 
      PMU_init_check();
-
- //    if (!localFreeArrayInitialized) initLocalFreeArray();
-//    if (!localNumAllocsBySizesInitialized) initLocalNumAllocsBySizes();
-//    if (!localNumAllocsFFLBySizesInitialized) initLocalNumAllocsFFLBySizes();
 
      //Data we need for each allocation
      allocation_metadata allocData = init_allocation(size, MALLOC);
@@ -963,92 +868,6 @@ void operator delete[] (void * ptr) __THROW {
 	yyfree (ptr);
 }
 
-//void analyzeAllocation(allocation_metadata *metadata) {
-//	//Analyzes for alignment and blowup
-//	///getOverhead(metadata->size, metadata->address, metadata->classSize, metadata->classSizeIndex, &(metadata->reused));
-//
-//	// Analyze perfinfo
-//	analyzePerfInfo(metadata);
-//}
-
-/*
-	updateFreeCounters
-
-	This function updates the local and global counters of free objects
-	needed for determing blowup. If libc, increment a global "freed_bytes"
-	variable
-*/
-//size_t updateFreeCounters(void * address) {
-//
-//	size_t current_class_size = 0;
-//
-//	if (bibop){
-//			size_t size = ShadowMemory::getObjectSize(address);
-//			current_class_size = getClassSizeFor(size);
-//			short class_size_index = getClassSizeIndex(size);
-////			localFreeArray[class_size_index]++;
-////			globalFreeArray[class_size_index]++;
-//	} else {
-//		size_t size = malloc_usable_size(address);
-//		current_class_size = size;
-//		freed_bytes += size;
-//	}
-//
-//	return current_class_size;
-//}
-
-/*
-	getClassSizeIndex
-
-	This function finds the class size for the given size
-	and returns the index into the class_sizes array for
-	this class size. 
-
-	This is used in updateFreeCounters. The local and global free
-	counter arrays are "identical" to the class_sizes array.
-	So we can call localFreeArray[index] and globalFreeArray[index]
-*/
-//short getClassSizeIndex(size_t size) {
-//	if (bumpPointer) {
-//		if (size < LARGE_OBJECT) return 0;
-//		else return 1;
-//	}
-//
-//	short class_size_index = 0;
-//	for (int i = 0; i < num_class_sizes; i++) {
-//		if (size > class_sizes[i]) continue;
-//		class_size_index = i;
-//		break;
-//	}
-//	return class_size_index;
-//}
-//
-//size_t getClassSizeFor (size_t size) {
-//
-//	if(size > large_object_threshold) {
-//			return size;
-//	}
-//
-//	size_t sizeToReturn = 0;
-//	if (bibop) {
-//		if (__builtin_expect(num_class_sizes == 0, false)) {
-//			fprintf (stderr, "num_class_sizes == 0. Figure out why. Abort()\n");
-//			abort();
-//		}
-//
-//		for (int i = 0; i < num_class_sizes; i++) {
-//
-//			size_t tempSize = class_sizes[i];;
-//			if (size > tempSize) continue;
-//			else if (size <= tempSize) {
-//				sizeToReturn = tempSize;
-//				break;
-//			}
-//		}
-//	}
-//	return sizeToReturn;
-//}
-
 void getClassSizeForStyles(void* uintaddr, allocation_metadata * allocData) {
 
     if(allocData->size == the_old_size) {
@@ -1089,53 +908,6 @@ void getClassSizeForStyles(void* uintaddr, allocation_metadata * allocData) {
     the_old_classSize = allocData->classSize;
     the_old_classSizeIndex = allocData->classSizeIndex;
 }
-
-//size_t getClassSizeForStyles(size_t size, uintptr_t uintaddr) {
-//    if(bibop)
-//        return(getClassSizeFor(size));
-//    return(malloc_usable_size((void *)uintaddr));
-//}
-
-// Create tuple for hashmap
-ObjectTuple* newObjectTuple (uint64_t address, size_t size) {
-
-	ObjectTuple* t = (ObjectTuple*) myMalloc (sizeof (ObjectTuple));
-	t->szUsed = size;
-
-	return t;
-}
-
-//MmapTuple* newMmapTuple (uint64_t address, size_t length, int prot, char origin) {
-//
-//	MmapTuple* t = (MmapTuple*) myMalloc (sizeof (MmapTuple));
-//
-//	uint64_t end = (address + length) - 1;
-//	t->start = address;
-//	t->end = end;
-//	t->length = length;
-//	t->rw = 0;
-//	t->origin = origin;
-//	if (prot == (PROT_READ | PROT_WRITE)) t->rw += length;
-//	else if (prot == (PROT_READ | PROT_WRITE | PROT_EXEC)) t->rw += length;
-//	t->tid = gettid();
-//	t->allocations = 0;
-//	return t;
-//}
-
-LC* newLC (LockType lockType, int contention) {
-	LC* lc = (LC*) myMalloc(sizeof(LC));
-	lc->contention = contention;
-	lc->maxContention = contention;
-	lc->lockType = lockType;
-	return lc;
-}
-
-//Overhead* newOverhead () {
-//
-//	Overhead* o = (Overhead*) myMalloc(sizeof(Overhead));
-//	o->init();
-//	return o;
-//}
 
 allocation_metadata init_allocation(size_t sz, enum memAllocType type) {
 	PerfReadInfo empty;
@@ -1351,14 +1123,10 @@ void writeContention () {
 
 		fprintf(thrData.output, "\n>>>>>>>>>>>>>>>>>>>>>>>>> DETAILED LOCK USAGE <<<<<<<<<<<<<<<<<<<<<<<<<\n");
 		for(auto lock : lockUsage) {
-				LC * data = lock.getData();
+				PerLockData * data = lock.getValue();
 				fprintf(thrData.output, "lockAddr = %#lx\ttype = %s\tmax contention thread = %5u\t",
-								lock.getKey(), LockTypeToString(data->lockType), data->maxContention);
-				if(data->lockType == SPIN_TRYLOCK || data->lockType == TRYLOCK) {
-                    fprintf(thrData.output, "success = %10u\n", data->times);
-                } else {
-                    fprintf(thrData.output, "times = %10u\tcontention times = %10u\tcontention rate = %5u%%\n", data->times, data->contention_times, data->contention_times*100/data->times);
-                }
+								lock.getKey(), LockTypeToString(data->type), data->maxContendThreads);
+                fprintf(thrData.output, "invocations = %10u\tcontention times = %10u\tcontention rate = %5u%%\n", data->calls, data->contendCalls, data->contendCalls*100/data->calls);
 		}
         fprintf(thrData.output, "\n");
 		fflush(thrData.output);
@@ -1535,13 +1303,13 @@ void checkGlobalMemoryUsage() {
 
 void incrementMemoryUsage(size_t size, size_t classSize, size_t new_touched_bytes, void * object) {
 
-		current_tc->realMemoryUsage += size;
-		current_tc->realAllocatedMemoryUsage += classSize;
-        if(current_tc->realAllocatedMemoryUsage > current_tc->maxRealAllocatedMemoryUsage) {
-            current_tc->maxRealAllocatedMemoryUsage = current_tc->realAllocatedMemoryUsage;
+		threadContention->realMemoryUsage += size;
+		threadContention->realAllocatedMemoryUsage += classSize;
+        if(threadContention->realAllocatedMemoryUsage > threadContention->maxRealAllocatedMemoryUsage) {
+            threadContention->maxRealAllocatedMemoryUsage = threadContention->realAllocatedMemoryUsage;
         }
-        if(current_tc->realMemoryUsage > current_tc->maxRealMemoryUsage) {
-            current_tc->maxRealMemoryUsage = current_tc->realMemoryUsage;
+        if(threadContention->realMemoryUsage > threadContention->maxRealMemoryUsage) {
+            threadContention->maxRealMemoryUsage = threadContention->realMemoryUsage;
         }
 		incrementGlobalMemoryAllocation(size, classSize);
 
@@ -1549,10 +1317,10 @@ void incrementMemoryUsage(size_t size, size_t classSize, size_t new_touched_byte
     checkGlobalAllocatedMemoryUsage();
 
 		if(new_touched_bytes > 0) {
-				current_tc->totalMemoryUsage += new_touched_bytes;
+				threadContention->totalMemoryUsage += new_touched_bytes;
 				__atomic_add_fetch(&mu.totalMemoryUsage, new_touched_bytes, __ATOMIC_RELAXED);
-				if(current_tc->totalMemoryUsage > current_tc->maxTotalMemoryUsage) {
-				    current_tc->maxTotalMemoryUsage = current_tc->totalMemoryUsage;
+				if(threadContention->totalMemoryUsage > threadContention->maxTotalMemoryUsage) {
+				    threadContention->maxTotalMemoryUsage = threadContention->totalMemoryUsage;
 				}
                 checkGlobalTotalMemoryUsage();
 		}
@@ -1561,8 +1329,8 @@ void incrementMemoryUsage(size_t size, size_t classSize, size_t new_touched_byte
 void decrementMemoryUsage(size_t size, size_t classSize, void * addr) {
   if(addr == NULL) return;
 
-	current_tc->realAllocatedMemoryUsage -= classSize;
-	current_tc->realMemoryUsage -= size;
+	threadContention->realAllocatedMemoryUsage -= classSize;
+	threadContention->realMemoryUsage -= size;
 
   decrementGlobalMemoryAllocation(size, classSize);
 
@@ -1571,7 +1339,7 @@ void decrementMemoryUsage(size_t size, size_t classSize, void * addr) {
 void collectAllocMetaData(allocation_metadata *metadata) {
         if (__builtin_expect(!globalized, true)) {
             if (!metadata->reused) {
-                cycles_alloc += metadata->cycles;
+//                cycles_alloc += metadata->cycles;
                 localTAD.cycles_alloc += metadata->cycles;
                 localTAD.numAllocs++;
                 localTAD.numAllocationFaults += metadata->after.faults;
@@ -1580,7 +1348,7 @@ void collectAllocMetaData(allocation_metadata *metadata) {
                 localTAD.numAllocationCacheMisses += metadata->after.cache_misses;
                 localTAD.numAllocationInstrs += metadata->after.instructions;
             } else {
-                cycles_allocFFL += metadata->cycles;
+//                cycles_allocFFL += metadata->cycles;
                 localTAD.cycles_allocFFL += metadata->cycles;
                 localTAD.numAllocsFFL++;
                 localTAD.numAllocationFaultsFFL += metadata->after.faults;
@@ -1592,7 +1360,7 @@ void collectAllocMetaData(allocation_metadata *metadata) {
         } else {
             globalize_lck.lock();
             if (!metadata->reused) {
-                cycles_alloc += metadata->cycles;
+//                cycles_alloc += metadata->cycles;
                 globalTAD.cycles_alloc += metadata->cycles;
                 globalTAD.numAllocs++;
                 globalTAD.numAllocationFaults += metadata->after.faults;
@@ -1601,7 +1369,7 @@ void collectAllocMetaData(allocation_metadata *metadata) {
                 globalTAD.numAllocationCacheMisses += metadata->after.cache_misses;
                 globalTAD.numAllocationInstrs += metadata->after.instructions;
             } else {
-                cycles_allocFFL += metadata->cycles;
+//                cycles_allocFFL += metadata->cycles;
                 globalTAD.cycles_allocFFL += metadata->cycles;
                 globalTAD.numAllocsFFL++;
                 globalTAD.numAllocationFaultsFFL += metadata->after.faults;
@@ -1779,20 +1547,17 @@ void calcAppFriendliness() {
 
 const char * LockTypeToString(LockType type) {
 		switch(type) {
-				case MUTEX:
+				case LOCK_TYPE_MUTEX:
 					return "mutex";
 
-				case SPINLOCK:
+				case LOCK_TYPE_SPINLOCK:
 					return "spinlock";
 
-				case TRYLOCK:
+				case LOCK_TYPE_TRYLOCK:
 					return "trylock";
 
-				case SPIN_TRYLOCK:
+				case LOCK_TYPE_SPIN_TRYLOCK:
 					return "spin_trylock";
-
-		    case NOLOCK:
-		        return "nolock";
 
 				default:
 					return "unknown";

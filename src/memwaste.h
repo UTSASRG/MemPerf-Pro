@@ -24,17 +24,16 @@ typedef struct {
     size_t size_using;
     size_t classSize;
     short classSizeIndex;
-} obj_status;
+} objStatus;
 
 class MemoryWaste{
 private:
-    static HashMap <void*, obj_status*, spinlock> addr_obj_status;
+    static HashMap <void*, objStatus, spinlock, PrivateHeap> objStatusMap;
     static thread_local uint64_t* mem_alloc_wasted;
     static thread_local uint64_t* mem_alloc_wasted_minus;
     static thread_local uint64_t* mem_freelist_wasted;
     static thread_local uint64_t* mem_freelist_wasted_minus;
     static thread_local bool thread_init;
-    static bool global_init;
 ///Here
     static spinlock record_lock;
     static thread_local uint64_t now_max_usage;
@@ -50,20 +49,21 @@ private:
     static uint64_t * mem_alloc_wasted_record_global_minus;
     static uint64_t * mem_freelist_wasted_record_global_minus;
 
-    static obj_status * newObjStatus(size_t size_using, size_t classSize, short classSizeIndex);
+    static uint64_t * mem_blowup;
+    static uint64_t * mem_blowup_global;
+    static int64_t * free_nums;
+
 public:
 
     static void initialize();
 ///Here
     static void initForNewTid();
     static bool allocUpdate(allocation_metadata * allocData, void * address);
-    static void freeUpdate(void* address);
+    static void freeUpdate(allocation_metadata * allocData, void* address);
     ///Here
     static bool recordMemory(uint64_t now_usage);
     static void globalizeMemory();
     static void reportMaxMemory(FILE * output);
-    static size_t getSize(void * address);
-    static size_t getClassSize(void * address);
     static void checkGlobalInit();
     static void checkThreadInit();
 };
