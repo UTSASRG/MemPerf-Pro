@@ -491,11 +491,24 @@ void PageMapEntry::clear() {
 }
 
 unsigned int CacheMapEntry::getUsedBytes() {
-		return num_used_bytes;
+    if(num_used_bytes > CACHELINE_SIZE) {
+        return CACHELINE_SIZE;
+    }
+    if(num_used_bytes < 0) {
+        return 0;
+    }
+    return num_used_bytes;
+
 }
 
 unsigned int PageMapEntry::getUsedBytes() {
-		return num_used_bytes;
+    if(num_used_bytes > PAGESIZE) {
+        return PAGESIZE;
+    }
+    if(num_used_bytes < 0) {
+        return 0;
+    }
+    return num_used_bytes;
 }
 
 bool PageMapEntry::isTouched() {
@@ -573,18 +586,12 @@ CacheMapEntry * PageMapEntry::getCacheMapEntry(unsigned long mega_idx, unsigned 
 bool PageMapEntry::addUsedBytes(unsigned int num_bytes) {
 		//__atomic_add_fetch(&num_used_bytes, num_bytes, __ATOMIC_RELAXED);
         num_used_bytes += num_bytes;
-        if(num_used_bytes > PAGESIZE) {
-            num_used_bytes = PAGESIZE;
-        }
 		return true;
 }
 
 bool PageMapEntry::subUsedBytes(unsigned int num_bytes) {
 		//__atomic_sub_fetch(&num_used_bytes, num_bytes, __ATOMIC_RELAXED);
     num_used_bytes -= num_bytes;
-    if(num_used_bytes > PAGESIZE) {
-        num_used_bytes = 0;
-    }
 		return true;
 }
 
@@ -654,18 +661,12 @@ CacheMapEntry * PageMapEntry::getCacheMapEntry(bool mvBumpPtr) {
 bool CacheMapEntry::addUsedBytes(unsigned int num_bytes) {
 		//__atomic_add_fetch(&num_used_bytes, num_bytes, __ATOMIC_RELAXED);
     num_used_bytes += num_bytes;
-    if(num_used_bytes > CACHELINE_SIZE) {
-        num_used_bytes = CACHELINE_SIZE;
-    }
 		return true;
 }
 
 bool CacheMapEntry::subUsedBytes(unsigned int num_bytes) {
 		//__atomic_sub_fetch(&num_used_bytes, num_bytes, __ATOMIC_RELAXED);
     num_used_bytes -= num_bytes;
-    if(num_used_bytes > CACHELINE_SIZE) {
-        num_used_bytes = 0;
-    }
 		return true;
 }
 

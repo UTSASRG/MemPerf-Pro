@@ -33,7 +33,6 @@ private:
     static thread_local uint64_t* mem_alloc_wasted_minus;
     static thread_local uint64_t* mem_freelist_wasted;
     static thread_local uint64_t* mem_freelist_wasted_minus;
-    static thread_local bool thread_init;
 ///Here
     static spinlock record_lock;
     static thread_local uint64_t now_max_usage;
@@ -64,8 +63,6 @@ public:
     static bool recordMemory(uint64_t now_usage);
     static void globalizeMemory();
     static void reportMaxMemory(FILE * output);
-    static void checkGlobalInit();
-    static void checkThreadInit();
 };
 
 #endif //MMPROF_MEMWASTE_H

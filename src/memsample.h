@@ -14,8 +14,7 @@
 
 #define CACHELINE_SIZE 64
 #define PAGESIZE 4096
-//#define SAMPLING_PERIOD 500
-#define SAMPLING_PERIOD 5000
+#define SAMPLING_PERIOD 500
 ///#define MMAP_PAGES 33	// must be in the form of 2^N + 1
 #define MMAP_PAGES 129
 #define DATA_MMAP_PAGES (MMAP_PAGES - 1)
@@ -101,6 +100,10 @@ typedef struct {
   uint64_t instructions = 0;
 } PerfReadInfo;
 
+//typedef struct {
+//    uint64_t cache_misses = 0;
+//} CacheMissesOutsideInfo;
+
 typedef struct {
   int perf_fd;
   int perf_fd2;
@@ -111,6 +114,7 @@ typedef struct {
 	int perf_fd_cache_miss;
 	int perf_fd_cache_ref;
 	int perf_fd_instr;
+	//int perf_fd_cache_miss_outside;
 	// Discontiguous sample data from the perf ring buffer will be copied into
 	// data_buf_copy in the correct order (that is, eliminating the discontinuity
   // present in the ring buffer (ring_buf)).
@@ -160,11 +164,7 @@ typedef struct {            //struct for holding data about allocations
     uint64_t numAllocationInstrsFFL;
 
 		uint threads;
-		uint num_mutex_locks;
-		uint num_try_locks;
-		uint num_spin_locks;
-		uint num_spin_trylocks;
-		size_t blowup_bytes;
+		//size_t blowup_bytes;
 
 		uint num_sbrk;
 		uint num_madvise;
@@ -176,6 +176,10 @@ typedef struct {            //struct for holding data about allocations
 		uint64_t cycles_alloc;
 		uint64_t cycles_allocFFL;
 		uint64_t cycles_free;
+
+		uint64_t numOutsideCacheMisses;
+
+		uint lock_nums[4];
 
 } __attribute__((__aligned__(CACHELINE_SIZE))) thread_alloc_data;
 

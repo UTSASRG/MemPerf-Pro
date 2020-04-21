@@ -35,6 +35,13 @@ struct read_format {
 	} values[PERF_GROUP_SIZE];
 };
 
+struct read_cache_misses_outside_format {
+    uint64_t nr;
+    struct {
+        uint64_t value;
+    } values[1];
+};
+
 inline void acquireGlobalPerfLock() {
 		pthread_spin_lock(&_perf_spin_lock);
 }
@@ -53,7 +60,7 @@ inline int create_perf_event(perf_event_attr * attr, int group) {
 }
 
 //get data from PMU and store it into the PerfReadInfo struct
-void getPerfCounts (PerfReadInfo * i, bool enableCounters) {
+void getPerfCounts (PerfReadInfo * i) {
 #ifdef NO_PMU
 #warning NO_PMU flag set -> sampling will be disabled
     return;
@@ -72,6 +79,26 @@ void getPerfCounts (PerfReadInfo * i, bool enableCounters) {
     memcpy(i, &(buffer.values), sizeof(buffer.values));
 
 }
+
+//void getCacheMissesOutside (CacheMissesOutsideInfo * i) {
+//#ifdef NO_PMU
+//    #warning NO_PMU flag set -> sampling will be disabled
+//    return;
+//#endif
+//
+//    if (!isCountingInit) {
+//        return;
+//    }
+//
+//    struct read_cache_misses_outside_format buffer;
+//
+//    if (read(perfInfo.perf_fd_cache_miss_outside, &buffer, sizeof(struct read_cache_misses_outside_format)) == -1) {
+//        perror("perf read failed");
+//    }
+//
+//    memcpy(i, &(buffer.values), sizeof(buffer.values));
+//
+//}
 
 void setupCounting(void) {
 	#ifdef NO_PMU
@@ -159,6 +186,8 @@ void setupCounting(void) {
     pe_instr.type = PERF_TYPE_HARDWARE;
 	pe_instr.config = PERF_COUNT_HW_INSTRUCTIONS;
 
+//    struct perf_event_attr pe_cache_miss_outside;
+//    memcpy(&pe_cache_miss_outside, &pe_cache_miss, sizeof(struct perf_event_attr));
 
 	// *** WARNING ***
 	// DO NOT change the order of the following create_perf_event system calls!
@@ -171,6 +200,8 @@ void setupCounting(void) {
 	perfInfo.perf_fd_tlb_writes = create_perf_event(&pe_tlb_writes, perfInfo.perf_fd_fault);
 	perfInfo.perf_fd_cache_miss = create_perf_event(&pe_cache_miss, perfInfo.perf_fd_fault);
 	perfInfo.perf_fd_instr = create_perf_event(&pe_instr, perfInfo.perf_fd_fault);
+
+    //perfInfo.perf_fd_cache_miss_outside = create_perf_event(&pe_cache_miss_outside, -1);
 
 }
 
@@ -223,7 +254,7 @@ void setupSampling() {
 
     //pe_load.sample_period = fuzzed_period;
     //pe_load.freq = 1;
-    pe_load.sample_freq = 10000;
+    pe_load.sample_freq = 1000000;
     pe_load.freq = 0;
 	pe_load.sample_type = sample_type;
 	pe_load.read_format = read_format;
@@ -352,6 +383,7 @@ void stopCounting(void) {
     close(perfInfo.perf_fd_tlb_writes);
     close(perfInfo.perf_fd_cache_miss);
     close(perfInfo.perf_fd_instr);
+    //close(perfInfo.perf_fd_cache_miss_outside);
 }
 
 void stopSampling(void) {

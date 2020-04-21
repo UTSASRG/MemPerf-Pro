@@ -80,7 +80,7 @@ class CacheMapEntry {
 		private:
 				//unsigned char num_used_bytes;
                 //std::atomic<unsigned char> num_used_bytes;
-                unsigned char num_used_bytes;
+                short num_used_bytes;
 				//pid_t owner;
 
 		public:
@@ -97,7 +97,7 @@ class PageMapEntry {
 				//unsigned classSize;
 				//unsigned short num_used_bytes;
 				//std::atomic<unsigned short> num_used_bytes;
-                unsigned short num_used_bytes;
+                short num_used_bytes;
 				CacheMapEntry * cache_map_entry;
 
 		public:

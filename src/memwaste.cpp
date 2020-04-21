@@ -11,8 +11,6 @@ thread_local uint64_t* MemoryWaste::mem_alloc_wasted_minus;
 thread_local uint64_t* MemoryWaste::mem_freelist_wasted;
 thread_local uint64_t* MemoryWaste::mem_freelist_wasted_minus;
 
-thread_local bool MemoryWaste::thread_init = false;
-
 spinlock MemoryWaste::record_lock;
 thread_local uint64_t MemoryWaste::now_max_usage = 0;
 const uint64_t MemoryWaste::stride;
@@ -57,8 +55,6 @@ void MemoryWaste::initForNewTid() {
     mem_freelist_wasted_record_minus = (uint64_t*) myMalloc(num_class_sizes * sizeof(uint64_t));
 
     mem_blowup = (uint64_t*) myMalloc(num_class_sizes * sizeof(uint64_t));
-
-    thread_init = true;
 }
 
 
@@ -206,27 +202,43 @@ void MemoryWaste::reportMaxMemory(FILE * output) {
         } else {
             mem_freelist_wasted_record_global[i] -= mem_freelist_wasted_record_global_minus[i];
         }
-
-        fprintf(output, "classsize: %10lu\tmemory in alloc fragments: %10luM\tmemory in freelists: %10luM\n",
-                class_sizes[i], mem_alloc_wasted_record_global[i]/1024/1024, mem_freelist_wasted_record_global[i]/1024/1024);
+        if(bibop) {
+            fprintf(output, "classsize: %10lu\t\t\tmemory in alloc fragments: %10luM\t\t\tmemory in freelists: %10luM\n",
+                    class_sizes[i], mem_alloc_wasted_record_global[i]/1024/1024, mem_freelist_wasted_record_global[i]/1024/1024);
+        } else {
+            if(i == 0) {
+                fprintf(output, "small object:\t\t\t\t\t\t\tmemory in alloc fragments: %10luM\t\t\tmemory in freelists: %10luM\n",
+                        mem_alloc_wasted_record_global[i]/1024/1024, mem_freelist_wasted_record_global[i]/1024/1024);
+            } else {
+                fprintf(output, "large object:\t\t\t\t\t\t\tmemory in alloc fragments: %10luM\t\t\tmemory in freelists: %10luM\n",
+                        mem_alloc_wasted_record_global[i]/1024/1024, mem_freelist_wasted_record_global[i]/1024/1024);
+            }
+        }
 
         mem_alloc_wasted_record_total += mem_alloc_wasted_record_global[i];
         mem_freelist_wasted_record_total += mem_freelist_wasted_record_global[i];
     }
 
-    fprintf(output, "total:\t\t\tmemory in alloc fragments: %10luM\tmemory in freelists: %10luM\n",
+    fprintf(output, "total:\t\t\t\t\t\t\t\t\t\tmemory in alloc fragments: %10luM\t\t\tmemory in freelists: %10luM\n",
             mem_alloc_wasted_record_total/1024/1024, mem_freelist_wasted_record_total/1024/1024);
 
     fprintf (output, "\n>>>>>>>>>>>>>>>    MEMORY BLOWUP    <<<<<<<<<<<<<<<\n");
     for (int i = 0; i < num_class_sizes; ++i) {
-
-        fprintf(output, "classsize: %10lu\tmemory blowup: %10luM\n",
-                class_sizes[i], mem_blowup_global[i]/1024/1024);
+        if(bibop) {
+            fprintf(output, "classsize: %10lu\t\t\tmemory blowup: %10luM\n",
+                    class_sizes[i], mem_blowup_global[i]/1024/1024);
+        } else {
+            if(i == 0) {
+                fprintf(output, "small object:\t\t\t\t\t\t\tmemory blowup: %10luM\n", mem_blowup_global[i]/1024/1024);
+            } else {
+                fprintf(output, "large object:\t\t\t\t\t\t\tmemory blowup: %10luM\n", mem_blowup_global[i]/1024/1024);
+            }
+        }
 
         mem_blowup_total += mem_blowup_global[i];
     }
 
-    fprintf(output, "total:\t\t\tmemory blowup: %10luM\n", mem_blowup_total/1024/1024);
+    fprintf(output, "total:\t\t\t\t\t\t\t\t\t\tmemory blowup: %10luM\n", mem_blowup_total/1024/1024);
 
 }
 
