@@ -244,17 +244,17 @@ void setupSampling() {
 	pe_load.size = sizeof(struct perf_event_attr);
 	pe_load.config = LOAD_ACCESS;
 
-//	int sign = rand() % 2;
-//	int percent = rand() % 1001;  // generates between 0 and 1000, representing 0% to 10%, respectively
-//	float fraction = percent / 10000.0;
-//	if(sign) {
-//			fraction *= -1;
-//	}
-//	int fuzzed_period = SAMPLING_PERIOD * (1 + fraction);
+	int sign = rand() % 2;
+	int percent = rand() % 1001;  // generates between 0 and 1000, representing 0% to 10%, respectively
+	float fraction = percent / 10000.0;
+	if(sign) {
+			fraction *= -1;
+	}
+	int fuzzed_period = SAMPLING_PERIOD * (1 + fraction);
 
     //pe_load.sample_period = fuzzed_period;
     //pe_load.freq = 1;
-    pe_load.sample_freq = SAMPLING_PERIOD;
+    pe_load.sample_freq = fuzzed_period;
     pe_load.freq = 0;
 	pe_load.sample_type = sample_type;
 	pe_load.read_format = read_format;
