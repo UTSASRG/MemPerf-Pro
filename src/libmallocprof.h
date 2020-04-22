@@ -69,28 +69,23 @@ typedef struct {
   // Instead for different types. Let's use an array here. 
   PerPrimitiveData pmdata[LOCK_TYPE_TOTAL];
 
-#if 0 
-	ulong mutex_waits = 0;
-	ulong mutex_wait_cycles = 0;
-	ulong spinlock_waits = 0;
-	ulong spinlock_wait_cycles = 0;
-	ulong mutex_trylock_waits = 0;
-	ulong mutex_trylock_fails = 0;
-	ulong spin_trylock_waits = 0;
-	ulong spin_trylock_fails = 0;
-#endif
-	ulong mmap_waits = 0;
-	ulong mmap_wait_cycles = 0;
+	ulong mmap_waits_alloc = 0;
+	ulong mmap_wait_cycles_alloc = 0;
 	ulong sbrk_waits = 0;
 	ulong sbrk_wait_cycles = 0;
 	ulong madvise_waits = 0;
 	ulong madvise_wait_cycles = 0;
-	ulong munmap_waits = 0;
-	ulong munmap_wait_cycles = 0;
+	ulong munmap_waits_alloc = 0;
+	ulong munmap_wait_cycles_alloc = 0;
 	ulong mremap_waits = 0;
 	ulong mremap_wait_cycles = 0;
 	ulong mprotect_waits = 0;
 	ulong mprotect_wait_cycles = 0;
+
+    ulong mmap_waits_free = 0;
+    ulong mmap_wait_cycles_free = 0;
+    ulong munmap_waits_free = 0;
+    ulong munmap_wait_cycles_free = 0;
 
 // TP END
 	long realMemoryUsage = 0;

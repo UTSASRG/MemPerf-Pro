@@ -120,6 +120,7 @@ MemoryUsage max_mu;
 thread_local thread_data thrData;
 //thread_local bool waiting;
 thread_local bool inAllocation;
+thread_local bool inFree;
 //thread_local bool inDeallocation;
 thread_local bool inMmap;
 thread_local bool PMUinit = false;
@@ -274,8 +275,10 @@ __attribute__((constructor)) initStatus initializer() {
 
 	// Generate the name of our output file, then open it for writing.
 	char outputFile[MAX_FILENAME_LEN];
-	snprintf(outputFile, MAX_FILENAME_LEN, "%s_libmallocprof_%d_main_thread.txt",
-			program_invocation_name, pid);
+//	snprintf(outputFile, MAX_FILENAME_LEN, "%s_libmallocprof_%d_main_thread.txt",
+//			program_invocation_name, pid);
+    snprintf(outputFile, MAX_FILENAME_LEN, "/home/jinzhou/parsec/records/%s_libmallocprof_%d_main_thread.txt",
+             program_invocation_name, pid);
     fprintf(stderr, "%s\n", outputFile);
 	// Will overwrite current file; change the fopen flag to "a" for append.
 	thrData.output = fopen(outputFile, "w");
@@ -534,6 +537,7 @@ extern "C" {
             return ptr;
         }
         //thread_local
+        inFree = false;
         inAllocation = true;
         PMU_init_check();
 
@@ -557,8 +561,6 @@ extern "C" {
 		allocData.cycles = allocData.tsc_after;
 
 		// Gets overhead, address usage, mmap usage, memHWM, and prefInfo
-		//analyzeAllocation(&allocData);
-        //analyzePerfInfo(&allocData);
         collectAllocMetaData(&allocData);
 
 		//fprintf(stderr, "ptr = %p, size = %d\n\n", object, sz);
@@ -595,6 +597,7 @@ extern "C" {
 		PMU_init_check();
 
 		// thread_local
+		inFree = false;
 		inAllocation = true;
 
 		// Data we need for each allocation
@@ -647,6 +650,7 @@ extern "C" {
         PMU_init_check();
 
         //thread_local
+        inFree = true;
         inAllocation = true;
 
 		//Data we need for each free
@@ -669,23 +673,45 @@ extern "C" {
 //        cycles_free += allocData.tsc_after;
         ///below
             if (__builtin_expect(!globalized, true)) {
-                localTAD.numFrees++;
-                localTAD.cycles_free += allocData.tsc_after;
-                localTAD.numDeallocationFaults += allocData.after.faults;
-                localTAD.numDeallocationTlbReadMisses += allocData.after.tlb_read_misses;
-                localTAD.numDeallocationTlbWriteMisses += allocData.after.tlb_write_misses;
-                localTAD.numDeallocationCacheMisses += allocData.after.cache_misses;
-                localTAD.numDeallocationInstrs += allocData.after.instructions;
+                if(allocData.size < large_object_threshold) {
+                    localTAD.numFrees++;
+                    localTAD.cycles_free += allocData.tsc_after;
+                    localTAD.numDeallocationFaults += allocData.after.faults;
+                    localTAD.numDeallocationTlbReadMisses += allocData.after.tlb_read_misses;
+                    localTAD.numDeallocationTlbWriteMisses += allocData.after.tlb_write_misses;
+                    localTAD.numDeallocationCacheMisses += allocData.after.cache_misses;
+                    localTAD.numDeallocationInstrs += allocData.after.instructions;
+                } else {
+                    localTAD.numFrees_large++;
+                    localTAD.cycles_free_large += allocData.tsc_after;
+                    localTAD.numDeallocationFaults_large += allocData.after.faults;
+                    localTAD.numDeallocationTlbReadMisses_large += allocData.after.tlb_read_misses;
+                    localTAD.numDeallocationTlbWriteMisses_large += allocData.after.tlb_write_misses;
+                    localTAD.numDeallocationCacheMisses_large += allocData.after.cache_misses;
+                    localTAD.numDeallocationInstrs_large += allocData.after.instructions;
+                }
             } else {
-                globalize_lck.lock();
-                globalTAD.numFrees++;
-                globalTAD.cycles_free += allocData.tsc_after;
-                globalTAD.numDeallocationFaults += allocData.after.faults;
-                globalTAD.numDeallocationTlbReadMisses += allocData.after.tlb_read_misses;
-                globalTAD.numDeallocationTlbWriteMisses += allocData.after.tlb_write_misses;
-                globalTAD.numDeallocationCacheMisses += allocData.after.cache_misses;
-                globalTAD.numDeallocationInstrs += allocData.after.instructions;
-                globalize_lck.unlock();
+                if(allocData.size < large_object_threshold) {
+                    globalize_lck.lock();
+                    globalTAD.numFrees++;
+                    globalTAD.cycles_free += allocData.tsc_after;
+                    globalTAD.numDeallocationFaults += allocData.after.faults;
+                    globalTAD.numDeallocationTlbReadMisses += allocData.after.tlb_read_misses;
+                    globalTAD.numDeallocationTlbWriteMisses += allocData.after.tlb_write_misses;
+                    globalTAD.numDeallocationCacheMisses += allocData.after.cache_misses;
+                    globalTAD.numDeallocationInstrs += allocData.after.instructions;
+                    globalize_lck.unlock();
+                } else {
+                    globalize_lck.lock();
+                    globalTAD.numFrees_large++;
+                    globalTAD.cycles_free_large += allocData.tsc_after;
+                    globalTAD.numDeallocationFaults_large += allocData.after.faults;
+                    globalTAD.numDeallocationTlbReadMisses_large += allocData.after.tlb_read_misses;
+                    globalTAD.numDeallocationTlbWriteMisses_large += allocData.after.tlb_write_misses;
+                    globalTAD.numDeallocationCacheMisses_large += allocData.after.cache_misses;
+                    globalTAD.numDeallocationInstrs_large += allocData.after.instructions;
+                    globalize_lck.unlock();
+                }
             }
         inAllocation = false;
 
@@ -727,6 +753,7 @@ extern "C" {
 		void * object;
 
 		//thread_local
+		inFree = false;
 		inAllocation = true;
 
 		//Do before
@@ -781,6 +808,7 @@ extern "C" {
     if (!inRealMain) return RealX::posix_memalign(memptr, alignment, size);
 
     //thread_local
+    inFree = false;
     inAllocation = true;
 
 		PMU_init_check();
@@ -813,6 +841,7 @@ extern "C" {
      if (!inRealMain) return RealX::memalign(alignment, size);
 
      //thread_local
+     inFree = false;
      inAllocation = true;
 
      PMU_init_check();
@@ -955,7 +984,7 @@ void getClassSizeForStyles(void* uintaddr, allocation_metadata * allocData) {
             }
         }
     } else {
-        if (allocData->size < LARGE_OBJECT) allocData->classSizeIndex = 0;
+        if (allocData->size < large_object_threshold) allocData->classSizeIndex = 0;
         else allocData->classSizeIndex = 1;
         allocData->classSize = malloc_usable_size(uintaddr);
     }
@@ -1077,6 +1106,12 @@ void globalizeTAD() {
 	globalTAD.numAllocationCacheMisses += localTAD.numAllocationCacheMisses;
 	globalTAD.numAllocationInstrs += localTAD.numAllocationInstrs;
 
+    globalTAD.numAllocationFaults_large += localTAD.numAllocationFaults_large;
+    globalTAD.numAllocationTlbReadMisses_large += localTAD.numAllocationTlbReadMisses_large;
+    globalTAD.numAllocationTlbWriteMisses_large += localTAD.numAllocationTlbWriteMisses_large;
+    globalTAD.numAllocationCacheMisses_large += localTAD.numAllocationCacheMisses_large;
+    globalTAD.numAllocationInstrs_large += localTAD.numAllocationInstrs_large;
+
 	globalTAD.numAllocationFaultsFFL += localTAD.numAllocationFaultsFFL;
 	globalTAD.numAllocationTlbReadMissesFFL += localTAD.numAllocationTlbReadMissesFFL;
 	globalTAD.numAllocationTlbWriteMissesFFL += localTAD.numAllocationTlbWriteMissesFFL;
@@ -1089,6 +1124,12 @@ void globalizeTAD() {
 	globalTAD.numDeallocationTlbReadMisses += localTAD.numDeallocationTlbReadMisses;
 	globalTAD.numDeallocationTlbWriteMisses += localTAD.numDeallocationTlbWriteMisses;
 
+    globalTAD.numDeallocationFaults_large += localTAD.numDeallocationFaults_large;
+    globalTAD.numDeallocationCacheMisses_large += localTAD.numDeallocationCacheMisses_large;
+    globalTAD.numDeallocationInstrs_large += localTAD.numDeallocationInstrs_large;
+    globalTAD.numDeallocationTlbReadMisses_large += localTAD.numDeallocationTlbReadMisses_large;
+    globalTAD.numDeallocationTlbWriteMisses_large += localTAD.numDeallocationTlbWriteMisses_large;
+
 	for(int i = 0; i < LOCK_TYPE_TOTAL; ++i) {
         globalTAD.lock_nums[i] += localTAD.lock_nums[i];
     }
@@ -1099,18 +1140,22 @@ void globalizeTAD() {
 	//globalTAD.blowup_bytes += localTAD.blowup_bytes;
 	//fprintf(stderr, "%u, %u, %u, %u\n", localTAD.num_mutex_locks, localTAD.num_try_locks, localTAD.num_spin_locks, localTAD.num_spin_trylocks);
 
-	globalTAD.num_sbrk += localTAD.num_sbrk;
-	globalTAD.num_madvise += localTAD.num_madvise;
-	globalTAD.malloc_mmaps += localTAD.malloc_mmaps;
+//	globalTAD.num_sbrk += localTAD.num_sbrk;
+//	globalTAD.num_madvise += localTAD.num_madvise;
+//	globalTAD.malloc_mmaps += localTAD.malloc_mmaps;
 
-	globalTAD.size_sbrk += localTAD.size_sbrk;
-	globalTAD.blowup_allocations += localTAD.blowup_allocations;
+	//globalTAD.size_sbrk += localTAD.size_sbrk;
+	//globalTAD.blowup_allocations += localTAD.blowup_allocations;
 	globalTAD.cycles_alloc += localTAD.cycles_alloc;
+    globalTAD.cycles_alloc_large += localTAD.cycles_alloc_large;
 	globalTAD.cycles_allocFFL += localTAD.cycles_allocFFL;
 	globalTAD.cycles_free += localTAD.cycles_free;
+    globalTAD.cycles_free_large += localTAD.cycles_free_large;
 	globalTAD.numAllocs += localTAD.numAllocs;
+    globalTAD.numAllocs_large += localTAD.numAllocs_large;
 	globalTAD.numAllocsFFL += localTAD.numAllocsFFL;
 	globalTAD.numFrees += localTAD.numFrees;
+    globalTAD.numFrees_large += localTAD.numFrees_large;
 
 	globalTAD.numOutsideCacheMisses += localTAD.numOutsideCacheMisses;
 
@@ -1134,20 +1179,27 @@ void writeThreadMaps () {
 	double numAllocs = safeDivisor(globalTAD.numAllocs);
 	double numAllocsFFL = safeDivisor(globalTAD.numAllocsFFL);
 	double numFrees = safeDivisor(globalTAD.numFrees);
+	double numAllocs_large = safeDivisor(globalTAD.numAllocs_large);
+    double numFrees_large = safeDivisor(globalTAD.numFrees_large);
 
   fprintf (thrData.output, "\n>>>>>>>>>>>>>>>    ALLOCATION NUM    <<<<<<<<<<<<<<<\n");
-	fprintf (thrData.output, "new allocations\t\t\t\t\t\t\t%20lu\n", globalTAD.numAllocs);
-	fprintf (thrData.output, "reused allocations\t\t\t\t\t%20lu\n", globalTAD.numAllocsFFL);
-	fprintf (thrData.output, "deallocations\t\t\t\t\t\t\t\t%20lu\n", globalTAD.numFrees);
+	fprintf (thrData.output, "small new allocations\t\t\t\t%20lu\n", globalTAD.numAllocs);
+	fprintf (thrData.output, "small reused allocations\t\t%20lu\n", globalTAD.numAllocsFFL);
+	fprintf (thrData.output, "small deallocations\t\t\t\t\t%20lu\n", globalTAD.numFrees);
+    fprintf (thrData.output, "large allocations\t\t\t\t\t\t%20lu\n", globalTAD.numAllocs_large);
+    fprintf (thrData.output, "large deallocations\t\t\t\t\t%20lu\n", globalTAD.numFrees_large);
 	uint64_t leak;
-	if(globalTAD.numAllocs+globalTAD.numAllocsFFL>globalTAD.numFrees) {
-	    leak = globalTAD.numAllocs+globalTAD.numAllocsFFL-globalTAD.numFrees;
+	if(globalTAD.numAllocs+globalTAD.numAllocsFFL+globalTAD.numAllocs_large > globalTAD.numFrees+globalTAD.numFrees_large) {
+	    leak = (globalTAD.numAllocs+globalTAD.numAllocsFFL+globalTAD.numAllocs_large) - (globalTAD.numFrees+globalTAD.numFrees_large);
 	} else {
 	    leak = 0;
 	}
-    fprintf (thrData.output, "potential leak num\t\t\t\t\t%20lu\n", leak);
+    fprintf (thrData.output, "potential leak num\t\t\t\t\t\t%20lu\n", leak);
 	fprintf (thrData.output, "\n");
-  fprintf (thrData.output, "\n>>>>>>>>>>>>>>>    NEW ALLOCATIONS    <<<<<<<<<<<<<<<\n");
+
+	MemoryWaste::reportAllocDistribution(thrData.output);
+
+  fprintf (thrData.output, "\n>>>>>>>>>>>>>>>    SMALL NEW ALLOCATIONS    <<<<<<<<<<<<<<<\n");
 	fprintf (thrData.output, "cycles\t\t\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.cycles_alloc, (globalTAD.cycles_alloc / numAllocs));
 	fprintf (thrData.output, "faults\t\t\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numAllocationFaults, (globalTAD.numAllocationFaults*100 / numAllocs));
 	fprintf (thrData.output, "tlb read misses\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numAllocationTlbReadMisses, (globalTAD.numAllocationTlbReadMisses*100 / numAllocs));
@@ -1156,7 +1208,7 @@ void writeThreadMaps () {
 	fprintf (thrData.output, "instructions\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.numAllocationInstrs, (globalTAD.numAllocationInstrs / numAllocs));
 	fprintf (thrData.output, "\n");
 
-	fprintf (thrData.output, "\n>>>>>>>>>>>>>>>  FREELIST ALLOCATIONS <<<<<<<<<<<<<<<\n");
+	fprintf (thrData.output, "\n>>>>>>>>>>>>>>>    SMALL FREELIST ALLOCATIONS    <<<<<<<<<<<<<<<\n");
 	fprintf (thrData.output, "cycles\t\t\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.cycles_allocFFL, (globalTAD.cycles_allocFFL / numAllocsFFL));
 	fprintf (thrData.output, "faults\t\t\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numAllocationFaultsFFL, (globalTAD.numAllocationFaultsFFL*100 / numAllocsFFL));
 	fprintf (thrData.output, "tlb read misses\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numAllocationTlbReadMissesFFL, (globalTAD.numAllocationTlbReadMissesFFL*100 / numAllocsFFL));
@@ -1165,13 +1217,30 @@ void writeThreadMaps () {
 	fprintf (thrData.output, "instructions\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.numAllocationInstrsFFL, (globalTAD.numAllocationInstrsFFL / numAllocsFFL));
 	fprintf (thrData.output, "\n");
 
-	fprintf (thrData.output, "\n>>>>>>>>>>>>>>>     DEALLOCATIONS     <<<<<<<<<<<<<<<\n");
+	fprintf (thrData.output, "\n>>>>>>>>>>>>>>>    SMALL DEALLOCATIONS    <<<<<<<<<<<<<<<\n");
 	fprintf (thrData.output, "cycles\t\t\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.cycles_free, (globalTAD.cycles_free / numFrees));
 	fprintf (thrData.output, "faults\t\t\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numDeallocationFaults, (globalTAD.numDeallocationFaults*100 / numFrees));
 	fprintf (thrData.output, "tlb read misses\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numDeallocationTlbReadMisses, (globalTAD.numDeallocationTlbReadMisses*100 / numFrees));
 	fprintf (thrData.output, "tlb write misses\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numDeallocationTlbWriteMisses, (globalTAD.numDeallocationTlbWriteMisses*100 / numFrees));
 	fprintf (thrData.output, "cache misses\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.numDeallocationCacheMisses, (globalTAD.numDeallocationCacheMisses / numFrees));
 	fprintf (thrData.output, "instrctions\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.numDeallocationInstrs, (globalTAD.numDeallocationInstrs / numFrees));
+
+    fprintf (thrData.output, "\n>>>>>>>>>>>>>>>    LARGE ALLOCATIONS    <<<<<<<<<<<<<<<\n");
+    fprintf (thrData.output, "cycles\t\t\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.cycles_alloc_large, (globalTAD.cycles_alloc_large / numAllocs_large));
+    fprintf (thrData.output, "faults\t\t\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numAllocationFaults_large, (globalTAD.numAllocationFaults_large*100 / numAllocs_large));
+    fprintf (thrData.output, "tlb read misses\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numAllocationTlbReadMisses_large, (globalTAD.numAllocationTlbReadMisses_large*100 / numAllocs_large));
+    fprintf (thrData.output, "tlb write misses\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numAllocationTlbWriteMisses_large, (globalTAD.numAllocationTlbWriteMisses_large*100 / numAllocs_large));
+    fprintf (thrData.output, "cache misses\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.numAllocationCacheMisses_large, (globalTAD.numAllocationCacheMisses_large / numAllocs_large));
+    fprintf (thrData.output, "instructions\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.numAllocationInstrs_large, (globalTAD.numAllocationInstrs_large / numAllocs_large));
+    fprintf (thrData.output, "\n");
+
+    fprintf (thrData.output, "\n>>>>>>>>>>>>>>>    LARGE DEALLOCATIONS    <<<<<<<<<<<<<<<\n");
+    fprintf (thrData.output, "cycles\t\t\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.cycles_free_large, (globalTAD.cycles_free_large / numFrees_large));
+    fprintf (thrData.output, "faults\t\t\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numDeallocationFaults_large, (globalTAD.numDeallocationFaults_large*100 / numFrees_large));
+    fprintf (thrData.output, "tlb read misses\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numDeallocationTlbReadMisses_large, (globalTAD.numDeallocationTlbReadMisses_large*100 / numFrees_large));
+    fprintf (thrData.output, "tlb write misses\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numDeallocationTlbWriteMisses_large, (globalTAD.numDeallocationTlbWriteMisses_large*100 / numFrees_large));
+    fprintf (thrData.output, "cache misses\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.numDeallocationCacheMisses_large, (globalTAD.numDeallocationCacheMisses_large / numFrees_large));
+    fprintf (thrData.output, "instrctions\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.numDeallocationInstrs_large, (globalTAD.numDeallocationInstrs_large / numFrees_large));
 
     fprintf (thrData.output, "\n>>>>>>>>>>>>>>>     LOCK TOTALS     <<<<<<<<<<<<<<<\n");
     fprintf (thrData.output, "pthread mutex locks\t\t\t\t\t%20u\n", globalTAD.lock_nums[0]);
@@ -1402,44 +1471,80 @@ void decrementMemoryUsage(size_t size, size_t classSize, void * addr) {
 void collectAllocMetaData(allocation_metadata *metadata) {
         if (__builtin_expect(!globalized, true)) {
             if (!metadata->reused) {
-//                cycles_alloc += metadata->cycles;
-                localTAD.cycles_alloc += metadata->cycles;
-                localTAD.numAllocs++;
-                localTAD.numAllocationFaults += metadata->after.faults;
-                localTAD.numAllocationTlbReadMisses += metadata->after.tlb_read_misses;
-                localTAD.numAllocationTlbWriteMisses += metadata->after.tlb_write_misses;
-                localTAD.numAllocationCacheMisses += metadata->after.cache_misses;
-                localTAD.numAllocationInstrs += metadata->after.instructions;
+                if(metadata->size < large_object_threshold) {
+                    localTAD.cycles_alloc += metadata->cycles;
+                    localTAD.numAllocs++;
+                    localTAD.numAllocationFaults += metadata->after.faults;
+                    localTAD.numAllocationTlbReadMisses += metadata->after.tlb_read_misses;
+                    localTAD.numAllocationTlbWriteMisses += metadata->after.tlb_write_misses;
+                    localTAD.numAllocationCacheMisses += metadata->after.cache_misses;
+                    localTAD.numAllocationInstrs += metadata->after.instructions;
+                } else {
+                    localTAD.cycles_alloc_large += metadata->cycles;
+                    localTAD.numAllocs_large++;
+                    localTAD.numAllocationFaults_large += metadata->after.faults;
+                    localTAD.numAllocationTlbReadMisses_large += metadata->after.tlb_read_misses;
+                    localTAD.numAllocationTlbWriteMisses_large += metadata->after.tlb_write_misses;
+                    localTAD.numAllocationCacheMisses_large += metadata->after.cache_misses;
+                    localTAD.numAllocationInstrs_large += metadata->after.instructions;
+                }
             } else {
-//                cycles_allocFFL += metadata->cycles;
-                localTAD.cycles_allocFFL += metadata->cycles;
-                localTAD.numAllocsFFL++;
-                localTAD.numAllocationFaultsFFL += metadata->after.faults;
-                localTAD.numAllocationTlbReadMissesFFL += metadata->after.tlb_read_misses;
-                localTAD.numAllocationTlbWriteMissesFFL += metadata->after.tlb_write_misses;
-                localTAD.numAllocationCacheMissesFFL += metadata->after.cache_misses;
-                localTAD.numAllocationInstrsFFL += metadata->after.instructions;
+                if(metadata->size < large_object_threshold) {
+                    localTAD.cycles_allocFFL += metadata->cycles;
+                    localTAD.numAllocsFFL++;
+                    localTAD.numAllocationFaultsFFL += metadata->after.faults;
+                    localTAD.numAllocationTlbReadMissesFFL += metadata->after.tlb_read_misses;
+                    localTAD.numAllocationTlbWriteMissesFFL += metadata->after.tlb_write_misses;
+                    localTAD.numAllocationCacheMissesFFL += metadata->after.cache_misses;
+                    localTAD.numAllocationInstrsFFL += metadata->after.instructions;
+                } else {
+                    localTAD.cycles_alloc_large += metadata->cycles;
+                    localTAD.numAllocs_large++;
+                    localTAD.numAllocationFaults_large += metadata->after.faults;
+                    localTAD.numAllocationTlbReadMisses_large += metadata->after.tlb_read_misses;
+                    localTAD.numAllocationTlbWriteMisses_large += metadata->after.tlb_write_misses;
+                    localTAD.numAllocationCacheMisses_large += metadata->after.cache_misses;
+                    localTAD.numAllocationInstrs_large += metadata->after.instructions;
+                }
             }
         } else {
             globalize_lck.lock();
             if (!metadata->reused) {
-//                cycles_alloc += metadata->cycles;
-                globalTAD.cycles_alloc += metadata->cycles;
-                globalTAD.numAllocs++;
-                globalTAD.numAllocationFaults += metadata->after.faults;
-                globalTAD.numAllocationTlbReadMisses += metadata->after.tlb_read_misses;
-                globalTAD.numAllocationTlbWriteMisses += metadata->after.tlb_write_misses;
-                globalTAD.numAllocationCacheMisses += metadata->after.cache_misses;
-                globalTAD.numAllocationInstrs += metadata->after.instructions;
+                if(metadata->size < large_object_threshold) {
+                    globalTAD.cycles_alloc += metadata->cycles;
+                    globalTAD.numAllocs++;
+                    globalTAD.numAllocationFaults += metadata->after.faults;
+                    globalTAD.numAllocationTlbReadMisses += metadata->after.tlb_read_misses;
+                    globalTAD.numAllocationTlbWriteMisses += metadata->after.tlb_write_misses;
+                    globalTAD.numAllocationCacheMisses += metadata->after.cache_misses;
+                    globalTAD.numAllocationInstrs += metadata->after.instructions;
+                } else {
+                    globalTAD.cycles_alloc_large += metadata->cycles;
+                    globalTAD.numAllocs_large++;
+                    globalTAD.numAllocationFaults_large += metadata->after.faults;
+                    globalTAD.numAllocationTlbReadMisses_large += metadata->after.tlb_read_misses;
+                    globalTAD.numAllocationTlbWriteMisses_large += metadata->after.tlb_write_misses;
+                    globalTAD.numAllocationCacheMisses_large += metadata->after.cache_misses;
+                    globalTAD.numAllocationInstrs_large += metadata->after.instructions;
+                }
             } else {
-//                cycles_allocFFL += metadata->cycles;
-                globalTAD.cycles_allocFFL += metadata->cycles;
-                globalTAD.numAllocsFFL++;
-                globalTAD.numAllocationFaultsFFL += metadata->after.faults;
-                globalTAD.numAllocationTlbReadMissesFFL += metadata->after.tlb_read_misses;
-                globalTAD.numAllocationTlbWriteMissesFFL += metadata->after.tlb_write_misses;
-                globalTAD.numAllocationCacheMissesFFL += metadata->after.cache_misses;
-                globalTAD.numAllocationInstrsFFL += metadata->after.instructions;
+                if(metadata->size < large_object_threshold) {
+                    globalTAD.cycles_allocFFL += metadata->cycles;
+                    globalTAD.numAllocsFFL++;
+                    globalTAD.numAllocationFaultsFFL += metadata->after.faults;
+                    globalTAD.numAllocationTlbReadMissesFFL += metadata->after.tlb_read_misses;
+                    globalTAD.numAllocationTlbWriteMissesFFL += metadata->after.tlb_write_misses;
+                    globalTAD.numAllocationCacheMissesFFL += metadata->after.cache_misses;
+                    globalTAD.numAllocationInstrsFFL += metadata->after.instructions;
+                } else {
+                    globalTAD.cycles_alloc_large += metadata->cycles;
+                    globalTAD.numAllocs_large++;
+                    globalTAD.numAllocationFaults_large += metadata->after.faults;
+                    globalTAD.numAllocationTlbReadMisses_large += metadata->after.tlb_read_misses;
+                    globalTAD.numAllocationTlbWriteMisses_large += metadata->after.tlb_write_misses;
+                    globalTAD.numAllocationCacheMisses_large += metadata->after.cache_misses;
+                    globalTAD.numAllocationInstrs_large += metadata->after.instructions;
+                }
             }
             globalize_lck.unlock();
         }

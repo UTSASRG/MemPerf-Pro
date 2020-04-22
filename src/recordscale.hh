@@ -25,6 +25,7 @@ extern thread_local thread_alloc_data localTAD;
 thread_local ThreadContention* threadContention;
 
 extern thread_local bool inAllocation;
+extern thread_local bool inFree;
 extern thread_local bool inMmap;
 extern bool realInitialized;
 extern bool mapsInitialized;
@@ -182,29 +183,30 @@ void * yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offs
 
   if (inMmap) return RealX::mmap (addr, length, prot, flags, fd, offset);
 
-  //thread_local
-  inMmap = true;
+    if(!inAllocation) return RealX::mmap (addr, length, prot, flags, fd, offset);
+    //thread_local
+    inMmap = true;
 
-  uint64_t timeStart = rdtscp();
-  void* retval = RealX::mmap(addr, length, prot, flags, fd, offset);
-  uint64_t timeStop = rdtscp();
+    uint64_t timeStart = rdtscp();
+    void* retval = RealX::mmap(addr, length, prot, flags, fd, offset);
+    uint64_t timeStop = rdtscp();
 
-  uint64_t address = (uint64_t)retval;
+    uint64_t address = (uint64_t)retval;
 
   //If this thread currently doing an allocation
-  if (inAllocation) {
-    //malloc_mmaps++;
-    localTAD.malloc_mmaps++;
-    threadContention->mmap_waits++;
-    threadContention->mmap_wait_cycles += (timeStop - timeStart);
+    if(!inFree) {
+        //localTAD.malloc_mmaps++;
+        threadContention->mmap_waits_alloc++;
+        threadContention->mmap_wait_cycles_alloc += (timeStop - timeStart);
+    } else {
+        threadContention->mmap_waits_free++;
+        threadContention->mmap_wait_cycles_free += (timeStop - timeStart);
+    }
 
     //mappings.insert(address, newMmapTuple(address, length, prot, 'a'));
 
 	// Need to check if selfmap.getInstance().getTextRegions() has
 	// ran. If it hasn't, we can't call isAllocatorInCallStack()
-  } else if(selfmapInitialized && isAllocatorInCallStack()) {
-    //mappings.insert(address, newMmapTuple(address, length, prot, 's'));
-  }
 
   inMmap = false;
   return retval;
@@ -230,7 +232,7 @@ int madvise(void *addr, size_t length, int advice){
   uint64_t timeStop = rdtscp();
 
 	//num_madvise++;
-	localTAD.num_madvise++;
+	//localTAD.num_madvise++;
   threadContention->madvise_waits++;
   threadContention->madvise_wait_cycles += (timeStop - timeStart);
   return result;
@@ -249,8 +251,8 @@ void *sbrk(intptr_t increment){
   threadContention->sbrk_waits++;
   threadContention->sbrk_wait_cycles += (timeStop - timeStart);
 
-  localTAD.num_sbrk++;
-  localTAD.size_sbrk += increment;
+  //localTAD.num_sbrk++;
+  //localTAD.size_sbrk += increment;
 
   //num_sbrk++;
   //size_sbrk += increment;
@@ -294,8 +296,13 @@ int munmap(void *addr, size_t length) {
   int ret =  RealX::munmap(addr, length);
   uint64_t timeStop = rdtscp();
 
-  threadContention->munmap_waits++;
-  threadContention->munmap_wait_cycles += (timeStop - timeStart);
+  if(!inFree) {
+      threadContention->munmap_waits_alloc++;
+      threadContention->munmap_wait_cycles_alloc += (timeStop - timeStart);
+  } else {
+      threadContention->munmap_waits_free++;
+      threadContention->munmap_wait_cycles_free += (timeStop - timeStart);
+  }
 
   //mappings.erase((intptr_t)addr);
   return ret;
@@ -338,7 +345,7 @@ void *mremap(void *old_address, size_t old_size, size_t new_size,
 
 void writeThreadContention() {
     fprintf(stderr, "writing\n");
-    fprintf (thrData.output, "\n>>>>>>>>>>>>>>>>>>>>>>>>>> THREAD CONTENTIONS <<<<<<<<<<<<<<<<<<<<<<<<<<\n\n");
+    fprintf (thrData.output, "\n>>>>>>>>>>>>>>>>>>>>>>>>>> THREAD CONTENTIONS <<<<<<<<<<<<<<<<<<<<<<<<<<\n");
 
     long maxRealMemoryUsage = 0;
     long maxRealAllocatedMemoryUsage = 0;
@@ -354,14 +361,18 @@ void writeThreadContention() {
           globalizedThreadContention.pmdata[j].calls += data->pmdata[j].calls;
           globalizedThreadContention.pmdata[j].cycles += data->pmdata[j].cycles;
         }
-        globalizedThreadContention.mmap_waits += data->mmap_waits;
-        globalizedThreadContention.mmap_wait_cycles += data->mmap_wait_cycles;
+        globalizedThreadContention.mmap_waits_alloc += data->mmap_waits_alloc;
+        globalizedThreadContention.mmap_wait_cycles_alloc += data->mmap_wait_cycles_alloc;
+        globalizedThreadContention.mmap_waits_free += data->mmap_waits_free;
+        globalizedThreadContention.mmap_wait_cycles_free += data->mmap_wait_cycles_free;
         globalizedThreadContention.sbrk_waits += data->sbrk_waits;
         globalizedThreadContention.sbrk_wait_cycles += data->sbrk_wait_cycles;
         globalizedThreadContention.madvise_waits += data->madvise_waits;
         globalizedThreadContention.madvise_wait_cycles += data->madvise_wait_cycles;
-        globalizedThreadContention.munmap_waits += data->munmap_waits;
-        globalizedThreadContention.munmap_wait_cycles += data->munmap_wait_cycles;
+        globalizedThreadContention.munmap_waits_alloc += data->munmap_waits_alloc;
+        globalizedThreadContention.munmap_wait_cycles_alloc += data->munmap_wait_cycles_alloc;
+        globalizedThreadContention.munmap_waits_free += data->munmap_waits_free;
+        globalizedThreadContention.munmap_wait_cycles_free += data->munmap_wait_cycles_free;
         globalizedThreadContention.mremap_waits += data->mremap_waits;
         globalizedThreadContention.mremap_wait_cycles += data->mremap_wait_cycles;
         globalizedThreadContention.mprotect_waits += data->mprotect_waits;
@@ -378,11 +389,17 @@ void writeThreadContention() {
 		maxRealAllocatedMemoryUsage = globalizedThreadContention.maxRealAllocatedMemoryUsage;
 		maxTotalMemoryUsage = globalizedThreadContention.maxTotalMemoryUsage;
 
-    fprintf (thrData.output, ">>> mmap\t\t\t\t\t\t\t\t\t\t%20lu\n",
-						globalizedThreadContention.mmap_waits);
-		fprintf (thrData.output, ">>> mmap_wait_cycles\t\t\t\t%20lu\tavg = %.1f\n",
-						globalizedThreadContention.mmap_wait_cycles,
-						((double)globalizedThreadContention.mmap_wait_cycles / safeDivisor(globalizedThreadContention.mmap_waits)));
+    fprintf (thrData.output, ">>> alloc_mmap\t\t\t\t\t\t\t%20lu\n",
+						globalizedThreadContention.mmap_waits_alloc);
+		fprintf (thrData.output, ">>> alloc_mmap_wait_cycles\t%20lu\tavg = %.1f\n",
+						globalizedThreadContention.mmap_wait_cycles_alloc,
+						((double)globalizedThreadContention.mmap_wait_cycles_alloc / safeDivisor(globalizedThreadContention.mmap_waits_alloc)));
+    fprintf (thrData.output, ">>> dealloc_mmap\t\t\t\t\t\t%20lu\n",
+             globalizedThreadContention.mmap_waits_free);
+    fprintf (thrData.output, ">>> dealloc_mmap_wait_cycles%20lu\tavg = %.1f\n",
+             globalizedThreadContention.mmap_wait_cycles_free,
+             ((double)globalizedThreadContention.mmap_wait_cycles_free / safeDivisor(globalizedThreadContention.mmap_waits_free)));
+
 		fprintf (thrData.output, ">>> sbrk\t\t\t\t\t\t\t\t\t\t%20lu\n",
 						globalizedThreadContention.sbrk_waits);
 		fprintf (thrData.output, ">>> sbrk_wait_cycles\t\t\t\t%20lu\tavg = %.1f\n",
@@ -393,11 +410,18 @@ void writeThreadContention() {
 		fprintf (thrData.output, ">>> madvise_wait_cycles\t\t\t%20lu\tavg = %.1f\n",
 						globalizedThreadContention.madvise_wait_cycles,
 						((double)globalizedThreadContention.madvise_wait_cycles / safeDivisor(globalizedThreadContention.madvise_waits)));
-		fprintf (thrData.output, ">>> munmap\t\t\t\t\t\t\t\t\t%20lu\n",
-						globalizedThreadContention.munmap_waits);
-		fprintf (thrData.output, ">>> munmap_wait_cycles\t\t\t%20lu\tavg = %.1f\n",
-						globalizedThreadContention.munmap_wait_cycles,
-						((double)globalizedThreadContention.munmap_wait_cycles / safeDivisor(globalizedThreadContention.munmap_waits)));
+
+		fprintf (thrData.output, ">>> alloc_munmap\t\t\t\t\t\t%20lu\n",
+						globalizedThreadContention.munmap_waits_alloc);
+		fprintf (thrData.output, ">>> alloc_munmap_wait_cycles%20lu\tavg = %.1f\n",
+						globalizedThreadContention.munmap_wait_cycles_alloc,
+						((double)globalizedThreadContention.munmap_wait_cycles_alloc / safeDivisor(globalizedThreadContention.munmap_waits_alloc)));
+    fprintf (thrData.output, ">>> dealloc_munmap\t\t\t\t\t%20lu\n",
+             globalizedThreadContention.munmap_waits_free);
+    fprintf (thrData.output, ">>> dealloc_munmap_wait_cycles%18lu\tavg = %.1f\n",
+             globalizedThreadContention.munmap_wait_cycles_free,
+             ((double)globalizedThreadContention.munmap_wait_cycles_free / safeDivisor(globalizedThreadContention.munmap_waits_free)));
+
 		fprintf (thrData.output, ">>> mremap\t\t\t\t\t\t\t\t\t%20lu\n",
 						globalizedThreadContention.mremap_waits);
 		fprintf (thrData.output, ">>> mremap_wait_cycles\t\t\t%20lu\tavg = %.1f\n",
@@ -414,7 +438,7 @@ void writeThreadContention() {
 						globalizedThreadContention.critical_section_duration,
 						((double)globalizedThreadContention.critical_section_duration / safeDivisor(globalizedThreadContention.critical_section_counter)));
 
-		fprintf (thrData.output, "\n>>>>>>>>>>>>>>>>>>>>>>>>>> Total Memory Usage <<<<<<<<<<<<<<<<<<<<<<<<<\n\n");
+		fprintf (thrData.output, "\n>>>>>>>>>>>>>>>>>>>>>>>>>> Total Memory Usage <<<<<<<<<<<<<<<<<<<<<<<<<\n");
     fprintf (thrData.output, ">>> Max Memory Usage in Threads:\n");
     fprintf (thrData.output, ">>> maxRealMemoryUsage\t\t%20zuM\n", maxRealMemoryUsage/1024/1024);
     fprintf (thrData.output, ">>> maxRealAllocMemoryUsage%19zuM\n", maxRealAllocatedMemoryUsage/1024/1024);

@@ -166,18 +166,39 @@ typedef struct {            //struct for holding data about allocations
 		uint threads;
 		//size_t blowup_bytes;
 
-		uint num_sbrk;
-		uint num_madvise;
-		uint malloc_mmaps;
+//		uint num_sbrk;
+//		uint num_madvise;
+//		uint malloc_mmaps;
 
-		uint size_sbrk;
-		uint blowup_allocations;
+		//uint size_sbrk;
+		//uint blowup_allocations;
 
 		uint64_t cycles_alloc;
 		uint64_t cycles_allocFFL;
 		uint64_t cycles_free;
 
 		uint64_t numOutsideCacheMisses;
+
+    ulong numAllocs_large;
+    ulong numFrees_large;
+
+    uint64_t numAllocationFaults_large;
+    uint64_t numDeallocationFaults_large;
+
+    uint64_t numAllocationTlbReadMisses_large;
+    uint64_t numAllocationTlbWriteMisses_large;
+
+    uint64_t numDeallocationTlbReadMisses_large;
+    uint64_t numDeallocationTlbWriteMisses_large;
+
+    uint64_t numAllocationCacheMisses_large;
+    uint64_t numDeallocationCacheMisses_large;
+
+    uint64_t numAllocationInstrs_large;
+    uint64_t numDeallocationInstrs_large;
+
+    uint64_t cycles_alloc_large;
+    uint64_t cycles_free_large;
 
 		uint lock_nums[4];
 
