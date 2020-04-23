@@ -74,8 +74,7 @@ Memory blowup is caused by the use of multiple heaps for the scalability purpose
 
 Secure allocators typically skip some objects in order to improve the security or reliability of the heap~\cite{DieHarder, openbsd, Guarder}. For instance, if a buffer overflow lands on non-used objects, it will cause no harm to the applications. However, it is extremely difficult to differentiate explicit skipping and external fragmentation. 
 
-For the memory overhead, \MP{} will report the memory overhead caused by internal fragmentation, and other reasons. It does not differentiate memory blowup from external fragmentation and explicit objects skipping, since it is relatively difficult to do that. Overall, \MP{} reports the wasted memory on each size class, due to internal fragmentation and other reasons. 
-
+For the memory overhead, \MP{} will report the memory overhead caused by internal fragmentation, memory blowup, and other overhead. 
 
 %It is relatively easy to compute the alignment overhead, as far as the information of size classes is known, which \MP{} utilizes a pre-run program to obtain (as described in Section~\ref{sec:understandingallocators}). \MP{} tracks each memory allocation, and then computes the alignment overhead for each allocation request. \todo{Of course, upon the deallocation, the corresponding alignment overhead will be extracted from the current overhead. But how we could know the actual alignment overhead for each object? It seems that we should store the information of such objects, or we could recompute due to the last object. }
 
