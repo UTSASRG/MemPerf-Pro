@@ -24,7 +24,6 @@ typedef struct {
     size_t size_using;
     size_t classSize;
     short classSizeIndex;
-    bool inBlowup;
 } objStatus;
 
 class MemoryWaste{
@@ -37,7 +36,8 @@ private:
 ///Here
     static spinlock record_lock;
     static thread_local uint64_t now_max_usage;
-    const static uint64_t stride = ONE_MEGABYTE;
+    //const static uint64_t stride = ONE_MEGABYTE;
+    const static uint64_t stride = 0;
 
     static thread_local uint64_t * mem_alloc_wasted_record;
     static thread_local uint64_t * mem_alloc_wasted_record_minus;
@@ -49,13 +49,12 @@ private:
     static uint64_t * mem_alloc_wasted_record_global_minus;
     static uint64_t * mem_freelist_wasted_record_global_minus;
 
-    static thread_local uint64_t * mem_blowup;
-    static thread_local uint64_t * mem_blowup_minus;
-    static thread_local uint64_t * mem_blowup_record;
-    static thread_local uint64_t * mem_blowup_minus_record;
-    static uint64_t * mem_blowup_global;
-    static uint64_t * mem_blowup_global_minus;
-    static int64_t * free_nums;
+    static thread_local int64_t * num_alloc_active;
+    static thread_local int64_t * num_alloc_active_record;
+    static int64_t * num_alloc_active_global;
+    static thread_local int64_t * num_freelist;
+    static thread_local int64_t * num_freelist_record;
+    static int64_t * num_freelist_global;
 
     static thread_local uint64_t * num_alloc;
     static thread_local uint64_t * num_allocFFL;
@@ -72,6 +71,9 @@ private:
     static uint64_t * num_allocFFL_record_global;
     static uint64_t * num_free_record_global;
 
+    static int64_t * blowupflag_record;
+    static int64_t * blowupflag;
+
 public:
 
     static void initialize();
@@ -83,7 +85,7 @@ public:
     static bool recordMemory(uint64_t now_usage);
     static void globalizeMemory();
     static void reportAllocDistribution(FILE * output);
-    static void reportMaxMemory(FILE * output);
+    static void reportMaxMemory(FILE * output, long realMem, long totalMem);
 };
 
 #endif //MMPROF_MEMWASTE_H

@@ -70,22 +70,65 @@ typedef struct {
   PerPrimitiveData pmdata[LOCK_TYPE_TOTAL];
 
 	ulong mmap_waits_alloc = 0;
-	ulong mmap_wait_cycles_alloc = 0;
-	ulong sbrk_waits = 0;
-	ulong sbrk_wait_cycles = 0;
-	ulong madvise_waits = 0;
-	ulong madvise_wait_cycles = 0;
-	ulong munmap_waits_alloc = 0;
-	ulong munmap_wait_cycles_alloc = 0;
-	ulong mremap_waits = 0;
-	ulong mremap_wait_cycles = 0;
-	ulong mprotect_waits = 0;
-	ulong mprotect_wait_cycles = 0;
-
     ulong mmap_waits_free = 0;
+    ulong mmap_waits_alloc_large = 0;
+    ulong mmap_waits_free_large = 0;
+
+    ulong mmap_wait_cycles_alloc = 0;
     ulong mmap_wait_cycles_free = 0;
+    ulong mmap_wait_cycles_alloc_large = 0;
+    ulong mmap_wait_cycles_free_large = 0;
+
+	ulong sbrk_waits_alloc = 0;
+    ulong sbrk_waits_free = 0;
+    ulong sbrk_waits_alloc_large = 0;
+    ulong sbrk_waits_free_large = 0;
+
+	ulong sbrk_wait_cycles_alloc = 0;
+    ulong sbrk_wait_cycles_free = 0;
+    ulong sbrk_wait_cycles_alloc_large = 0;
+    ulong sbrk_wait_cycles_free_large = 0;
+
+	ulong madvise_waits_alloc = 0;
+    ulong madvise_waits_free = 0;
+    ulong madvise_waits_alloc_large = 0;
+    ulong madvise_waits_free_large = 0;
+
+	ulong madvise_wait_cycles_alloc = 0;
+    ulong madvise_wait_cycles_free = 0;
+    ulong madvise_wait_cycles_alloc_large = 0;
+    ulong madvise_wait_cycles_free_large = 0;
+
+	ulong munmap_waits_alloc = 0;
     ulong munmap_waits_free = 0;
+    ulong munmap_waits_alloc_large = 0;
+    ulong munmap_waits_free_large = 0;
+
+	ulong munmap_wait_cycles_alloc = 0;
     ulong munmap_wait_cycles_free = 0;
+    ulong munmap_wait_cycles_alloc_large = 0;
+    ulong munmap_wait_cycles_free_large = 0;
+
+	ulong mremap_waits_alloc = 0;
+    ulong mremap_waits_free = 0;
+    ulong mremap_waits_alloc_large = 0;
+    ulong mremap_waits_free_large = 0;
+
+	ulong mremap_wait_cycles_alloc = 0;
+    ulong mremap_wait_cycles_free = 0;
+    ulong mremap_wait_cycles_alloc_large = 0;
+    ulong mremap_wait_cycles_free_large = 0;
+
+	ulong mprotect_waits_alloc = 0;
+    ulong mprotect_waits_free = 0;
+    ulong mprotect_waits_alloc_large = 0;
+    ulong mprotect_waits_free_large = 0;
+
+	ulong mprotect_wait_cycles_alloc = 0;
+    ulong mprotect_wait_cycles_free = 0;
+    ulong mprotect_wait_cycles_alloc_large = 0;
+    ulong mprotect_wait_cycles_free_large = 0;
+
 
 // TP END
 	long realMemoryUsage = 0;

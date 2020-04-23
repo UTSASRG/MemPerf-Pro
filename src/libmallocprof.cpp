@@ -121,6 +121,7 @@ thread_local thread_data thrData;
 //thread_local bool waiting;
 thread_local bool inAllocation;
 thread_local bool inFree;
+thread_local size_t now_size;
 //thread_local bool inDeallocation;
 thread_local bool inMmap;
 thread_local bool PMUinit = false;
@@ -519,7 +520,7 @@ extern "C" {
         // itself will call malloc().
         if((profilerInitialized != INITIALIZED) || (!selfmapInitialized)) {
             void* ptr = myMalloc (sz);
-            //fprintf(stderr, "0 ptr = %p, size = %d\n", ptr, sz);
+            //fprintf(stderr, "malloc 0 ptr = %p, size = %d\n", ptr, sz);
             return ptr;
             //return myMalloc (sz);
         }
@@ -527,17 +528,18 @@ extern "C" {
         //Malloc is being called by a thread that is already in malloc
         if (inAllocation) {
             void* ptr = RealX::malloc(sz);
-            //fprintf(stderr, "1 ptr = %p, size = %d\n", ptr, sz);
+            //fprintf(stderr, "malloc 1 ptr = %p, size = %d\n", ptr, sz);
             return ptr;
         }
 
         if (!inRealMain) {
             void* ptr = RealX::malloc(sz);
-            //fprintf(stderr, "2 ptr = %p, size = %d\n", ptr, sz);
+            //fprintf(stderr, "malloc 2 ptr = %p, size = %d\n", ptr, sz);
             return ptr;
         }
         //thread_local
         inFree = false;
+        now_size = sz;
         inAllocation = true;
         PMU_init_check();
 
@@ -547,8 +549,8 @@ extern "C" {
 		//Do before
 		doBefore(&allocData);
 		//Do allocation
-//        fprintf(stderr, "malloc %d\n", sz);
 		object = RealX::malloc(sz);
+        //fprintf(stderr, "malloc ptr = %p, size = %d\n", object, sz);
         doAfter(&allocData);
         //fprintf(stderr, "malloc done %d %p\n", sz, object);
 //        allocData.address = (uint64_t) object;
@@ -583,21 +585,30 @@ extern "C" {
 		}
 
 		if (profilerInitialized != INITIALIZED) {
-
 			void * ptr = NULL;
 			ptr = yymalloc (nelem * elsize);
-			if (ptr) memset(ptr, 0, nelem * elsize);
+            //fprintf(stderr, "calloc 0 ptr = %p, size = %d\n", ptr, nelem * elsize);
+            if (ptr) memset(ptr, 0, nelem * elsize);
 			return ptr;
 		}
 
-		if (inAllocation) return RealX::calloc(nelem, elsize);
+		if (inAllocation) {
+            void * ptr = RealX::calloc (nelem, elsize);
+            //fprintf(stderr, "calloc 1 ptr = %p, size = %d\n", ptr, nelem * elsize);
+		    return ptr;
+		}
 
-		if (!inRealMain) return RealX::calloc (nelem, elsize);
+		if (!inRealMain) {
+            void * ptr = RealX::calloc (nelem, elsize);
+            //fprintf(stderr, "calloc 2 ptr = %p, size = %d\n", ptr, nelem * elsize);
+		    return ptr;
+		}
 
 		PMU_init_check();
 
 		// thread_local
 		inFree = false;
+		now_size = nelem * elsize;
 		inAllocation = true;
 
 		// Data we need for each allocation
@@ -609,6 +620,7 @@ extern "C" {
 
 		// Do allocation
 		object = RealX::calloc(nelem, elsize);
+        //fprintf(stderr, "calloc ptr = %p, size = %d\n", object, nelem * elsize);
         doAfter(&allocData);
         allocData.reused = MemoryWaste::allocUpdate(&allocData, object);
         size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject(object, allocData.size, false);
@@ -636,17 +648,20 @@ extern "C" {
         // Determine whether the specified object came from our global memory;
         // only call RealX::free() if the object did not come from here.
         if (ptr >= (void *)myMem && ptr <= myMemEnd) {
+            //fprintf(stderr, "free 0 ptr = %p\n", ptr);
             myFree (ptr);
             return;
         }
         if (ptr >= (void *)myMem_hash && ptr <= myMemEnd_hash) {
+            //fprintf(stderr, "free 1 ptr = %p\n", ptr);
             return;
         }
         if ((profilerInitialized != INITIALIZED) || !inRealMain) {
+            //fprintf(stderr, "free 2 ptr = %p\n", ptr);
             myFree(ptr);
             return;
         }
-        //fprintf(stderr, "free...%p\n", ptr);
+        //fprintf(stderr, "free ptr = %p\n", ptr);
         PMU_init_check();
 
         //thread_local
@@ -658,6 +673,12 @@ extern "C" {
 		//Do before free
 
         MemoryWaste::freeUpdate(&allocData, ptr);
+        if(allocData.size == 0) {
+            RealX::free(ptr);
+            inAllocation = false;
+            return;
+        }
+        now_size = allocData.size;
         decrementMemoryUsage(allocData.size, allocData.classSize, ptr);
         ShadowMemory::updateObject(ptr, allocData.size, true);
 
@@ -727,23 +748,35 @@ extern "C" {
 		if (!realInitialized) RealX::initializer();
 		if((profilerInitialized != INITIALIZED) || (ptr >= (void *)myMem && ptr <= myMemEnd)) {
 			if(ptr == NULL) {
-					return yymalloc(sz);
-			}
-			int * metadata = (int *)ptr - 1;
-			unsigned old_size = *metadata;
-			if(sz <= old_size) {
-					return ptr;
-			}
-			void * new_obj = yymalloc(sz);
-			memcpy(new_obj, ptr, old_size);
-			yyfree(ptr);
-			return new_obj;
+                return yymalloc(sz);
+            }
+            int * metadata = (int *)ptr - 1;
+            unsigned old_size = *metadata;
+            if(sz <= old_size) {
+                return ptr;
+            }
+            void * new_obj = yymalloc(sz);
+            memcpy(new_obj, ptr, old_size);
+            yyfree(ptr);
+            //fprintf(stderr, "realloc 0 ptr = %p, new ptr = %p, size = %d\n", ptr, new_obj, sz);
+            return new_obj;
 		}
 
-		if (!mapsInitialized) return RealX::realloc (ptr, sz);
-		if (inAllocation) return RealX::realloc (ptr, sz);
-		if (!inRealMain) return RealX::realloc (ptr, sz);
-
+		if (!mapsInitialized) {
+		    void * object = RealX::realloc (ptr, sz);
+            //fprintf(stderr, "realloc 1 ptr = %p, new ptr = %p, size = %d\n", ptr, object, sz);
+		    return object;
+		}
+		if (inAllocation) {
+            void * object = RealX::realloc (ptr, sz);
+            //fprintf(stderr, "realloc 2 ptr = %p, new ptr = %p, size = %d\n", ptr, object, sz);
+            return object;
+        }
+		if (!inRealMain) {
+            void * object = RealX::realloc (ptr, sz);
+            //fprintf(stderr, "realloc 3 ptr = %p, new ptr = %p, size = %d\n", ptr, object, sz);
+            return object;
+        }
 		PMU_init_check();
 
 		//Data we need for each allocation
@@ -754,6 +787,7 @@ extern "C" {
 
 		//thread_local
 		inFree = false;
+		now_size = sz;
 		inAllocation = true;
 
 		//Do before
@@ -767,6 +801,7 @@ extern "C" {
         doBefore(&allocData);
         //Do allocation
         object = RealX::realloc(ptr, sz);
+        //fprintf(stderr, "realloc ptr = %p, new ptr = %p, size = %d\n", ptr, object, sz);
         //Do after
         doAfter(&allocData);
         allocData.size = sz;
@@ -805,10 +840,12 @@ extern "C" {
 
 
 	int yyposix_memalign(void **memptr, size_t alignment, size_t size) {
+        countEventsOutside(true);
     if (!inRealMain) return RealX::posix_memalign(memptr, alignment, size);
 
     //thread_local
     inFree = false;
+    now_size = size;
     inAllocation = true;
 
 		PMU_init_check();
@@ -817,15 +854,20 @@ extern "C" {
     allocation_metadata allocData = init_allocation(size, MALLOC);
 
     //Do allocation
+    doBefore(&allocData);
     int retval = RealX::posix_memalign(memptr, alignment, size);
+    doAfter(&allocData);
     void * object = *memptr;
     allocData.reused = MemoryWaste::allocUpdate(&allocData, object);
     //Do after
     size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject(object, allocData.size, false);
     incrementMemoryUsage(size, allocData.classSize, new_touched_bytes, object);
 
+        allocData.cycles = allocData.tsc_after;
+        collectAllocMetaData(&allocData);
     // thread_local
     inAllocation = false;
+        countEventsOutside(false);
     return retval;
 	}
 
@@ -837,11 +879,13 @@ extern "C" {
 
 
  void * yymemalign(size_t alignment, size_t size) {
+     countEventsOutside(true);
     // fprintf(stderr, "yymemalign alignment %d, size %d\n", alignment, size);
      if (!inRealMain) return RealX::memalign(alignment, size);
 
      //thread_local
      inFree = false;
+     now_size = size;
      inAllocation = true;
 
      PMU_init_check();
@@ -850,14 +894,19 @@ extern "C" {
      allocation_metadata allocData = init_allocation(size, MALLOC);
 
      //Do allocation
+     doBefore(&allocData);
      void * object = RealX::memalign(alignment, size);
+     doAfter(&allocData);
      MemoryWaste::allocUpdate(&allocData, object);
      //Do after
     size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject(object, allocData.size, false);
     incrementMemoryUsage(size, allocData.classSize, new_touched_bytes, object);
 
+     allocData.cycles = allocData.tsc_after;
+     collectAllocMetaData(&allocData);
     // thread_local
     inAllocation = false;
+     countEventsOutside(false);
     return object;
 	}
 
@@ -1194,10 +1243,10 @@ void writeThreadMaps () {
 	} else {
 	    leak = 0;
 	}
-    fprintf (thrData.output, "potential leak num\t\t\t\t\t\t%20lu\n", leak);
+    fprintf (thrData.output, "potential leak num\t\t\t\t\t%20lu\n", leak);
 	fprintf (thrData.output, "\n");
 
-	MemoryWaste::reportAllocDistribution(thrData.output);
+	//MemoryWaste::reportAllocDistribution(thrData.output);
 
   fprintf (thrData.output, "\n>>>>>>>>>>>>>>>    SMALL NEW ALLOCATIONS    <<<<<<<<<<<<<<<\n");
 	fprintf (thrData.output, "cycles\t\t\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.cycles_alloc, (globalTAD.cycles_alloc / numAllocs));
@@ -1256,7 +1305,7 @@ void writeContention () {
 		fprintf(thrData.output, "\n>>>>>>>>>>>>>>>>>>>>>>>>> DETAILED LOCK USAGE <<<<<<<<<<<<<<<<<<<<<<<<<\n");
 		for(auto lock : lockUsage) {
 				PerLockData * data = lock.getValue();
-				fprintf(thrData.output, "lockAddr = %#lx\t\ttype = %s\t\tmax contention thread = %10d\t\t",
+				fprintf(thrData.output, "lockAddr = %#lx\t\ttype = %s\t\tmax contention thread = %5d\t\t",
 								lock.getKey(), LockTypeToString(data->type), data->maxContendThreads);
                 fprintf(thrData.output, "invocations = %10u\t\tcontention times = %10u\t\tcontention rate = %3u%%\n", data->calls, data->contendCalls, data->contendCalls*100/data->calls);
 		}
@@ -1435,16 +1484,21 @@ void checkGlobalMemoryUsage() {
 
 void incrementMemoryUsage(size_t size, size_t classSize, size_t new_touched_bytes, void * object) {
 
+    if(classSize-size > PAGESIZE) {
+        classSize -= (classSize-size)/PAGESIZE*PAGESIZE;
+    }
+
+
 		threadContention->realMemoryUsage += size;
 		threadContention->realAllocatedMemoryUsage += classSize;
-        if(threadContention->realAllocatedMemoryUsage > threadContention->maxRealAllocatedMemoryUsage) {
+    if(threadContention->realMemoryUsage > threadContention->maxRealMemoryUsage) {
+        threadContention->maxRealMemoryUsage = threadContention->realMemoryUsage;
+    }
+    if(threadContention->realAllocatedMemoryUsage > threadContention->maxRealAllocatedMemoryUsage) {
             threadContention->maxRealAllocatedMemoryUsage = threadContention->realAllocatedMemoryUsage;
         }
-        if(threadContention->realMemoryUsage > threadContention->maxRealMemoryUsage) {
-            threadContention->maxRealMemoryUsage = threadContention->realMemoryUsage;
-        }
-		incrementGlobalMemoryAllocation(size, classSize);
 
+		incrementGlobalMemoryAllocation(size, classSize);
     checkGlobalRealMemoryUsage();
     checkGlobalAllocatedMemoryUsage();
 
