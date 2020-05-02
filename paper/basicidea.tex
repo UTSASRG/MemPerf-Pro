@@ -1,24 +1,19 @@
 \section{Overview of mmprof}
 
-\MP{} aims to identify all important factors of memory allocators, as described in Section~\ref{sec:factors}. \MP{} not only uncovers potential issues, but also present some specific reasons of issues that could help programmers to solve these issues. 
-This Section talks about the basic idea of \MP{}, technical challenges, and related techniques.  
+\MP{} aims to identify all important factors of memory allocators, as described in Section~\ref{sec:factors}. In the end, \MP{} presents some potential reasons of issues that could help programmers to solve these issues. This Section talks about the basic idea of \MP{}, technical challenges, and related techniques.  
 %\MP{} reports some counter information, such as runtime per allocation/deallocation, memory overhead, or lock contention issues. It could further present some internal reasons of causing the issues, by intercepting synchronizations, system calls, and employing hardware performance counters. For instance, the DieHarder allocator is slow in its deallocation, mainly due to the use of a central lock (therefore causing the high contention), the large number of cache misses, and other reasons (as described in Section~\ref{}). Overall,   %Although \MP{} may employ the binary instrumentation to perform a more detailed profiling, such as identifying the instructions within each allocation or deallocation, the binary instrumentation may impose prohibitive performance overhead. With a high overhead, the profiling results may be significantly skewed, such as the waiting time of each lock acquisition inside the allocation. Instead, \MP{} employs the PMU hardware, RDTSC timestamp hardware, and simple counters together to perform the profiling. 
 
 \subsection{Basic Idea}
 
 \MP{} is designed as a drop-in library that can be simply linked to applications (and allocators) with the preloading mechanism, which does not require the change or the re-compilation of applications and allocators.
 
-Sine \MP{} aims to discover the issue inside allocations and deallocations, it intercepts the interfaces between applications with the memory allocator, such as invocations of memory-related APIs, such as \texttt{malloc}, \texttt{free}, \texttt{calloc}. Also, it also intercepts the interactions between the allocator with other components of the system, such as the OS (e.g., memory related system calls), and the pthreads library (e.g., synchronizations). By intercepting system calls, it could reveal whether an allocator causes significant kernel contention. From synchronizations, it could tell the scalability design of an allocator. As shown in Figure~\ref{fig:basicidea}, \MP{} also employs hardware performance counters to collect hardware information inside and outside the allocation/deallocation, such as the instructions, cache misses, or TLB misses of each allocation and deallocation. All the information reported by \MP{} helps programmer to identify the particular design issues inside the allocator.  
+Sine \MP{} aims to discover the issues of an  allocator, it intercepts the interactions between applications with the memory allocator, such as invocations of memory-related APIs, such as \texttt{malloc}, \texttt{free}, \texttt{calloc}, as shown in Fig.~\ref{fig:basicidea}. Also, it also intercepts the interactions between the allocator with other components of the system, such as the OS (e.g., memory related system calls), and the pthreads library (e.g., synchronizations). By intercepting system calls, it could collect whether an allocator causes significant kernel contention. From synchronizations, it could tell the scalable design of an allocator. As shown in Fig.~\ref{fig:basicidea}, \MP{} also employs hardware Performance Monitoring Units (PMU) to collect hardware related information inside and outside the allocation/deallocation, such as hardware instructions, cache misses, or TLB misses. %All the information are integrated together in order to help programmers identify the particular design issues inside the allocator.  
  
 \begin{figure}[!ht]
 \centering
-\includegraphics[width=5.5in]{figures/basicidea}
-\caption{Basic Idea of mmprof\label{fig:basicidea}}
+\includegraphics[width=4in]{figures/overview}
+\caption{Basic Idea of \texttt{mmprof}.\label{fig:basicidea}}
 \end{figure}
-
-Overall, \MP{} focuses on the allocator itself and its potential impact on applications (called as ``application friendliness''). These factors, when combined together, explain the performance difference of different allocators on different applications. \MP{} can assist allocator developers to identify the potential design issue, without writing a custom profiler. It could also help a user to choose an appropriate allocator for specific applications. In the remainder of this section, we describe the basic idea of its profiling. 
-
-\MP{} profiles the performance overhead, the memory overhead, and the scalability issues of allocators. Additionally, it also identifies whether an allocator is performance-friendly to a specific application, called as ''\textit{application friendliness}''.  
 
 
 \begin{table}[h]
@@ -30,60 +25,49 @@ Overall, \MP{} focuses on the allocator itself and its potential impact on appli
 Category & Collected Data & Collection Methods \\ \hline
 \multirow{2}{*}{Performance Overhead} & {Alloc/Free runtime} & Simple Counter, RDTSC Timestamp\\ \cline{2-3}
 & {Cache misses, page faults, TLB misses, instructions} & Performance Monitoring Units (PMU) \\ \hline
-\multirow{2}{*}{Memory Overhead} & Internal fragmentation & Simple counter\\ \cline{2-3}
-& {External fragmentation, memory blowup} & Simple counter \\ \hline
+\multirow{3}{*}{Memory Overhead} & Internal fragmentation & Simple counter\\ \cline{2-3}
+	& Memory blowup & Simple counter \\ \cline{2-3}
+& {External fragmentation \& others} & Simple counter \\ \hline
 \multirow{2}{*}{Scalability} & Lock's acquisition, contention rate, runtime & Simple counter, RDTSC timestamp\\ \cline{2-3}
-& {Number and runtime of related system calls} & Simple counter, RDTSC timestamp \\ \hline
-{Application Friendliness} & Cache/page utilization rate, cache conflicts & Simple counter, PMU \\ \hline
+& {Number and runtime of memory related syscalls} & Simple counter, RDTSC timestamp \\ \hline
+\multirow{2}{*}{Application Friendliness} & Cache/page utilization rate & Simple counter \\ \cline{2-3}
+& Cache misses, page faults, TLB misses & PMU\\ \hline
   \end{tabular}
   \centering
   \caption{Profiling data and methods of \MP{}.\label{table:alldata}}
 \end{table}
 
+Overall, \MP{} focuses on the allocator itself and its potential impact on applications (called as ``\textit{application friendliness}''). It  collects all data listed in Table~\ref{table:alldata}. The data, when combined together, explains the performance difference of different allocators on the same applications. \MP{} assists allocator developers to identify the potential design issue, without writing a custom profiler. It could also help users to choose an appropriate allocator for a specific application. In the remainder of this section, we describe the idea of profiling different important factors. 
+
+
+%\MP{} profiles the performance overhead, the memory overhead, and the scalability issues of allocators. Additionally, it also identifies whether an allocator is performance-friendly to a specific application, called as ''\textit{application friendliness}''.  
 
 \subsubsection{Performance Overhead}
 
-For the performance overhead, \MP{} collects the  data of each allocation and deallocation, instead of the summarized values over the whole execution. Each allocation/deallocation data helps identify potential issues inside, if the data is counterintuitive. \MP{} collects the following performance data. 
+For the performance overhead, \MP{} collects the average data of each allocation and deallocation, instead of the summarized values over the whole execution. \MP{} further differentiates the runtime for different types of allocations, such as new/re-used allocation of small and large objects. Each allocation/deallocation data helps identify potential issues inside, if the data is counterintuitive. \MP{} collects the following performance data. 
 
-First, \MP{} collects the runtime of each allocation and deallocation with the RDTSC instruction, as further described in Section~\ref{}.  \MP{} utilizes the RDTSC instruction to collect the timestamp before and after each operation, and uses the difference of timestamps as the runtime of a specific operation. In its implementation, \MP{} further differentiates the runtime for different types of allocations, such as new/re-used allocation of small and large objects, as further described in Section~\ref{sec:performanceimplement}. 
+First, \MP{} collects the runtime of each allocation and deallocation with the RDTSC instruction.  \MP{} obtains the timestamp before and after each operation, and uses the difference of timestamps as the runtime of a specific operation. Its implementation is further described in Section~\ref{sec:performanceimplement}. 
 
-Second, \MP{} also collects hardware events for each allocation and deallocation, such as cache misses, page faults, TLB misses, and instructions. These events enable the capability to discover a specific design issue without explicit instrumentation. For instance, a large number of instructions possibly indicates a questionable design of the allocator. 
-
-%For instance, the \texttt{DieHarder} allocator is observed to have a very high number (\todo{up to X $\times$}) of cache misses upon each deallocation.  By examining the code, we found out a serious implementation issue of the DieHarder allocator, which traverses all mini-heaps to identify the placement of each object, causing excessive cache misses upon each deallocation.  
-
-%Based on our understanding, the hardware events, such as retired instructions, cache misses or TLB misses, will help reveal some implementation issues of an allocator. For instance, \MP{} detects that the DieHarder allocator has an excessive number of cache misses and TLB misses upon each deallocation, around 5 times of each deallocation, which is significantly larger than that of other allocators. By examining the code, we found out a serious implementation issue of the DieHarder allocator, which traverses all mini-heaps to identify the placement of each object. Obviously, this implementation is extremely slow, considering that every deallocation has to perform such expensive lookup. By fixing such issues, the DieHarder's performance improves around \todo{20\%}.     
-
-
-\begin{comment}
-Can we integrate the cache misses or page faults for each allocation and deallocation, so that we could identify the issue of DieHarder that invokes many unnecessary cache misses?
-
-If we could correlate cache misses to each thread, then we could do this. 
-
-If allocation and deallocation takes too much time, it could be caused by multiple reasons:
-
-(1) First, it just takes a lot of instructions (could we find out the lapsed instructions for each thread?)
-(2) It may be caused by not good algorithm? 
-(3) It can be caused by lock contention?
-(4) It can be caused by system call related contention?
-\end{comment} 
+Second, \MP{} also collects hardware events for each allocation and deallocation, such as cache misses, page faults, TLB misses, and instructions, by employing the PMU hardware. These events enable the capability to discover a specific design issue without explicit instrumentation. For instance, a large number of instructions possibly indicates a suceptible design of the allocator. 
 
 \subsubsection{Memory Overhead}
 
-The memory overhead of an allocator comes from multiple aspects, including metadata overhead, internal fragmentation, external fragmentation, memory blowup, or explicit objects skipping. The metadata is used to track the available objects of each heap and the size information of each object. Based on our understanding, the metadata information is relatively small comparing to other memory overhead, which is omitted by \MP{}. 
+The memory overhead of an allocator comes from multiple aspects, including metadata overhead, internal fragmentation, external fragmentation, memory blowup, or explicit objects skipping. 
 
-Internal fragmentation is caused by the use of of size classes. Allocators manage heap objects using size classes in order to enable memory re-utilization. The difference between the requested size and the size of the corresponding class is internal fragmentation, which cannot be utilized to satisfy other requests. 
+The metadata is used to track available objects of each size class and the size information of each object. Based on our understanding, the metadata information is relatively small comparing to other memory overhead, which is omitted by \MP{}. 
 
-External fragmentation occurs, when the total amount of the available memory is sufficient to satisfy a request but fail to do so due to non-contiguous memory. External fragmentation is also related to the use of size classes. Most performant allocators rarely or never perform objects coalescing and splitting, since it is extremely expensive to perform these operations. Further, it is impossible to change the size class for only few objects in BiBOP-style allocators, since BiBOP-style allocators typically use a single size for all objects in the whole bag. That is, objects cannot be changed to other size classes, until all objects in the whole bag are freed. This design may cause extensive external fragmentation overhead. 
+Internal fragmentation is introduced when \MP{} uses size classes for allocations to enable memory re-utilization, instead of exact sizes. The difference between the requested size and the size of the corresponding class is internal fragmentation, which cannot be utilized to satisfy other requests. 
 
-Memory blowup is caused by the use of multiple heaps for the scalability purpose, where memory deallocations from one heap can not be utilized to satisfy the concurrent memory requests of another heap~\cite{Hoard}. In order to solve this issue, Li et. al. employ heuristics to adjust the synchronization frequency dynamically~\cite{DBLP:conf/iwmm/LiLD19}. Since modern allocators typically utilize per-thread heap or arena to reduce the contention overhead, the memory blowup will be a big source of memory consumption. 
+External fragmentation occurs, when the total amount of the available memory is sufficient to satisfy a request but fail to do so due to non-contiguous memory. External fragmentation is also related to the use of size classes, because alloctors rarely or never perform objects coalescing and splitting, since it is extremely expensive to perform these operations. Further, it is impossible to change the size class for only few objects inside the bag, since BiBOP-style allocators typically use a single size for all objects in the whole bag. That is, objects cannot be changed to other size classes, until all objects in the whole bag are freed. This design may cause extensive external fragmentation overhead. 
 
-Secure allocators typically skip some objects in order to improve the security or reliability of the heap~\cite{DieHarder, openbsd, Guarder}. For instance, if a buffer overflow lands on non-used objects, it will cause no harm to the applications. However, it is extremely difficult to differentiate explicit skipping and external fragmentation. 
+Memory blowup occurs due to the use of multiple heaps for the scalability purpose, where memory deallocations from one heap can not be utilized to satisfy the concurrent memory requests of another heap~\cite{Hoard}. In order to solve this issue, Li et. al. employ heuristics to adjust the synchronization frequency dynamically~\cite{DBLP:conf/iwmm/LiLD19}. Since modern allocators typically utilize per-thread heaps or multiple arenas to reduce the contention overhead,  memory blowup is a big source of memory consumption. It is challenging to profile memory blowup, as further described in Section~\ref{sec:profilingmemory}. 
 
-For the memory overhead, \MP{} will report the memory overhead caused by internal fragmentation, memory blowup, and other overhead. 
+Secure allocators typically skip some objects in order to improve the security or reliability of the heap~\cite{DieHarder, Guarder}. For instance, if a buffer overflow lands on non-used objects, it will cause no harm to the applications. However, it is extremely difficult to differentiate explicit skipping and external fragmentation. 
+
 
 %It is relatively easy to compute the alignment overhead, as far as the information of size classes is known, which \MP{} utilizes a pre-run program to obtain (as described in Section~\ref{sec:understandingallocators}). \MP{} tracks each memory allocation, and then computes the alignment overhead for each allocation request. \todo{Of course, upon the deallocation, the corresponding alignment overhead will be extracted from the current overhead. But how we could know the actual alignment overhead for each object? It seems that we should store the information of such objects, or we could recompute due to the last object. }
 
-\todo{For the memory blowup overhead, \MP{} profiles two types of blowup overhead. One type is simply based on the size of freed objects. If the total size of freed objects is larger than the requested size, but an allocation is satisfied from never-allocated objects, which is consider to be a memory blowup. Another type is based on the total size of freed objects with the same size. } 
+%\todo{For the memory blowup overhead, \MP{} profiles two types of blowup overhead. One type is simply based on the size of freed objects. If the total size of freed objects is larger than the requested size, but an allocation is satisfied from never-allocated objects, which is consider to be a memory blowup. Another type is based on the total size of freed objects with the same size. } 
 
 %However, it is extremely challenging to compute  the metadata overhead, since it is difficult to identify the location of the metadata, without knowing (or changing) the detailed design of an allocator. \MP{} proposes a novel way to get the metadata overhead, based on the equation~\ref{eq:memoryoverhead}. That is, the metadata overhead can be computed if the total memory overhead ($Total\_{OH}$), alignment overhead ($Align\_{OH}$), or memory blowup ($Blowup$) is known.   
 
@@ -112,10 +96,10 @@ For memory overhead, programmers only care about the time with the maximum overh
 
 \MP{} profiles the scalability issues caused by user-space contention and kernel-space contention separately. 
 
-\paragraph{User Space Contention:} User-space contention can be evaluated by explicit uses of locks. \MP{} obtains the number of lock acquisitions, the average time for each lock acquisition, and the average time of spending under the protection of each lock. \MP{} intercepts standard synchronizations in order to collect the data. Therefore, some allocators, such as the default Linux allocators or Hoard, will be changed to use the standard synchronizations.  
-%After that, \MP{} could divide the number of the lock acquisitions by the number of allocations, in order to find out whether the allocator substantially acquires the lock or not. Based on our knowledge, some allocators prevents the lock as much as possible, which possibly achieves better scalability. 
+\paragraph{User Space Contention:} User-space contention can be evaluated by explicit uses of locks. \MP{} obtains the number of lock acquisitions, the average time for each lock acquisition, and the average time of spending under the protection of each lock. \MP{} intercepts standard synchronizations in order to collect the data. 
+%Therefore, some allocators, such as the default Linux allocators or Hoard, will be changed to use the standard synchronizations.  
 
-The average time for each lock acquisition indicates potential lock contention inside. The average time of each critical section helps expose whether the lock contention is due to the heavy workload inside the critical section or not. For instance, if the contention is high, but the average time inside the critical section is low, then this allocator should possibly employs more  threads to distribute its overhead. In contrast, if the average time inside the critical section is high, then the allocator should possibly move some computation out of the critical section or simplify its management. 
+The average time for each lock acquisition indicates potential lock contention inside. The average time of each critical section helps expose whether the lock contention is due to the heavy workload inside the critical section or not. For instance, if the contention is high, but the average time inside the critical section is low, then this allocator should employ more fine-grained locks to distribute its overhead. In contrast, if the average time inside the critical section is high, then the allocator should possibly move some computation out of the critical section or simplify its management. 
 
 %\MP{} obtains the average acquisition time for locks without the contention at first. Then it could show whether the lock contention of an allocator is significant high or not.
 
@@ -125,7 +109,7 @@ The average time for each lock acquisition indicates potential lock contention i
 \subsubsection{Kernel Contention}
 \MP{} also evaluates the potential kernel contention caused by the allocators, since an allocator may interact with the OS substantially. \MP{} does not require to change the kernel directly to achieve this target. Instead, \MP{} monitors the number and the duration time of memory-related system calls inside the user space, such as \texttt{mmap}, \texttt{munmap}, \texttt{madvise}, \texttt{sbrk}, \texttt{madvise}, or \texttt{mremap}. By examining the source code of the Linux kernel, they will acquire a process-based lock (e.g. \texttt{mmap\_sem}) upon the entry of these system calls, causing the kernel-level contention. If an allocator invokes a much larger number of system calls, or if the average time spending on a system call is higher than the execution time of this system call without the contention, which indicating significant contention side, then the allocator should be improved. 
 
-\MP{} intercepts the invocations of these system calls, utilizes the RDTSC timestamps to collect the duration time of each system calls, and saves the duration and the number of invocations to the thread-local storage. In the end, it computes the average time and the number of invocations for each system call. Similarly, the average time can be compared with the time without the contention. Therefore, it is easy to know whether there exists kernel contention or not. Therefore, the allocator can be improved by avoiding such frequent system calls. This method helps to detect an issue of the Linux allocator, which causes significant slowdown on one application. 
+\MP{} intercepts invocations of these system calls, utilizes the RDTSC timestamps to collect the duration time of each system calls, and saves the duration and the number of invocations to the thread-local storage. In the end, it computes the average time and the number of invocations for each system call. Similarly, the average time can be compared with the time without the contention. Therefore, it is easy to know whether there exists kernel contention or not. Therefore, an allocator can be improved by reducing frequent system calls. This method helps to detect an issue of the Linux allocator, which causes significant slowdown on one application. 
 
   
 %\MP{} also tracks the virtual memory regions by analyzing these system calls. 
@@ -145,21 +129,19 @@ That is, we may have to integrate with SyncPerf for doing this. We will borrow t
 \subsubsection{Application Friendliness} 
 \label{sec:friendliness}
 
-Application friendliness helps explain the performance difference of using different allocators. For instance, a well-performed allocator (in its allocation and deallocation) may greatly affect the performance of an application, if it is not cache-friendly. Based on our observation, there are multiple factors that could impact the performance of an application
+Application friendliness helps explain the performance difference of using different allocators. For instance, a well-performed allocator (in its allocation and deallocation) may still greatly slowdown the performance of an application, if it is not cache-friendly. Based on our observation, there are multiple factors that could impact the performance of an application.
 
-
-
-
-%Cache utilization rate indicates the percentage of cache line are utilized for holding the actual heap data. Memory allocators may significantly affect this ratio. For instance, some allocators (e.g., the Linux allocator) may collocate the metadata with the actual heap objects. This method, although improving the speed of memory management, will reduce the cache utilization rate and cause more cache misses unnecessarily. 
-The first parameter is the cache utilization rate. Cache utilization rate is the percentage of words that are actually holding actual objects. An allocator with a high cache utilization rate will cause less cache misses, benefiting the overall performance. Multiple reason may affect the cache utilization rate. First, some allocators (e.g., the Linux allocator) that  prepend the metadata just before each object may reduce the cache utilization rate. This design is efficient for its memory management, but reduces the performance for normal memory accesses. Every cache load operation caused by a memory access is forced to load the metadata unnecessarily, which could load useful data otherwise.  Second, a coarse-grained size class may also reduce cache utilization rate, due to internal fragmentation. Third, freed objects that are not reutilized timely may also cause a low cache utilization rate. 
+The first parameter is the cache utilization rate. Cache utilization rate is the percentage of words that are actually holding actual objects. An allocator with a high cache utilization rate will cause less cache misses, benefiting the overall performance. Multiple reason may affect the cache utilization rate. First, some allocators (e.g., the Linux allocator) that  prepend the metadata just before each object may reduce the cache utilization rate. This design is efficient for its memory management, but reduces the performance for normal memory accesses. Every cache load operation caused by a memory access is forced to load the metadata unnecessarily, which is not used during normal executions. 
+ %which could load useful data otherwise.  
+ Second, a coarse-grained size class may also reduce cache utilization rate, due to internal fragmentation. Third, freed objects that are not reutilized timely may also cause a low cache utilization rate. 
 
  %Similarly, if page utilization rate is low, it may cause high TLB misses and prohibitive memory consumption. \MP{} samples memory accesses, and checks the corresponding cache utilization rate and page utilization rate. Overall, \MP{} could report an average cache utilization rate and page utilization rate over all samples. 
 
-The second parameter is page utilization rate. Page utilization rate indicates the percentage of a page that are actively utilized for holding the actual heap data. An allocator with a higher page utilization rate will introduce less page faults and less Translation Lookaside Buffer (TLB) misses. Less page faults and less TLB misses will benefit the performance, since it is generally slow to serve a page fault and handle a TLB miss due to the multi-level page table design. Similar to the reasons described above, a low page utilization rate can be caused by the prepending of the metadata, coarse-grained size class, and untimely reutilization of freed objects. 
+The second parameter is page utilization rate. Page utilization rate indicates the percentage of a page that are actively utilized for holding the actual heap data. An allocator with a higher page utilization rate will introduce less page faults and less Translation Lookaside Buffer (TLB) misses. Less page faults and less TLB misses will benefit the performance, since it is  slow to serve a page fault and handle a TLB miss due to the multi-level page table design. Similar to the reasons described above, a low page utilization rate can be caused by the prepending of the metadata, coarse-grained size class, and untimely reutilization of freed objects. 
 
-The third parameter is cache misses of applications. Upon cache misses, the data has to be loaded from the main memory, which is much slower than accessing the cache directly. 
+The third parameter is cache misses of applications. Cache misses can be caused by conflicting or falsely-shared misses. Upon cache misses, the data has to be loaded from the main memory, which is much slower than accessing the cache directly. 
 
-Overall, \MP{} employs the PMU hardware to collect these parameters. It employs the PMU-based sampling to sample memory accesses, and collects the data of cache and page utilization data upon sample events, as described in Section~\ref{sec:profilefriendliness}. In order to collect cache misses, \MP{} relies on the PMU hardware to collect cache misses of every thread separately, and then computes the total number of cache misses for the whole application.
+Overall, \MP{} employs the PMU hardware to collect these parameters. It employs the PMU-based sampling to sample memory accesses, and collects the data of cache and page utilization data upon sample events, as described in Section~\ref{sec:profilefriendliness}. \MP{} employs PMU to collect cache misses/page faults outside memory management.
 
 
 
@@ -172,9 +154,11 @@ Overall, \MP{} employs the PMU hardware to collect these parameters. It employs 
 
 As described above, \MP{} employs hardware PMUs, RDTSC, and simple counters together to perform the profiling. However, there exists some technical challenges. 
 
-The first and the most important challenge is the \textbf{overhead challenge}, where a careless design may impose up to 100 $\times$ overhead, based on our experience of the development. The huge overhead could be unaffordable even for development phases. More importantly, the significant overhead may also skew the evaluation results unnecessarily. 
+The first and the most important challenge is the \textbf{overhead challenge}, where a careless design may impose up to 100 $\times$ overhead, based on our past experience of the development. The huge overhead could be unaffordable even for development phases. More importantly, the significant overhead may also skew the evaluation results unnecessarily. 
 
-Other challenges come from the adaption to different allocators. Specific issues include the following ones: (1) How to obtain the specific details of different allocators, such as size class information, type of allocator, metadata size information? (Section~\ref{sec:understandingallocators}) (2) How to design a general but fast lookup mechanism for different allocators (Section~\ref{})? %(3) How to profile the user-space contention and kernel-contention for the Glibc's allocator (Section~\ref{}), since it invokes system calls and synchronizations without invoking APIs explicitly?
+The second challenge is collect the data precisely, such as memory blowup. Although it sounds intuitive initially to do, it is challenging to deal with the impact of deallocations. 
+
+Other challenges come from the adaption to different allocators. Specific issues include the following ones: (1) How to obtain the specific details of different allocators, such as size class information, type of allocator, metadata size information? (Section~\ref{sec:understandingallocators}) (2) How to design a general but fast lookup mechanism for different allocators? (3) How to profile kernel-contention for allocators?
 
 
 \subsection{Related Techniques}

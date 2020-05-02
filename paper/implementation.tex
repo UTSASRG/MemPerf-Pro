@@ -43,6 +43,8 @@ The threshold for big objects are typically detected by checking whether there i
 %We differentiate between used and new objects differently for BiBOP-style allocators and bump-pointer-based ones. For the former, counter arrays are used to track the number of free objects for each class size used by the allocator. In this way, if the given class size free-object-counter is non-zero, we will count the executed cycles toward the ``reused object'' pathway. Similarly for bump-pointer-based allocators, a simple running total is maintained for freed objects, and this total is compared to the size of the current allocation request.
 
 \subsection{Profiling Memory Overhead}
+\label{sec:profilingmemory}
+
 \MP{} profiles the maximum memory data, including real memory usage, real allocated memory, and total memory. Real memory usage is the amount of memory actually requested  by the application, where real allocated memory is the sum of real memory usage and internal fragmentation caused by size-class based allocation. For example, if an application requests the memory by \texttt{malloc(454)}, then real memory usage is incremented by $454$, but real allocated memory will be incremented by $512$ (when the corresponding size class is $512$ bytes). For this case, total memory will be  be incremented by the page size (e.g., 4096 bytes), provided that the page was previously unused. 
 %In order to track the maximum memory data, \MP{} will update the global data 
 
@@ -95,7 +97,7 @@ complexity to obtain the metadata.
           
 \begin{figure*}[!ht]
 \centering
-\includegraphics[width=5.5in]{figures/lookup2}
+\includegraphics[width=5.5in]{figures/lookup}
 \caption{Three-level Lookup Mechanism.\label{fig:lookup}}
 \end{figure*}
 
