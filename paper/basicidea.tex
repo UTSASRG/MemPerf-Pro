@@ -11,8 +11,8 @@ Sine \MP{} aims to discover the issues of an  allocator, it intercepts the inter
  
 \begin{figure}[!ht]
 \centering
-\includegraphics[width=4in]{figures/overview}
-\caption{Basic Idea of \texttt{mmprof}.\label{fig:basicidea}}
+\includegraphics[width=3.5in]{figures/overview}
+\caption{Basic idea of \texttt{mmprof}.\label{fig:basicidea}}
 \end{figure}
 
 
@@ -30,7 +30,7 @@ Category & Collected Data & Collection Methods \\ \hline
 & {External fragmentation \& others} & Simple counter \\ \hline
 \multirow{2}{*}{Scalability} & Lock's acquisition, contention rate, runtime & Simple counter, RDTSC timestamp\\ \cline{2-3}
 & {Number and runtime of memory related syscalls} & Simple counter, RDTSC timestamp \\ \hline
-\multirow{2}{*}{Application Friendliness} & Cache/page utilization rate & Simple counter \\ \cline{2-3}
+\multirow{2}{*}{Application Friendliness} & Cache/page utilization rate & Simple counter, PMU  \\ \cline{2-3}
 & Cache misses, page faults, TLB misses & PMU\\ \hline
   \end{tabular}
   \centering
