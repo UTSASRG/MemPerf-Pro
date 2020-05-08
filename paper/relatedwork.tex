@@ -1,4 +1,5 @@
 \section{Related Work}
+\label{sec:relatedwork}
 
 \paragraph{Study of Memory Allocators} There exist multiple studies in the past. Some evaluate the response time, memory consumption, and memory fragmentation of  popular allocators with different number of cores~\cite{6084042, ferreira2011comparison}. Zavrtanik et. al. evaluates the runtime, memory consumption, scalability of multiple allocators~\cite{zavrtanikexperimental}. However, they typically run a set of applications, and then report some observable behavior of different allocators. However, they do not design a general profiler that cannot tell the specific issues inside the allocators. For instance, they cannot tell where memory overhead is from, and why the allocator is not scalable. 
 

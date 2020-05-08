@@ -4,8 +4,9 @@
 The experimental evaluation will answer the following questions:
 \begin{itemize}
 \item How is the effectiveness of \MP{}? (Section~\ref{sec:effectiveness}) 	
-\item What is the performance overhead of \MP{}? (Section~\ref{})
-\item What is the memory overhead of \MP{}? (Section~\ref{})
+\item What is the performance overhead of \MP{}? (Section~\ref{sec:perf})
+\item What is the memory overhead of \MP{}? (Section~\ref{sec:memory})
+\item What are the range of metrics for performant allocators? (Section~\ref{})
 \end{itemize}
 
 Experiments were performed on a two-processor machine, where each processor is Intel(R) Xeon(R) Gold 6230. Each processor has 20 cores in total. This machine has 256GB of main memory, 20MB of L2 cache, and 1280KB L1 cache. The underlying OS is Ubuntu 18.04.3 LTS, installed with the Linux-5.3.0-40. All applications were compiled using GCC-7.5.0, with -O2 and -g flags.
@@ -13,26 +14,13 @@ Experiments were performed on a two-processor machine, where each processor is I
 \subsection{Effectiveness}
 \label{sec:effectiveness}
 
-In order to evaluate the effectiveness, we evaluate \MP{} with four general purpose allocators, e.g. Linux allocator (version 2.21 and 2.28), TCMalloc~\citep{tcmalloc}, jemalloc, and Hoard, and two secure allocators, i.e. DieHarder and OpenBSD. These allocators include both sequential and BiBOP-style allocators. Secure allocators were included, since they will increase runtime overhead due to decreased cache locality and increased instruction counts. That is, they represent some unique possibilities for \MP{} to show its effectiveness. 
+In order to evaluate the effectiveness, we evaluate \MP{} with five general purpose allocators, e.g. two versions of the Linux allocator (version 2.21 and 2.28), TCMalloc~\citep{tcmalloc}, jemalloc, and Hoard, and two secure allocators, i.e. DieHarder and OpenBSD. These allocators include both sequential and BiBOP-style allocators. Secure allocators were included, since they have their memory management policy, representing some unique possibilities for \MP{}. 
 
-For the evaluation, we use the default configuration for these allocators. But we also does some changes as discussed in the following. In order to evaluate the Linux allocators, they are compiled separately as a stand-alone library, and their synchronizations were changed to use the standard synchronizations provided by the \texttt{pthread} library (instead of using the internal implementation as \texttt{lll\_lock}). Since Hoard are using \texttt{std::lock\_guard} for its synchronization, we replaced it for the standard synchronization in order to track its synchronization behavior. 
+For the evaluation, we use their default configuration. However, we do make some changes, mostly due to the interception of synchronizations. Since Linux allocators are included in \texttt{glibc} libraries, they invokes the internal synchronizations as \texttt{lll\_lock}, which cannot be intercepted by \MP{}. They are compiled separately as a stand-alone library. Since Hoard are using \texttt{std::lock\_guard} for its synchronization, which cannot be intercepted, we replaced them with POSIX spin locks to track its synchronization behavior.
 
-
-
-\subsubsection{Performance Issues}
+\todo{Let's use a table to list all dramatic difference between these allocators. This gives us some evidence of allocators}
 
 
-
-\subsubsection{Memory Issues}
-
-\subsubsection{Scalability}
-
-
-
-\subsubsection{Application Friendliness}
-
-
-\subsubsection{Conclusions}
 
 For a performant allocator, what's the common things within the average allocator. We could utilize a table to list the average points of each allocator. Potentially, we could utilize these parameters to evaluate a new allocator. 
 
@@ -44,7 +32,7 @@ It seems that BIBOP style allocators are the trend of allocators, which not only
 \subsection{Issues Identified in Different Allocators}
 
 \paragraph{glibc-2.21:}
-This allocator of glibc-2.21 has a known bug that invokes excessively large number of \texttt{madvise} systems calls under certain memory use patterns. This is exhibited clearly under the dedup application of the PARSEC suite.
+This allocator of glibc-2.21 has a bug that invokes excessively large number of \texttt{madvise} systems calls under certain memory use patterns, exhibited clearly when running the dedup application. 
 Using a non-buggy version of glibc (2.24), the allocator typically makes around $280$ calls to \texttt{madvise}, whereas the affected version (2.21) makes about $505,233$.
 	This phenomenon is seen clearly in the \texttt{num\_advise} and \texttt{madvise\_wait\_cycles} output fields in the log produced by \MP{}.
 
@@ -69,12 +57,16 @@ Despite its BIBOP-style memory layout, \texttt{tcmalloc} typically performs very
 
 
 \subsection{Performance Overhead}
+\label{sec:perf}
+
 We will evaluate the performance overhead of the profiler itself. 
 
 \subsection{Memory Overhead}
+\label{sec:memory}
+
 We will evaluate the performance overhead of the profiler itself. 
 
-\subsection{Allocator Metrics}
+\subsection{Range of Allocator Metrics}
 We will provide the metrics to evaluate the allocators, based on the averaged value. 
 \todo{What types of metrics should we used? For instance, what type of policy should we used to exclude an allocator, and then get the value of the allocator. 20\%}
 We will provide a table that can be utilized to evaluate all future allocators. 

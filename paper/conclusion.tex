@@ -1,1 +1,4 @@
 \section{Conclusion}
+\label{sec:conclusion}
+
+Memory allocator could significantly impact the performance of applications. However, none of the existing profilers helps understand the behavior of an allocator, and determine  a performance or memory overhead issue caused by the allocator. This paper designs the first general profiler to profile the performance, memory overhead, scalability, and application-friendliness of a memory allocator, by the employment of simple counters, timestamp register, and hardware performance monitoring units. It will benefit allocator programmers and normal users. Our extensive evaluation has confirmed that \texttt{mmprof} helps identify multiple design issues in widely-used allocators. Therefore, \texttt{mmprof} will be an indispensable complementary to existing profilers. 
