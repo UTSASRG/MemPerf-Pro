@@ -45,7 +45,7 @@ NUM_MALLOCS = 80000
 #CFLAGS += -DNO_PMU
 #CFLAGS2 += -DNO_PMU
 
-INCLUDE_DIRS = -I. -I/usr/include/x86_64-linux-gnu/c++/4.8/
+INCLUDE_DIRS = -I.
 LIBS     := dl pthread
 
 TARGETS =	libmallocprof.so 			

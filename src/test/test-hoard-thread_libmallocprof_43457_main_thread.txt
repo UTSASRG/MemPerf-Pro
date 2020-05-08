@@ -51,7 +51,7 @@ num pthread spin trylocks                         0
 
 >>>>>>>>>>>>>>>>>>>>>>>>>> Thread Contention <<<<<<<<<<<<<<<<<<<<<<<<<<
 
->>> mutex_waits                                   0
+>>>                                    0
 >>> mutex_wait_cycles                             0    avg = 0.0
 >>> mutex_trylock_waits                           0
 >>> mutex_trylock_fails                           0

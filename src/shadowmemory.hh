@@ -1,7 +1,7 @@
 #ifndef __SHADOWMAP_H__
 #define __SHADOWMAP_H__
 
-#include <atomic>
+//#include <atomic>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>

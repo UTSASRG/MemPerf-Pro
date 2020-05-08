@@ -6,7 +6,7 @@
  * @author Stefen Ramirez <stfnrmz0@gmail.com>
  */
 
-#include <atomic>  //atomic vars
+//#include <atomic>  //atomic vars
 #include <dlfcn.h> //dlsym
 #include <fcntl.h> //fopen flags
 #include <stdio.h> //print, getline
@@ -98,7 +98,7 @@ size_t* class_sizes;
 
 //thread_local uint blowup_allocations = 0;
 thread_local unsigned long long total_cycles_start = 0;
-std::atomic<std::uint64_t> total_global_cycles (0);
+//std::atomic<std::uint64_t> total_global_cycles (0);
 //std::atomic<std::uint64_t> cycles_alloc (0);
 //std::atomic<std::uint64_t> cycles_allocFFL (0);
 //std::atomic<std::uint64_t> cycles_free (0);
@@ -205,6 +205,9 @@ extern "C" {
     #endif
  }
 
+// spinlock tid_lock;
+//int num_tid = 0;
+
 // Constructor
 __attribute__((constructor)) initStatus initializer() {
 
@@ -242,7 +245,11 @@ __attribute__((constructor)) initStatus initializer() {
 
 
 	void * program_break = RealX::sbrk(0);
-	thrData.tid = syscall(__NR_gettid);
+
+	//thrData.tid = syscall(__NR_gettid);
+//    tid_lock.init();
+//    thrData.tid = num_tid++;
+
 
 	thrData.stackStart = (char *)__builtin_frame_address(0);
 	thrData.stackEnd = (char *)__libc_stack_end;
@@ -377,7 +384,7 @@ void exitHandler() {
 
 	inRealMain = false;
 	unsigned long long total_cycles_end = rdtscp();
-	total_global_cycles += total_cycles_end - total_cycles_start;
+	//total_global_cycles += total_cycles_end - total_cycles_start;
 	#ifndef NO_PMU
 	stopSampling();
 
@@ -445,7 +452,6 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
 	PMU_init_check();
 	lockUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 128*32);
   MemoryWaste::initialize();
-  MemoryWaste::initForNewTid();
 	mapsInitialized = true;
 
 	inRealMain = true;
@@ -473,6 +479,8 @@ void collectAllocMetaData(allocation_metadata *metadata);
 //thread_local CacheMissesOutsideInfo eventOutside_after;
 thread_local PerfReadInfo eventOutside_before;
 thread_local PerfReadInfo eventOutside_after;
+thread_local uint64_t eventOutside_timestart;
+thread_local uint64_t eventOutside_timestop;
 thread_local bool eventOutsideStart = false;
 
 void countEventsOutside(bool end) {
@@ -482,15 +490,38 @@ void countEventsOutside(bool end) {
     eventOutsideStart = !end;
     if(!end) {
         getPerfCounts(&eventOutside_before);
+        eventOutside_timestart = rdtscp();
     } else {
+        eventOutside_timestop = rdtscp();
         getPerfCounts(&eventOutside_after);
     }
     if(end) {
         eventOutside_after.cache_misses -= eventOutside_before.cache_misses;
+        eventOutside_after.faults -= eventOutside_before.faults;
+        eventOutside_after.tlb_read_misses -= eventOutside_before.tlb_read_misses;
+        eventOutside_after.tlb_write_misses -= eventOutside_before.tlb_write_misses;
+        uint64_t time_diff = eventOutside_timestop - eventOutside_timestart;
+
         if(eventOutside_after.cache_misses > 10000000000) {
             eventOutside_after.cache_misses = 0;
         }
+        if(eventOutside_after.faults > 10000000000) {
+            eventOutside_after.faults = 0;
+        }
+        if(eventOutside_after.tlb_read_misses > 10000000000) {
+            eventOutside_after.tlb_read_misses = 0;
+        }
+        if(eventOutside_after.tlb_write_misses > 10000000000) {
+            eventOutside_after.tlb_write_misses = 0;
+        }
+        if(time_diff > 10000000000) {
+            time_diff = 0;
+        }
         localTAD.numOutsideCacheMisses += eventOutside_after.cache_misses;
+        localTAD.numOutsideFaults += eventOutside_after.faults;
+        localTAD.numOutsideTlbReadMisses += eventOutside_after.tlb_read_misses;
+        localTAD.numOutsideTlbWriteMisses += eventOutside_after.tlb_write_misses;
+        localTAD.numOutsideCycles += time_diff;
     }
 }
 
@@ -1046,7 +1077,7 @@ allocation_metadata init_allocation(size_t sz, enum memAllocType type) {
 	allocation_metadata new_metadata = {
 		reused : false,
 		//tid : gettid(),
-		//tid: thrData.tid,
+		tid: thrData.tid,
 		before : empty,
 		after : empty,
 		size : sz,
@@ -1207,12 +1238,14 @@ void globalizeTAD() {
     globalTAD.numFrees_large += localTAD.numFrees_large;
 
 	globalTAD.numOutsideCacheMisses += localTAD.numOutsideCacheMisses;
+	globalTAD.numOutsideFaults += localTAD.numOutsideFaults;
+	globalTAD.numOutsideTlbReadMisses += localTAD.numOutsideTlbReadMisses;
+	globalTAD.numOutsideTlbWriteMisses += localTAD.numOutsideTlbWriteMisses;
+	globalTAD.numOutsideCycles += localTAD.numOutsideCycles;
 
 	globalize_lck.unlock();
 
     globalized = true;
-
-    MemoryWaste::globalizeMemory();
 }
 
 void writeAllocData () {
@@ -1305,9 +1338,12 @@ void writeContention () {
 		fprintf(thrData.output, "\n>>>>>>>>>>>>>>>>>>>>>>>>> DETAILED LOCK USAGE <<<<<<<<<<<<<<<<<<<<<<<<<\n");
 		for(auto lock : lockUsage) {
 				PerLockData * data = lock.getValue();
-				fprintf(thrData.output, "lockAddr = %#lx\t\ttype = %s\t\tmax contention thread = %5d\t\t",
-								lock.getKey(), LockTypeToString(data->type), data->maxContendThreads);
-                fprintf(thrData.output, "invocations = %10u\t\tcontention times = %10u\t\tcontention rate = %3u%%\n", data->calls, data->contendCalls, data->contendCalls*100/data->calls);
+				if(data->contendCalls*100/data->calls >= 2 || data->cycles/data->calls >= 2000) {
+                    fprintf(thrData.output, "lockAddr = %#lx\t\ttype = %s\t\tmax contention thread = %5d\t\t",
+                            lock.getKey(), LockTypeToString(data->type), data->maxContendThreads);
+                    fprintf(thrData.output, "invocations = %10u\t\tcontention times = %10u\t\tcontention rate = %3u%%\t\t", data->calls, data->contendCalls, data->contendCalls*100/data->calls);
+                    fprintf(thrData.output, "avg cycles = %10u\n", data->cycles/data->calls);
+                }
 		}
         fprintf(thrData.output, "\n");
 		//fflush(thrData.output);
@@ -1445,8 +1481,6 @@ void doAfter (allocation_metadata *metadata) {
 void incrementGlobalMemoryAllocation(size_t size, size_t classsize) {
   __atomic_add_fetch(&mu.realMemoryUsage, size, __ATOMIC_RELAXED);
   __atomic_add_fetch(&mu.realAllocatedMemoryUsage, classsize, __ATOMIC_RELAXED);
-    ///Here
-  MemoryWaste::recordMemory((uint64_t)mu.realAllocatedMemoryUsage);
 }
 
 void decrementGlobalMemoryAllocation(size_t size, size_t classsize) {
@@ -1455,32 +1489,29 @@ void decrementGlobalMemoryAllocation(size_t size, size_t classsize) {
 }
 
 void checkGlobalRealMemoryUsage() {
-    if(mu.realMemoryUsage > max_mu.realMemoryUsage) {
+    //if(mu.realMemoryUsage > max_mu.realMemoryUsage) {
+    if(mu.realMemoryUsage > max_mu.realMemoryUsage + ONE_MEGABYTE) {
         max_mu.realMemoryUsage = mu.realMemoryUsage;
+        MemoryWaste::recordMemory();
     }
 }
 
 void checkGlobalAllocatedMemoryUsage() {
-    if(mu.realAllocatedMemoryUsage > max_mu.realAllocatedMemoryUsage) {
+    //if(mu.realAllocatedMemoryUsage > max_mu.realAllocatedMemoryUsage) {
+    if(mu.realAllocatedMemoryUsage > max_mu.realAllocatedMemoryUsage + ONE_MEGABYTE) {
         max_mu.realAllocatedMemoryUsage = mu.realAllocatedMemoryUsage;
     }
 }
 
 
 void checkGlobalTotalMemoryUsage() {
-    if(mu.totalMemoryUsage > max_mu.maxTotalMemoryUsage) {
+    //if(mu.totalMemoryUsage > max_mu.maxTotalMemoryUsage) {
+    if(mu.totalMemoryUsage > max_mu.maxTotalMemoryUsage + ONE_MEGABYTE) {
         max_mu.maxTotalMemoryUsage = mu.totalMemoryUsage;
         max_mu.totalMemoryUsage = mu.totalMemoryUsage;
     }
 }
 
-void checkGlobalMemoryUsage() {
-  MemoryUsage mu_tmp = mu;
-  if(mu_tmp.totalMemoryUsage > max_mu.maxTotalMemoryUsage) {
-    mu_tmp.maxTotalMemoryUsage = mu_tmp.totalMemoryUsage;
-    max_mu = mu_tmp;
-  }
-}
 
 void incrementMemoryUsage(size_t size, size_t classSize, size_t new_touched_bytes, void * object) {
 
@@ -1762,7 +1793,12 @@ void calcAppFriendliness() {
 		//FILE * outfd = stderr;
 		fprintf(outfd, "sampled accesses\t\t\t\t\t\t\t\t\t\t\t=%20ld\n", totalAccesses);
 		fprintf(outfd, "storing instructions\t\t\t\t\t\t\t\t\t=%20ld\n", totalCacheWrites);
-		fprintf(outfd, "cache misses outside allocs and frees\t=%20ld\n", globalTAD.numOutsideCacheMisses);
+
+		fprintf(outfd, "cache misses outside allocs per 1M cycles\t=%15ld\n", globalTAD.numOutsideCacheMisses/(globalTAD.numOutsideCycles/1000000));
+    fprintf(outfd, "page faults outside allocs per 1M cycles\t=%15ld\n", globalTAD.numOutsideFaults/(globalTAD.numOutsideCycles/1000000 ));
+    fprintf(outfd, "TLB read misses outside allocs per 1M cycles\t=%15ld\n", globalTAD.numOutsideTlbReadMisses/(globalTAD.numOutsideCycles/1000000 ));
+    fprintf(outfd, "TLB write misses outside allocs per 1M cycles\t=%15ld\n", globalTAD.numOutsideTlbWriteMisses/(globalTAD.numOutsideCycles/1000000 ));
+
 		fprintf(outfd, "avg. cache utilization\t\t\t\t\t\t\t\t=%19d%%\n", (int)(avgTotalCacheUtil * 100));
 		fprintf(outfd, "avg. page utilization\t\t\t\t\t\t\t\t\t=%19d%%\n", (int)(avgTotalPageUtil * 100));
 }

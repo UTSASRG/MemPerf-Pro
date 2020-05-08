@@ -50,7 +50,7 @@ FILE* outputFile;
 //Unused
 //__thread thread_data thrData;
 bool opening_maps_file;
-bool isLibc;
+//bool isLibc;
 
 //Debugging flags DEBUG
 const bool d_mmap = false;
@@ -562,22 +562,22 @@ int find_pages (uintptr_t vstart, uintptr_t vend, unsigned long pagesFound[]) {
 	return entries;
 }
 
-MmapTuple* newMmapTuple (uint64_t address, size_t length, int prot, char origin) {
-
-	MmapTuple* t = (MmapTuple*) myMalloc (sizeof (MmapTuple));
-
-	uint64_t end = (address + length) - 1;
-	t->start = address;
-	t->end = end;
-	t->length = length;
-	t->rw = 0;
-	t->origin = origin;
-	if (prot == (PROT_READ | PROT_WRITE)) t->rw += length;
-	else if (prot == (PROT_READ | PROT_WRITE | PROT_EXEC)) t->rw += length;
-	t->tid = pid;
-	t->allocations = 0;
-	return t;
-}
+//MmapTuple* newMmapTuple (uint64_t address, size_t length, int prot, char origin) {
+//
+//	MmapTuple* t = (MmapTuple*) myMalloc (sizeof (MmapTuple));
+//
+//	uint64_t end = (address + length) - 1;
+//	t->start = address;
+//	t->end = end;
+//	t->length = length;
+//	t->rw = 0;
+//	t->origin = origin;
+//	if (prot == (PROT_READ | PROT_WRITE)) t->rw += length;
+//	else if (prot == (PROT_READ | PROT_WRITE | PROT_EXEC)) t->rw += length;
+//	t->tid = pid;
+//	t->allocations = 0;
+//	return t;
+//}
 
 // First integer after class_sizes is how many there will be
 void writeClassSizes() {
