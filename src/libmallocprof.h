@@ -156,15 +156,15 @@ typedef struct {
 	unsigned szUsed;
 } ObjectTuple;
 
-typedef struct {
-	uint64_t start;
-	uint64_t end;
-	size_t length;
-	uint64_t rw;
-	char origin;
-	pid_t tid;
-	std::atomic_uint allocations;
-} MmapTuple;
+//typedef struct {
+//	uint64_t start;
+//	uint64_t end;
+//	size_t length;
+//	uint64_t rw;
+//	char origin;
+//	pid_t tid;
+//	std::atomic_uint allocations;
+//} MmapTuple;
 
 
 typedef struct {

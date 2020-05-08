@@ -41,7 +41,7 @@ typedef struct {
   unsigned int contendCalls; // How many of them have the contention
   int contendThreads;    // How many are waiting
   int maxContendThreads; // How many threads are contending on this lock
-  unsigned int cycles; // Total cycles  
+  unsigned long cycles; // Total cycles
 } PerLockData;
 
 
@@ -121,6 +121,7 @@ extern void countEventsOutside(bool end);
   int result = lockfuncs[LOCK_TYPE].realLock((void *)LOCK); \
   uint64_t timeStop = rdtscp(); \
   pmdata->cycles += (timeStop - timeStart); \
+  thisLock->cycles += (timeStop - timeStart); \
   if(threadContention->lock_counter == 0) { \
     threadContention->critical_section_start = timeStop; \
   } \
@@ -179,13 +180,21 @@ int pthread_spin_unlock(pthread_spinlock_t *lock) {
 // MMAP
 void * yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset) {
 
-  if (!realInitialized) RealX::initializer();
+  if (!realInitialized) {
+      RealX::initializer();
+  }
 
-  if (!mapsInitialized) return RealX::mmap (addr, length, prot, flags, fd, offset);
+  if (!mapsInitialized) {
+      return RealX::mmap (addr, length, prot, flags, fd, offset);
+  }
 
-  if (inMmap) return RealX::mmap (addr, length, prot, flags, fd, offset);
+  if (inMmap) {
+      return RealX::mmap (addr, length, prot, flags, fd, offset);
+  }
 
-    if(!inAllocation) return RealX::mmap (addr, length, prot, flags, fd, offset);
+    if(!inAllocation) {
+        return RealX::mmap (addr, length, prot, flags, fd, offset);
+    }
     //thread_local
     inMmap = true;
 
@@ -331,6 +340,7 @@ int mprotect(void* addr, size_t len, int prot) {
 
 
 int munmap(void *addr, size_t length) {
+
   if (!realInitialized) RealX::initializer();
 
   if(!inAllocation){
@@ -614,16 +624,19 @@ void writeThreadContention() {
 						globalizedThreadContention.critical_section_duration,
 						((double)globalizedThreadContention.critical_section_duration / safeDivisor(globalizedThreadContention.critical_section_counter)));
 
+		long realMem = max_mu.realAllocatedMemoryUsage;
+		long realAllocMem = max_mu.realAllocatedMemoryUsage;
+		long totalMem = max_mu.totalMemoryUsage;
 		fprintf (thrData.output, "\n>>>>>>>>>>>>>>>>>>>>>>>>>> Total Memory Usage <<<<<<<<<<<<<<<<<<<<<<<<<\n");
     fprintf (thrData.output, ">>> Max Memory Usage in Threads:\n");
     fprintf (thrData.output, ">>> maxRealMemoryUsage\t\t%20zuK\n", maxRealMemoryUsage/1024);
     fprintf (thrData.output, ">>> maxRealAllocMemoryUsage%19zuK\n", maxRealAllocatedMemoryUsage/1024);
     fprintf (thrData.output, ">>> maxTotalMemoryUsage\t\t%20zuK\n\n", maxTotalMemoryUsage/1024);
     fprintf (thrData.output, ">>> Global Memory Usage:\n");
-    fprintf (thrData.output, ">>> realMemoryUsage\t\t\t\t%20zuK\n", max_mu.realMemoryUsage/1024);
-    fprintf (thrData.output, ">>> realAllocatedMemoryUsage%18zuK\n", max_mu.realAllocatedMemoryUsage/1024);
-    fprintf (thrData.output, ">>> totalMemoryUsage\t\t\t%20zuK\n", max_mu.totalMemoryUsage/1024);
-    MemoryWaste::reportMaxMemory(thrData.output, max_mu.realMemoryUsage, max_mu.totalMemoryUsage);
+    fprintf (thrData.output, ">>> realMemoryUsage\t\t\t\t%20zuK\n", realMem/1024);
+    fprintf (thrData.output, ">>> realAllocatedMemoryUsage%18zuK\n", realAllocMem/1024);
+    fprintf (thrData.output, ">>> totalMemoryUsage\t\t\t%20zuK\n", totalMem/1024);
+    MemoryWaste::reportMaxMemory(thrData.output, realMem, totalMem);
 }
 
 #endif

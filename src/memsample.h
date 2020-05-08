@@ -10,7 +10,7 @@
 #include <unistd.h>
 #include <syscall.h>
 #include <sys/mman.h>
-#include <atomic>
+//#include <atomic>
 
 #define CACHELINE_SIZE 64
 #define PAGESIZE 4096
@@ -178,6 +178,10 @@ typedef struct {            //struct for holding data about allocations
 		uint64_t cycles_free;
 
 		uint64_t numOutsideCacheMisses;
+    uint64_t numOutsideFaults;
+    uint64_t numOutsideTlbReadMisses;
+    uint64_t numOutsideTlbWriteMisses;
+    uint64_t numOutsideCycles;
 
     ulong numAllocs_large;
     ulong numFrees_large;

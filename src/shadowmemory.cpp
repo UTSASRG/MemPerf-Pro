@@ -584,14 +584,12 @@ CacheMapEntry * PageMapEntry::getCacheMapEntry(unsigned long mega_idx, unsigned 
 }
 
 bool PageMapEntry::addUsedBytes(unsigned int num_bytes) {
-		//__atomic_add_fetch(&num_used_bytes, num_bytes, __ATOMIC_RELAXED);
-        num_used_bytes += num_bytes;
+		__atomic_add_fetch(&num_used_bytes, num_bytes, __ATOMIC_RELAXED);
 		return true;
 }
 
 bool PageMapEntry::subUsedBytes(unsigned int num_bytes) {
-		//__atomic_sub_fetch(&num_used_bytes, num_bytes, __ATOMIC_RELAXED);
-    num_used_bytes -= num_bytes;
+		__atomic_sub_fetch(&num_used_bytes, num_bytes, __ATOMIC_RELAXED);
 		return true;
 }
 
@@ -659,14 +657,12 @@ CacheMapEntry * PageMapEntry::getCacheMapEntry(bool mvBumpPtr) {
 }
 
 bool CacheMapEntry::addUsedBytes(unsigned int num_bytes) {
-		//__atomic_add_fetch(&num_used_bytes, num_bytes, __ATOMIC_RELAXED);
-    num_used_bytes += num_bytes;
+    __atomic_add_fetch(&num_used_bytes, num_bytes, __ATOMIC_RELAXED);
 		return true;
 }
 
 bool CacheMapEntry::subUsedBytes(unsigned int num_bytes) {
-		//__atomic_sub_fetch(&num_used_bytes, num_bytes, __ATOMIC_RELAXED);
-    num_used_bytes -= num_bytes;
+		__atomic_sub_fetch(&num_used_bytes, num_bytes, __ATOMIC_RELAXED);
 		return true;
 }
 
