@@ -14,7 +14,6 @@
 
 #define MAX_OBJ_NUM 4096*4*64
 //#define MAX_PAGE_NUM 4096
-//#define MAX_THREAD_NUMBER 2048
 
 
 extern int num_class_sizes;
@@ -29,24 +28,20 @@ typedef struct {
 class MemoryWaste{
 private:
     static HashMap <void*, objStatus, spinlock, PrivateHeap> objStatusMap;
-    static uint64_t* mem_alloc_wasted;
-    static uint64_t* mem_alloc_wasted_minus;
-    static uint64_t* mem_freelist_wasted;
-    static uint64_t* mem_freelist_wasted_minus;
-///Here
     static spinlock record_lock;
-    static uint64_t now_max_usage;
-    const static uint64_t stride = ONE_MEGABYTE;
+    static char record_time[1024];
 
+    static uint64_t* mem_alloc_wasted;
     static uint64_t * mem_alloc_wasted_record;
-    static uint64_t * mem_alloc_wasted_record_minus;
-    static uint64_t * mem_freelist_wasted_record;
-    static uint64_t * mem_freelist_wasted_record_minus;
+    static uint64_t * mem_alloc_wasted_record_global;
 
     static int64_t * num_alloc_active;
     static int64_t * num_alloc_active_record;
+    static int64_t * num_alloc_active_record_global;
+
     static int64_t * num_freelist;
     static int64_t * num_freelist_record;
+    static int64_t * num_freelist_record_global;
 
     static uint64_t * num_alloc;
     static uint64_t * num_allocFFL;
@@ -55,6 +50,10 @@ private:
     static uint64_t * num_alloc_record;
     static uint64_t * num_allocFFL_record;
     static uint64_t * num_free_record;
+
+    static uint64_t * num_alloc_record_global;
+    static uint64_t * num_allocFFL_record_global;
+    static uint64_t * num_free_record_global;
 
     static int64_t * blowupflag_record;
     static int64_t * blowupflag;
@@ -66,8 +65,7 @@ public:
     static bool allocUpdate(allocation_metadata * allocData, void * address);
     static void freeUpdate(allocation_metadata * allocData, void* address);
     ///Here
-    static bool recordMemory(uint64_t now_usage);
-    static void reportAllocDistribution(FILE * output);
+    static bool recordMemory();
     static void reportMaxMemory(FILE * output, long realMem, long totalMem);
 };
 

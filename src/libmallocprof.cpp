@@ -205,6 +205,9 @@ extern "C" {
     #endif
  }
 
+// spinlock tid_lock;
+//int num_tid = 0;
+
 // Constructor
 __attribute__((constructor)) initStatus initializer() {
 
@@ -242,7 +245,11 @@ __attribute__((constructor)) initStatus initializer() {
 
 
 	void * program_break = RealX::sbrk(0);
-	thrData.tid = syscall(__NR_gettid);
+
+	//thrData.tid = syscall(__NR_gettid);
+//    tid_lock.init();
+//    thrData.tid = num_tid++;
+
 
 	thrData.stackStart = (char *)__builtin_frame_address(0);
 	thrData.stackEnd = (char *)__libc_stack_end;
@@ -1070,7 +1077,7 @@ allocation_metadata init_allocation(size_t sz, enum memAllocType type) {
 	allocation_metadata new_metadata = {
 		reused : false,
 		//tid : gettid(),
-		//tid: thrData.tid,
+		tid: thrData.tid,
 		before : empty,
 		after : empty,
 		size : sz,
@@ -1474,8 +1481,6 @@ void doAfter (allocation_metadata *metadata) {
 void incrementGlobalMemoryAllocation(size_t size, size_t classsize) {
   __atomic_add_fetch(&mu.realMemoryUsage, size, __ATOMIC_RELAXED);
   __atomic_add_fetch(&mu.realAllocatedMemoryUsage, classsize, __ATOMIC_RELAXED);
-    ///Here
-  MemoryWaste::recordMemory((uint64_t)mu.realAllocatedMemoryUsage);
 }
 
 void decrementGlobalMemoryAllocation(size_t size, size_t classsize) {
@@ -1484,32 +1489,29 @@ void decrementGlobalMemoryAllocation(size_t size, size_t classsize) {
 }
 
 void checkGlobalRealMemoryUsage() {
-    if(mu.realMemoryUsage > max_mu.realMemoryUsage) {
+    //if(mu.realMemoryUsage > max_mu.realMemoryUsage) {
+    if(mu.realMemoryUsage > max_mu.realMemoryUsage + ONE_MEGABYTE) {
         max_mu.realMemoryUsage = mu.realMemoryUsage;
+        MemoryWaste::recordMemory();
     }
 }
 
 void checkGlobalAllocatedMemoryUsage() {
-    if(mu.realAllocatedMemoryUsage > max_mu.realAllocatedMemoryUsage) {
+    //if(mu.realAllocatedMemoryUsage > max_mu.realAllocatedMemoryUsage) {
+    if(mu.realAllocatedMemoryUsage > max_mu.realAllocatedMemoryUsage + ONE_MEGABYTE) {
         max_mu.realAllocatedMemoryUsage = mu.realAllocatedMemoryUsage;
     }
 }
 
 
 void checkGlobalTotalMemoryUsage() {
-    if(mu.totalMemoryUsage > max_mu.maxTotalMemoryUsage) {
+    //if(mu.totalMemoryUsage > max_mu.maxTotalMemoryUsage) {
+    if(mu.totalMemoryUsage > max_mu.maxTotalMemoryUsage + ONE_MEGABYTE) {
         max_mu.maxTotalMemoryUsage = mu.totalMemoryUsage;
         max_mu.totalMemoryUsage = mu.totalMemoryUsage;
     }
 }
 
-void checkGlobalMemoryUsage() {
-  MemoryUsage mu_tmp = mu;
-  if(mu_tmp.totalMemoryUsage > max_mu.maxTotalMemoryUsage) {
-    mu_tmp.maxTotalMemoryUsage = mu_tmp.totalMemoryUsage;
-    max_mu = mu_tmp;
-  }
-}
 
 void incrementMemoryUsage(size_t size, size_t classSize, size_t new_touched_bytes, void * object) {
 

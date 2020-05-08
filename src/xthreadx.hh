@@ -62,8 +62,8 @@ class xthreadx {
 		size_t stackSize;
 		thread_t * current = (thread_t *) arg;
 
-		pid_t tid = gettid();
-		thrData.tid = tid;
+//		pid_t tid = gettid();
+//		thrData.tid = tid;
 
 		#ifdef THREAD_OUTPUT
 		pid_t pid = getpid();
@@ -94,7 +94,7 @@ class xthreadx {
 		thrData.stackStart = thrData.stackEnd + stackSize;
 
 		if(thrData.output) {
-			fprintf(thrData.output, ">>> thread %d stack start @ %p, stack end @ %p\n", tid,
+			fprintf(thrData.output, ">>> thread %d stack start @ %p, stack end @ %p\n", gettid(),
 				thrData.stackStart, thrData.stackEnd);
 		}
 

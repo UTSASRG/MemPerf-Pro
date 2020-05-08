@@ -201,7 +201,7 @@ enum memAllocType {
 
 typedef struct  {
 	bool reused;
-	//pid_t tid;
+	pid_t tid;
 	PerfReadInfo before;
 	PerfReadInfo after;
 	size_t size;

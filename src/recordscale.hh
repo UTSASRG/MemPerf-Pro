@@ -85,7 +85,9 @@ void setThreadContention() {
     abort();
   }
   threadContention = &all_threadcontention_array[current_index];
-  threadContention->tid = gettid();
+  //threadContention->tid = gettid();
+    threadContention->tid = current_index;
+    thrData.tid = current_index;
 }
 
 extern void countEventsOutside(bool end);
