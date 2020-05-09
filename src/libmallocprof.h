@@ -58,8 +58,8 @@ typedef enum {
 } MemSyscallType; 
 
 typedef struct {
-  ulong calls; 
-  ulong cycles; 
+  ulong calls = 0;
+  ulong cycles = 0;
 } PerPrimitiveData;
 
 //Structure for perthread contention

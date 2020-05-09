@@ -1282,6 +1282,7 @@ void writeThreadMaps () {
 	//MemoryWaste::reportAllocDistribution(thrData.output);
 
   fprintf (thrData.output, "\n>>>>>>>>>>>>>>>    SMALL NEW ALLOCATIONS    <<<<<<<<<<<<<<<\n");
+    fprintf (thrData.output, "num\t\t\t\t\t\t\t\t\t\t\t\t\t%20lu\n", globalTAD.numAllocs);
 	fprintf (thrData.output, "cycles\t\t\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.cycles_alloc, (globalTAD.cycles_alloc / numAllocs));
 	fprintf (thrData.output, "faults\t\t\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numAllocationFaults, (globalTAD.numAllocationFaults*100 / numAllocs));
 	fprintf (thrData.output, "tlb read misses\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numAllocationTlbReadMisses, (globalTAD.numAllocationTlbReadMisses*100 / numAllocs));
@@ -1291,6 +1292,7 @@ void writeThreadMaps () {
 	fprintf (thrData.output, "\n");
 
 	fprintf (thrData.output, "\n>>>>>>>>>>>>>>>    SMALL FREELIST ALLOCATIONS    <<<<<<<<<<<<<<<\n");
+    fprintf (thrData.output, "num\t\t\t\t\t\t\t\t\t\t\t\t\t%20lu\n", globalTAD.numAllocsFFL);
 	fprintf (thrData.output, "cycles\t\t\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.cycles_allocFFL, (globalTAD.cycles_allocFFL / numAllocsFFL));
 	fprintf (thrData.output, "faults\t\t\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numAllocationFaultsFFL, (globalTAD.numAllocationFaultsFFL*100 / numAllocsFFL));
 	fprintf (thrData.output, "tlb read misses\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numAllocationTlbReadMissesFFL, (globalTAD.numAllocationTlbReadMissesFFL*100 / numAllocsFFL));
@@ -1300,6 +1302,7 @@ void writeThreadMaps () {
 	fprintf (thrData.output, "\n");
 
 	fprintf (thrData.output, "\n>>>>>>>>>>>>>>>    SMALL DEALLOCATIONS    <<<<<<<<<<<<<<<\n");
+    fprintf (thrData.output, "num\t\t\t\t\t\t\t\t\t\t\t\t\t%20lu\n", globalTAD.numFrees);
 	fprintf (thrData.output, "cycles\t\t\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.cycles_free, (globalTAD.cycles_free / numFrees));
 	fprintf (thrData.output, "faults\t\t\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numDeallocationFaults, (globalTAD.numDeallocationFaults*100 / numFrees));
 	fprintf (thrData.output, "tlb read misses\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numDeallocationTlbReadMisses, (globalTAD.numDeallocationTlbReadMisses*100 / numFrees));
@@ -1308,6 +1311,7 @@ void writeThreadMaps () {
 	fprintf (thrData.output, "instrctions\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.numDeallocationInstrs, (globalTAD.numDeallocationInstrs / numFrees));
 
     fprintf (thrData.output, "\n>>>>>>>>>>>>>>>    LARGE ALLOCATIONS    <<<<<<<<<<<<<<<\n");
+    fprintf (thrData.output, "num\t\t\t\t\t\t\t\t\t\t\t\t\t%20lu\n", globalTAD.numAllocs_large);
     fprintf (thrData.output, "cycles\t\t\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.cycles_alloc_large, (globalTAD.cycles_alloc_large / numAllocs_large));
     fprintf (thrData.output, "faults\t\t\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numAllocationFaults_large, (globalTAD.numAllocationFaults_large*100 / numAllocs_large));
     fprintf (thrData.output, "tlb read misses\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numAllocationTlbReadMisses_large, (globalTAD.numAllocationTlbReadMisses_large*100 / numAllocs_large));
@@ -1317,6 +1321,7 @@ void writeThreadMaps () {
     fprintf (thrData.output, "\n");
 
     fprintf (thrData.output, "\n>>>>>>>>>>>>>>>    LARGE DEALLOCATIONS    <<<<<<<<<<<<<<<\n");
+    fprintf (thrData.output, "num\t\t\t\t\t\t\t\t\t\t\t\t\t%20lu\n", globalTAD.numFrees_large);
     fprintf (thrData.output, "cycles\t\t\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.cycles_free_large, (globalTAD.cycles_free_large / numFrees_large));
     fprintf (thrData.output, "faults\t\t\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numDeallocationFaults_large, (globalTAD.numDeallocationFaults_large*100 / numFrees_large));
     fprintf (thrData.output, "tlb read misses\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numDeallocationTlbReadMisses_large, (globalTAD.numDeallocationTlbReadMisses_large*100 / numFrees_large));
@@ -1324,11 +1329,45 @@ void writeThreadMaps () {
     fprintf (thrData.output, "cache misses\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.numDeallocationCacheMisses_large, (globalTAD.numDeallocationCacheMisses_large / numFrees_large));
     fprintf (thrData.output, "instrctions\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.numDeallocationInstrs_large, (globalTAD.numDeallocationInstrs_large / numFrees_large));
 
+    ThreadContention globalizedThreadContention;
+
+    for(int i = 0; i <= threadcontention_index; i++) {
+        ThreadContention* data = &all_threadcontention_array[i];
+        for(int j = LOCK_TYPE_MUTEX; j < LOCK_TYPE_TOTAL; j++) {
+            globalizedThreadContention.pmdata[j].calls += data->pmdata[j].calls;
+            globalizedThreadContention.pmdata[j].cycles += data->pmdata[j].cycles;
+
+        }
+        globalizedThreadContention.critical_section_counter += data->critical_section_counter;
+        globalizedThreadContention.critical_section_duration += data->critical_section_duration;
+    }
+
     fprintf (thrData.output, "\n>>>>>>>>>>>>>>>     LOCK TOTALS     <<<<<<<<<<<<<<<\n");
     fprintf (thrData.output, "pthread mutex locks\t\t\t\t\t%20u\n", globalTAD.lock_nums[0]);
+    fprintf (thrData.output, "calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[0].calls);
+    fprintf (thrData.output, "avg cycles per call\t\t\t\t\t%20.1f\n\n",
+             (double)globalizedThreadContention.pmdata[0].cycles / safeDivisor(globalizedThreadContention.pmdata[0].calls));
+
     fprintf (thrData.output, "pthread spin locks\t\t\t\t\t%20u\n", globalTAD.lock_nums[1]);
+    fprintf (thrData.output, "calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[1].calls);
+    fprintf (thrData.output, "avg cycles per call\t\t\t\t\t%20.1f\n\n",
+             (double)globalizedThreadContention.pmdata[1].cycles / safeDivisor(globalizedThreadContention.pmdata[1].calls));
+
     fprintf (thrData.output, "pthread trylocks\t\t\t\t\t\t%20u\n", globalTAD.lock_nums[2]);
+    fprintf (thrData.output, "calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[2].calls);
+    fprintf (thrData.output, "avg cycles per call\t\t\t\t\t%20.1f\n\n",
+             (double)globalizedThreadContention.pmdata[2].cycles / safeDivisor(globalizedThreadContention.pmdata[2].calls));
+
     fprintf (thrData.output, "pthread spin trylocks\t\t\t\t%20u\n", globalTAD.lock_nums[3]);
+    fprintf (thrData.output, "calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[3].calls);
+    fprintf (thrData.output, "avg cycles per call\t\t\t\t\t%20.1f\n\n",
+             (double)globalizedThreadContention.pmdata[3].cycles / safeDivisor(globalizedThreadContention.pmdata[3].calls));
+
+    fprintf (thrData.output, ">>> critical_section\t\t\t\t%20lu\n",
+             globalizedThreadContention.critical_section_counter);
+    fprintf (thrData.output, ">>> critical_section_cycles\t\t%18lu\tavg = %.1f\n",
+             globalizedThreadContention.critical_section_duration,
+             ((double)globalizedThreadContention.critical_section_duration / safeDivisor(globalizedThreadContention.critical_section_counter)));
 
     writeContention();
 }
@@ -1480,34 +1519,30 @@ void doAfter (allocation_metadata *metadata) {
 
 void incrementGlobalMemoryAllocation(size_t size, size_t classsize) {
   __atomic_add_fetch(&mu.realMemoryUsage, size, __ATOMIC_RELAXED);
-  __atomic_add_fetch(&mu.realAllocatedMemoryUsage, classsize, __ATOMIC_RELAXED);
+  //__atomic_add_fetch(&mu.realAllocatedMemoryUsage, classsize, __ATOMIC_RELAXED);
 }
 
 void decrementGlobalMemoryAllocation(size_t size, size_t classsize) {
   __atomic_sub_fetch(&mu.realMemoryUsage, size, __ATOMIC_RELAXED);
-  __atomic_sub_fetch(&mu.realAllocatedMemoryUsage, classsize, __ATOMIC_RELAXED);
+  //__atomic_sub_fetch(&mu.realAllocatedMemoryUsage, classsize, __ATOMIC_RELAXED);
 }
 
 void checkGlobalRealMemoryUsage() {
-    //if(mu.realMemoryUsage > max_mu.realMemoryUsage) {
-    if(mu.realMemoryUsage > max_mu.realMemoryUsage + ONE_MEGABYTE) {
+    if(mu.realMemoryUsage > max_mu.realMemoryUsage) {
         max_mu.realMemoryUsage = mu.realMemoryUsage;
         MemoryWaste::recordMemory();
     }
 }
 
-void checkGlobalAllocatedMemoryUsage() {
-    //if(mu.realAllocatedMemoryUsage > max_mu.realAllocatedMemoryUsage) {
-    if(mu.realAllocatedMemoryUsage > max_mu.realAllocatedMemoryUsage + ONE_MEGABYTE) {
-        max_mu.realAllocatedMemoryUsage = mu.realAllocatedMemoryUsage;
-    }
-}
+//void checkGlobalAllocatedMemoryUsage() {
+//    if(mu.realAllocatedMemoryUsage > max_mu.realAllocatedMemoryUsage) {
+//        max_mu.realAllocatedMemoryUsage = mu.realAllocatedMemoryUsage;
+//    }
+//}
 
 
 void checkGlobalTotalMemoryUsage() {
-    //if(mu.totalMemoryUsage > max_mu.maxTotalMemoryUsage) {
-    if(mu.totalMemoryUsage > max_mu.maxTotalMemoryUsage + ONE_MEGABYTE) {
-        max_mu.maxTotalMemoryUsage = mu.totalMemoryUsage;
+    if(mu.totalMemoryUsage > max_mu.totalMemoryUsage) {
         max_mu.totalMemoryUsage = mu.totalMemoryUsage;
     }
 }
@@ -1519,35 +1554,40 @@ void incrementMemoryUsage(size_t size, size_t classSize, size_t new_touched_byte
         classSize -= (classSize-size)/PAGESIZE*PAGESIZE;
     }
 
-
 		threadContention->realMemoryUsage += size;
-		threadContention->realAllocatedMemoryUsage += classSize;
     if(threadContention->realMemoryUsage > threadContention->maxRealMemoryUsage) {
         threadContention->maxRealMemoryUsage = threadContention->realMemoryUsage;
     }
+
+    threadContention->realAllocatedMemoryUsage += classSize;
     if(threadContention->realAllocatedMemoryUsage > threadContention->maxRealAllocatedMemoryUsage) {
             threadContention->maxRealAllocatedMemoryUsage = threadContention->realAllocatedMemoryUsage;
         }
 
-		incrementGlobalMemoryAllocation(size, classSize);
+    incrementGlobalMemoryAllocation(size, classSize);
     checkGlobalRealMemoryUsage();
-    checkGlobalAllocatedMemoryUsage();
+    //checkGlobalAllocatedMemoryUsage();
+
 
 		if(new_touched_bytes > 0) {
 				threadContention->totalMemoryUsage += new_touched_bytes;
 				__atomic_add_fetch(&mu.totalMemoryUsage, new_touched_bytes, __ATOMIC_RELAXED);
-				if(threadContention->totalMemoryUsage > threadContention->maxTotalMemoryUsage) {
-				    threadContention->maxTotalMemoryUsage = threadContention->totalMemoryUsage;
-				}
-                checkGlobalTotalMemoryUsage();
-		}
+            if(threadContention->totalMemoryUsage > threadContention->maxTotalMemoryUsage) {
+                threadContention->maxTotalMemoryUsage = threadContention->totalMemoryUsage;
+            }
+            checkGlobalTotalMemoryUsage();
+        }
 }
 
 void decrementMemoryUsage(size_t size, size_t classSize, void * addr) {
   if(addr == NULL) return;
 
-	threadContention->realAllocatedMemoryUsage -= classSize;
-	threadContention->realMemoryUsage -= size;
+    if(classSize-size > PAGESIZE) {
+        classSize -= (classSize-size)/PAGESIZE*PAGESIZE;
+    }
+
+    threadContention->realMemoryUsage -= size;
+    threadContention->realAllocatedMemoryUsage -= classSize;
 
   decrementGlobalMemoryAllocation(size, classSize);
 

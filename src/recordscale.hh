@@ -72,7 +72,7 @@ UnlockFuncs unlockfuncs [LOCK_TYPE_TOTAL] =
 
 //void checkGlobalMemoryUsageBySizes();
 void checkGlobalRealMemoryUsage();
-void checkGlobalAllocatedMemoryUsage();
+//void checkGlobalAllocatedMemoryUsage();
 void checkGlobalTotalMemoryUsage();
 void checkGlobalMemoryUsage();
 
@@ -438,11 +438,8 @@ void writeThreadContention() {
     for(int i = 0; i <= threadcontention_index; i++) {
         ThreadContention* data = &all_threadcontention_array[i];
 
-        globalizedThreadContention.tid += data->tid;
-        for(int j = LOCK_TYPE_MUTEX; j < LOCK_TYPE_TOTAL; j++) {
-          globalizedThreadContention.pmdata[j].calls += data->pmdata[j].calls;
-          globalizedThreadContention.pmdata[j].cycles += data->pmdata[j].cycles;
-        }
+//        globalizedThreadContention.tid += data->tid;
+
         globalizedThreadContention.mmap_waits_alloc += data->mmap_waits_alloc;
         globalizedThreadContention.mmap_waits_alloc_large += data->mmap_waits_alloc_large;
         globalizedThreadContention.mmap_waits_free += data->mmap_waits_free;
@@ -502,9 +499,6 @@ void writeThreadContention() {
         globalizedThreadContention.mprotect_wait_cycles_alloc_large += data->mprotect_wait_cycles_alloc_large;
         globalizedThreadContention.mprotect_wait_cycles_free += data->mprotect_wait_cycles_free;
         globalizedThreadContention.mprotect_wait_cycles_free_large += data->mprotect_wait_cycles_free_large;
-
-        globalizedThreadContention.critical_section_counter += data->critical_section_counter;
-        globalizedThreadContention.critical_section_duration += data->critical_section_duration;
 
         globalizedThreadContention.maxRealMemoryUsage = MAX(data->maxRealMemoryUsage, globalizedThreadContention.maxRealMemoryUsage);
         globalizedThreadContention.maxRealAllocatedMemoryUsage = MAX(data->maxRealAllocatedMemoryUsage, globalizedThreadContention.maxRealAllocatedMemoryUsage);
@@ -620,15 +614,10 @@ void writeThreadContention() {
              ((double)globalizedThreadContention.mprotect_wait_cycles_free_large / safeDivisor(globalizedThreadContention.mprotect_waits_free_large)));
 
 
-		fprintf (thrData.output, ">>> critical_section\t\t\t\t%20lu\n",
-						globalizedThreadContention.critical_section_counter);
-		fprintf (thrData.output, ">>> critical_section_cycles\t\t%18lu\tavg = %.1f\n",
-						globalizedThreadContention.critical_section_duration,
-						((double)globalizedThreadContention.critical_section_duration / safeDivisor(globalizedThreadContention.critical_section_counter)));
-
-		long realMem = max_mu.realAllocatedMemoryUsage;
-		long realAllocMem = max_mu.realAllocatedMemoryUsage;
-		long totalMem = max_mu.totalMemoryUsage;
+		long realMem = MAX(max_mu.realMemoryUsage, maxRealMemoryUsage);
+		//long realAllocMem = MAX(max_mu.realAllocatedMemoryUsage, maxRealAllocatedMemoryUsage);
+    long realAllocMem = realMem + MemoryWaste::recordSumup();
+		long totalMem = MAX(max_mu.totalMemoryUsage, MAX(maxTotalMemoryUsage, realAllocMem));
 		fprintf (thrData.output, "\n>>>>>>>>>>>>>>>>>>>>>>>>>> Total Memory Usage <<<<<<<<<<<<<<<<<<<<<<<<<\n");
     fprintf (thrData.output, ">>> Max Memory Usage in Threads:\n");
     fprintf (thrData.output, ">>> maxRealMemoryUsage\t\t%20zuK\n", maxRealMemoryUsage/1024);

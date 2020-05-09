@@ -58,6 +58,16 @@ private:
     static int64_t * blowupflag_record;
     static int64_t * blowupflag;
 
+    static uint64_t mem_alloc_wasted_record_total;
+    static uint64_t mem_blowup_total;
+
+    static uint64_t num_alloc_active_total;
+    static uint64_t num_freelist_total;
+
+    static uint64_t num_alloc_total;
+    static uint64_t num_allocFFL_total;
+    static uint64_t num_free_total;
+
 public:
 
     static void initialize();
@@ -66,6 +76,7 @@ public:
     static void freeUpdate(allocation_metadata * allocData, void* address);
     ///Here
     static bool recordMemory();
+    static uint64_t recordSumup();
     static void reportMaxMemory(FILE * output, long realMem, long totalMem);
 };
 
