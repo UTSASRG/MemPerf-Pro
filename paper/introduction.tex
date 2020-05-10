@@ -8,14 +8,14 @@ Memory allocator is such a component that could significantly impact the perform
 
 %Performance of modern applications is often greatly impacted by memory accesses. when obtaining undesired performance, programmers mainly focus on optimizing the program code. Although memory allocators serve as the sole proxy for programs to request and return memory from the operating system, programmers lack even basic understandings of their behaviors, such as how well they perform themselves, how they interact with the OS, and whether their memory management policy fits the target program. 
 
-In order to investigate the performance impact, we have evaluated the following allocators, such as the Linux allocator, TcMalloc~\citep{TCMalloc}, \texttt{jemalloc}~\citep{jemalloc}, Hoard~\citep{Hoard}, DieHarder~\citep{DieHarder}, and OpenBSD's allocator~\citep{openbsd}, where the latter two are secure allocators. We ran the same set of applications from PARSEC~\citep{parsec} and Phoenix~\citep{phoenix} with these allocators, and observed the dramatic performance difference among them. Fig.~\ref{fig:motivation} shows performance results of partial applications, where all data in the figure are normalized to the runtime of the Linux's default allocator. We have the following observations: (1) the performance difference with different allocators can be as big as $20\times$; This indicates that spending additional effort in optimizing the application code may have the less performance impact than simply switching to a better allocator. (2) no allocator performs consistently the best across these applications, indicating the importance of confirming whether an allocator is suitable for the application. 
+In order to investigate the performance impact, we have evaluated the following allocators, such as the Linux allocator, TcMalloc~\citep{TCMalloc}, \texttt{jemalloc}~\citep{jemalloc}, Hoard~\citep{Hoard}, DieHarder~\citep{DieHarder}, and OpenBSD's allocator~\citep{openbsd}, where the latter two are secure allocators. We ran the same set of applications from PARSEC~\citep{parsec} and Phoenix~\citep{phoenix} with these allocators, and observed the dramatic performance difference among them. Fig.~\ref{fig:motivation} shows performance results of partial applications, where all data in the figure are normalized to the runtime of the Linux's default allocator. We have the following observations: (1) the performance difference with different allocators can be as big as $88\times$; This indicates that spending additional effort in optimizing the application code may have the less performance impact than simply switching to a better allocator. (2) no allocator performs consistently the best across these applications, indicating the importance of confirming whether an allocator is suitable for the application. 
 
 %\todo{Xin: Use the gprof{} and Coz to try on one application--dedup, check whether they could identify the issues inside or not. }
 
 
 \begin{figure}[!ht]
 \centering
-\includegraphics[width=5in]{figures/motivation}
+\includegraphics[width=5in]{figures/regular-performance}
 \caption{Performance Difference When Using Different Allocators\label{fig:motivation}}
 \end{figure}
 
