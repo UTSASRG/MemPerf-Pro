@@ -65,7 +65,6 @@ bool ShadowMemory::initialize() {
 }
 
 unsigned ShadowMemory::updateObject(void * address, size_t size, bool isFree) {
-    //fprintf(stderr, "updateObject address %p, size %d, isfree %d\n", address, size, isFree);
     if(address == NULL) {
 				fprintf(stderr, "ERROR: null pointer passed into %s at %s:%d\n",
                 __FUNCTION__, __FILE__, __LINE__);
@@ -261,16 +260,38 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType)
 				    } else {
                         usageData->numPassiveFS++;
 				    }
-				    if(cme->FS_sampled == false) {
+				    if(cme->FS_sampled == 0) {
                         if(cme->status == 0) {
                             usageData->numObjectFSCacheLine++;
-                        } else if(cme->status == 1) {
-                            usageData->numActiveFSCacheLine++;
-                        } else {
-                            usageData->numPassiveFSCacheLine++;
+                            cme->FS_sampled = cme->status+1;
                         }
-                        cme->FS_sampled = true;
-				    }
+                        if(cme->status == 1) {
+                            usageData->numActiveFSCacheLine++;
+                            cme->FS_sampled = cme->status+1;
+                        }
+                        if(cme->status == 2){
+                            usageData->numPassiveFSCacheLine++;
+                            cme->FS_sampled = cme->status+1;
+                        }
+				    } else if(cme->FS_sampled == 1) {
+				        if(cme->status == 1) {
+                            usageData->numObjectFSCacheLine--;
+                            usageData->numActiveFSCacheLine++;
+                            cme->FS_sampled = cme->status+1;
+                        }
+				        if(cme->status == 2){
+                            usageData->numObjectFSCacheLine--;
+                            usageData->numPassiveFSCacheLine++;
+                            cme->FS_sampled = cme->status+1;
+                        }
+                    } else if(cme->FS_sampled == 2) {
+                        if (cme->status == 2) {
+                            usageData->numActiveFSCacheLine--;
+                            usageData->numPassiveFSCacheLine++;
+                            cme->FS_sampled = cme->status + 1;
+                        }
+                    }
+
                 }
             cme->last_write = thrData.tid;
         }
@@ -462,6 +483,7 @@ bool PageMapEntry::updateCacheLines(uintptr_t uintaddr, unsigned long mega_index
 
 				if(current->getUsedBytes() == 0) {
                     current->status = 0;
+                    current->last_write = -1;
 				}
 
 		}
@@ -510,6 +532,7 @@ bool PageMapEntry::updateCacheLines(uintptr_t uintaddr, unsigned long mega_index
 
             if(current->getUsedBytes() == 0) {
                 current->status = 0;
+                current->last_write = -1;
             }
 		}
 

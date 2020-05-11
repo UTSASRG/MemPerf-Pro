@@ -22,7 +22,7 @@
 #include "xthreadx.hh"
 #include "recordscale.hh"
 #include "memwaste.h"
-
+spinlock memlock;
 //Globals
 uint64_t total_cycles;
 bool bibop = false;
@@ -218,6 +218,9 @@ __attribute__((constructor)) initStatus initializer() {
 	profilerInitialized = IN_PROGRESS;
 
 	inConstructor = true;
+
+//	memlock.init();
+
 	// Ensure we are operating on a system using 64-bit pointers.
 	// This is necessary, as later we'll be taking the low 8-byte word
 	// of callsites. This could obviously be expanded to support 32-bit systems
@@ -278,10 +281,10 @@ __attribute__((constructor)) initStatus initializer() {
 
 	// Generate the name of our output file, then open it for writing.
 	char outputFile[MAX_FILENAME_LEN];
-//	snprintf(outputFile, MAX_FILENAME_LEN, "%s_libmallocprof_%d_main_thread.txt",
-//			program_invocation_name, pid);
-    snprintf(outputFile, MAX_FILENAME_LEN, "/home/jinzhou/parsec/records/%s_libmallocprof_%d_main_thread.txt",
-             program_invocation_name, pid);
+	snprintf(outputFile, MAX_FILENAME_LEN, "%s_libmallocprof_%d_main_thread.txt",
+			program_invocation_name, pid);
+//    snprintf(outputFile, MAX_FILENAME_LEN, "/home/jinzhou/parsec/records/%s_libmallocprof_%d_main_thread.txt",
+//             program_invocation_name, pid);
     fprintf(stderr, "%s\n", outputFile);
 	// Will overwrite current file; change the fopen flag to "a" for append.
 	thrData.output = fopen(outputFile, "w");
@@ -1646,11 +1649,11 @@ void doAfter (allocation_metadata *metadata) {
 
 }
 
-void incrementGlobalMemoryAllocation(size_t size, size_t classsize) {
+void incrementGlobalMemoryAllocation(size_t size) {
   __atomic_add_fetch(&mu.realMemoryUsage, size, __ATOMIC_RELAXED);
 }
 
-void decrementGlobalMemoryAllocation(size_t size, size_t classsize) {
+void decrementGlobalMemoryAllocation(size_t size) {
   __atomic_sub_fetch(&mu.realMemoryUsage, size, __ATOMIC_RELAXED);
 }
 
@@ -1663,13 +1666,14 @@ void checkGlobalRealMemoryUsage() {
 
 
 void checkGlobalTotalMemoryUsage() {
-    if(mu.totalMemoryUsage > max_mu.totalMemoryUsage) {
+    if (mu.totalMemoryUsage > max_mu.totalMemoryUsage) {
         max_mu.totalMemoryUsage = mu.totalMemoryUsage;
     }
 }
 
-
 void incrementMemoryUsage(size_t size, size_t classSize, size_t new_touched_bytes, void * object) {
+
+    //memlock.lock();
 
     if(classSize-size > PAGESIZE) {
         classSize -= (classSize-size)/PAGESIZE*PAGESIZE;
@@ -1685,7 +1689,7 @@ void incrementMemoryUsage(size_t size, size_t classSize, size_t new_touched_byte
             threadContention->maxRealAllocatedMemoryUsage = threadContention->realAllocatedMemoryUsage;
         }
 
-    incrementGlobalMemoryAllocation(size, classSize);
+    incrementGlobalMemoryAllocation(size);
     checkGlobalRealMemoryUsage();
 
 
@@ -1697,10 +1701,15 @@ void incrementMemoryUsage(size_t size, size_t classSize, size_t new_touched_byte
             }
             checkGlobalTotalMemoryUsage();
         }
+
+		//memlock.unlock();
 }
 
 void decrementMemoryUsage(size_t size, size_t classSize, void * addr) {
+
   if(addr == NULL) return;
+
+    //memlock.lock();
 
     if(classSize-size > PAGESIZE) {
         classSize -= (classSize-size)/PAGESIZE*PAGESIZE;
@@ -1709,7 +1718,9 @@ void decrementMemoryUsage(size_t size, size_t classSize, void * addr) {
     threadContention->realMemoryUsage -= size;
     threadContention->realAllocatedMemoryUsage -= classSize;
 
-  decrementGlobalMemoryAllocation(size, classSize);
+  decrementGlobalMemoryAllocation(size);
+
+    //memlock.unlock();
 
 }
 

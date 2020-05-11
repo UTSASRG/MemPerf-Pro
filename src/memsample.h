@@ -85,9 +85,9 @@ typedef struct {
     unsigned long numObjectFS;
     unsigned long numActiveFS;
     unsigned long numPassiveFS;
-    unsigned long numObjectFSCacheLine;
-    unsigned long numActiveFSCacheLine;
-    unsigned long numPassiveFSCacheLine;
+    long numObjectFSCacheLine;
+    long numActiveFSCacheLine;
+    long numPassiveFSCacheLine;
     unsigned long cachelines;
 } friendly_data;
 

@@ -689,7 +689,6 @@ void writeThreadContention() {
 
 
 		long realMem = MAX(max_mu.realMemoryUsage, maxRealMemoryUsage);
-		//long realAllocMem = MAX(max_mu.realAllocatedMemoryUsage, maxRealAllocatedMemoryUsage);
     long realAllocMem = realMem + MemoryWaste::recordSumup();
 		totalMem = MAX(max_mu.totalMemoryUsage, MAX(maxTotalMemoryUsage, realAllocMem));
 		fprintf (thrData.output, "\n>>>>>>>>>>>>>>>>>>>>>>>>>> Total Memory Usage <<<<<<<<<<<<<<<<<<<<<<<<<\n");

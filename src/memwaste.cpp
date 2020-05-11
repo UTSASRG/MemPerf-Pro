@@ -185,6 +185,7 @@ void MemoryWaste::freeUpdate(allocation_metadata * allocData, void* address) {
 
 bool MemoryWaste::recordMemory() {
 
+
     record_lock.lock();
 
 //    FILE *fp = NULL;
@@ -192,14 +193,14 @@ bool MemoryWaste::recordMemory() {
 //    while(fgets(record_time, 1024, fp)) {fprintf(stderr, record_time);}
 //    pclose(fp);
 
-    memcpy(mem_alloc_wasted_record, mem_alloc_wasted, threadcontention_index * num_class_sizes * sizeof(uint64_t));
+    memcpy(mem_alloc_wasted_record, mem_alloc_wasted, (threadcontention_index+1) * num_class_sizes * sizeof(uint64_t));
 
-    memcpy(num_alloc_record, num_alloc, threadcontention_index * num_class_sizes * sizeof(uint64_t));
-    memcpy(num_allocFFL_record, num_allocFFL, threadcontention_index * num_class_sizes * sizeof(uint64_t));
-    memcpy(num_free_record, num_free, threadcontention_index * num_class_sizes * sizeof(uint64_t));
+    memcpy(num_alloc_record, num_alloc, (threadcontention_index+1) * num_class_sizes * sizeof(uint64_t));
+    memcpy(num_allocFFL_record, num_allocFFL, (threadcontention_index+1) * num_class_sizes * sizeof(uint64_t));
+    memcpy(num_free_record, num_free, (threadcontention_index+1) * num_class_sizes * sizeof(uint64_t));
 
-    memcpy(num_alloc_active_record, num_alloc_active, threadcontention_index * num_class_sizes * sizeof(int64_t));
-    memcpy(num_freelist_record, num_freelist, threadcontention_index * num_class_sizes * sizeof(int64_t));
+    memcpy(num_alloc_active_record, num_alloc_active, (threadcontention_index+1) * num_class_sizes * sizeof(int64_t));
+    memcpy(num_freelist_record, num_freelist, (threadcontention_index+1) * num_class_sizes * sizeof(int64_t));
 
     memcpy(blowupflag_record, blowupflag, num_class_sizes * sizeof(int64_t));
 
@@ -262,6 +263,9 @@ void MemoryWaste::reportMaxMemory(FILE * output, long realMem, long totalMem) {
             //int64_t blowup = class_sizes[i] * (num_alloc_record_global[i] - blowupflag_record[i]);
             if(blowup < 0) {
                 blowup = 0;
+            }
+            if(blowup > totalMem - realMem - mem_alloc_wasted_record_total) {
+                blowup = totalMem - realMem - mem_alloc_wasted_record_total;
             }
         } else {
             blowup = 0;
