@@ -14,7 +14,7 @@
 
 #define CACHELINE_SIZE 64
 #define PAGESIZE 4096
-#define SAMPLING_PERIOD 1000000
+#define SAMPLING_PERIOD 100000
 ///#define MMAP_PAGES 33	// must be in the form of 2^N + 1
 #define MMAP_PAGES 129
 #define DATA_MMAP_PAGES (MMAP_PAGES - 1)
@@ -82,6 +82,13 @@ typedef struct {
     //unsigned long numCacheOwnerConflicts;
     unsigned long numCacheBytes;
     unsigned long numPageBytes;
+    unsigned long numObjectFS;
+    unsigned long numActiveFS;
+    unsigned long numPassiveFS;
+    unsigned long numObjectFSCacheLine;
+    unsigned long numActiveFSCacheLine;
+    unsigned long numPassiveFSCacheLine;
+    unsigned long cachelines;
 } friendly_data;
 
 typedef struct {

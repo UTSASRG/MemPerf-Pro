@@ -8,7 +8,7 @@
 #include "memwaste.h"
 
 extern thread_local thread_data thrData;
-extern thread_local unsigned long long total_cycles_start;
+//extern thread_local unsigned long long total_cycles_start;
 //extern std::atomic<std::uint64_t> total_global_cycles;
 
 extern "C" void setThreadContention();
@@ -20,7 +20,7 @@ extern void initMyLocalMem();
 thread_local extern uint64_t thread_stack_start;
 thread_local extern uint64_t myThreadID;
 thread_local extern perf_info perfInfo;
-
+extern "C" void countEventsOutside(bool end);
 class xthreadx {
 	typedef void * threadFunction(void *);
 	typedef struct thread {
@@ -38,7 +38,7 @@ class xthreadx {
 		children->startArg = arg;
 		children->startRoutine = fn;
 
-		total_cycles_start = rdtscp();
+		//total_cycles_start = rdtscp();
 		int result = RealX::pthread_create(tid, attr, xthreadx::startThread, (void *)children);
 		if(result) {
 			fprintf(stderr, "error: pthread_create failed: %s\n", strerror(errno));
@@ -108,7 +108,9 @@ class xthreadx {
 		return result;
 	}
 
+
   static void threadExit() {
+      countEventsOutside(true);
     #ifndef NO_PMU
     stopSampling();
     //doPerfCounterRead();

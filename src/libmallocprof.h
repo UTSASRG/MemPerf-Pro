@@ -34,7 +34,7 @@
 #define TEMP_MEM_SIZE 1024 * 1024 * 1024 //1GB
 #define MAX_CLASS_SIZE 1050000
 //#define LOCAL_BUF_SIZE 204800000
-#define LOCAL_BUF_SIZE 204800000 * 2
+#define LOCAL_BUF_SIZE 204800000 * 4
 
 pid_t gettid();
 // TP BEGIN
@@ -58,8 +58,12 @@ typedef enum {
 } MemSyscallType; 
 
 typedef struct {
-  ulong calls = 0;
-  ulong cycles = 0;
+  ulong calls[4] = {0, 0, 0, 0};
+  ulong cycles[4] = {0, 0, 0, 0};
+  ulong new_calls = 0;
+  ulong ffl_calls = 0;
+  ulong new_cycles = 0;
+  ulong ffl_cycles = 0;
 } PerPrimitiveData;
 
 //Structure for perthread contention
@@ -155,16 +159,6 @@ typedef struct {
 typedef struct {
 	unsigned szUsed;
 } ObjectTuple;
-
-//typedef struct {
-//	uint64_t start;
-//	uint64_t end;
-//	size_t length;
-//	uint64_t rw;
-//	char origin;
-//	pid_t tid;
-//	std::atomic_uint allocations;
-//} MmapTuple;
 
 
 typedef struct {

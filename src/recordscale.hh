@@ -34,6 +34,7 @@ extern bool selfmapInitialized;
 extern initStatus profilerInitialized;
 
 extern MemoryUsage max_mu;
+extern bool inRealMain;
 
 typedef struct {
   LockType     type;  // What is the lock type 
@@ -42,6 +43,8 @@ typedef struct {
   int contendThreads;    // How many are waiting
   int maxContendThreads; // How many threads are contending on this lock
   unsigned long cycles; // Total cycles
+    unsigned int percalls[4] = {0, 0, 0, 0};
+    unsigned long percycles[4] = {0, 0, 0, 0};
 } PerLockData;
 
 
@@ -91,6 +94,22 @@ void setThreadContention() {
 }
 
 extern void countEventsOutside(bool end);
+extern thread_local bool realing;
+
+void divideSmallAlloc(size_t sz, bool reused) {
+    if(sz >= large_object_threshold) return;
+    for(int i = 0; i < 4; ++i) {
+        if(reused) {
+            threadContention->pmdata[i].ffl_calls += threadContention->pmdata[i].calls[0];
+            threadContention->pmdata[i].ffl_cycles += threadContention->pmdata[i].cycles[0];
+        } else {
+            threadContention->pmdata[i].new_calls += threadContention->pmdata[i].calls[0];
+            threadContention->pmdata[i].new_cycles += threadContention->pmdata[i].cycles[0];
+        }
+        threadContention->pmdata[i].calls[0] = 0;
+        threadContention->pmdata[i].cycles[0] = 0;
+    }
+}
 
 /* ************************Synchronization******************************** */
 // In the PTHREAD_LOCK_HANDLE, we will pretend the initialization
@@ -98,11 +117,10 @@ extern void countEventsOutside(bool end);
   if(!mapsInitialized) { \
     return 0; \
   } \
-  if (!inAllocation) { \
+  if (!realing || !inRealMain) { \
     return lockfuncs[LOCK_TYPE].realLock((void *)LOCK); \
   } \
   PerPrimitiveData *pmdata = &threadContention->pmdata[LOCK_TYPE]; \
-  pmdata->calls++; \
   PerLockData * thisLock = lockUsage.find((uint64_t)LOCK, sizeof(uint64_t)); \
   if(thisLock == NULL)  { \
     PerLockData  newLock; \
@@ -111,7 +129,6 @@ extern void countEventsOutside(bool end);
     thisLock = lockUsage.insert((uint64_t)LOCK, sizeof(uint64_t), newLock); \
     localTAD.lock_nums[LOCK_TYPE]++; \
   } \
-  thisLock->calls++;  \
   int contendThreads = ++(thisLock->contendThreads); \
   if(contendThreads > 1) { \
     thisLock->contendCalls ++; \
@@ -122,7 +139,32 @@ extern void countEventsOutside(bool end);
   uint64_t timeStart = rdtscp();\
   int result = lockfuncs[LOCK_TYPE].realLock((void *)LOCK); \
   uint64_t timeStop = rdtscp(); \
-  pmdata->cycles += (timeStop - timeStart); \
+    if(!inFree) {\
+if(now_size < large_object_threshold) {\
+pmdata->calls[0]++; \
+pmdata->cycles[0] += (timeStop - timeStart); \
+  thisLock->percalls[0]++;  \
+  thisLock->percycles[0] += (timeStop - timeStart); \
+} else { \
+pmdata->calls[1]++; \
+pmdata->cycles[1] += (timeStop - timeStart); \
+  thisLock->percalls[1]++;  \
+  thisLock->percycles[1] += (timeStop - timeStart); \
+} \
+} else { \
+if(now_size < large_object_threshold) { \
+pmdata->calls[2]++; \
+pmdata->cycles[2] += (timeStop - timeStart); \
+  thisLock->percalls[2]++;  \
+  thisLock->percycles[2] += (timeStop - timeStart); \
+} else { \
+pmdata->calls[3]++; \
+pmdata->cycles[3] += (timeStop - timeStart); \
+  thisLock->percalls[3]++;  \
+  thisLock->percycles[3] += (timeStop - timeStart); \
+} \
+} \
+  thisLock->calls++;  \
   thisLock->cycles += (timeStop - timeStart); \
   if(threadContention->lock_counter == 0) { \
     threadContention->critical_section_start = timeStop; \
@@ -152,7 +194,7 @@ int pthread_mutex_trylock(pthread_mutex_t *mutex) {
   if(!mapsInitialized) { \
     return 0; \
   } \
-  if (inAllocation) { \
+  if (realing && inRealMain) { \
     PerLockData * thisLock = lockUsage.find((uint64_t)lock, sizeof(uint64_t)); \
     thisLock->contendThreads--; \
     threadContention->lock_counter--; \
@@ -194,7 +236,7 @@ void * yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offs
       return RealX::mmap (addr, length, prot, flags, fd, offset);
   }
 
-    if(!inAllocation) {
+    if(!realing || !inRealMain) {
         return RealX::mmap (addr, length, prot, flags, fd, offset);
     }
     //thread_local
@@ -234,12 +276,13 @@ void * yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offs
   return retval;
 }
 
+extern MemoryUsage mu;
 
 // MADVISE
 int madvise(void *addr, size_t length, int advice){
   if (!realInitialized) RealX::initializer();
 
-  if (!inAllocation) {
+  if (!realing || !inRealMain) {
     return RealX::madvise(addr, length, advice);
   }
 
@@ -248,7 +291,9 @@ int madvise(void *addr, size_t length, int advice){
     if(threadContention->totalMemoryUsage > returned) {
       threadContention->totalMemoryUsage -= returned;
     }
+      __atomic_sub_fetch(&mu.totalMemoryUsage, returned, __ATOMIC_RELAXED);
   }
+
 
   uint64_t timeStart = rdtscp();
   int result = RealX::madvise(addr, length, advice);
@@ -278,7 +323,7 @@ int madvise(void *addr, size_t length, int advice){
 // SBRK
 void *sbrk(intptr_t increment){
   if (!realInitialized) RealX::initializer();
-  if(profilerInitialized != INITIALIZED || !inAllocation)
+  if(profilerInitialized != INITIALIZED || !realing  || !inRealMain)
       return RealX::sbrk(increment);
 
   uint64_t timeStart = rdtscp();
@@ -311,7 +356,7 @@ void *sbrk(intptr_t increment){
 int mprotect(void* addr, size_t len, int prot) {
   if (!realInitialized) RealX::initializer();
 
-  if(!inAllocation){
+  if(!realing || !inRealMain){
     return RealX::mprotect(addr, len, prot);
   }
 
@@ -345,7 +390,7 @@ int munmap(void *addr, size_t length) {
 
   if (!realInitialized) RealX::initializer();
 
-  if(!inAllocation){
+  if(!realing || !inRealMain){
       return RealX::munmap(addr, length);
   }
 
@@ -357,6 +402,7 @@ int munmap(void *addr, size_t length) {
   if(threadContention->totalMemoryUsage > returned) {
       threadContention->totalMemoryUsage -= returned;
   }
+    __atomic_sub_fetch(&mu.totalMemoryUsage, returned, __ATOMIC_RELAXED);
 
   uint64_t timeStart = rdtscp();
   int ret =  RealX::munmap(addr, length);
@@ -392,7 +438,7 @@ void *mremap(void *old_address, size_t old_size, size_t new_size,
   void* new_address = va_arg(ap, void*);
   va_end(ap);
 
-  if(!inAllocation){
+  if(!realing || !inRealMain){
     return RealX::mremap(old_address, old_size, new_size, flags, new_address);
   }
 
@@ -421,6 +467,10 @@ void *mremap(void *old_address, size_t old_size, size_t new_size,
 
   return ret;
 }
+
+
+extern uint64_t total_cycles;
+long totalMem;
 
 /* ************************Systemn Calls End******************************** */
 };
@@ -510,114 +560,138 @@ void writeThreadContention() {
 		maxTotalMemoryUsage = globalizedThreadContention.maxTotalMemoryUsage;
 
     fprintf (thrData.output, ">>> small_alloc_mmap\t\t\t\t%20lu\n", globalizedThreadContention.mmap_waits_alloc);
-    fprintf (thrData.output, ">>> small_alloc_mmap_wait_cycles%16lu\tavg = %.1f\n",
+    fprintf (thrData.output, ">>> small_alloc_mmap_wait_cycles%16lu(%3d%%)\tavg = %.1f\n",
              globalizedThreadContention.mmap_wait_cycles_alloc,
+             globalizedThreadContention.mmap_wait_cycles_alloc / (total_cycles/100),
 						((double)globalizedThreadContention.mmap_wait_cycles_alloc / safeDivisor(globalizedThreadContention.mmap_waits_alloc)));
     fprintf (thrData.output, ">>> large_alloc_mmap\t\t\t\t%20lu\n", globalizedThreadContention.mmap_waits_alloc_large);
-    fprintf (thrData.output, ">>> large_alloc_mmap_wait_cycles%16lu\tavg = %.1f\n",
+    fprintf (thrData.output, ">>> large_alloc_mmap_wait_cycles%16lu(%3d%%)\tavg = %.1f\n",
              globalizedThreadContention.mmap_wait_cycles_alloc_large,
+             globalizedThreadContention.mmap_wait_cycles_alloc_large / (total_cycles/100),
              ((double)globalizedThreadContention.mmap_wait_cycles_alloc_large / safeDivisor(globalizedThreadContention.mmap_waits_alloc_large)));
     fprintf (thrData.output, ">>> small_dealloc_mmap\t\t\t%20lu\n", globalizedThreadContention.mmap_waits_free);
-    fprintf (thrData.output, ">>> small_dealloc_mmap_wait_cycles%14lu\tavg = %.1f\n",
+    fprintf (thrData.output, ">>> small_dealloc_mmap_wait_cycles%14lu(%3d%%)\tavg = %.1f\n",
              globalizedThreadContention.mmap_wait_cycles_free,
-             ((double)globalizedThreadContention.mmap_wait_cycles_free / safeDivisor(globalizedThreadContention.mmap_waits_free)));
+             globalizedThreadContention.mmap_wait_cycles_free / (total_cycles/100),
+            ((double)globalizedThreadContention.mmap_wait_cycles_free / safeDivisor(globalizedThreadContention.mmap_waits_free)));
     fprintf (thrData.output, ">>> large_dealloc_mmap\t\t\t%20lu\n", globalizedThreadContention.mmap_waits_free_large);
-    fprintf (thrData.output, ">>> large_dealloc_mmap_wait_cycles%14lu\tavg = %.1f\n\n",
+    fprintf (thrData.output, ">>> large_dealloc_mmap_wait_cycles%14lu(%3d%%)\tavg = %.1f\n\n",
              globalizedThreadContention.mmap_wait_cycles_free_large,
-             ((double)globalizedThreadContention.mmap_wait_cycles_free_large / safeDivisor(globalizedThreadContention.mmap_waits_free_large)));
+             globalizedThreadContention.mmap_wait_cycles_free_large / (total_cycles/100),
+            ((double)globalizedThreadContention.mmap_wait_cycles_free_large / safeDivisor(globalizedThreadContention.mmap_waits_free_large)));
 
 
     fprintf (thrData.output, ">>> small_alloc_sbrk\t\t\t\t%20lu\n", globalizedThreadContention.sbrk_waits_alloc);
-    fprintf (thrData.output, ">>> small_alloc_sbrk_wait_cycles%16lu\tavg = %.1f\n",
+    fprintf (thrData.output, ">>> small_alloc_sbrk_wait_cycles%16lu(%3d%%)\tavg = %.1f\n",
              globalizedThreadContention.sbrk_wait_cycles_alloc,
+             globalizedThreadContention.sbrk_wait_cycles_alloc / (total_cycles/100),
              ((double)globalizedThreadContention.sbrk_wait_cycles_alloc / safeDivisor(globalizedThreadContention.sbrk_waits_alloc)));
     fprintf (thrData.output, ">>> large_alloc_sbrk\t\t\t\t%20lu\n", globalizedThreadContention.sbrk_waits_alloc_large);
-    fprintf (thrData.output, ">>> large_alloc_sbrk_wait_cycles%16lu\tavg = %.1f\n",
+    fprintf (thrData.output, ">>> large_alloc_sbrk_wait_cycles%16lu(%3d%%)\tavg = %.1f\n",
              globalizedThreadContention.sbrk_wait_cycles_alloc_large,
-             ((double)globalizedThreadContention.sbrk_wait_cycles_alloc_large / safeDivisor(globalizedThreadContention.sbrk_waits_alloc_large)));
+             globalizedThreadContention.sbrk_wait_cycles_alloc_large / (total_cycles/100),
+            ((double)globalizedThreadContention.sbrk_wait_cycles_alloc_large / safeDivisor(globalizedThreadContention.sbrk_waits_alloc_large)));
     fprintf (thrData.output, ">>> small_dealloc_sbrk\t\t\t%20lu\n", globalizedThreadContention.sbrk_waits_free);
-    fprintf (thrData.output, ">>> small_dealloc_sbrk_wait_cycles%14lu\tavg = %.1f\n",
+    fprintf (thrData.output, ">>> small_dealloc_sbrk_wait_cycles%14lu(%3d%%)\tavg = %.1f\n",
              globalizedThreadContention.sbrk_wait_cycles_free,
-             ((double)globalizedThreadContention.sbrk_wait_cycles_free / safeDivisor(globalizedThreadContention.sbrk_waits_free)));
+             globalizedThreadContention.sbrk_wait_cycles_free / (total_cycles/100),
+            ((double)globalizedThreadContention.sbrk_wait_cycles_free / safeDivisor(globalizedThreadContention.sbrk_waits_free)));
     fprintf (thrData.output, ">>> large_dealloc_sbrk\t\t\t%20lu\n", globalizedThreadContention.sbrk_waits_free_large);
-    fprintf (thrData.output, ">>> large_dealloc_sbrk_wait_cycles%14lu\tavg = %.1f\n\n",
+    fprintf (thrData.output, ">>> large_dealloc_sbrk_wait_cycles%14lu(%3d%%)\tavg = %.1f\n\n",
              globalizedThreadContention.sbrk_wait_cycles_free_large,
-             ((double)globalizedThreadContention.sbrk_wait_cycles_free_large / safeDivisor(globalizedThreadContention.sbrk_waits_free_large)));
+             globalizedThreadContention.sbrk_wait_cycles_free_large / (total_cycles/100),
+            ((double)globalizedThreadContention.sbrk_wait_cycles_free_large / safeDivisor(globalizedThreadContention.sbrk_waits_free_large)));
 
     fprintf (thrData.output, ">>> small_alloc_madvise\t\t\t%20lu\n", globalizedThreadContention.madvise_waits_alloc);
-    fprintf (thrData.output, ">>> small_alloc_madvise_wait_cycles%13lu\tavg = %.1f\n",
+    fprintf (thrData.output, ">>> small_alloc_madvise_wait_cycles%13lu(%3d%%)\tavg = %.1f\n",
              globalizedThreadContention.madvise_wait_cycles_alloc,
-             ((double)globalizedThreadContention.madvise_wait_cycles_alloc / safeDivisor(globalizedThreadContention.madvise_waits_alloc)));
+             globalizedThreadContention.madvise_wait_cycles_alloc / (total_cycles/100),
+            ((double)globalizedThreadContention.madvise_wait_cycles_alloc / safeDivisor(globalizedThreadContention.madvise_waits_alloc)));
     fprintf (thrData.output, ">>> large_alloc_madvise\t\t\t%20lu\n", globalizedThreadContention.madvise_waits_alloc_large);
-    fprintf (thrData.output, ">>> large_alloc_madvise_wait_cycles%13lu\tavg = %.1f\n",
+    fprintf (thrData.output, ">>> large_alloc_madvise_wait_cycles%13lu(%3d%%)\tavg = %.1f\n",
              globalizedThreadContention.madvise_wait_cycles_alloc_large,
-             ((double)globalizedThreadContention.madvise_wait_cycles_alloc_large / safeDivisor(globalizedThreadContention.madvise_waits_alloc_large)));
+             globalizedThreadContention.madvise_wait_cycles_alloc_large / (total_cycles/100),
+            ((double)globalizedThreadContention.madvise_wait_cycles_alloc_large / safeDivisor(globalizedThreadContention.madvise_waits_alloc_large)));
     fprintf (thrData.output, ">>> small_dealloc_madvise\t\t%20lu\n", globalizedThreadContention.madvise_waits_free);
-    fprintf (thrData.output, ">>> small_dealloc_madvise_wait_cycles%11lu\tavg = %.1f\n",
+    fprintf (thrData.output, ">>> small_dealloc_madvise_wait_cycles%11lu(%3d%%)\tavg = %.1f\n",
              globalizedThreadContention.madvise_wait_cycles_free,
-             ((double)globalizedThreadContention.madvise_wait_cycles_free / safeDivisor(globalizedThreadContention.madvise_waits_free)));
+             globalizedThreadContention.madvise_wait_cycles_free / (total_cycles/100),
+            ((double)globalizedThreadContention.madvise_wait_cycles_free / safeDivisor(globalizedThreadContention.madvise_waits_free)));
     fprintf (thrData.output, ">>> large_dealloc_madvise\t\t%20lu\n", globalizedThreadContention.madvise_waits_free_large);
-    fprintf (thrData.output, ">>> large_dealloc_madvise_wait_cycles%11lu\tavg = %.1f\n\n",
+    fprintf (thrData.output, ">>> large_dealloc_madvise_wait_cycles%11lu(%3d%%)\tavg = %.1f\n\n",
              globalizedThreadContention.madvise_wait_cycles_free_large,
-             ((double)globalizedThreadContention.madvise_wait_cycles_free_large / safeDivisor(globalizedThreadContention.madvise_waits_free_large)));
+             globalizedThreadContention.madvise_wait_cycles_free_large / (total_cycles/100),
+            ((double)globalizedThreadContention.madvise_wait_cycles_free_large / safeDivisor(globalizedThreadContention.madvise_waits_free_large)));
 
     fprintf (thrData.output, ">>> small_alloc_munmap\t\t\t%20lu\n", globalizedThreadContention.munmap_waits_alloc);
-    fprintf (thrData.output, ">>> small_alloc_munmap_wait_cycles%14lu\tavg = %.1f\n",
+    fprintf (thrData.output, ">>> small_alloc_munmap_wait_cycles%14lu(%3d%%)\tavg = %.1f\n",
              globalizedThreadContention.munmap_wait_cycles_alloc,
-             ((double)globalizedThreadContention.munmap_wait_cycles_alloc / safeDivisor(globalizedThreadContention.munmap_waits_alloc)));
+             globalizedThreadContention.munmap_wait_cycles_alloc / (total_cycles/100),
+            ((double)globalizedThreadContention.munmap_wait_cycles_alloc / safeDivisor(globalizedThreadContention.munmap_waits_alloc)));
     fprintf (thrData.output, ">>> large_alloc_munmap\t\t\t%20lu\n", globalizedThreadContention.munmap_waits_alloc_large);
-    fprintf (thrData.output, ">>> large_alloc_munmap_wait_cycles%14lu\tavg = %.1f\n",
+    fprintf (thrData.output, ">>> large_alloc_munmap_wait_cycles%14lu(%3d%%)\tavg = %.1f\n",
              globalizedThreadContention.munmap_wait_cycles_alloc_large,
-             ((double)globalizedThreadContention.munmap_wait_cycles_alloc_large / safeDivisor(globalizedThreadContention.munmap_waits_alloc_large)));
+             globalizedThreadContention.munmap_wait_cycles_alloc_large / (total_cycles/100),
+            ((double)globalizedThreadContention.munmap_wait_cycles_alloc_large / safeDivisor(globalizedThreadContention.munmap_waits_alloc_large)));
     fprintf (thrData.output, ">>> small_dealloc_munmap\t\t%20lu\n", globalizedThreadContention.munmap_waits_free);
-    fprintf (thrData.output, ">>> small_dealloc_munmap_wait_cycles%12lu\tavg = %.1f\n",
+    fprintf (thrData.output, ">>> small_dealloc_munmap_wait_cycles%12lu(%3d%%)\tavg = %.1f\n",
              globalizedThreadContention.munmap_wait_cycles_free,
-             ((double)globalizedThreadContention.munmap_wait_cycles_free / safeDivisor(globalizedThreadContention.munmap_waits_free)));
+             globalizedThreadContention.munmap_wait_cycles_free / (total_cycles/100),
+            ((double)globalizedThreadContention.munmap_wait_cycles_free / safeDivisor(globalizedThreadContention.munmap_waits_free)));
     fprintf (thrData.output, ">>> large_dealloc_munmap\t\t%20lu\n", globalizedThreadContention.munmap_waits_free_large);
-    fprintf (thrData.output, ">>> large_dealloc_munmap_wait_cycles%12lu\tavg = %.1f\n\n",
+    fprintf (thrData.output, ">>> large_dealloc_munmap_wait_cycles%12lu(%3d%%)\tavg = %.1f\n\n",
              globalizedThreadContention.munmap_wait_cycles_free_large,
-             ((double)globalizedThreadContention.munmap_wait_cycles_free_large / safeDivisor(globalizedThreadContention.munmap_waits_free_large)));
+             globalizedThreadContention.munmap_wait_cycles_free_large / (total_cycles/100),
+            ((double)globalizedThreadContention.munmap_wait_cycles_free_large / safeDivisor(globalizedThreadContention.munmap_waits_free_large)));
 
     fprintf (thrData.output, ">>> small_alloc_mremap\t\t\t%20lu\n", globalizedThreadContention.mremap_waits_alloc);
-    fprintf (thrData.output, ">>> small_alloc_mremap_wait_cycles%14lu\tavg = %.1f\n",
+    fprintf (thrData.output, ">>> small_alloc_mremap_wait_cycles%14lu(%3d%%)\tavg = %.1f\n",
              globalizedThreadContention.mremap_wait_cycles_alloc,
-             ((double)globalizedThreadContention.mremap_wait_cycles_alloc / safeDivisor(globalizedThreadContention.mremap_waits_alloc)));
+             globalizedThreadContention.mremap_wait_cycles_alloc / (total_cycles/100),
+            ((double)globalizedThreadContention.mremap_wait_cycles_alloc / safeDivisor(globalizedThreadContention.mremap_waits_alloc)));
     fprintf (thrData.output, ">>> large_alloc_mremap\t\t\t%20lu\n", globalizedThreadContention.mremap_waits_alloc_large);
-    fprintf (thrData.output, ">>> large_alloc_mremap_wait_cycles%14lu\tavg = %.1f\n",
+    fprintf (thrData.output, ">>> large_alloc_mremap_wait_cycles%14lu(%3d%%)\tavg = %.1f\n",
              globalizedThreadContention.mremap_wait_cycles_alloc_large,
-             ((double)globalizedThreadContention.mremap_wait_cycles_alloc_large / safeDivisor(globalizedThreadContention.mremap_waits_alloc_large)));
+             globalizedThreadContention.mremap_wait_cycles_alloc_large / (total_cycles/100),
+            ((double)globalizedThreadContention.mremap_wait_cycles_alloc_large / safeDivisor(globalizedThreadContention.mremap_waits_alloc_large)));
     fprintf (thrData.output, ">>> small_dealloc_mremap\t\t%20lu\n", globalizedThreadContention.mremap_waits_free);
-    fprintf (thrData.output, ">>> small_dealloc_mremap_wait_cycles%12lu\tavg = %.1f\n",
+    fprintf (thrData.output, ">>> small_dealloc_mremap_wait_cycles%12lu(%3d%%)\tavg = %.1f\n",
              globalizedThreadContention.mremap_wait_cycles_free,
-             ((double)globalizedThreadContention.mremap_wait_cycles_free / safeDivisor(globalizedThreadContention.mremap_waits_free)));
+             globalizedThreadContention.mremap_wait_cycles_free / (total_cycles/100),
+            ((double)globalizedThreadContention.mremap_wait_cycles_free / safeDivisor(globalizedThreadContention.mremap_waits_free)));
     fprintf (thrData.output, ">>> large_dealloc_mremap\t\t%20lu\n", globalizedThreadContention.mremap_waits_free_large);
-    fprintf (thrData.output, ">>> large_dealloc_mremap_wait_cycles%12lu\tavg = %.1f\n\n",
+    fprintf (thrData.output, ">>> large_dealloc_mremap_wait_cycles%12lu(%3d%%)\tavg = %.1f\n\n",
              globalizedThreadContention.mremap_wait_cycles_free_large,
-             ((double)globalizedThreadContention.mremap_wait_cycles_free_large / safeDivisor(globalizedThreadContention.mremap_waits_free_large)));
+             globalizedThreadContention.mremap_wait_cycles_free_large / (total_cycles/100),
+            ((double)globalizedThreadContention.mremap_wait_cycles_free_large / safeDivisor(globalizedThreadContention.mremap_waits_free_large)));
 
 
     fprintf (thrData.output, ">>> small_alloc_mprotect\t\t%20lu\n", globalizedThreadContention.mprotect_waits_alloc);
-    fprintf (thrData.output, ">>> small_alloc_mprotect_wait_cycles%12lu\tavg = %.1f\n",
+    fprintf (thrData.output, ">>> small_alloc_mprotect_wait_cycles%12lu(%3d%%)\tavg = %.1f\n",
              globalizedThreadContention.mprotect_wait_cycles_alloc,
-             ((double)globalizedThreadContention.mprotect_wait_cycles_alloc / safeDivisor(globalizedThreadContention.mprotect_waits_alloc)));
+             globalizedThreadContention.mprotect_wait_cycles_alloc / (total_cycles/100),
+            ((double)globalizedThreadContention.mprotect_wait_cycles_alloc / safeDivisor(globalizedThreadContention.mprotect_waits_alloc)));
     fprintf (thrData.output, ">>> large_alloc_mprotect\t\t%20lu\n", globalizedThreadContention.mprotect_waits_alloc_large);
-    fprintf (thrData.output, ">>> large_alloc_mprotect_wait_cycles%12lu\tavg = %.1f\n",
+    fprintf (thrData.output, ">>> large_alloc_mprotect_wait_cycles%12lu(%3d%%)\tavg = %.1f\n",
              globalizedThreadContention.mprotect_wait_cycles_alloc_large,
-             ((double)globalizedThreadContention.mprotect_wait_cycles_alloc_large / safeDivisor(globalizedThreadContention.mprotect_waits_alloc_large)));
+             globalizedThreadContention.mprotect_wait_cycles_alloc_large / (total_cycles/100),
+            ((double)globalizedThreadContention.mprotect_wait_cycles_alloc_large / safeDivisor(globalizedThreadContention.mprotect_waits_alloc_large)));
     fprintf (thrData.output, ">>> small_dealloc_mprotect\t%20lu\n", globalizedThreadContention.mprotect_waits_free);
-    fprintf (thrData.output, ">>> small_dealloc_mprotect_wait_cycles%10lu\tavg = %.1f\n",
+    fprintf (thrData.output, ">>> small_dealloc_mprotect_wait_cycles%10lu(%3d%%)\tavg = %.1f\n",
              globalizedThreadContention.mprotect_wait_cycles_free,
-             ((double)globalizedThreadContention.mprotect_wait_cycles_free / safeDivisor(globalizedThreadContention.mprotect_waits_free)));
+             globalizedThreadContention.mprotect_wait_cycles_free / (total_cycles/100),
+            ((double)globalizedThreadContention.mprotect_wait_cycles_free / safeDivisor(globalizedThreadContention.mprotect_waits_free)));
     fprintf (thrData.output, ">>> large_dealloc_mprotect\t%20lu\n", globalizedThreadContention.mprotect_waits_free_large);
-    fprintf (thrData.output, ">>> large_dealloc_mprotect_wait_cycles%10lu\tavg = %.1f\n\n",
+    fprintf (thrData.output, ">>> large_dealloc_mprotect_wait_cycles%10lu(%3d%%)\tavg = %.1f\n\n",
              globalizedThreadContention.mprotect_wait_cycles_free_large,
-             ((double)globalizedThreadContention.mprotect_wait_cycles_free_large / safeDivisor(globalizedThreadContention.mprotect_waits_free_large)));
+             globalizedThreadContention.mprotect_wait_cycles_free_large / (total_cycles/100),
+            ((double)globalizedThreadContention.mprotect_wait_cycles_free_large / safeDivisor(globalizedThreadContention.mprotect_waits_free_large)));
 
 
 		long realMem = MAX(max_mu.realMemoryUsage, maxRealMemoryUsage);
 		//long realAllocMem = MAX(max_mu.realAllocatedMemoryUsage, maxRealAllocatedMemoryUsage);
     long realAllocMem = realMem + MemoryWaste::recordSumup();
-		long totalMem = MAX(max_mu.totalMemoryUsage, MAX(maxTotalMemoryUsage, realAllocMem));
+		totalMem = MAX(max_mu.totalMemoryUsage, MAX(maxTotalMemoryUsage, realAllocMem));
 		fprintf (thrData.output, "\n>>>>>>>>>>>>>>>>>>>>>>>>>> Total Memory Usage <<<<<<<<<<<<<<<<<<<<<<<<<\n");
     fprintf (thrData.output, ">>> Max Memory Usage in Threads:\n");
     fprintf (thrData.output, ">>> maxRealMemoryUsage\t\t%20zuK\n", maxRealMemoryUsage/1024);

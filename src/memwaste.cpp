@@ -137,10 +137,6 @@ bool MemoryWaste::allocUpdate(allocation_metadata * allocData, void * address) {
     if(classSize-allocData->size >= PAGESIZE) {
         mem_alloc_wasted[(allocData->tid*num_class_sizes)+classSizeIndex] -= (classSize-allocData->size)/PAGESIZE*PAGESIZE;
     }
-///Jin
-//    if(__atomic_load_n(&blowupflag[classSizeIndex], __ATOMIC_RELAXED) > 0 ) {
-//        __atomic_sub_fetch(&blowupflag[classSizeIndex], 1, __ATOMIC_RELAXED);
-//    }
 
     if(blowupflag[classSizeIndex] > 0) {
         blowupflag[classSizeIndex]--;
@@ -181,8 +177,6 @@ void MemoryWaste::freeUpdate(allocation_metadata * allocData, void* address) {
 
     status->size_using = 0;
     status->classSize = classSize;
-///Jin
-//    __atomic_add_fetch(&blowupflag[classSizeIndex], 1, __ATOMIC_RELAXED);
 
     blowupflag[classSizeIndex]++;
 
@@ -260,12 +254,16 @@ void MemoryWaste::reportMaxMemory(FILE * output, long realMem, long totalMem) {
     }
 
     fprintf (output, "\n>>>>>>>>>>>>>>>    MEMORY DISTRIBUTION    <<<<<<<<<<<<<<<\n");
-    fprintf(output, record_time);
+    //fprintf(output, record_time);
     for (int i = 0; i < num_class_sizes; ++i) {
-
-        int64_t blowup = class_sizes[i] * (num_freelist_record_global[i] - blowupflag_record[i]);
-        //int64_t blowup = class_sizes[i] * (num_alloc_record_global[i] - blowupflag_record[i]);
-        if(blowup < 0) {
+        int64_t blowup;
+        if(bibop) {
+            blowup = class_sizes[i] * (num_freelist_record_global[i] - blowupflag_record[i]);
+            //int64_t blowup = class_sizes[i] * (num_alloc_record_global[i] - blowupflag_record[i]);
+            if(blowup < 0) {
+                blowup = 0;
+            }
+        } else {
             blowup = 0;
         }
 
@@ -292,7 +290,9 @@ void MemoryWaste::reportMaxMemory(FILE * output, long realMem, long totalMem) {
     if(exfrag < 0) {
         exfrag = 0;
     }
-
+    if(totalMem == 0) {
+        totalMem = 1;
+    }
     fprintf(output, "\ntotal:\t\t\t\t\t\t\t\t\t\t"
                     "total internal fragmentation:%10luK(%3d%%)\n\t\t\t\t\t\t\t\t\t\t\t\t\t"
                     "total memory blowup:\t\t\t\t\t\t%10ldK(%3d%%)\n\t\t\t\t\t\t\t\t\t\t\t\t\t"

@@ -78,14 +78,16 @@ inline void * alignupPointer(void * ptr, size_t alignto) {
 
 class CacheMapEntry {
 		private:
-				//unsigned char num_used_bytes;
-                //std::atomic<unsigned char> num_used_bytes;
                 short num_used_bytes;
-				//pid_t owner;
 
 		public:
-				//pid_t getOwner();
-				//void setOwner(pid_t new_owner);
+    short status = 0;
+    int last_allocate = -1;
+    int remain_size = -1;
+    bool freed = false;
+    int last_write = -1;
+    bool sampled = false;
+    bool FS_sampled = false;
 				unsigned int getUsedBytes();
 				bool addUsedBytes(unsigned int num_bytes);
 				bool subUsedBytes(unsigned int num_bytes);
@@ -94,9 +96,6 @@ class CacheMapEntry {
 class PageMapEntry {
 		private:
 				bool touched;
-				//unsigned classSize;
-				//unsigned short num_used_bytes;
-				//std::atomic<unsigned short> num_used_bytes;
                 short num_used_bytes;
 				CacheMapEntry * cache_map_entry;
 
@@ -108,20 +107,14 @@ class PageMapEntry {
 				void clear();
 				bool isTouched();
 				void setTouched();
-				void clearTouched();
 				unsigned int getUsedBytes();
 				bool addUsedBytes(unsigned int num_bytes);
 				bool subUsedBytes(unsigned int num_bytes);
-				//unsigned getClassSize();
-				//void setClassSize(unsigned size);
 };
 
 class ShadowMemory {
 		private:
 				static unsigned updatePages(uintptr_t uintaddr, unsigned long mega_index, unsigned page_index, unsigned size, bool isFree);
-				//static bool updateObjectSize(uintptr_t uintaddr, unsigned size);
-				//static unsigned getPageClassSize(unsigned long mega_index, unsigned page_index);
-				//static unsigned getLastPageClassSize(unsigned long mega_index, unsigned page_index);
 
 				static PageMapEntry ** mega_map_begin;
 				static PageMapEntry * page_map_begin;
@@ -136,16 +129,12 @@ class ShadowMemory {
 		public:
 				static pthread_spinlock_t cache_map_lock;
 				static void doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType);
-				//static size_t libc_malloc_usable_size(size_t size);
-				//static unsigned getPageClassSize(void * address);
 				static bool initialize();
 				static inline PageMapEntry ** getMegaMapEntry(unsigned long mega_index);
 				static unsigned cleanupPages(uintptr_t uintaddr, size_t length);
 				static CacheMapEntry * doCacheMapBumpPointer();
 				static PageMapEntry * doPageMapBumpPointer();
 				static PageMapEntry * getPageMapEntry(unsigned long mega_idx, unsigned page_idx);
-				//static unsigned getObjectSize(uintptr_t uintaddr, unsigned long mega_index, unsigned page_index);
-				//static unsigned getObjectSize(void * address);
 				static unsigned updateObject(void * address, size_t size, bool isFree);
 				static map_tuple getMapTupleByAddress(uintptr_t uintaddr);
 };

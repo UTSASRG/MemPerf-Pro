@@ -154,10 +154,10 @@ test/test-xlibc-thread: libmallocprof.so test/$(THREADTEST_FILE)
 
 # Hoard
 test/test-hoard: libmallocprof.so test/$(TEST_FILE)
-	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic ../Memoryallocators/Hoard/src/libhoard.so -o test/test-hoard test/$(TEST_FILE)
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic ../Memoryallocators/Hoard-spinlock/src/libhoard.so -o test/test-hoard test/$(TEST_FILE)
 
 test/test-hoard-thread: libmallocprof.so test/$(THREADTEST_FILE)
-	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic ../Memoryallocators/Hoard/src/libhoard.so -o test/test-hoard-thread test/$(THREADTEST_FILE) -pthread
+	$(CXX) $(CFLAGS2) -rdynamic ./libmallocprof.so -rdynamic ../Memoryallocators/Hoard-spinlock/src/libhoard.so -o test/test-hoard-thread test/$(THREADTEST_FILE) -pthread
 
 # JeMalloc
 test/test-jemalloc-thread: libmallocprof.so test/$(THREADTEST_FILE)
