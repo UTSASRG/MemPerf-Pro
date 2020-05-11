@@ -1660,7 +1660,6 @@ void decrementGlobalMemoryAllocation(size_t size) {
 void checkGlobalRealMemoryUsage() {
     if(mu.realMemoryUsage > max_mu.realMemoryUsage) {
         max_mu.realMemoryUsage = mu.realMemoryUsage;
-        MemoryWaste::recordMemory();
     }
 }
 
@@ -1668,6 +1667,7 @@ void checkGlobalRealMemoryUsage() {
 void checkGlobalTotalMemoryUsage() {
     if (mu.totalMemoryUsage > max_mu.totalMemoryUsage) {
         max_mu.totalMemoryUsage = mu.totalMemoryUsage;
+        MemoryWaste::recordMemory(mu.realMemoryUsage);
     }
 }
 
@@ -1679,28 +1679,29 @@ void incrementMemoryUsage(size_t size, size_t classSize, size_t new_touched_byte
         classSize -= (classSize-size)/PAGESIZE*PAGESIZE;
     }
 
-		threadContention->realMemoryUsage += size;
+    threadContention->realMemoryUsage += size;
+    threadContention->realAllocatedMemoryUsage += classSize;
+    if(new_touched_bytes > 0) {
+        threadContention->totalMemoryUsage += new_touched_bytes;
+    }
+
     if(threadContention->realMemoryUsage > threadContention->maxRealMemoryUsage) {
         threadContention->maxRealMemoryUsage = threadContention->realMemoryUsage;
     }
-
-    threadContention->realAllocatedMemoryUsage += classSize;
     if(threadContention->realAllocatedMemoryUsage > threadContention->maxRealAllocatedMemoryUsage) {
             threadContention->maxRealAllocatedMemoryUsage = threadContention->realAllocatedMemoryUsage;
         }
+    if(threadContention->totalMemoryUsage > threadContention->maxTotalMemoryUsage) {
+        threadContention->maxTotalMemoryUsage = threadContention->totalMemoryUsage;
+    }
+
 
     incrementGlobalMemoryAllocation(size);
+    if(new_touched_bytes > 0) {
+        __atomic_add_fetch(&mu.totalMemoryUsage, new_touched_bytes, __ATOMIC_RELAXED);
+    }
     checkGlobalRealMemoryUsage();
-
-
-		if(new_touched_bytes > 0) {
-				threadContention->totalMemoryUsage += new_touched_bytes;
-				__atomic_add_fetch(&mu.totalMemoryUsage, new_touched_bytes, __ATOMIC_RELAXED);
-            if(threadContention->totalMemoryUsage > threadContention->maxTotalMemoryUsage) {
-                threadContention->maxTotalMemoryUsage = threadContention->totalMemoryUsage;
-            }
             checkGlobalTotalMemoryUsage();
-        }
 
 		//memlock.unlock();
 }

@@ -87,7 +87,9 @@ class CacheMapEntry {
     bool freed = false;
     int last_write = -1;
     bool sampled = false;
-    int FS_sampled = 0;
+    bool objfs = false;
+    bool actfs = false;
+    bool pasfs = false;
 				unsigned int getUsedBytes();
 				bool addUsedBytes(unsigned int num_bytes);
 				bool subUsedBytes(unsigned int num_bytes);

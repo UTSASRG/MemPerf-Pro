@@ -48,6 +48,8 @@ uint64_t MemoryWaste::num_alloc_total = 0;
 uint64_t MemoryWaste::num_allocFFL_total = 0;
 uint64_t MemoryWaste::num_free_total = 0;
 
+long MemoryWaste::realMem = 0;
+
 extern int threadcontention_index;
 
 void MemoryWaste::initialize() {
@@ -183,7 +185,7 @@ void MemoryWaste::freeUpdate(allocation_metadata * allocData, void* address) {
 }
 
 
-bool MemoryWaste::recordMemory() {
+bool MemoryWaste::recordMemory(long realMemory) {
 
 
     record_lock.lock();
@@ -192,6 +194,8 @@ bool MemoryWaste::recordMemory() {
 //    fp = popen("time 2>&1", "r");
 //    while(fgets(record_time, 1024, fp)) {fprintf(stderr, record_time);}
 //    pclose(fp);
+
+realMem = realMemory;
 
     memcpy(mem_alloc_wasted_record, mem_alloc_wasted, (threadcontention_index+1) * num_class_sizes * sizeof(uint64_t));
 
@@ -248,7 +252,7 @@ uint64_t MemoryWaste::recordSumup() {
 }
 
 
-void MemoryWaste::reportMaxMemory(FILE * output, long realMem, long totalMem) {
+void MemoryWaste::reportMaxMemory(FILE * output, long totalMem) {
 
     if(output == nullptr) {
         output = stderr;
@@ -261,11 +265,11 @@ void MemoryWaste::reportMaxMemory(FILE * output, long realMem, long totalMem) {
         if(bibop) {
             blowup = class_sizes[i] * (num_freelist_record_global[i] - blowupflag_record[i]);
             //int64_t blowup = class_sizes[i] * (num_alloc_record_global[i] - blowupflag_record[i]);
-            if(blowup < 0) {
-                blowup = 0;
-            }
             if(blowup > totalMem - realMem - mem_alloc_wasted_record_total) {
                 blowup = totalMem - realMem - mem_alloc_wasted_record_total;
+            }
+            if(blowup < 0) {
+                blowup = 0;
             }
         } else {
             blowup = 0;
@@ -298,18 +302,24 @@ void MemoryWaste::reportMaxMemory(FILE * output, long realMem, long totalMem) {
         totalMem = 1;
     }
     fprintf(output, "\ntotal:\t\t\t\t\t\t\t\t\t\t"
-                    "total internal fragmentation:%10luK(%3d%%)\n\t\t\t\t\t\t\t\t\t\t\t\t\t"
-                    "total memory blowup:\t\t\t\t\t\t%10ldK(%3d%%)\n\t\t\t\t\t\t\t\t\t\t\t\t\t"
-                    "total external fragmentation:\t\t\t\t%10ldK(%3d%%)\n\t\t\t\t\t\t\t\t\t\t\t\t\t"
-                    "total real using memory:\t\t\t\t%10ldK(%3d%%)\n\t\t\t\t\t\t\t\t\t\t\t\t\t"
+                    "total internal fragmentation:%10luK(%3d%%)\n\t\t\t\t\t\t\t\t\t\t\t\t\t",
+            mem_alloc_wasted_record_total/1024, mem_alloc_wasted_record_total*100/totalMem);
+    if(bibop) {
+        fprintf(output, "total memory blowup:\t\t\t\t\t\t%10ldK(%3d%%)\n\t\t\t\t\t\t\t\t\t\t\t\t\t"
+                        "total external fragmentation:\t\t\t\t%10ldK(%3d%%)\n\t\t\t\t\t\t\t\t\t\t\t\t\t",
+                mem_blowup_total/1024, mem_blowup_total*100/totalMem,
+                exfrag/1024, exfrag*100/totalMem);
+    } else {
+        fprintf(output, "total memory blowup + external fragmentation:\t\t\t\t%10ldK(%3d%%)\n\t\t\t\t\t\t\t\t\t\t\t\t\t",
+                exfrag/1024, exfrag*100/totalMem);
+    }
+    fprintf(output,
+            "total real using memory:\t\t\t\t%10ldK(%3d%%)\n\t\t\t\t\t\t\t\t\t\t\t\t\t"
                     "total using memory:\t\t\t\t%10ldK\n"
                     "\ncurrent status:\t\t\t\t\t\t\t\t\t\t"
                     "active objects: %10lu\t\t\tfreelist objects: %10lu"
                     "\naccumulative results:\t\t\t\t\t\t\t\t\t\t"
                     "new allocated: %10lu\t\t\treused allocated: %10lu\t\t\tfreed: %10lu\n",
-            mem_alloc_wasted_record_total/1024, mem_alloc_wasted_record_total*100/totalMem,
-            mem_blowup_total/1024, mem_blowup_total*100/totalMem,
-            exfrag/1024, exfrag*100/totalMem,
             realMem/1024,
             100 - mem_alloc_wasted_record_total*100/totalMem - mem_blowup_total*100/totalMem - exfrag*100/totalMem,
             totalMem/1024,

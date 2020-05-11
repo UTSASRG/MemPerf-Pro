@@ -255,44 +255,24 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType)
 				if(cme->last_write != thrData.tid && cme->last_write != -1) {
 				    if(cme->status == 0) {
                         usageData->numObjectFS++;
+                        if(cme->objfs == false) {
+                            usageData->numObjectFSCacheLine++;
+                            cme->objfs = true;
+                        }
 				    } else if(cme->status == 1) {
                         usageData->numActiveFS++;
+                        if(cme->actfs == false) {
+                            usageData->numActiveFSCacheLine++;
+                            cme->actfs = true;
+                        }
 				    } else {
                         usageData->numPassiveFS++;
+                        if(cme->pasfs == false) {
+                            usageData->numPassiveFSCacheLine++;
+                            cme->pasfs = true;
+                        }
 				    }
-				    if(cme->FS_sampled == 0) {
-                        if(cme->status == 0) {
-                            usageData->numObjectFSCacheLine++;
-                            cme->FS_sampled = cme->status+1;
-                        }
-                        if(cme->status == 1) {
-                            usageData->numActiveFSCacheLine++;
-                            cme->FS_sampled = cme->status+1;
-                        }
-                        if(cme->status == 2){
-                            usageData->numPassiveFSCacheLine++;
-                            cme->FS_sampled = cme->status+1;
-                        }
-				    } else if(cme->FS_sampled == 1) {
-				        if(cme->status == 1) {
-                            usageData->numObjectFSCacheLine--;
-                            usageData->numActiveFSCacheLine++;
-                            cme->FS_sampled = cme->status+1;
-                        }
-				        if(cme->status == 2){
-                            usageData->numObjectFSCacheLine--;
-                            usageData->numPassiveFSCacheLine++;
-                            cme->FS_sampled = cme->status+1;
-                        }
-                    } else if(cme->FS_sampled == 2) {
-                        if (cme->status == 2) {
-                            usageData->numActiveFSCacheLine--;
-                            usageData->numPassiveFSCacheLine++;
-                            cme->FS_sampled = cme->status + 1;
-                        }
-                    }
-
-                }
+				}
             cme->last_write = thrData.tid;
         }
 		if(cme->sampled == false) {
@@ -461,10 +441,15 @@ bool PageMapEntry::updateCacheLines(uintptr_t uintaddr, unsigned long mega_index
 				if(current->status != 2) {
 				    if(!isFree) {
                         if(current->last_allocate != thrData.tid && current->last_allocate != -1) {
-                            if(current->status == 0) {
-                                current->status = 1;
-                            } else if(current->freed) {
+//                            if(current->status == 0) {
+//                                current->status = 1;
+//                            } else if(current->freed) {
+//                                current->status = 2;
+//                            }
+                            if(current->freed) {
                                 current->status = 2;
+                            } else {
+                                current->status = 1;
                             }
                         }
                         current->last_allocate = thrData.tid;
@@ -509,10 +494,15 @@ bool PageMapEntry::updateCacheLines(uintptr_t uintaddr, unsigned long mega_index
                     if(current->status != 2) {
                         if(!isFree) {
                             if(current->last_allocate != thrData.tid && current->last_allocate != -1) {
-                                if(current->status == 0) {
-                                    current->status = 1;
-                                } else if(current->freed) {
+//                                if(current->status == 0) {
+//                                    current->status = 1;
+//                                } else if(current->freed) {
+//                                    current->status = 2;
+//                                }
+                                if(current->freed) {
                                     current->status = 2;
+                                } else {
+                                    current->status = 1;
                                 }
                             }
                             current->last_allocate = thrData.tid;

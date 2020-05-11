@@ -68,6 +68,8 @@ private:
     static uint64_t num_allocFFL_total;
     static uint64_t num_free_total;
 
+    static long realMem;
+
 public:
 
     static void initialize();
@@ -75,9 +77,9 @@ public:
     static bool allocUpdate(allocation_metadata * allocData, void * address);
     static void freeUpdate(allocation_metadata * allocData, void* address);
     ///Here
-    static bool recordMemory();
+    static bool recordMemory(long totalMemory);
     static uint64_t recordSumup();
-    static void reportMaxMemory(FILE * output, long realMem, long totalMem);
+    static void reportMaxMemory(FILE * output, long realMem);
 };
 
 #endif //MMPROF_MEMWASTE_H
