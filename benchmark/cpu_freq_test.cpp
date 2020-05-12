@@ -33,11 +33,11 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "total cycles in 1 seconds are %lf \n", total_cycle / 10.0);
 
     total_cycle = 0;
+    start = rdtscp();
     for (int i = 0; i < 1000000000; i++) {
-        start = rdtscp();
         __pause();
-        total_cycle += rdtscp() - start;
     }
+    total_cycle += rdtscp() - start;
 
     fprintf(stderr, "total cycles for pause are %lf \n", total_cycle / 1000000000.0);
 }
