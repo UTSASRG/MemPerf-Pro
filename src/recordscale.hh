@@ -319,15 +319,11 @@ int madvise(void *addr, size_t length, int advice){
   return result;
 }
 
-//unsigned int increment_total = 0;
 // SBRK
 void *sbrk(intptr_t increment){
   if (!realInitialized) RealX::initializer();
   if(profilerInitialized != INITIALIZED || !realing  || !inRealMain)
       return RealX::sbrk(increment);
-
-//    increment_total += increment;
-//fprintf(stderr, "sbrk %lld\n", increment_total/1024);
 
   uint64_t timeStart = rdtscp();
   void *retptr = RealX::sbrk(increment);
@@ -477,7 +473,6 @@ long totalMem;
 
 /* ************************Systemn Calls End******************************** */
 };
-
 void writeThreadContention() {
     fprintf(stderr, "writing\n");
     fprintf (thrData.output, "\n>>>>>>>>>>>>>>>>>>>>>>>>>> THREAD CONTENTIONS <<<<<<<<<<<<<<<<<<<<<<<<<<\n");
@@ -694,7 +689,6 @@ void writeThreadContention() {
 		long realMem = MAX(max_mu.realMemoryUsage, maxRealMemoryUsage);
     long realAllocMem = realMem + MemoryWaste::recordSumup();
 		totalMem = MAX(max_mu.totalMemoryUsage, MAX(maxTotalMemoryUsage, realAllocMem));
-		fprintf(stderr, "max_mu.totalMemoryUsage %lu\n", max_mu.totalMemoryUsage/1024);
 		fprintf (thrData.output, "\n>>>>>>>>>>>>>>>>>>>>>>>>>> Total Memory Usage <<<<<<<<<<<<<<<<<<<<<<<<<\n");
     fprintf (thrData.output, ">>> Max Memory Usage in Threads:\n");
     fprintf (thrData.output, ">>> maxRealMemoryUsage\t\t%20zuK\n", maxRealMemoryUsage/1024);

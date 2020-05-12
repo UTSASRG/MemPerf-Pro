@@ -21,6 +21,34 @@ thread_local extern uint64_t thread_stack_start;
 thread_local extern uint64_t myThreadID;
 thread_local extern perf_info perfInfo;
 extern "C" void countEventsOutside(bool end);
+#define MAX_THREAD_NUMBER 1024
+extern uint64_t cycles_with_improve[MAX_THREAD_NUMBER];
+extern uint64_t cycles_without_improve[MAX_THREAD_NUMBER];
+uint64_t total_cycles_with_improve = 0;
+uint64_t total_cycles_without_improve = 0;
+int current_threads = 1;
+extern int threadcontention_index;
+extern spinlock improve_lock;
+
+void improve_cycles_stage_count(int add_thread) {
+    uint64_t critical_cycles_with_improve = 0, critical_cycles_without_improve = 0;
+    improve_lock.lock();
+    for(int t = 0; t <= threadcontention_index; ++t) {
+        if(cycles_with_improve[t] > critical_cycles_with_improve) {
+            critical_cycles_with_improve = cycles_with_improve[t];
+        }
+        if(cycles_without_improve[t] > critical_cycles_without_improve) {
+            critical_cycles_without_improve = cycles_without_improve[t];
+        }
+        total_cycles_with_improve += critical_cycles_with_improve;
+        total_cycles_without_improve += critical_cycles_without_improve;
+        cycles_with_improve[t] = 0;
+        cycles_without_improve[t] = 0;
+    }
+    //current_threads += add_thread;
+    improve_lock.unlock();
+}
+
 class xthreadx {
 	typedef void * threadFunction(void *);
 	typedef struct thread {
@@ -43,8 +71,6 @@ class xthreadx {
 		if(result) {
 			fprintf(stderr, "error: pthread_create failed: %s\n", strerror(errno));
 		}
-		unsigned long long total_cycles_end = rdtscp();
-		//total_global_cycles += total_cycles_end - total_cycles_start;
 
 		return result;
 	}
@@ -61,9 +87,6 @@ class xthreadx {
 		void * result = NULL;
 		size_t stackSize;
 		thread_t * current = (thread_t *) arg;
-
-//		pid_t tid = gettid();
-//		thrData.tid = tid;
 
 		#ifdef THREAD_OUTPUT
 		pid_t pid = getpid();
@@ -100,7 +123,9 @@ class xthreadx {
 
 		#ifndef NO_PMU
 		initPMU();
-		#endif
+        #endif
+        improve_cycles_stage_count(1);
+        countEventsOutside(false);
 		result = current->startRoutine(current->startArg);
 
 		threadExit();
@@ -111,6 +136,7 @@ class xthreadx {
 
   static void threadExit() {
       countEventsOutside(true);
+      improve_cycles_stage_count(-1);
     #ifndef NO_PMU
     stopSampling();
     //doPerfCounterRead();

@@ -277,7 +277,6 @@ void initLocalFreeArray();
 void initMyLocalMem();
 void* myLocalMalloc(size_t);
 void myLocalFree(void*);
-void printMyMemUtilization();
 void initGlobalCSM();
 SMapEntry* newSMapEntry();
 //void start_smaps();

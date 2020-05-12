@@ -140,9 +140,17 @@ bool MemoryWaste::allocUpdate(allocation_metadata * allocData, void * address) {
         mem_alloc_wasted[(allocData->tid*num_class_sizes)+classSizeIndex] -= (classSize-allocData->size)/PAGESIZE*PAGESIZE;
     }
 
-    if(blowupflag[classSizeIndex] > 0) {
-        blowupflag[classSizeIndex]--;
-}
+    if(classSize < 10000) {
+        if( blowupflag[classSizeIndex] > 0) {
+            blowupflag[classSizeIndex]--;
+        }
+    } else {
+        record_lock.lock();
+        if( blowupflag[classSizeIndex] > 0) {
+            blowupflag[classSizeIndex]--;
+        }
+        record_lock.unlock();
+    }
 
 
     return reused;
@@ -180,8 +188,13 @@ void MemoryWaste::freeUpdate(allocation_metadata * allocData, void* address) {
     status->size_using = 0;
     status->classSize = classSize;
 
-    blowupflag[classSizeIndex]++;
-
+    if(classSize < 10000) {
+        blowupflag[classSizeIndex]++;
+    } else {
+        record_lock.lock();
+        blowupflag[classSizeIndex]++;
+        record_lock.unlock();
+    }
 }
 
 
@@ -264,11 +277,7 @@ void MemoryWaste::reportMaxMemory(FILE * output, long totalMem) {
         int64_t blowup;
         if(bibop) {
             blowup = class_sizes[i] * (num_freelist_record_global[i] - blowupflag_record[i]);
-            //int64_t blowup = class_sizes[i] * (num_alloc_record_global[i] - blowupflag_record[i]);
-            if(blowup > totalMem - realMem - mem_alloc_wasted_record_total) {
-                blowup = totalMem - realMem - mem_alloc_wasted_record_total;
-            }
-            if(blowup < 0) {
+            if(blowup < 0 || blowup > totalMem - realMem - mem_alloc_wasted_record_total) {
                 blowup = 0;
             }
         } else {
