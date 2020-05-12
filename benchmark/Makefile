@@ -1,10 +1,11 @@
 TARGET = micro-tcmalloc micro-jemalloc cpu_freq
 
 CXX = g++
-CXXFLAGS = -g -O2 -std=c++14 -Wno-unused-result -Wl,--no-as-needed
+CXXFLAGS = -g -O2 -std=c++14 -Wno-unused-result -Wl,--no-as-needed -DCYCLES_PERSECOND=2094895684.64 -DCYCLES_PER_PAUSE=5
 
 TCMALLOC_LIB = /usr/local/lib/libtcmalloc_minimal.so
 JEMALLOC_LIB = /media/umass/datasystem/xin/allocaters/jemalloc-5.2.1/lib/libjemalloc.so
+
 
 all: $(TARGET)
 
