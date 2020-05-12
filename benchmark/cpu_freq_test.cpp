@@ -28,16 +28,16 @@ inline void __pause() {
 int main(int argc, char *argv[]) {
 
     unsigned long long start = rdtscp();
-    sleep(100);
+    sleep(10);
     unsigned long long total_cycle = rdtscp() - start;
-    fprintf(stderr, "total cycles in 100 seconds are %llu \n", total_cycle);
+    fprintf(stderr, "total cycles in 1 seconds are %lf \n", total_cycle/10.0);
 
     total_cycle = 0;
-    for (int i = 0; i < 100000; i++) {
+    for (int i = 0; i < 1000000000; i++) {
         start = rdtscp();
         __pause();
         total_cycle += rdtscp() - start;
     }
 
-    fprintf(stderr, "total cycles for 100000 pauses are %llu \n", total_cycle);
+    fprintf(stderr, "total cycles for pause are %lf \n", total_cycle/1000000000.0);
 }
