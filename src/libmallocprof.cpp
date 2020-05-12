@@ -22,7 +22,7 @@
 #include "xthreadx.hh"
 #include "recordscale.hh"
 #include "memwaste.h"
-spinlock memlock;
+spinlock improve_lock;
 //Globals
 uint64_t total_cycles;
 bool bibop = false;
@@ -47,28 +47,9 @@ initStatus profilerInitialized = NOT_INITIALIZED;
 pid_t pid;
 //size_t alignment = 0;
 size_t large_object_threshold = 0;
-//size_t metadata_object = 0;
-//size_t metadata_overhead = 0;
-//size_t total_blowup = 0;
-//size_t totalSizeAlloc = 0;
-//size_t totalSizeFree = 0;
-//size_t totalSizeDiff = 0;
-//size_t totalMemOverhead = 0;
-
-//Smaps Sampling-------------//
-//void setupSignalHandler();
-//void startSignalTimer();
 size_t smaps_bufferSize = 1024;
 //FILE* smaps_infile = nullptr;
 char* smaps_buffer;
-//OverheadSample worstCaseOverhead;
-//OverheadSample currentCaseOverhead;
-//SMapEntry* smapsDontCheck[100];
-//short smapsDontCheckIndex = 0;
-//short smapsDontCheckNumEntries = 0;
-//timer_t smap_timer;
-//uint64_t smap_samples = 0;
-//uint64_t smap_sample_cycles = 0;
 struct itimerspec stopTimer;
 struct itimerspec resumeTimer;
 //unsigned timer_nsec = 333000000;
@@ -81,42 +62,10 @@ unsigned timer_sec = 1;
 int num_class_sizes;
 size_t* class_sizes;
 
-//Atomic Globals ATOMIC
-//std::atomic_bool mmap_active(false);
-//std::atomic_bool sbrk_active(false);
-//std::atomic_bool madvise_active(false);
-//std::atomic<std::size_t> freed_bytes (0);
-//std::atomic<std::size_t> blowup_bytes (0);
-//std::atomic<std::size_t> alignment_bytes (0);
-//
-//thread_local uint64_t total_time_wait = 0;
-
-//uint num_sbrk = 0;
-//uint num_madvise = 0;
-//uint malloc_mmaps = 0;
-//std::size_t size_sbrk = 0;
-
-//thread_local uint blowup_allocations = 0;
-//thread_local unsigned long long total_cycles_start = 0;
-//std::atomic<std::uint64_t> total_global_cycles (0);
-//std::atomic<std::uint64_t> cycles_alloc (0);
-//std::atomic<std::uint64_t> cycles_allocFFL (0);
-//std::atomic<std::uint64_t> cycles_free (0);
-
-//uint64_t * realMemoryUsageBySizes = nullptr;
-//uint64_t * memoryUsageBySizes = nullptr;
-//uint64_t * freedMemoryUsageBySizes = nullptr;
-//uint64_t * realMemoryUsageBySizesWhenMax = nullptr;
-//uint64_t * memoryUsageBySizesWhenMax = nullptr;
-//uint64_t * freedMemoryUsageBySizesWhenMax = nullptr;
 MemoryUsage mu;
 MemoryUsage max_mu;
 
 /// REQUIRED!
-//std::atomic<unsigned>* globalFreeArray = nullptr;
-//uint64_t * globalNumAllocsBySizes = nullptr;
-//uint64_t* globalNumAllocsFFLBySizes = nullptr;
-//Thread local variables THREAD_LOCAL
 thread_local thread_data thrData;
 //thread_local bool waiting;
 thread_local bool inAllocation;
@@ -125,14 +74,6 @@ thread_local size_t now_size;
 //thread_local bool inDeallocation;
 thread_local bool inMmap;
 thread_local bool PMUinit = false;
-//thread_local uint64_t timeAttempted;
-//thread_local uint64_t timeWaiting;
-//thread_local unsigned* localFreeArray = nullptr;
-//thread_local bool localFreeArrayInitialized = false;
-//thread_local uint64_t * localNumAllocsBySizes = nullptr;
-//thread_local bool localNumAllocsBySizesInitialized = false;
-//thread_local uint64_t * localNumAllocsFFLBySizes = nullptr;
-//thread_local bool localNumAllocsFFLBySizesInitialized = false;
 thread_local uint64_t myThreadID;
 thread_local thread_alloc_data localTAD;
 thread_local bool globalized = false;
@@ -219,7 +160,6 @@ __attribute__((constructor)) initStatus initializer() {
 
 	inConstructor = true;
 
-//	memlock.init();
 
 	// Ensure we are operating on a system using 64-bit pointers.
 	// This is necessary, as later we'll be taking the low 8-byte word
@@ -246,6 +186,7 @@ __attribute__((constructor)) initStatus initializer() {
     //fprintf(stderr, "myMen_hash = %p, %p\n", myMem_hash, myMemEnd_hash);
     myMemLock_hash.init();
 
+    improve_lock.init();
 
 	void * program_break = RealX::sbrk(0);
 
@@ -281,10 +222,10 @@ __attribute__((constructor)) initStatus initializer() {
 
 	// Generate the name of our output file, then open it for writing.
 	char outputFile[MAX_FILENAME_LEN];
-	snprintf(outputFile, MAX_FILENAME_LEN, "%s_libmallocprof_%d_main_thread.txt",
-			program_invocation_name, pid);
-//    snprintf(outputFile, MAX_FILENAME_LEN, "/home/jinzhou/parsec/records/%s_libmallocprof_%d_main_thread.txt",
-//             program_invocation_name, pid);
+//	snprintf(outputFile, MAX_FILENAME_LEN, "%s_libmallocprof_%d_main_thread.txt",
+//			program_invocation_name, pid);
+    snprintf(outputFile, MAX_FILENAME_LEN, "/home/jinzhou/parsec/records/%s_libmallocprof_%d_main_thread.txt",
+             program_invocation_name, pid);
     fprintf(stderr, "%s\n", outputFile);
 	// Will overwrite current file; change the fopen flag to "a" for append.
 	thrData.output = fopen(outputFile, "w");
@@ -354,36 +295,20 @@ __attribute__((destructor)) void finalizer_mallocprof () {}
 
 void dumpHashmaps() {
 
-	// fprintf(stderr, "addressUsage.printUtilization():\n");
-	// addressUsage.printUtilization();
-
-//	fprintf(stderr, "overhead.printUtilization():\n");
-//	overhead.printUtilization();
 
 	fprintf(stderr, "lockUsage.printUtilization():\n");
   lockUsage.printUtilization();
 
-	//fprintf(stderr, "threadContention.printUtilization():\n");
-	//threadContention.printUtilization();
-
-	// fprintf(stderr, "threadToCSM.printUtilization():\n");
-	// threadToCSM.printUtilization();
 	fprintf(stderr, "\n");
 }
 
-void printMyMemUtilization () {
 
-	fprintf(stderr, "&myMem = %p\n", myMem);
-	fprintf(stderr, "myMemEnd = %p\n", myMemEnd);
-	fprintf(stderr, "myMemPosition = %lu\n", myMemPosition);
-	fprintf(stderr, "myMemAllocations = %lu\n", myMemAllocations);
-}
+extern void improve_cycles_stage_count(int add_thread);
 
 void exitHandler() {
     countEventsOutside(true);
-	inRealMain = false;
-	unsigned long long total_cycles_end = rdtscp();
-	//total_global_cycles += total_cycles_end - total_cycles_start;
+    inRealMain = false;
+    improve_cycles_stage_count(-1);
 	#ifndef NO_PMU
 	stopSampling();
 
@@ -461,8 +386,12 @@ extern "C" int libmallocprof_libc_start_main(main_fn_t main_fn, int argc,
 
 void collectAllocMetaData(allocation_metadata *metadata);
 
-//thread_local CacheMissesOutsideInfo eventOutside_before;
-//thread_local CacheMissesOutsideInfo eventOutside_after;
+uint64_t cycles_with_improve[MAX_THREAD_NUMBER] = {0};
+uint64_t cycles_without_improve[MAX_THREAD_NUMBER] = {0};
+const size_t improved_cycles[5] = {200, 50, 100, 1000, 1000};
+const size_t improved_large_obj_thres = 10000;
+
+
 thread_local PerfReadInfo eventOutside_before;
 thread_local PerfReadInfo eventOutside_after;
 thread_local uint64_t eventOutside_timestart;
@@ -508,6 +437,9 @@ void countEventsOutside(bool end) {
         localTAD.numOutsideTlbReadMisses += eventOutside_after.tlb_read_misses;
         localTAD.numOutsideTlbWriteMisses += eventOutside_after.tlb_write_misses;
         localTAD.numOutsideCycles += time_diff;
+
+        cycles_with_improve[thrData.tid] += time_diff;
+        cycles_without_improve[thrData.tid] += time_diff;
     }
 }
 
@@ -715,6 +647,12 @@ extern "C" {
 //        cycles_free += allocData.tsc_after;
         ///below
             if (__builtin_expect(!globalized, true)) {
+                cycles_without_improve[thrData.tid] += allocData.tsc_after;
+                if(allocData.size < improved_large_obj_thres) {
+                    cycles_with_improve[thrData.tid] += improved_cycles[2];
+                } else {
+                    cycles_with_improve[thrData.tid] += improved_cycles[4];
+                }
                 if(allocData.size < large_object_threshold) {
                     localTAD.numFrees++;
                     localTAD.cycles_free += allocData.tsc_after;
@@ -1092,9 +1030,8 @@ void* myMalloc (size_t size) {
 	if (myLocalMemInitialized) {
 		return myLocalMalloc(size);
 	}
-
 	myMemLock.lock ();
-	void* p;
+    void* p;
 	if((myMemPosition + size + MY_METADATA_SIZE) < TEMP_MEM_SIZE) {
 		unsigned * metadata = (unsigned *)(myMem + myMemPosition);
 		*metadata = size;
@@ -1673,7 +1610,6 @@ void checkGlobalTotalMemoryUsage() {
 
 void incrementMemoryUsage(size_t size, size_t classSize, size_t new_touched_bytes, void * object) {
 
-    //memlock.lock();
 
     if(classSize-size > PAGESIZE) {
         classSize -= (classSize-size)/PAGESIZE*PAGESIZE;
@@ -1703,14 +1639,13 @@ void incrementMemoryUsage(size_t size, size_t classSize, size_t new_touched_byte
     checkGlobalRealMemoryUsage();
             checkGlobalTotalMemoryUsage();
 
-		//memlock.unlock();
 }
 
 void decrementMemoryUsage(size_t size, size_t classSize, void * addr) {
 
   if(addr == NULL) return;
 
-    //memlock.lock();
+
 
     if(classSize-size > PAGESIZE) {
         classSize -= (classSize-size)/PAGESIZE*PAGESIZE;
@@ -1721,22 +1656,26 @@ void decrementMemoryUsage(size_t size, size_t classSize, void * addr) {
 
   decrementGlobalMemoryAllocation(size);
 
-    //memlock.unlock();
-
 }
 
 void collectAllocMetaData(allocation_metadata *metadata) {
-        if (__builtin_expect(!globalized, true)) {
-            if (!metadata->reused) {
-                if(metadata->size < large_object_threshold) {
-                    localTAD.cycles_alloc += metadata->cycles;
-                    localTAD.numAllocs++;
-                    localTAD.numAllocationFaults += metadata->after.faults;
-                    localTAD.numAllocationTlbReadMisses += metadata->after.tlb_read_misses;
-                    localTAD.numAllocationTlbWriteMisses += metadata->after.tlb_write_misses;
-                    localTAD.numAllocationCacheMisses += metadata->after.cache_misses;
-                    localTAD.numAllocationInstrs += metadata->after.instructions;
-                } else {
+    if (__builtin_expect(!globalized, true)) {
+        cycles_without_improve[thrData.tid] += metadata->cycles;
+        if (!metadata->reused) {
+            if(metadata->size < improved_large_obj_thres) {
+                cycles_with_improve[thrData.tid] += improved_cycles[0];
+            } else {
+                cycles_with_improve[thrData.tid] += improved_cycles[3];
+            }
+            if(metadata->size < large_object_threshold) {
+                localTAD.cycles_alloc += metadata->cycles;
+                localTAD.numAllocs++;
+                localTAD.numAllocationFaults += metadata->after.faults;
+                localTAD.numAllocationTlbReadMisses += metadata->after.tlb_read_misses;
+                localTAD.numAllocationTlbWriteMisses += metadata->after.tlb_write_misses;
+                localTAD.numAllocationCacheMisses += metadata->after.cache_misses;
+                localTAD.numAllocationInstrs += metadata->after.instructions;
+            } else {
                     localTAD.cycles_alloc_large += metadata->cycles;
                     localTAD.numAllocs_large++;
                     localTAD.numAllocationFaults_large += metadata->after.faults;
@@ -1746,6 +1685,11 @@ void collectAllocMetaData(allocation_metadata *metadata) {
                     localTAD.numAllocationInstrs_large += metadata->after.instructions;
                 }
             } else {
+            if(metadata->size < improved_large_obj_thres) {
+                cycles_with_improve[thrData.tid] += improved_cycles[1];
+            } else {
+                cycles_with_improve[thrData.tid] += improved_cycles[3];
+            }
                 if(metadata->size < large_object_threshold) {
                     localTAD.cycles_allocFFL += metadata->cycles;
                     localTAD.numAllocsFFL++;
@@ -1954,7 +1898,8 @@ void updateGlobalFriendlinessData() {
 }
 
 extern long totalMem;
-
+extern uint64_t total_cycles_with_improve;
+extern  uint64_t total_cycles_without_improve;
 void calcAppFriendliness() {
 		// Final call to update the global data, using this (the main thread's) local data.
 
@@ -2003,6 +1948,19 @@ void calcAppFriendliness() {
             fprintf(outfd, "avg. cache utilization\t\t\t\t\t\t\t\t=%19d%%\n", (int)(avgTotalCacheUtil * 100));
             fprintf(outfd, "avg. page utilization\t\t\t\t\t\t\t\t\t=%19d%%\n", (int)(avgTotalPageUtil * 100));
 		}
+
+    fprintf(thrData.output, "\n>>>>>>>>>>>>>>>>>>>>>>>>> POTENTIAL SPEEDUP <<<<<<<<<<<<<<<<<<<<<<<<<\n");
+    fprintf(thrData.output, "expected small new alloc cycles\t=%16lu(%3d%%)\n", improved_cycles[0], (int)((double)improved_cycles[0]/safeDivisor(globalTAD.cycles_alloc/100)));
+    fprintf(thrData.output, "expected small reused alloc cycles\t=%16lu(%3d%%)\n", improved_cycles[1], (int)((double)improved_cycles[1]/safeDivisor(globalTAD.cycles_allocFFL/100)));
+    fprintf(thrData.output, "expected small dealloc cycles\t=%16lu(%3d%%)\n", improved_cycles[2], (int)((double)improved_cycles[2]/safeDivisor(globalTAD.cycles_free/100)));
+    fprintf(thrData.output, "expected large alloc cycles\t=%16lu(%3d%%)\n", improved_cycles[3], (int)((double)improved_cycles[3]/safeDivisor(globalTAD.cycles_alloc_large/100)));
+    fprintf(thrData.output, "expected large dealloc cycles\t=%16lu(%3d%%)\n", improved_cycles[4], (int)((double)improved_cycles[4]/safeDivisor(globalTAD.cycles_free_large/100)));
+    fprintf(thrData.output, "expected object threshold\t=%16lu\n", improved_large_obj_thres);
+if(total_cycles_without_improve > total_cycles_with_improve) {
+    fprintf(thrData.output, "expected speedup\t=%5d%%\n", (int)((double)(total_cycles_without_improve-total_cycles_with_improve)/safeDivisor(total_cycles_without_improve/100)));
+} else {
+    fprintf(thrData.output, "expected speedup\t=0%%\n");
+}
 }
 
 const char * LockTypeToString(LockType type) {
