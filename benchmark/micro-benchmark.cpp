@@ -105,7 +105,7 @@ void new_allocation_worker(int thread_index) {
     for (int i = 0; i < niterations; i++) {
         random_pause();
         for (int j = 0; j < nobjects; j++) {
-            //   fprintf(stderr, "new allocate num:%d, time:%lf \n", j, rdtscp() / cpu_cycles_per_second);
+//            fprintf(stderr, "thread index:%d, new allocate num:%d, time:%lf \n", thread_index, j, rdtscp() / cpu_cycles_per_second);
             unsigned long long start = rdtscp();
             total_new_allocations[i * nobjects + j] = new Foo[objSize];
             assert (total_new_allocations[i * nobjects + j]);
