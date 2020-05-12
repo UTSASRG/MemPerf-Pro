@@ -54,7 +54,7 @@ int random_pause_max = 50;
 double cpu_cycles_per_second = 2094895684.64;
 
 double cycles_per_allocation = cpu_cycles_per_second / allocationPerSeconds;
-double cycles_per_pause = 111;
+double cycles_per_pause = 382;
 
 
 class Foo {
@@ -100,6 +100,7 @@ void new_allocation_worker() {
         for (int j = 0; j < nobjects; j++) {
             unsigned long long start = rdtscp();
             total_new_allocations[i * nobjects + j] = new Foo[objSize];
+            fprintf(stderr, "new allocate num:%d, time:%llu \n", j, rdtscp());
             assert (total_new_allocations[j]);
             rate_limit(rdtscp() - start);
         }
