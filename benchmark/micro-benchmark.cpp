@@ -47,12 +47,13 @@ inline unsigned long long rdtscp() {
 
 int niterations = 50;    // Default number of iterations.
 int nobjects = 30000;  // Default number of objects.
-int nthreads = 1;    // Default number of threads.
-int objSize = 1;
+int nthreads = 40;    // Default number of threads.
+int objSize = 9;
 int allocationPerSeconds = 1;
 int random_pause_max = 50;
 double cpu_freq = 2327507.08008;
 double cycles_per_allocation = cpu_freq * 1000000 / allocationPerSeconds;
+double cycles_per_pause = 100;
 
 
 class Foo {
@@ -65,27 +66,27 @@ public:
     int y;
 };
 
-void rate_limit(unsigned long long cycles_elasped) {
+inline void __pause() {
+    volatile int f = 1;
+    f = f + f;
+    f = f * f;
+    f = f + f;
+    f = f * f;
+}
+
+inline void rate_limit(unsigned long long cycles_elasped) {
     if (cycles_per_allocation < cycles_elasped) {
         fprintf(stderr, "ERROR: allocation freq is too high\n");
     }
-    for (volatile int d = 0; d < (cycles_per_allocation - allocationPerSeconds); d++) {
-        volatile int f = 1;
-        f = f + f;
-        f = f * f;
-        f = f + f;
-        f = f * f;
+    for (volatile int d = 0; d < (cycles_per_allocation - cycles_elasped) / cycles_per_pause; d++) {
+        __pause();
     }
 }
 
-void random_pause() {
+inline void random_pause() {
     int random_work = rand() % random_pause_max;
     for (volatile int d = 0; d < random_work; d++) {
-        volatile int f = 1;
-        f = f + f;
-        f = f * f;
-        f = f + f;
-        f = f * f;
+        __pause();
     }
 }
 
@@ -122,6 +123,7 @@ void free_allocation_worker() {
     //free allocation and deallocation
     for (int i = 0; i < niterations; i++) {
         random_pause();
+        m
         for (int j = 0; j < nobjects; j++) {
             unsigned long long start = rdtscp();
             free_allocations[j] = new Foo[objSize];
@@ -142,31 +144,39 @@ int main(int argc, char *argv[]) {
     thread **threads;
 
     if (argc >= 2) {
-        nthreads = atoi(argv[1]);
+        cpu_freq = atoi(argv[1]);
     }
 
     if (argc >= 3) {
-        objSize = atoi(argv[2]);
+        nthreads = atoi(argv[2]);
     }
 
     if (argc >= 4) {
-        allocationPerSeconds = atoi(argv[3]);
+        objSize = atoi(argv[3]);
     }
 
     if (argc >= 5) {
-        nobjects = atoi(argv[4]);
+        allocationPerSeconds = atoi(argv[4]);
     }
 
     if (argc >= 6) {
-        niterations = atoi(argv[5]);
+        nobjects = atoi(argv[5]);
     }
+
+    if (argc >= 7) {
+        niterations = atoi(argv[6]);
+    }
+
     cycles_per_allocation = cpu_freq * 1000000 / allocationPerSeconds;
+    unsigned start = rdtscp();
+    __pause();
+    cycles_per_pause = rdtscp() - start;
 
     srand((unsigned) rdtscp());
 
-    printf("Running micro benchmark for %d threads, %d objSize, %d allocationPerSeconds, %d nobjects, %d iterations...\n",
+    printf("Running micro benchmark for %d threads, %d objSize, %d allocationPerSeconds, %lf cpu_freq , %d nobjects, %d iterations...\n",
            nthreads, objSize,
-           allocationPerSeconds, nobjects, niterations);
+           allocationPerSeconds, cpu_freq, nobjects, niterations);
 
     threads = new thread *[nthreads];
 
