@@ -30,7 +30,7 @@ int main(int argc, char *argv[]) {
     unsigned long long start = rdtscp();
     sleep(10);
     unsigned long long total_cycle = rdtscp() - start;
-    fprintf(stderr, "total cycles in 1 seconds are %lf \n", total_cycle/10.0);
+    fprintf(stderr, "total cycles in 1 seconds are %lf \n", total_cycle / 10.0);
 
     total_cycle = 0;
     for (int i = 0; i < 1000000000; i++) {
@@ -39,5 +39,5 @@ int main(int argc, char *argv[]) {
         total_cycle += rdtscp() - start;
     }
 
-    fprintf(stderr, "total cycles for pause are %lf \n", total_cycle/1000000000.0);
+    fprintf(stderr, "total cycles for pause are %lf \n", total_cycle / 1000000000.0);
 }
