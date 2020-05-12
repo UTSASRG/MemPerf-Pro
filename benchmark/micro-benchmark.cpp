@@ -51,8 +51,9 @@ int nthreads = 40;    // Default number of threads.
 int objSize = 9;
 int allocationPerSeconds = 1;
 int random_pause_max = 50;
-double cpu_freq = 2327507.08008;
-double cycles_per_allocation = cpu_freq * 1000000 / allocationPerSeconds;
+double cpu_cycles_per_second = 2094895684.64;
+
+double cycles_per_allocation = cpu_freq / allocationPerSeconds;
 double cycles_per_pause = 100;
 
 
@@ -123,7 +124,6 @@ void free_allocation_worker() {
     //free allocation and deallocation
     for (int i = 0; i < niterations; i++) {
         random_pause();
-        m
         for (int j = 0; j < nobjects; j++) {
             unsigned long long start = rdtscp();
             free_allocations[j] = new Foo[objSize];
@@ -180,8 +180,6 @@ int main(int argc, char *argv[]) {
 
     threads = new thread *[nthreads];
 
-    high_resolution_clock t;
-    auto start = t.now();
 
     int i;
     // new allocation
@@ -209,11 +207,6 @@ int main(int argc, char *argv[]) {
     for (i = 0; i < nthreads; i++) {
         delete threads[i];
     }
-
-    auto stop = t.now();
-    auto elapsed = duration_cast<duration<double>>(stop - start);
-
-    cout << "Time elapsed = " << elapsed.count() << endl;
 
     delete[] threads;
 
