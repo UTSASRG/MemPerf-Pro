@@ -54,7 +54,7 @@ int random_pause_max = 50;
 double cpu_cycles_per_second = 2094895684.64;
 
 double cycles_per_allocation = cpu_cycles_per_second / allocationPerSeconds;
-double cycles_per_pause = 100;
+double cycles_per_pause = 111;
 
 
 class Foo {
@@ -148,23 +148,27 @@ int main(int argc, char *argv[]) {
     }
 
     if (argc >= 3) {
-        nthreads = atoi(argv[2]);
+        cycles_per_pause = atoi(argv[2]);
     }
 
     if (argc >= 4) {
-        objSize = atoi(argv[3]);
+        nthreads = atoi(argv[3]);
     }
 
     if (argc >= 5) {
-        allocationPerSeconds = atoi(argv[4]);
+        objSize = atoi(argv[4]);
     }
 
     if (argc >= 6) {
-        nobjects = atoi(argv[5]);
+        allocationPerSeconds = atoi(argv[5]);
     }
 
     if (argc >= 7) {
-        niterations = atoi(argv[6]);
+        nobjects = atoi(argv[6]);
+    }
+
+    if (argc >= 8) {
+        niterations = atoi(argv[7]);
     }
 
     cycles_per_allocation = cpu_cycles_per_second / allocationPerSeconds;
@@ -174,9 +178,9 @@ int main(int argc, char *argv[]) {
 
     srand((unsigned) rdtscp());
 
-    printf("Running micro benchmark for %d threads, %d objSize, %d allocationPerSeconds, %lf cpu_cycles_per_second , %d nobjects, %d iterations...\n",
+    printf("Running micro benchmark for %d threads, %d objSize, %d allocationPerSeconds, %lf cpu_cycles_per_second , %lf cycles_per_pause, %d nobjects, %d iterations...\n",
            nthreads, objSize,
-           allocationPerSeconds, cpu_cycles_per_second, nobjects, niterations);
+           allocationPerSeconds, cpu_cycles_per_second, cycles_per_pause, nobjects, niterations);
 
     threads = new thread *[nthreads];
 
