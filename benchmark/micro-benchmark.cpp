@@ -51,6 +51,8 @@ int nthreads = 1;    // Default number of threads.
 int objSize = 1;
 int allocationPerSeconds = 1;
 int random_pause_max = 50;
+double cpu_freq = 2327507.08008;
+double cycles_per_allocation = cpu_freq * 1000000 / allocationPerSeconds;
 
 
 class Foo {
@@ -63,8 +65,11 @@ public:
     int y;
 };
 
-void wait() {
-    for (volatile int d = 0; d < allocationPerSeconds; d++) {
+void rate_limit(unsigned long long cycles_elasped) {
+    if (cycles_per_allocation < cycles_elasped) {
+        fprintf(stderr, "ERROR: allocation freq is too high\n");
+    }
+    for (volatile int d = 0; d < (cycles_per_allocation - allocationPerSeconds); d++) {
         volatile int f = 1;
         f = f + f;
         f = f * f;
@@ -151,6 +156,8 @@ int main(int argc, char *argv[]) {
     if (argc >= 6) {
         niterations = atoi(argv[5]);
     }
+    cycles_per_allocation = cpu_freq * 1000000 / allocationPerSeconds;
+
     srand((unsigned) rdtscp());
 
     printf("Running micro benchmark for %d threads, %d objSize, %d allocationPerSeconds, %d nobjects, %d iterations...\n",
