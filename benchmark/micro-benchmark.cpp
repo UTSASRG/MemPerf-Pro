@@ -172,9 +172,6 @@ int main(int argc, char *argv[]) {
     }
 
     cycles_per_allocation = cpu_cycles_per_second / allocationPerSeconds;
-    unsigned start = rdtscp();
-    __pause();
-    cycles_per_pause = rdtscp() - start;
 
     srand((unsigned) rdtscp());
 
