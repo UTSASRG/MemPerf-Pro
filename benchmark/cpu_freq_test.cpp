@@ -17,6 +17,13 @@ inline unsigned long long rdtscp() {
     return retval;
 }
 
+inline void __pause() {
+    volatile int f = 1;
+    f = f + f;
+    f = f * f;
+    f = f + f;
+    f = f * f;
+}
 
 int main(int argc, char *argv[]) {
 
@@ -24,4 +31,11 @@ int main(int argc, char *argv[]) {
     sleep(100);
     unsigned long long total_cycle = rdtscp() - start;
     fprintf(stderr, "total cycles in 100 seconds are %llu \n", total_cycle);
+
+    start = rdtscp();
+    for (int i = 0; i < 100; i++) {
+        __pause();
+    }
+    unsigned long long total_cycle = rdtscp() - start;
+    fprintf(stderr, "total cycles for 100 pauses are %llu \n", total_cycle);
 }
