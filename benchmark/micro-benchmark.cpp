@@ -96,17 +96,19 @@ void new_allocation_worker() {
     for (int i = 0; i < niterations; i++) {
         random_pause();
         for (int j = 0; j < nobjects; j++) {
+            unsigned long long start = rdtscp();
             total_new_allocations[i * nobjects + j] = new Foo[objSize];
-            assert (a[j]);
-            wait();
+            assert (total_new_allocations[j]);
+            rate_limit(rdtscp() - start);
         }
     }
 
     for (int i = 0; i < niterations; i++) {
         random_pause();
         for (int j = 0; j < nobjects; j++) {
+            unsigned long long start = rdtscp();
             delete total_new_allocations[i * nobjects + j];
-            wait();
+            rate_limit(rdtscp() - start);
         }
     }
 
@@ -121,13 +123,15 @@ void free_allocation_worker() {
     for (int i = 0; i < niterations; i++) {
         random_pause();
         for (int j = 0; j < nobjects; j++) {
-            total_new_allocations[j] = new Foo[objSize];
-            assert (a[j]);
-            wait();
+            unsigned long long start = rdtscp();
+            free_allocations[j] = new Foo[objSize];
+            assert (free_allocations[j]);
+            rate_limit(rdtscp() - start);
         }
         for (int j = 0; j < nobjects; j++) {
-            free(total_new_allocations[j]);
-            wait();
+            unsigned long long start = rdtscp();
+            free(free_allocations[j]);
+            rate_limit(rdtscp() - start);
         }
     }
     delete free_allocations;
