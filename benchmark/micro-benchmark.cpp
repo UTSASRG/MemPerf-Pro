@@ -123,7 +123,6 @@ void free_allocation_worker() {
     //free allocation and deallocation
     for (int i = 0; i < niterations; i++) {
         random_pause();
-        m
         for (int j = 0; j < nobjects; j++) {
             unsigned long long start = rdtscp();
             free_allocations[j] = new Foo[objSize];
@@ -180,8 +179,6 @@ int main(int argc, char *argv[]) {
 
     threads = new thread *[nthreads];
 
-    high_resolution_clock t;
-    auto start = t.now();
 
     int i;
     // new allocation
@@ -210,12 +207,8 @@ int main(int argc, char *argv[]) {
         delete threads[i];
     }
 
-    auto stop = t.now();
-    auto elapsed = duration_cast<duration<double>>(stop - start);
-
-    cout << "Time elapsed = " << elapsed.count() << endl;
-
     delete[] threads;
 
     return 0;
 }
+
