@@ -208,7 +208,7 @@ int main(int argc, char *argv[]) {
     total_free_allocation_cycles = (unsigned long long *) malloc(nthreads * sizeof(unsigned long long));
     total_free_deallocation_cycles = (unsigned long long *) malloc(nthreads * sizeof(unsigned long long));
 
-    printf("Running micro benchmark for %d threads, %d objSize, %d allocationPerSeconds, %lf double CYCLES_PERSECOND = 2094895684.64; , %lf CYCLES_PER_PAUSE, %d nobjects, %d iterations...\n",
+    printf("Running micro benchmark for %d threads, %d objSize, %d allocationPerSeconds, %lf CYCLES_PERSECOND , %lf CYCLES_PER_PAUSE, %d nobjects, %d iterations...\n",
            nthreads, objSize,
            allocationPerSeconds, CYCLES_PERSECOND, CYCLES_PER_PAUSE, nobjects, niterations);
 
