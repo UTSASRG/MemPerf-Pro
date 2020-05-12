@@ -49,11 +49,17 @@ int niterations = 50;    // Default number of iterations.
 int nobjects = 30000;  // Default number of objects.
 int nthreads = 1;    // Default number of threads.
 int objSize = 9;
-int allocationPerSeconds = 1;
+int allocationPerSeconds = 30000;
 int random_pause_max = 50;
 double cpu_cycles_per_second = 2094895684.64;
 double cycles_per_allocation = cpu_cycles_per_second / allocationPerSeconds;
-double cycles_per_pause = 25;
+double cycles_per_pause = 5;
+
+
+unsigned long long *total_new_allocation_cycles;
+unsigned long long *total_new_free_cycles;
+unsigned long long *total_free_allocation_cycles;
+unsigned long long *total_free_deallocation_cycles;
 
 
 class Foo {
@@ -90,36 +96,53 @@ inline void random_pause() {
     }
 }
 
-void new_allocation_worker() {
+void new_allocation_worker(int thread_index) {
     Foo **total_new_allocations;
     total_new_allocations = new Foo *[nobjects * niterations];
+    total_new_allocation_cycles[thread_index] = 0;
+    total_new_free_cycles[thread_index] = 0;
 
     for (int i = 0; i < niterations; i++) {
         random_pause();
         for (int j = 0; j < nobjects; j++) {
-            fprintf(stderr, "new allocate num:%d, time:%lf \n", j, rdtscp() / cpu_cycles_per_second);
+            //   fprintf(stderr, "new allocate num:%d, time:%lf \n", j, rdtscp() / cpu_cycles_per_second);
             unsigned long long start = rdtscp();
             total_new_allocations[i * nobjects + j] = new Foo[objSize];
             assert (total_new_allocations[i * nobjects + j]);
-            rate_limit(rdtscp() - start);
+            unsigned long long elasped = rdtscp() - start;
+            total_new_allocation_cycles[thread_index] += elasped;
+            rate_limit(elasped);
         }
     }
+
+    fprintf(stderr, "thread_index:%d, new allocate total call num:%d, total cycles:%llu, average cycles:%llu \n",
+            thread_index, niterations * nobjects,
+            total_new_allocation_cycles[thread_index],
+            total_new_allocation_cycles[thread_index] / (niterations * nobjects));
+
 
     for (int i = 0; i < niterations; i++) {
         random_pause();
         for (int j = 0; j < nobjects; j++) {
             unsigned long long start = rdtscp();
-            delete total_new_allocations[i * nobjects + j];
-            rate_limit(rdtscp() - start);
+            free(total_new_allocations[i * nobjects + j]);
+            unsigned long long elasped = rdtscp() - start;
+            total_new_free_cycles[thread_index] += elasped;
+            rate_limit(elasped);
         }
     }
+    fprintf(stderr, "thread_index:%d, new deallocation call num:%d, total cycles:%llu, average cycles:%llu \n",
+            thread_index, niterations * nobjects,
+            total_new_free_cycles[thread_index], total_new_free_cycles[thread_index] / (niterations * nobjects));
 
     delete total_new_allocations;
 }
 
-void free_allocation_worker() {
+void free_allocation_worker(int thread_index) {
     Foo **free_allocations;
     free_allocations = new Foo *[nobjects];
+    total_free_allocation_cycles[thread_index] = 0;
+    total_free_deallocation_cycles[thread_index] = 0;
 
     //free allocation and deallocation
     for (int i = 0; i < niterations; i++) {
@@ -128,15 +151,30 @@ void free_allocation_worker() {
             unsigned long long start = rdtscp();
             free_allocations[j] = new Foo[objSize];
             assert (free_allocations[j]);
-            rate_limit(rdtscp() - start);
+            unsigned long long elasped = rdtscp() - start;
+            total_free_allocation_cycles[thread_index] += elasped;
+            rate_limit(elasped);
         }
         for (int j = 0; j < nobjects; j++) {
             unsigned long long start = rdtscp();
             free(free_allocations[j]);
+            unsigned long long elasped = rdtscp() - start;
+            total_free_deallocation_cycles[thread_index] += elasped;
             rate_limit(rdtscp() - start);
         }
     }
     delete free_allocations;
+
+    fprintf(stderr, "thread_index:%d, free allocate total call num:%d, total cycles:%llu, average cycles:%llu \n",
+            thread_index, niterations * nobjects,
+            total_free_allocation_cycles[thread_index],
+            total_free_allocation_cycles[thread_index] / (niterations * nobjects));
+
+    fprintf(stderr, "thread_index:%d, free deallocation total call num:%d, total cycles:%llu, average cycles:%llu \n",
+            thread_index, niterations * nobjects,
+            total_free_deallocation_cycles[thread_index],
+            total_free_deallocation_cycles[thread_index] / (niterations * nobjects));
+
 }
 
 
@@ -175,6 +213,11 @@ int main(int argc, char *argv[]) {
 
     srand((unsigned) rdtscp());
 
+    total_new_allocation_cycles = (unsigned long long *) malloc(nthreads * sizeof(unsigned long long));
+    total_new_free_cycles = (unsigned long long *) malloc(nthreads * sizeof(unsigned long long));
+    total_free_allocation_cycles = (unsigned long long *) malloc(nthreads * sizeof(unsigned long long));
+    total_free_deallocation_cycles = (unsigned long long *) malloc(nthreads * sizeof(unsigned long long));
+
     printf("Running micro benchmark for %d threads, %d objSize, %d allocationPerSeconds, %lf cpu_cycles_per_second , %lf cycles_per_pause, %d nobjects, %d iterations...\n",
            nthreads, objSize,
            allocationPerSeconds, cpu_cycles_per_second, cycles_per_pause, nobjects, niterations);
@@ -182,10 +225,12 @@ int main(int argc, char *argv[]) {
     threads = new thread *[nthreads];
 
 
+    fprintf(stderr, "new allocate work start \n");
+
     int i;
     // new allocation
     for (i = 0; i < nthreads; i++) {
-        threads[i] = new thread(new_allocation_worker);
+        threads[i] = new thread(new_allocation_worker, i);
     }
 
     for (i = 0; i < nthreads; i++) {
@@ -196,9 +241,11 @@ int main(int argc, char *argv[]) {
         delete threads[i];
     }
 
+    fprintf(stderr, "free allocate work start \n");
+
     // free allocation
     for (i = 0; i < nthreads; i++) {
-        threads[i] = new thread(free_allocation_worker);
+        threads[i] = new thread(free_allocation_worker, i);
     }
 
     for (i = 0; i < nthreads; i++) {
@@ -210,6 +257,37 @@ int main(int argc, char *argv[]) {
     }
 
     delete[] threads;
+
+    unsigned long long final_total_new_allocation_cycles = 0;
+    unsigned long long final_total_new_free_cycles = 0;
+    unsigned long long final_total_free_allocation_cycles = 0;
+    unsigned long long final_total_free_deallocation_cycles = 0;
+    for (i = 0; i < nthreads; i++) {
+        final_total_new_allocation_cycles += total_new_allocation_cycles[i];
+        final_total_new_free_cycles += total_new_free_cycles[i];
+        final_total_free_allocation_cycles += total_free_allocation_cycles[i];
+        final_total_free_deallocation_cycles += total_free_deallocation_cycles[i];
+    }
+
+    fprintf(stderr, "final new allocate total call num:%d, total cycles:%llu, average cycles:%llu \n",
+            niterations * nobjects * nthreads,
+            final_total_new_allocation_cycles,
+            final_total_new_allocation_cycles / (niterations * nobjects * nthreads));
+
+    fprintf(stderr, "final new deallocation call num:%d, total cycles:%llu, average cycles:%llu \n",
+            niterations * nobjects * nthreads,
+            final_total_new_free_cycles,
+            final_total_new_free_cycles / (niterations * nobjects * nthreads));
+
+    fprintf(stderr, "final free allocate total call num:%d, total cycles:%llu, average cycles:%llu \n",
+            niterations * nobjects * nthreads,
+            final_total_free_allocation_cycles,
+            final_total_free_allocation_cycles / (niterations * nobjects * nthreads));
+
+    fprintf(stderr, "final free deallocation total call num:%d, total cycles:%llu, average cycles:%llu \n",
+            niterations * nobjects * nthreads,
+            final_total_free_deallocation_cycles,
+            final_total_free_deallocation_cycles / (niterations * nobjects * nthreads));
 
     return 0;
 }
