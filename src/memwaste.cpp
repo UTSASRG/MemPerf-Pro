@@ -134,23 +134,15 @@ bool MemoryWaste::allocUpdate(allocation_metadata * allocData, void * address) {
 
     num_alloc_active[(allocData->tid*num_class_sizes)+classSizeIndex]++;
 
-///Jin
     mem_alloc_wasted[(allocData->tid*num_class_sizes)+classSizeIndex] += classSize-allocData->size;
     if(classSize-allocData->size >= PAGESIZE) {
         mem_alloc_wasted[(allocData->tid*num_class_sizes)+classSizeIndex] -= (classSize-allocData->size)/PAGESIZE*PAGESIZE;
     }
 
-    if(classSize < 10000) {
+
         if( blowupflag[classSizeIndex] > 0) {
             blowupflag[classSizeIndex]--;
         }
-    } else {
-        record_lock.lock();
-        if( blowupflag[classSizeIndex] > 0) {
-            blowupflag[classSizeIndex]--;
-        }
-        record_lock.unlock();
-    }
 
 
     return reused;
@@ -178,7 +170,6 @@ void MemoryWaste::freeUpdate(allocation_metadata * allocData, void* address) {
     allocData->size = size;
     allocData->classSize = classSize;
 
-///Jin
     if(classSize-size >= PAGESIZE) {
         mem_alloc_wasted[(allocData->tid*num_class_sizes)+classSizeIndex] += (classSize-allocData->size)/PAGESIZE*PAGESIZE;
     }
@@ -188,13 +179,8 @@ void MemoryWaste::freeUpdate(allocation_metadata * allocData, void* address) {
     status->size_using = 0;
     status->classSize = classSize;
 
-    if(classSize < 10000) {
         blowupflag[classSizeIndex]++;
-    } else {
-        record_lock.lock();
-        blowupflag[classSizeIndex]++;
-        record_lock.unlock();
-    }
+
 }
 
 
@@ -274,25 +260,20 @@ void MemoryWaste::reportMaxMemory(FILE * output, long totalMem) {
     fprintf (output, "\n>>>>>>>>>>>>>>>    MEMORY DISTRIBUTION    <<<<<<<<<<<<<<<\n");
     //fprintf(output, record_time);
     for (int i = 0; i < num_class_sizes; ++i) {
-        int64_t blowup;
-        if(bibop) {
-            blowup = class_sizes[i] * (num_freelist_record_global[i] - blowupflag_record[i]);
+        int64_t blowup = class_sizes[i] * (num_freelist_record_global[i] - blowupflag_record[i]);
             if(blowup < 0 || blowup > totalMem - realMem - mem_alloc_wasted_record_total) {
                 blowup = 0;
             }
-        } else {
-            blowup = 0;
+
+        if(mem_alloc_wasted_record_global[i]/1024 == 0 && blowup/1024 == 0 &&
+                num_alloc_active_record_global[i] == 0 && num_freelist_record_global[i] == 0 &&
+                num_alloc_record_global[i] == 0 && num_allocFFL_record_global[i] == 0 &&
+                num_free_record_global[i] == 0) {
+            continue;
         }
 
-        if(bibop) {
             fprintf(output, "size: %10lu\t\t\t", class_sizes[i]);
-        } else {
-            if(i == 0) {
-                fprintf(output, "small object:\t\t\t\t\t\t\t");
-            } else {
-                fprintf(output, "large object:\t\t\t\t\t\t\t");
-            }
-        }
+
         fprintf(output, "internal fragmentation: %10luK\t\t\tmemory blowup: %10luK\t\t\t"
                         "active alloc: %10ld\t\t\tfreelist objects: %10ld\t\t\t"
                         "new allocated: %10lu\t\t\treused allocated: %10lu\t\t\tfreed: %10lu\n",
@@ -313,15 +294,10 @@ void MemoryWaste::reportMaxMemory(FILE * output, long totalMem) {
     fprintf(output, "\ntotal:\t\t\t\t\t\t\t\t\t\t"
                     "total internal fragmentation:%10luK(%3d%%)\n\t\t\t\t\t\t\t\t\t\t\t\t\t",
             mem_alloc_wasted_record_total/1024, mem_alloc_wasted_record_total*100/totalMem);
-    if(bibop) {
         fprintf(output, "total memory blowup:\t\t\t\t\t\t%10ldK(%3d%%)\n\t\t\t\t\t\t\t\t\t\t\t\t\t"
                         "total external fragmentation:\t\t\t\t%10ldK(%3d%%)\n\t\t\t\t\t\t\t\t\t\t\t\t\t",
                 mem_blowup_total/1024, mem_blowup_total*100/totalMem,
                 exfrag/1024, exfrag*100/totalMem);
-    } else {
-        fprintf(output, "total memory blowup + external fragmentation:\t\t\t\t%10ldK(%3d%%)\n\t\t\t\t\t\t\t\t\t\t\t\t\t",
-                exfrag/1024, exfrag*100/totalMem);
-    }
     fprintf(output,
             "total real using memory:\t\t\t\t%10ldK(%3d%%)\n\t\t\t\t\t\t\t\t\t\t\t\t\t"
                     "total using memory:\t\t\t\t%10ldK\n"
