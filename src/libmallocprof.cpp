@@ -224,7 +224,7 @@ __attribute__((constructor)) initStatus initializer() {
 	char outputFile[MAX_FILENAME_LEN];
 //	snprintf(outputFile, MAX_FILENAME_LEN, "%s_libmallocprof_%d_main_thread.txt",
 //			program_invocation_name, pid);
-    snprintf(outputFile, MAX_FILENAME_LEN, "/home/jinzhou/parsec/records/%s_libmallocprof_%d_main_thread.txt",
+    snprintf(outputFile, MAX_FILENAME_LEN, "/home/jinzhou/parsec/records_t/%s_libmallocprof_%d_main_thread.txt",
              program_invocation_name, pid);
     fprintf(stderr, "%s\n", outputFile);
 	// Will overwrite current file; change the fopen flag to "a" for append.
@@ -238,27 +238,6 @@ __attribute__((constructor)) initStatus initializer() {
 	fprintf(thrData.output, ">>> program break @ %p\n", program_break);
 	//fflush(thrData.output);
 
-	if (bibop) {
-		//Print class sizes to thrData output
-		fprintf (thrData.output, ">>> class_sizes ");
-
-		//Create and init Overhead for each class size
-		for (int i = 0; i < num_class_sizes; i++) {
-
-			size_t cs = class_sizes[i];
-
-			fprintf (thrData.output, "%zu ", cs);
-			//overhead.insert(cs, newOverhead());
-		}
-
-		fprintf (thrData.output, "\n");
-		//fflush(thrData.output);
-	}
-	else {
-		num_class_sizes = 2;
-		//Create an entry in the overhead hashmap with key 0
-		//overhead.insert(BP_OVERHEAD, newOverhead());
-	}
 
 	profilerInitialized = INITIALIZED;
 
@@ -303,7 +282,7 @@ void dumpHashmaps() {
 }
 
 
-extern void improve_cycles_stage_count(int add_thread);
+extern void improve_cycles_stage_count();
 
 void exitHandler() {
     countEventsOutside(true);
@@ -388,8 +367,9 @@ void collectAllocMetaData(allocation_metadata *metadata);
 
 uint64_t cycles_with_improve[MAX_THREAD_NUMBER] = {0};
 uint64_t cycles_without_improve[MAX_THREAD_NUMBER] = {0};
-const size_t improved_cycles[5] = {200, 50, 100, 1000, 1000};
-const size_t improved_large_obj_thres = 10000;
+uint64_t cycles_without_alloc[MAX_THREAD_NUMBER] = {0};
+const size_t improved_cycles[5] = {970, 453, 394, 12537, 8962};
+const size_t improved_large_obj_thres = 204808;
 
 
 thread_local PerfReadInfo eventOutside_before;
@@ -440,6 +420,7 @@ void countEventsOutside(bool end) {
 
         cycles_with_improve[thrData.tid] += time_diff;
         cycles_without_improve[thrData.tid] += time_diff;
+        cycles_without_alloc[thrData.tid] += time_diff;
     }
 }
 
@@ -643,11 +624,9 @@ extern "C" {
 		//Do after free
 		doAfter(&allocData);
 
-        //thread_local
-//        cycles_free += allocData.tsc_after;
-        ///below
             if (__builtin_expect(!globalized, true)) {
                 cycles_without_improve[thrData.tid] += allocData.tsc_after;
+                ///Jin
                 if(allocData.size < improved_large_obj_thres) {
                     cycles_with_improve[thrData.tid] += improved_cycles[2];
                 } else {
@@ -972,7 +951,6 @@ void getClassSizeForStyles(void* uintaddr, allocation_metadata * allocData) {
 
     the_old_size = allocData->size;
 
-    if(bibop) {
         if(allocData->size > large_object_threshold) {
             allocData->classSize = allocData->size;
             allocData->classSizeIndex = num_class_sizes -1;
@@ -994,11 +972,6 @@ void getClassSizeForStyles(void* uintaddr, allocation_metadata * allocData) {
                 return;
             }
         }
-    } else {
-        if (allocData->size < large_object_threshold) allocData->classSizeIndex = 0;
-        else allocData->classSizeIndex = 1;
-        allocData->classSize = malloc_usable_size(uintaddr);
-    }
     the_old_classSize = allocData->classSize;
     the_old_classSizeIndex = allocData->classSizeIndex;
 }
@@ -1661,6 +1634,7 @@ void decrementMemoryUsage(size_t size, size_t classSize, void * addr) {
 void collectAllocMetaData(allocation_metadata *metadata) {
     if (__builtin_expect(!globalized, true)) {
         cycles_without_improve[thrData.tid] += metadata->cycles;
+        ///Jin
         if (!metadata->reused) {
             if(metadata->size < improved_large_obj_thres) {
                 cycles_with_improve[thrData.tid] += improved_cycles[0];
@@ -1900,6 +1874,7 @@ void updateGlobalFriendlinessData() {
 extern long totalMem;
 extern uint64_t total_cycles_with_improve;
 extern  uint64_t total_cycles_without_improve;
+extern  uint64_t total_cycles_without_alloc;
 void calcAppFriendliness() {
 		// Final call to update the global data, using this (the main thread's) local data.
 
@@ -1950,14 +1925,30 @@ void calcAppFriendliness() {
 		}
 
     fprintf(thrData.output, "\n>>>>>>>>>>>>>>>>>>>>>>>>> POTENTIAL SPEEDUP <<<<<<<<<<<<<<<<<<<<<<<<<\n");
-    fprintf(thrData.output, "expected small new alloc cycles\t=%16lu(%3d%%)\n", improved_cycles[0], (int)((double)improved_cycles[0]/safeDivisor(globalTAD.cycles_alloc/100)));
-    fprintf(thrData.output, "expected small reused alloc cycles\t=%16lu(%3d%%)\n", improved_cycles[1], (int)((double)improved_cycles[1]/safeDivisor(globalTAD.cycles_allocFFL/100)));
-    fprintf(thrData.output, "expected small dealloc cycles\t=%16lu(%3d%%)\n", improved_cycles[2], (int)((double)improved_cycles[2]/safeDivisor(globalTAD.cycles_free/100)));
-    fprintf(thrData.output, "expected large alloc cycles\t=%16lu(%3d%%)\n", improved_cycles[3], (int)((double)improved_cycles[3]/safeDivisor(globalTAD.cycles_alloc_large/100)));
-    fprintf(thrData.output, "expected large dealloc cycles\t=%16lu(%3d%%)\n", improved_cycles[4], (int)((double)improved_cycles[4]/safeDivisor(globalTAD.cycles_free_large/100)));
-    fprintf(thrData.output, "expected object threshold\t=%16lu\n", improved_large_obj_thres);
+
+    double numAllocs = safeDivisor(globalTAD.numAllocs);
+    double numAllocsFFL = safeDivisor(globalTAD.numAllocsFFL);
+    double numFrees = safeDivisor(globalTAD.numFrees);
+    double numAllocs_large = safeDivisor(globalTAD.numAllocs_large);
+    double numFrees_large = safeDivisor(globalTAD.numFrees_large);
+
+    fprintf(thrData.output, "expected small new alloc cycles\t=%16lu(%3d%%)\n", improved_cycles[0], (int)((double)improved_cycles[0]*100/safeDivisor(globalTAD.cycles_alloc / numAllocs)));
+    fprintf(thrData.output, "expected small reused alloc cycles\t=%16lu(%3d%%)\n", improved_cycles[1], (int)((double)improved_cycles[1]*100/safeDivisor(globalTAD.cycles_allocFFL / numAllocsFFL)));
+    fprintf(thrData.output, "expected small dealloc cycles\t=%16lu(%3d%%)\n", improved_cycles[2], (int)((double)improved_cycles[2]*100/safeDivisor(globalTAD.cycles_free / numFrees)));
+    fprintf(thrData.output, "expected large alloc cycles\t=%16lu(%3d%%)\n", improved_cycles[3], (int)((double)improved_cycles[3]*100/safeDivisor(globalTAD.cycles_alloc_large / numAllocs_large)));
+    fprintf(thrData.output, "expected large dealloc cycles\t=%16lu(%3d%%)\n", improved_cycles[4], (int)((double)improved_cycles[4]*100/safeDivisor(globalTAD.cycles_free_large / numFrees_large)));
+    fprintf(thrData.output, "expected object threshold\t=%16u\n", improved_large_obj_thres);
+
+
+    fprintf(thrData.output, "critical cycles without improvement\t=%16lu\n", total_cycles_without_improve);
+    fprintf(thrData.output, "critical cycles with improvement\t=%16lu\n", total_cycles_with_improve);
+    fprintf(thrData.output, "critical cycles without allocs\t=%16lu\n", total_cycles_without_alloc);
+    fprintf(thrData.output, "critical cycles for allocs\t=%16lu(%3d%%)\n", (total_cycles_without_improve-total_cycles_without_alloc),
+             (int)((double)(total_cycles_without_improve-total_cycles_without_alloc)/safeDivisor(total_cycles_without_improve/100)));
+
+
 if(total_cycles_without_improve > total_cycles_with_improve) {
-    fprintf(thrData.output, "expected speedup\t=%5d%%\n", (int)((double)(total_cycles_without_improve-total_cycles_with_improve)/safeDivisor(total_cycles_without_improve/100)));
+    fprintf(thrData.output, "expected speedup\t=%5d%%\n", (int)((double)(total_cycles_without_improve-total_cycles_with_improve)/safeDivisor(total_cycles_with_improve/100)));
 } else {
     fprintf(thrData.output, "expected speedup\t=0%%\n");
 }
