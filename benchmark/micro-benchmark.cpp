@@ -106,8 +106,8 @@ void new_allocation_worker(int thread_index) {
 //            fprintf(stderr, "thread index:%d, new allocate num:%d, time:%lf \n", thread_index, j, rdtscp() / CYCLES_PERSECOND);
             unsigned long long start = rdtscp();
             total_new_allocations[i * nobjects + j] = new Foo[objSize];
-            assert (total_new_allocations[i * nobjects + j]);
             unsigned long long elasped = rdtscp() - start;
+            assert (total_new_allocations[i * nobjects + j]);
             total_new_allocation_cycles[thread_index] += elasped;
             rate_limit(elasped);
         }
@@ -148,8 +148,8 @@ void free_allocation_worker(int thread_index) {
         for (int j = 0; j < nobjects; j++) {
             unsigned long long start = rdtscp();
             free_allocations[j] = new Foo[objSize];
-            assert (free_allocations[j]);
             unsigned long long elasped = rdtscp() - start;
+            assert (free_allocations[j]);
             total_free_allocation_cycles[thread_index] += elasped;
             rate_limit(elasped);
         }
@@ -208,7 +208,7 @@ int main(int argc, char *argv[]) {
     total_free_allocation_cycles = (unsigned long long *) malloc(nthreads * sizeof(unsigned long long));
     total_free_deallocation_cycles = (unsigned long long *) malloc(nthreads * sizeof(unsigned long long));
 
-    printf("Running micro benchmark for %d threads, %d objSize, %d allocationPerSeconds, %lf CYCLES_PERSECOND , %lf CYCLES_PER_PAUSE, %d nobjects, %d iterations...\n",
+    fprintf(stderr,"Running micro benchmark for %d threads, %d objSize, %d allocationPerSeconds, %lf CYCLES_PERSECOND , %lf CYCLES_PER_PAUSE, %d nobjects, %d iterations...\n",
            nthreads, objSize,
            allocationPerSeconds, CYCLES_PERSECOND, CYCLES_PER_PAUSE, nobjects, niterations);
 
