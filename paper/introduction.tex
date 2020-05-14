@@ -2,13 +2,17 @@
 
 \section{Introduction}
 
-Analyzing the performance of a complicated application is a challenging topic, since an application is actively interacting with multiple components inside the system, such as different libraries, operating system, or the underlying hardware. Whenever one component is not tapped with applications very well, then the performance of such applications can be greatly impacted. 
+Analyzing the performance of a complicated application is challenging, since an application frequently interacts with multiple components inside the system, such as different libraries, operating system, or the underlying hardware. Any mismatch between any component and the application may cause substantial performance issue.
+%Whenever one component is not tapped with applications very well, then the performance of such applications can be greatly impacted. 
 
-Memory allocator is such a component that could significantly impact the performance of applications, due to multiple reasons. First, an application may make intensive invocations of memory allocations and deallocations. Then an allocator's performance and scalability in memory management operations, and memory overhead will greatly affect the application that is using this allocator. Second, even if an allocator is efficient in its management operations, it could still cause significant slowdown if it is not application-friendly, such as with a low cache utilization rate. In case of low cache utilization rate, there will be more program stalls in the execution caused by waiting for the data loading from the memory, comparing to the one with high cache utilization rate.  
+Memory allocator is such a component that could significantly impact the performance of applications, due to multiple reasons. First, many applications make extensive invocations of allocations and deallocations through the memory allocator. Since memory management is on the critical path, the allocator's memory management operations will greatly affect the application that is using this allocator. 
+Second, even if an allocator is efficient in its management operations, it could still cause significant slowdown if it is not application-friendly, such as serious false sharing issue. Fig.~\ref{fig:motivation} shows such an example. TcMalloc is a well-known performant allocator that was designed by Google~\cite{tcmalloc}, but it is running $47\times$ slower than the default Linux allocator for \texttt{cache-thrash}, due to false sharing issue. 
+
+%with a low cache utilization rate. In case of low cache utilization rate, there will be more program stalls in the execution caused by waiting for the data loading from the memory, comparing to the one with high cache utilization rate.  
 
 %Performance of modern applications is often greatly impacted by memory accesses. when obtaining undesired performance, programmers mainly focus on optimizing the program code. Although memory allocators serve as the sole proxy for programs to request and return memory from the operating system, programmers lack even basic understandings of their behaviors, such as how well they perform themselves, how they interact with the OS, and whether their memory management policy fits the target program. 
 
-In order to investigate the performance impact, we have evaluated the following allocators, such as the Linux allocator, TcMalloc~\citep{TCMalloc}, \texttt{jemalloc}~\citep{jemalloc}, Hoard~\citep{Hoard}, DieHarder~\citep{DieHarder}, and OpenBSD's allocator~\citep{openbsd}, where the latter two are secure allocators. We ran the same set of applications from PARSEC~\citep{parsec} and Phoenix~\citep{phoenix} with these allocators, and observed the dramatic performance difference among them. Fig.~\ref{fig:motivation} shows performance results of partial applications, where all data in the figure are normalized to the runtime of the Linux's default allocator. We have the following observations: (1) the performance difference with different allocators can be as big as $88\times$; This indicates that spending additional effort in optimizing the application code may have the less performance impact than simply switching to a better allocator. (2) no allocator performs consistently the best across these applications, indicating the importance of confirming whether an allocator is suitable for the application. 
+In order to investigate the performance impact, we have evaluated the following allocators, including two Linux allocators (glibc-2.28 and glibc-2.21), TcMalloc~\citep{tcmalloc}, \texttt{jemalloc}~\citep{jemalloc}, Hoard~\citep{Hoard}, DieHarder~\citep{DieHarder}, and OpenBSD's allocator~\citep{openbsd}, where the latter two are secure allocators. We ran the same set of applications from PARSEC~\citep{parsec},  Phoenix~\citep{phoenix}, and multiple synthetic applications from Hoard~\cite{Hoard}, and observed the dramatic performance difference among them. Fig.~\ref{fig:motivation} shows performance results of partial applications, where all data in the figure are normalized to the runtime of the Linux's default allocator. We have the following observations: (1) the performance difference with different allocators can be as big as $88\times$; This indicates that spending additional effort in optimizing the application code may have a smaller performance impact than simply switching to a better allocator. (2) no allocator performs consistently the best across these applications, indicating the importance of confirming whether an allocator is suitable for the application. 
 
 %\todo{Xin: Use the gprof{} and Coz to try on one application--dedup, check whether they could identify the issues inside or not. }
 
@@ -21,22 +25,21 @@ In order to investigate the performance impact, we have evaluated the following 
 
 %Are all profilers combined together could figure out the performance issues? No, since they are not differentiated between memory management operations. Also, they cannot identify the issues caused by kernel contention.
 
-Although memory allocators have a big impact on the performance and memory overhead, none of existing profilers can actually report this issue. Existing allocation profilers, such as \texttt{mprof}~\citep{Zorn:1988:MAP:894814}, Mtrace~\citep{mtrace}, Mtrace++~\citep{Lee:2000:DMM:786772.787150}, \texttt{TcMalloc} Profiler~\citep{tcmalloc-profiler}, or CLR profiler~\citep{lupasc2014dynamic}, mainly focus on how an application uses the memory, instead of identifying the design issues of allocators. For instance, \texttt{mprof} attribute memory allocations to different allocation sites, and reports memory leaks, an allocation bin table, a direct allocation table that shows memory usage of functions~\citep{Zorn:1988:MAP:894814}. The \texttt{TcMalloc} profiler reports heap usage of different allocation sites, and locates memory leaks~\citep{tcmalloc-profiler}. But they cannot help identify the performance and memory issues inside the allocator itself. 
+Although memory allocators have a big impact on the performance and memory overhead, none of existing profilers can actually report this issue. Existing allocation profilers, such as \texttt{mprof}~\citep{Zorn:1988:MAP:894814}, Mtrace~\citep{mtrace}, Mtrace++~\citep{Lee:2000:DMM:786772.787150}, \texttt{TcMalloc} Profiler~\citep{tcmalloc-profiler}, or CLR profiler~\citep{lupasc2014dynamic}, mainly focus on how an application uses the memory, instead of identifying the design issues of allocators. For instance, \texttt{mprof} attributes memory allocations to different allocation sites, and reports memory leaks and a direct allocation table that shows memory usage of functions~\citep{Zorn:1988:MAP:894814}. The \texttt{TcMalloc} profiler reports heap usage of different allocation sites, and locates memory leaks~\citep{tcmalloc-profiler}. But they cannot identify the performance and memory issues inside the allocator itself. 
 
-General profilers, such as gprof~\citep{DBLP:conf/sigplan/GrahamKM82}, Coz~\citep{Coz}, and perf~\citep{perf}, cannot identify performance issues of an memory allocator as well, because of the following reasons. \texttt{First}, they do not collect the allocator-specific data, and  provide no metrics for evaluating the allocator. For instance, \texttt{perf} may report the number of cache misses, but it is impossible to know how many of these events are actually caused by the allocator itself. Without that information, it is not able to tell whether the performance issue is coming from an allocator. \texttt{Second}, none of them collect kernel contention information, one important issue related to the allocator. For instance, the allocator of glibc-2.21 actually slows down the performance of \texttt{dedup} by more than 44\%, which is caused by frequent \texttt{madivse} system calls that actually lead to the kernel contention. However, such an important issue cannot be identified by general profilers~\citep{DBLP:conf/sigplan/GrahamKM82, Coz, perf}, \todo{as discussed in Section~\ref{}}. Third, none of existing profilers can actually report application friendliness of an allocator, which is critical to understand the performance slowdown of using an allocator.   
+General profilers, such as gprof~\citep{DBLP:conf/sigplan/GrahamKM82}, Coz~\citep{Coz}, and perf~\citep{perf}, cannot identify performance issues of an memory allocator as well, because of the following reasons. \texttt{First}, they do not collect allocator-specific data, and  provide no metrics for evaluating an allocator. For instance, \texttt{perf} may report the number of cache misses, but it is impossible to know how many of these events are actually caused by the allocator. Without that information, it is not able to tell whether a performance issue is coming from an allocator. \texttt{Second}, none of them collects kernel contention information, one important issue related to the allocator. For instance, the glibc-2.21 allocator slows down the performance of \texttt{dedup} by more than 20\%, which is caused by frequent \texttt{madivse} system calls that actually lead to the kernel contention. However, such an important issue cannot be identified by general profilers~\citep{DBLP:conf/sigplan/GrahamKM82, Coz, perf}, \todo{as discussed in Section~\ref{}}. Third, none of existing profilers reports application friendliness of an allocator, which is critical to understand the performance slowdown caused by the used allocator.   
 
-This paper proposes \MP{}, the \textbf{first} general profiler to profile different memory allocators. \textbf{\MP{} not only helps allocator programmers, but also benefits normal programmers/users}. \textit{First, it provides multiple metrics that helps allocator developers to discover design issues of a particular memory allocator}. It also provides the reasonable range of these metrics for a performant allocator, based on the evaluation results of multiple popular allocators. \textit{Second, it helps normal programmers to determine whether a performance/scalability issue of an application is caused by a memory allocator}. \MP{} reports multiple metrics that are sufficient for users to judge whether the allocator has the performance/scalability issue or not. If so,  programmers should fix the issue of the allocator or switch to a better allocator, instead of improving the application itself. 
-\textit{Third, mmprof reports different types of memory overhead caused by an allocator, helping normal users to analyze the memory overhead issue.} 
+This paper proposes \MP{}, the \textbf{first} general profiler to profile different memory allocators. \textbf{\MP{} not only helps allocator programmers, but also benefits normal programmers/users}. \textit{First, it provides multiple metrics that helps allocator developers to discover design issues of a particular memory allocator}. It also provides the reasonable range of these metrics for a performant allocator, based on the evaluation results of multiple popular allocators. \textit{Second, it helps normal programmers to determine whether a performance/scalability issue of an application is caused by a memory allocator}. \MP{} reports multiple metrics that are sufficient for users to judge whether the allocator is the culprit of the performance/scalability issue or not. If so,  programmers should fix the issue inside the allocator or switch to a better allocator, instead of focusing on the application itself. 
+\textit{Third, mmprof reports different types of memory overhead caused by an allocator, helping normal users analyze the memory overhead issue.} 
 %Existing allocator profilers only reports memory usage/leaks from application code~\cite{mprof, Zorn:1988:MAP:894814, mtrace, Lee:2000:DMM:786772.787150, tcmalloc-profiler, lupasc2014dynamic}, which are complementary to \MP{}. 
-If the memory overhead is mainly caused by an allocator, e.g., TcMalloc uses $3.8\times$ more memory than the Linux allocator for \texttt{aget},
-then it is not much useful to reduce memory usage of the application. Instead, a memory-efficient allocator should be employed.   
+If the memory overhead is mainly caused by an allocator, e.g., TcMalloc uses $1.8\times$ more memory than the Linux allocator for \texttt{swaptions}, then it is less useful to reduce memory usage of the application. Instead, a memory-efficient allocator should be employed.   
 
 
 % What to do? and How to do?
-\MP{} aims to evaluate all important aspects of memory allocators, such as performance, memory, scalability, and application-friendliness. \MP{} is based on an observation that memory allocators share multiple commonalities, making it feasible to design a general profiler for different allocators. First, they interact with other components similarly: they provide the same APIs to applications (e.g., \texttt{malloc()} and \texttt{free()}), invoke a limited set of system calls (e.g., \texttt{mmap}, \texttt{sbrk}), and employ a set of thread synchronization primitives for the synchronization. Second, popular allocators share similar memory management policies, such as belong to either sequential or BiBOP-style type, employing per-thread heaps, differentiating small and big objects, managing small objects with different size classes, where more details are discussed in Section~\ref{sec:allocator}. Therefore, \textit{mmprof employs some common mechanisms to perform the profiling, while relies on a configuration file to understand the difference between different allocators}.    
+\MP{} aims to evaluate all important aspects of memory allocators, such as performance, memory, scalability, and application-friendliness. \MP{} is based on an observation that memory allocators share multiple commonalities, making it feasible to design a general profiler for different allocators. First, they interact with other components similarly: they provide the same APIs to applications (e.g., \texttt{malloc()} and \texttt{free()}), invoke a limited set of system calls (e.g., \texttt{mmap}, \texttt{sbrk}), and employ a set of thread synchronization primitives for  synchronization. Second, popular allocators share similar memory management policies, such as belonging to either sequential or BiBOP-style type, employing per-thread heaps, differentiating small and big objects, managing small objects with different size classes, where more details are discussed in Section~\ref{sec:allocator}. Therefore, \textit{mmprof employs some common mechanisms to perform the profiling, while employing a configuration file to understand the difference between different allocators}.    
 
 \MP{} intercepts the interactions between an allocator and other components, such as the application, the pthreads library, and the underlying Operating Systems, in order to collect the detailed data for each allocation/deallocation, and the contention information of user and kernel space. 
- \MP{} employs simple counters and timestamps for collecting the basic data, such as the number of invocations, contending times, and runtime. In additional to that, \MP{} further employs Performance Monitoring Units (PMUs) to collect hardware events, and attributes them to each allocation/deallocation. The PMUs avoid the requirement of changing the code explicitly, and provide more insights about  a particular design issue. \MP{} also proposes practical solutions for evaluating some important metrics, such as cache/page utilization rate, memory blowup, active/passive false sharing, and kernel contention. Although these metrics have been proposed before~\cite{Hoard}, \textit{mmprof is the first one to evaluate them quantitatively}. In order to enable the comparison between different executions, \MP{} proposes to normalize the  data for each allocation, each access, and each unit of time.  
+ \MP{} employs simple counters and timestamps for collecting the basic data, such as the number of invocations, contending times, and runtime. In additional to that, \MP{} further employs Performance Monitoring Units (PMUs) to collect hardware events, and attributes them to each allocation/deallocation. The PMUs avoid the requirement of changing the code explicitly, and provide more insights about  a particular design issue. \MP{} also proposes practical solutions to evaluate some important metrics, such as cache/page utilization rate, memory blowup, active/passive false sharing, and kernel contention. Although these metrics have been proposed before~\cite{Hoard}, \textit{mmprof is the first one to evaluate them quantitatively}. In order to enable the comparison between different executions, \MP{} normalizes the data to each allocation, each access, and each unit of time.  
 
 % How we are going to implement this? 
 %\MP{} uses the hardware Performance Monitor Units (PMU) and RDTSC timestamps widely available in modern CPUs to perform the profiling. \MP{} achieves three goals to act as a practical memory allocator profiler for real-world programs. First, it should directly work on the executables. Second, it should reveal the overhead and scalability of the allocators themselves. Since the invocations to the memory management functions are synchronous, the efficiency of the allocator has a direct impact on performance. Third, it should quantify the ``application friendliness'' of the memory allocator, a metric to show how well the allocator manages memory for the application, which is drawn from statistics of accesses to different levels of the memory hierarchy.
@@ -49,152 +52,9 @@ then it is not much useful to reduce memory usage of the application. Instead, a
 
 %To address these challenges, we design \MP{} in a principled way to determine what events to sample and what profile knowledge the sampled events contribute to. Briefly speaking, \MP{} always intercepts the allocator library calls to figure out when the program execution is inside the allocator, during which it samples both performance related PMU events (e.g., cache misses) to determine the implementation issues and intercepts OS kernel calls to understand OS-level contention. When the program execution is outside of the allocator, \MP{} samples specific PMU events to determine cache line- and page-level utilization ratio, and cache contention rate, which could directly and significantly impact the performance of the corresponding applications. To maintain low overhead, \MP{} employs a fast lookup mechanism that enables fast checking on the size information of each object, and on the cache line usage and page usage upon each sampled access. ??(WB) one more sentence about the low overhead?? ??(WB) It allocates its internal memory on ...??
 
-Based on our extensive evaluation, \MP{} successfully identifies many design/implementation issues inside popular allocators, as further described in Section~\ref{sec:effectiveness}. \MP{} also provides some metrics to evaluate the performance, memory overhead, scalability, and application-friendliness of an allocator, which can serve the basis when designing a new allocator. Due to its careful design, \todo{\MP{}'s performance overhead is around 50\%, and memory overhead is around 2$\times$}, while sampling a large number of events and collecting a large amount of information. This practical design reduces \MP{}'s interference of the original execution, reporting the metrics confidently. 
+Based on our extensive evaluation, \MP{} successfully identifies many design/implementation issues inside popular allocators, as further described in Section~\ref{sec:effectiveness}. \MP{} also provides some metrics to evaluate the performance, memory overhead, scalability, and application-friendliness of an allocator, which can serve the basis when designing a new allocator. Due to its careful design, \todo{\MP{}'s performance overhead is around 50\%, and memory overhead is around 2$\times$}, while sampling a large number of events and collecting a large amount of information. This efficient design reduces \MP{}'s interference to the original execution, allows it reporting the metrics confidently. 
 
-%For instance, \MP{} finds out that the DieHarder allocator causes excessive number of cache and TLB misses upon each deallocation, e.g. \todo{5 times} on average compared an optimized design. \MP{} reveals that multithreaded allocators, such as ??, reclaims memory but fails to reuse these freed memory for future requests, typically from another thread, which causes the blowup problem~\citep{Hoard}. \MP further shows that the ??allocator invokes different system calls, such as \texttt{mmap}, \texttt{brk}, \texttt{madvise}, and \texttt{munmap}, which cause unnecessary kernel contention inside the OS (and limit its scalability). Lastly, \MP{} evaluates the application friendliness of the allocators and show that the program's poor performance when using ?? is strongly correlated with its low friendliness. In all the profiling runs of real-world programs using popular allocators, \MP{} incurs at most ??X runtime overhead ??X memory overhead, while sampling and processing a large amount of events, and for the first time revealing various performance issues latent in the allocators.
-
-%\input{challenges.tex}
-
-\begin{comment}
-
-Challenge 1: How to know the specific details of different allocators? We utilized a small program to get the allocator's specific feature. For instance, whether they are BIBOP style or Bump-pointer based, the size class information and the metadata information. 
-
-Challenge 2: how to perform the profiling? Similar to existing work, we majorly use the time (supported by RTDSC), the number (instrumentation-based counting), and some hardware events (PMU events) to perform the sampling. The sampling approach will be similar to existing work, but we attribute those events to the memory management events, such as allocations and deallocations. 
-
-Challenge 3: how to reduce the performance overhead? In order to reduce the number of cache contention, we re-design our data structure to avoid false sharing and true sharing as much as possible. Also, we 
-
-Challenge 4: we propose a novel method to evaluate the application friendliness. We evaluate the cache friendliness, or TLB friendliness. 
-
-Challenge 5: we employs an internal allocator to avoid the interfering with allocations and deallocations of applications.  
-
-
-Overview:
-\MP{} is an drop-in library that should be linked before any runtime library. Similar to existing profilers, \MP{} also collects  hardware events, time information and the number of invocations. However, \MP{} attribute these events or data to each invocation of memory allocation and deallocation, which can present users  intuitive information about the possible issue of each allocator. As a profiler, \MP{} further summarizes the performance overhead, memory overhead, scalability, and application friendliness of each allocator. 
-
-
-For performance overhead, \MP{} focuses on the following items: 
-
-
-Since memory overhead can be caused by multiple factors, such as metadata overhead, alignment overhead (internal fragmentation), and memory blowup. Memory blowup is defined as ,. 
-
-For scalability, \MP{} not only focuses on the potential bottleneck within the user space, but also includes the potential bottleneck caused by the allocator. Programmers have identified one particular performance bottleneck of applications, such as dedup issue. 
-It won't cause the . 
-
-\MP{} also aims to answer whether an allocator is friendly to the applications or not, such as . . 
-
-
-   
-
-
-MallocProfiler will serve two purposes. 
-(1) This will be utilized to get the allocator related parameters. 
-
-(2) We will be able to identify whether the performance problem is caused by the memory allocator. We could actually divide the overhead to the overhead of allocator or the overhead of applications. 
-Therefore, we could identify the root causes and not always blame for the application writer. 
-
-
-
- 
-
-However, the memory allocator itself has not got sufficient attention that it should reserve to. 
-For instance, there is no an dedicate the allocator profiler that can be utilized for identify the allocator's behavior.
-
-Having this profiler will serve three purposes. First, it will help the designers and developers that could discover the issues of memory allocators, without the need of porting or developing the profiler for a specific allocator. Second, it helps programmers to determine whether the performance issue is coming from the memory allocator. Third, it will help users to choose the best memory allocators that is suitable for a specific applications, if there are multiple choices available. 
-
- Linux, TCMalloc, Jemalloc, Hoard, OpenBSD, DieHarder. Then shows the internal reason of why some are slower than others. 
-
-We may choose two general-purpose allocators and two secure allocators. Then we know why secure allocators are slower, currently. 
-
-The general idea is to understand performance, memory, and scalability of different allocators, while providing some evidence of allocator. During the design of allocator, we usually need to understand the inherent reason. The difficulty is how to collect the information without changing the specific allocator. That is, how to design a general allocator profiler, which can help assist the analysis of different allocators. 
-
-We will work on the allocator profiling to understanding the performance, memory and scalability of memory allocator. We may  memory related those system calls. How long it spent on the memory allocation and deallocation, using RDTSC, which can be caused by long memory allocation time? How much of objects has been re-utilized? How is the memory blowup, what is the memory consumption and how much has been allocated? Can we know lock contention of memory allocation, maybe we could monitor the lock usage, just as SyncPerf, and identify that lock acquisitions are  waiting during allocation? Can we identify is there inter-objects cache contention on these objects? If yes, that is the possible example of these allocators.  
-
-What are the design goals of \MP{}? 
-
-\MP{} needs to be general to different memory allocators, which requires no change of the code at all even when connecting with different allocators. The first target is transparency, which should not require the changes of allocators, if the allocator is working as a dynamic library. 
-
-Second, \MP{} should be able to identify the issues of different allocators. 
-
-
-	
-\end{comment}
-
-
-\begin{comment}
-
-Dynamic memory management plays an important role in the performance of applications, especially on multithreaded programs. 
-For performance related to memory uses, some work focuses on improving existing memory allocators. Some focuses on a better memory layout among different elements of the same data structure. 
-But there is little work that focuses on the improving the performance by changing the behavior of memory allocations and deallocations. 
-
-\HeapPerf{} tries to identify some places inside applications that can introduce the performance problems. These problems can be solved by changing the behavior of memory allocations, without using the new memory allocator. 
-These problems are rarely investigated in the past. The most closest work related to this is to simply record the placement with excessive allocations. However, excessive allocations is a total class of the problems that are investigated in this paper, but the existing work fails to present any detailed idea on the following problems: whether all these excessive memory allocations can be reduced? whether they can improve the performance? how to reduce that? These questions requires highly expertise and large amount of manual effort. Instead, \HeapPerf{} presents more useful idea on these questions, and hope to guide programmers, even non-experts, to solve these problems easily. 
-
-We observe three different patterns that can cause performance problems, or called as anti-patterns~\citep{}. 
-
-The second type is shown as Figure~\ref{}. In this example, there are a number of memory allocations that will allocate small amount of bytes for each one. More particularly, these allocations are inside the same loop, and have the same size. Unfortunately, memory allocators will not precisely allocate the specified size of objects. For example, the \texttt{glibc} allocator will allocate 32 bytes as long as the required size is between 4 bytes and 24 bytes. Based on the explanation of Hoard~\citep{Hoard}, this method helps to manage small sizes of different objects, without introducing too many external fragmentation. However, this also introduces a significant problem on cache inefficiency, since only less than 13\% cache is actually utilized, which can introduce around $8\times$ performance slowdown comparing to the code listed in Figure~\ref{}. 
-
-
-The second type is shown as Figure~\ref{}, there are a number of unnecessary memory allocations and deallocations. By moving the placement of allocations to outside the loop, we can significantly improve the performance by reducing the overhead related to memory allocations and deallocations. 
-
-The third type is related to the uses of heap variables or stack variables. Some excessive heap objects, if they are turned into stack variables, will have large performance benefit. Comparing to heap objects, the overhead of memory allocations and deallocations can be largely reduced if using stack variables. Also, the stack is typically locate inside the cache, which will have lower access latency. Also, stack variables will have exact size, without the addition of metadata and huge alignment. 
-\todo{Whether those variables have been touched only very few times, typically should be putted into the heap objects since they may cause the in-efficient cache utilization as well}.  
- 
-
-
-Heap memory related performance bugs can be from the following categories, if only think about applications. 
-
-\begin{itemize}
-\item: Too many allocations and deallocations. The total run time spending in memory allocation and liberation may take up to 30\% execution time\citep{1190248}. 
-
-\item: Too many memory uses: this can actually affect the performance when there are too much memory that has been allocated but not used. This can be caused by memory leaks or too late de-allocation. \todo{Most existing tools focus on the memory leak, but whether there are some tools that can uncover delayed-deallocation?}  
-
-\item: 
-\end{itemize}
-
-
-What we can do for heap memory management?
-
-First, we can point out the unnecessary memory allocations and deallocations. For example, we can malloc a large object, and then assign to different small projects. Some of them may be called inside the internal level of loop functions, we can move up to external loop level. 
-By reducing unnecessary memory allocations, we expect to improve the performance. 
-
-Second, we can give a statistics on the life-span of objects. Whether we can find out some problems inside? For example, we can use stack variables instead of heap if some objects are too short-lived, or mostly inside a function call. 
-
-Third, we can actually give the statistics on each callsite. Some callsites may have larger number of allocations. 
-
-Can we evaluate the performance related to heap allocations? For example, how much time is spending on memory allocation. 
-We can approximate the time of spending on each allocation. Then we can attribute the time to different statements, just similar to gprof. Then maybe it is obvious that we can reduce the overhead by reducing the memory allocations. Then it is possible that a separate paper by using the 
-
-
-In the end, although not every interested, it is to check the overhead of every memory allocation on each popular memory allocation. Thus, pointing out that the memory allocation actually should pay attention to the level of stacks. Thus, it is possible that we can design a new memory allocator by reducing the level of memory allocation. This is a reverse to HeapLayer. It is great to have an survey paper on this:
-
-A. How is the overhead of memory allocation in large applications? How we can evaluate it? 
-B. How is the overhead that comes from memory management? We evaluate this on some popular benchmarks. 
-C. Whether the overhead comes from different cache uses? or other things. 
-D. It will shed a light whether we need to re-design the memory allocator. 
-It will be a perfect paper for ICSE or SC.
-
-How we can evaluate the cache friendliness of memory allocators? 
-For instance, how much memory will be reutilized immediately? If one direct use will be one point, then how many score of different allocators. 
-
-Also, how much of memory blowup? 
-
-%%%%%%%%%%%%%%%%%%%%%%%
-% Possible solutions:
-% (1) We will check the malloc and free are allocated in sequence. For example, we are always doing the malloc(8) and free(8) in sequence. Given the number of these allocations is large. Then it is much possible that it is a problem. However, it can be a problem for the performance reason. But we can basically maintain a stack that maintains five possible allocations. 
-%% Should we just use a two-phase solution? That is, we can use a hash-table to identify different allocation site with their memory uses: how many times for memory allocations? How many times for related free operations? If there are a lot of memory allocations that are not freed, then it is possible a memory leak. We could also identify whether those memory are actually touched or not by using the watchpoint mechanisms? Also, we may try to check whether memory allocation are in the same sequence, for example, alloc-free-alloc-free, and with the same size. If yes, then it is possible that is unnecessary memory operations. 
-
-%%%%%%%%%%%%%%%%%%%%%%%%%
-Typically, I think that mtrace utilizes 
-
-Can we check the example of malloc-free situations?
-Can we base on a ``anomaly detection'' but.  
-I guess that the memory will be freed before the next allocation. If not, then there is high probability of leaking. If memory allocated is on the same site, 
-	
-\end{comment}
- 
-
-
-
+\todo{one way to highlight the contribution is to emphasize on the **complex** considerations of designing good allocators and the challenges to identify design problems. We want to let the reviewer know that it's difficult to do. }
 
 \subsection*{Contribution}
 
@@ -226,4 +86,4 @@ Overall, this paper makes the following contributions.
 
 \subsection*{Outline}
 
-The remained of this paper is organized as follows. Section~\ref{sec:background} starts to talk about the background of memory allocators. Then Section~\ref{sec:overview} describes the basic idea of \MP{}, and Section~\ref{sec:implementation} presents the detailed implementation. After that, Section~\ref{sec:evaluation} shows the results of experiments on different allocators using \MP{}, and Section~{sec:limitation} discusses some limitation. In the end,  Section~\ref{sec:relatedwork} discusses related work in this field, and Section~\ref{sec:conclusion} concludes this paper. 
+The remained of this paper is organized as follows. Section~\ref{sec:background} discusses the background of memory allocators, and the basic idea and challenges of \MP{}. Then Section~\ref{sec:implementation} presents the detailed implementation. After that, Section~\ref{sec:evaluation} shows the results of experiments on different allocators using \MP{}, and Section~{sec:limitation} discusses some limitation. In the end,  Section~\ref{sec:relatedwork} discusses related work in this field, and Section~\ref{sec:conclusion} concludes this paper. 

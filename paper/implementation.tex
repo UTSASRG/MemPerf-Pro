@@ -56,6 +56,8 @@ For the kernel-space scalability, \MP{} focuses on memory-related system calls i
 \subsection{Application Friendliness}
 \label{sec:profilefriendliness}
 
+Currently, the Linux kernel has supported PMUs starting from 2009 (Linux-2.6.31)~\cite{pmulinuxsupport}, where users could set up performance monitoring via  the \texttt{perf\_event\_open} system call. After collecting events, the user program could fetch these events. 
+
 \MP{} reports whether an allocator is friendly to a specific application. Different from all previous parts that only focusing inside memory management operations, application friendliness focuses on outside memory management operations. More specifically, \MP{} focuses on the following parameters, including (1)~the average cache line utilization; (2)~the average page utilization; (3)~the number of cache misses. As discussed in Section~\ref{sec:friendliness}, a user-friendly allocator should have high cache-line and page utilization rates, but with a low number of cache misses.  
 
 \MP{} employs the PMU-based sampling to track the average cache utilize and page utilization. Basically, \MP{} samples memory accesses periodically, with a default sampling period of 5,000. Upon every sampled event, \MP{} collects the number of used bytes for the current cache line and the current page, and also increments the number of sampled cache lines and pages. In the end, \MP{} computes the utilization rate with a simple division. For cache utilization rate, the dividend is the total number of used bytes, and the divisor is the the total number of bytes for these cache lines. The page utilization rate is computed similarly, but focusing on the page level instead. 
@@ -75,6 +77,9 @@ complexity to obtain the metadata.
 \end{figure*}
 
 Note that this design is also efficient in memory consumption. If a range of addresses are not used, then there is no need to allocate physical memory for the corresponding page entries and cache entries. This design is able to adapt to different allocators, where memory mappings of a heap is varied from a few to hundreds of thousands, and these mappings can be scattered along the whole address space of a process. To track valid memory mappings dynamically, \MP{} intercepts memory related system calls inside allocations/deallocations, such as \texttt{sbrk}, \texttt{mmap}, \texttt{munmap}, \texttt{mremap}. 
+
+\subsection{Predicting Performance Impact}
+\label{sec:predict}
 
 \subsection{Adapting To Different Allocators}
 \label{sec:understandingallocators}
