@@ -22,6 +22,8 @@
 #include "xthreadx.hh"
 #include "recordscale.hh"
 #include "memwaste.h"
+#include <sched.h>
+
 spinlock improve_lock;
 //Globals
 uint64_t total_cycles;
@@ -146,9 +148,6 @@ extern "C" {
     #endif
  }
 
-// spinlock tid_lock;
-//int num_tid = 0;
-
 // Constructor
 __attribute__((constructor)) initStatus initializer() {
 
@@ -159,7 +158,6 @@ __attribute__((constructor)) initStatus initializer() {
 	profilerInitialized = IN_PROGRESS;
 
 	inConstructor = true;
-
 
 	// Ensure we are operating on a system using 64-bit pointers.
 	// This is necessary, as later we'll be taking the low 8-byte word
@@ -368,7 +366,8 @@ void collectAllocMetaData(allocation_metadata *metadata);
 uint64_t cycles_with_improve[MAX_THREAD_NUMBER] = {0};
 uint64_t cycles_without_improve[MAX_THREAD_NUMBER] = {0};
 uint64_t cycles_without_alloc[MAX_THREAD_NUMBER] = {0};
-const size_t improved_cycles[5] = {970, 453, 394, 12537, 8962};
+const size_t improved_cycles_serial[5] = {5586, 640, 472, 11736, 6780};
+const size_t improved_cycles_parallel[5] = {603376, 1303, 1053, 20893, 6624};
 const size_t improved_large_obj_thres = 204808;
 
 
@@ -426,6 +425,21 @@ void countEventsOutside(bool end) {
 
 thread_local bool realing = false;
 extern void divideSmallAlloc(size_t sz, bool reused);
+
+///Freq
+//extern int running_thread;
+//extern struct freq_t serial_freq, paralled_freq[MAX_THREAD_NUMBER];
+//void freq_add(int type, uint64_t cycles) {
+//    if(running_thread == 1) {
+//        serial_freq.num[type]++;
+//        serial_freq.cycle[type] += cycles;
+//    } else {
+//        paralled_freq[thrData.tid].num[type]++;
+//        paralled_freq[thrData.tid].cycle[type] += cycles;
+//    }
+//}
+
+
 // Memory management functions
 extern "C" {
 	void * yymalloc(size_t sz) {
@@ -628,11 +642,23 @@ extern "C" {
                 cycles_without_improve[thrData.tid] += allocData.tsc_after;
                 ///Jin
                 if(allocData.size < improved_large_obj_thres) {
-                    cycles_with_improve[thrData.tid] += improved_cycles[2];
+                    if(running_thread == 1) {
+                        cycles_with_improve[thrData.tid] += improved_cycles_serial[2];
+                    } else {
+                        cycles_with_improve[thrData.tid] += improved_cycles_parallel[2];
+                    }
                 } else {
-                    cycles_with_improve[thrData.tid] += improved_cycles[4];
+                    if(running_thread == 1) {
+                        cycles_with_improve[thrData.tid] += improved_cycles_serial[4];
+                    } else {
+                        cycles_with_improve[thrData.tid] += improved_cycles_parallel[4];
+                    }
                 }
                 if(allocData.size < large_object_threshold) {
+
+                    ///Freq
+                    //freq_add(2, allocData.tsc_after);
+
                     localTAD.numFrees++;
                     localTAD.cycles_free += allocData.tsc_after;
                     localTAD.numDeallocationFaults += allocData.after.faults;
@@ -641,6 +667,9 @@ extern "C" {
                     localTAD.numDeallocationCacheMisses += allocData.after.cache_misses;
                     localTAD.numDeallocationInstrs += allocData.after.instructions;
                 } else {
+
+//                    freq_add(4, allocData.tsc_after);
+
                     localTAD.numFrees_large++;
                     localTAD.cycles_free_large += allocData.tsc_after;
                     localTAD.numDeallocationFaults_large += allocData.after.faults;
@@ -960,18 +989,28 @@ void getClassSizeForStyles(void* uintaddr, allocation_metadata * allocData) {
 
             return;
         }
-        for (int i = 0; i < num_class_sizes; i++) {
-            size_t tempSize = class_sizes[i];
-            if (allocData->size <= tempSize) {
-                allocData->classSize = tempSize;
-                allocData->classSizeIndex = i;
+        if(bibop) {
+            for (int i = 0; i < num_class_sizes; i++) {
+                size_t tempSize = class_sizes[i];
+                if (allocData->size <= tempSize) {
+                    allocData->classSize = tempSize;
+                    allocData->classSizeIndex = i;
 
-                the_old_classSize = allocData->classSize;
-                the_old_classSizeIndex = allocData->classSizeIndex;
+                    the_old_classSize = allocData->classSize;
+                    the_old_classSizeIndex = allocData->classSizeIndex;
 
-                return;
+                    return;
+                }
             }
-        }
+        } else {
+            if(allocData->size <= 24) {
+                allocData->classSizeIndex = 0;
+                allocData->classSize = 24;
+            } else {
+                allocData->classSizeIndex = (allocData->size - 24) / 16 + 1;
+                allocData->classSize = class_sizes[allocData->classSizeIndex];
+            }
+         }
     the_old_classSize = allocData->classSize;
     the_old_classSizeIndex = allocData->classSizeIndex;
 }
@@ -1631,17 +1670,30 @@ void decrementMemoryUsage(size_t size, size_t classSize, void * addr) {
 
 }
 
+
 void collectAllocMetaData(allocation_metadata *metadata) {
     if (__builtin_expect(!globalized, true)) {
         cycles_without_improve[thrData.tid] += metadata->cycles;
         ///Jin
         if (!metadata->reused) {
             if(metadata->size < improved_large_obj_thres) {
-                cycles_with_improve[thrData.tid] += improved_cycles[0];
+                if(running_thread == 1) {
+                    cycles_with_improve[thrData.tid] += improved_cycles_serial[0];
+                } else {
+                    cycles_with_improve[thrData.tid] += improved_cycles_parallel[0];
+                }
             } else {
-                cycles_with_improve[thrData.tid] += improved_cycles[3];
+                if(running_thread == 1) {
+                    cycles_with_improve[thrData.tid] += improved_cycles_serial[3];
+                } else {
+                    cycles_with_improve[thrData.tid] += improved_cycles_parallel[3];
+                }
             }
             if(metadata->size < large_object_threshold) {
+
+                ///Freq
+//                freq_add(0, metadata->cycles);
+
                 localTAD.cycles_alloc += metadata->cycles;
                 localTAD.numAllocs++;
                 localTAD.numAllocationFaults += metadata->after.faults;
@@ -1650,6 +1702,10 @@ void collectAllocMetaData(allocation_metadata *metadata) {
                 localTAD.numAllocationCacheMisses += metadata->after.cache_misses;
                 localTAD.numAllocationInstrs += metadata->after.instructions;
             } else {
+
+                ///Freq
+//                freq_add(3, metadata->cycles);
+
                     localTAD.cycles_alloc_large += metadata->cycles;
                     localTAD.numAllocs_large++;
                     localTAD.numAllocationFaults_large += metadata->after.faults;
@@ -1660,11 +1716,23 @@ void collectAllocMetaData(allocation_metadata *metadata) {
                 }
             } else {
             if(metadata->size < improved_large_obj_thres) {
-                cycles_with_improve[thrData.tid] += improved_cycles[1];
+                if(running_thread == 1) {
+                    cycles_with_improve[thrData.tid] += improved_cycles_serial[1];
+                } else {
+                    cycles_with_improve[thrData.tid] += improved_cycles_parallel[1];
+                }
             } else {
-                cycles_with_improve[thrData.tid] += improved_cycles[3];
+                if(running_thread == 1) {
+                    cycles_with_improve[thrData.tid] += improved_cycles_serial[3];
+                } else {
+                    cycles_with_improve[thrData.tid] += improved_cycles_parallel[3];
+                }
             }
                 if(metadata->size < large_object_threshold) {
+
+                    ///Freq
+//                    freq_add(1, metadata->cycles);
+
                     localTAD.cycles_allocFFL += metadata->cycles;
                     localTAD.numAllocsFFL++;
                     localTAD.numAllocationFaultsFFL += metadata->after.faults;
@@ -1673,6 +1741,10 @@ void collectAllocMetaData(allocation_metadata *metadata) {
                     localTAD.numAllocationCacheMissesFFL += metadata->after.cache_misses;
                     localTAD.numAllocationInstrsFFL += metadata->after.instructions;
                 } else {
+
+                    ///Freq
+//                    freq_add(3, metadata->cycles);
+
                     localTAD.cycles_alloc_large += metadata->cycles;
                     localTAD.numAllocs_large++;
                     localTAD.numAllocationFaults_large += metadata->after.faults;
@@ -1875,8 +1947,12 @@ extern long totalMem;
 extern uint64_t total_cycles_with_improve;
 extern  uint64_t total_cycles_without_improve;
 extern  uint64_t total_cycles_without_alloc;
+//extern void freq_printout();
 void calcAppFriendliness() {
-		// Final call to update the global data, using this (the main thread's) local data.
+
+    //freq_printout();
+
+    // Final call to update the global data, using this (the main thread's) local data.
 
     fprintf(thrData.output, "\n>>>>>>>>>>>>>>>>>>>>>>>>> APP FRIENDLINESS <<<<<<<<<<<<<<<<<<<<<<<<<\n");
 
@@ -1932,12 +2008,12 @@ void calcAppFriendliness() {
     double numAllocs_large = safeDivisor(globalTAD.numAllocs_large);
     double numFrees_large = safeDivisor(globalTAD.numFrees_large);
 
-    fprintf(thrData.output, "expected small new alloc cycles\t=%16lu(%3d%%)\n", improved_cycles[0], (int)((double)improved_cycles[0]*100/safeDivisor(globalTAD.cycles_alloc / numAllocs)));
-    fprintf(thrData.output, "expected small reused alloc cycles\t=%16lu(%3d%%)\n", improved_cycles[1], (int)((double)improved_cycles[1]*100/safeDivisor(globalTAD.cycles_allocFFL / numAllocsFFL)));
-    fprintf(thrData.output, "expected small dealloc cycles\t=%16lu(%3d%%)\n", improved_cycles[2], (int)((double)improved_cycles[2]*100/safeDivisor(globalTAD.cycles_free / numFrees)));
-    fprintf(thrData.output, "expected large alloc cycles\t=%16lu(%3d%%)\n", improved_cycles[3], (int)((double)improved_cycles[3]*100/safeDivisor(globalTAD.cycles_alloc_large / numAllocs_large)));
-    fprintf(thrData.output, "expected large dealloc cycles\t=%16lu(%3d%%)\n", improved_cycles[4], (int)((double)improved_cycles[4]*100/safeDivisor(globalTAD.cycles_free_large / numFrees_large)));
-    fprintf(thrData.output, "expected object threshold\t=%16u\n", improved_large_obj_thres);
+//    fprintf(thrData.output, "expected small new alloc cycles\t=%16lu(%3d%%)\n", improved_cycles[0], (int)((double)improved_cycles[0]*100/safeDivisor(globalTAD.cycles_alloc / numAllocs)));
+//    fprintf(thrData.output, "expected small reused alloc cycles\t=%16lu(%3d%%)\n", improved_cycles[1], (int)((double)improved_cycles[1]*100/safeDivisor(globalTAD.cycles_allocFFL / numAllocsFFL)));
+//    fprintf(thrData.output, "expected small dealloc cycles\t=%16lu(%3d%%)\n", improved_cycles[2], (int)((double)improved_cycles[2]*100/safeDivisor(globalTAD.cycles_free / numFrees)));
+//    fprintf(thrData.output, "expected large alloc cycles\t=%16lu(%3d%%)\n", improved_cycles[3], (int)((double)improved_cycles[3]*100/safeDivisor(globalTAD.cycles_alloc_large / numAllocs_large)));
+//    fprintf(thrData.output, "expected large dealloc cycles\t=%16lu(%3d%%)\n", improved_cycles[4], (int)((double)improved_cycles[4]*100/safeDivisor(globalTAD.cycles_free_large / numFrees_large)));
+//    fprintf(thrData.output, "expected object threshold\t=%16u\n", improved_large_obj_thres);
 
 
     fprintf(thrData.output, "critical cycles without improvement\t=%16lu\n", total_cycles_without_improve);

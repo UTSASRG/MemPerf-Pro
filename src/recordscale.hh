@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdarg.h>
+#include <sched.h>
 
 
 #define MAX_THREAD_NUMBER 1024
@@ -91,6 +92,13 @@ void setThreadContention() {
   //threadContention->tid = gettid();
     threadContention->tid = current_index;
     thrData.tid = current_index;
+
+//    cpu_set_t mask;
+//    CPU_ZERO(&mask);
+//    CPU_SET(thrData.tid%40, &mask);
+//    if(sched_setaffinity(0, sizeof(mask), &mask) < 0 ) {
+//        fprintf(stderr, "sched_setaffinity %d\n", thrData.tid);
+//    }
 }
 
 extern void countEventsOutside(bool end);
