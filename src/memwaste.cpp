@@ -48,6 +48,8 @@ uint64_t MemoryWaste::num_alloc_total = 0;
 uint64_t MemoryWaste::num_allocFFL_total = 0;
 uint64_t MemoryWaste::num_free_total = 0;
 
+long MemoryWaste::realMem = 0;
+
 extern int threadcontention_index;
 
 void MemoryWaste::initialize() {
@@ -132,19 +134,15 @@ bool MemoryWaste::allocUpdate(allocation_metadata * allocData, void * address) {
 
     num_alloc_active[(allocData->tid*num_class_sizes)+classSizeIndex]++;
 
-///Jin
     mem_alloc_wasted[(allocData->tid*num_class_sizes)+classSizeIndex] += classSize-allocData->size;
     if(classSize-allocData->size >= PAGESIZE) {
         mem_alloc_wasted[(allocData->tid*num_class_sizes)+classSizeIndex] -= (classSize-allocData->size)/PAGESIZE*PAGESIZE;
     }
-///Jin
-//    if(__atomic_load_n(&blowupflag[classSizeIndex], __ATOMIC_RELAXED) > 0 ) {
-//        __atomic_sub_fetch(&blowupflag[classSizeIndex], 1, __ATOMIC_RELAXED);
-//    }
 
-    if(blowupflag[classSizeIndex] > 0) {
-        blowupflag[classSizeIndex]--;
-}
+
+        if( blowupflag[classSizeIndex] > 0) {
+            blowupflag[classSizeIndex]--;
+        }
 
 
     return reused;
@@ -172,7 +170,6 @@ void MemoryWaste::freeUpdate(allocation_metadata * allocData, void* address) {
     allocData->size = size;
     allocData->classSize = classSize;
 
-///Jin
     if(classSize-size >= PAGESIZE) {
         mem_alloc_wasted[(allocData->tid*num_class_sizes)+classSizeIndex] += (classSize-allocData->size)/PAGESIZE*PAGESIZE;
     }
@@ -181,15 +178,14 @@ void MemoryWaste::freeUpdate(allocation_metadata * allocData, void* address) {
 
     status->size_using = 0;
     status->classSize = classSize;
-///Jin
-//    __atomic_add_fetch(&blowupflag[classSizeIndex], 1, __ATOMIC_RELAXED);
 
-    blowupflag[classSizeIndex]++;
+        blowupflag[classSizeIndex]++;
 
 }
 
 
-bool MemoryWaste::recordMemory() {
+bool MemoryWaste::recordMemory(long realMemory) {
+
 
     record_lock.lock();
 
@@ -198,14 +194,16 @@ bool MemoryWaste::recordMemory() {
 //    while(fgets(record_time, 1024, fp)) {fprintf(stderr, record_time);}
 //    pclose(fp);
 
-    memcpy(mem_alloc_wasted_record, mem_alloc_wasted, threadcontention_index * num_class_sizes * sizeof(uint64_t));
+realMem = realMemory;
 
-    memcpy(num_alloc_record, num_alloc, threadcontention_index * num_class_sizes * sizeof(uint64_t));
-    memcpy(num_allocFFL_record, num_allocFFL, threadcontention_index * num_class_sizes * sizeof(uint64_t));
-    memcpy(num_free_record, num_free, threadcontention_index * num_class_sizes * sizeof(uint64_t));
+    memcpy(mem_alloc_wasted_record, mem_alloc_wasted, (threadcontention_index+1) * num_class_sizes * sizeof(uint64_t));
 
-    memcpy(num_alloc_active_record, num_alloc_active, threadcontention_index * num_class_sizes * sizeof(int64_t));
-    memcpy(num_freelist_record, num_freelist, threadcontention_index * num_class_sizes * sizeof(int64_t));
+    memcpy(num_alloc_record, num_alloc, (threadcontention_index+1) * num_class_sizes * sizeof(uint64_t));
+    memcpy(num_allocFFL_record, num_allocFFL, (threadcontention_index+1) * num_class_sizes * sizeof(uint64_t));
+    memcpy(num_free_record, num_free, (threadcontention_index+1) * num_class_sizes * sizeof(uint64_t));
+
+    memcpy(num_alloc_active_record, num_alloc_active, (threadcontention_index+1) * num_class_sizes * sizeof(int64_t));
+    memcpy(num_freelist_record, num_freelist, (threadcontention_index+1) * num_class_sizes * sizeof(int64_t));
 
     memcpy(blowupflag_record, blowupflag, num_class_sizes * sizeof(int64_t));
 
@@ -253,31 +251,29 @@ uint64_t MemoryWaste::recordSumup() {
 }
 
 
-void MemoryWaste::reportMaxMemory(FILE * output, long realMem, long totalMem) {
+void MemoryWaste::reportMaxMemory(FILE * output, long totalMem) {
 
     if(output == nullptr) {
         output = stderr;
     }
 
     fprintf (output, "\n>>>>>>>>>>>>>>>    MEMORY DISTRIBUTION    <<<<<<<<<<<<<<<\n");
-    fprintf(output, record_time);
+    //fprintf(output, record_time);
     for (int i = 0; i < num_class_sizes; ++i) {
-
         int64_t blowup = class_sizes[i] * (num_freelist_record_global[i] - blowupflag_record[i]);
-        //int64_t blowup = class_sizes[i] * (num_alloc_record_global[i] - blowupflag_record[i]);
-        if(blowup < 0) {
-            blowup = 0;
+            if(blowup < 0 || blowup > totalMem - realMem - mem_alloc_wasted_record_total) {
+                blowup = 0;
+            }
+
+        if(mem_alloc_wasted_record_global[i]/1024 == 0 && blowup/1024 == 0 &&
+                num_alloc_active_record_global[i] == 0 && num_freelist_record_global[i] == 0 &&
+                num_alloc_record_global[i] == 0 && num_allocFFL_record_global[i] == 0 &&
+                num_free_record_global[i] == 0) {
+            continue;
         }
 
-        if(bibop) {
             fprintf(output, "size: %10lu\t\t\t", class_sizes[i]);
-        } else {
-            if(i == 0) {
-                fprintf(output, "small object:\t\t\t\t\t\t\t");
-            } else {
-                fprintf(output, "large object:\t\t\t\t\t\t\t");
-            }
-        }
+
         fprintf(output, "internal fragmentation: %10luK\t\t\tmemory blowup: %10luK\t\t\t"
                         "active alloc: %10ld\t\t\tfreelist objects: %10ld\t\t\t"
                         "new allocated: %10lu\t\t\treused allocated: %10lu\t\t\tfreed: %10lu\n",
@@ -292,20 +288,23 @@ void MemoryWaste::reportMaxMemory(FILE * output, long realMem, long totalMem) {
     if(exfrag < 0) {
         exfrag = 0;
     }
-
+    if(totalMem == 0) {
+        totalMem = 1;
+    }
     fprintf(output, "\ntotal:\t\t\t\t\t\t\t\t\t\t"
-                    "total internal fragmentation:%10luK(%3d%%)\n\t\t\t\t\t\t\t\t\t\t\t\t\t"
-                    "total memory blowup:\t\t\t\t\t\t%10ldK(%3d%%)\n\t\t\t\t\t\t\t\t\t\t\t\t\t"
-                    "total external fragmentation:\t\t\t\t%10ldK(%3d%%)\n\t\t\t\t\t\t\t\t\t\t\t\t\t"
-                    "total real using memory:\t\t\t\t%10ldK(%3d%%)\n\t\t\t\t\t\t\t\t\t\t\t\t\t"
+                    "total internal fragmentation:%10luK(%3d%%)\n\t\t\t\t\t\t\t\t\t\t\t\t\t",
+            mem_alloc_wasted_record_total/1024, mem_alloc_wasted_record_total*100/totalMem);
+        fprintf(output, "total memory blowup:\t\t\t\t\t\t%10ldK(%3d%%)\n\t\t\t\t\t\t\t\t\t\t\t\t\t"
+                        "total external fragmentation:\t\t\t\t%10ldK(%3d%%)\n\t\t\t\t\t\t\t\t\t\t\t\t\t",
+                mem_blowup_total/1024, mem_blowup_total*100/totalMem,
+                exfrag/1024, exfrag*100/totalMem);
+    fprintf(output,
+            "total real using memory:\t\t\t\t%10ldK(%3d%%)\n\t\t\t\t\t\t\t\t\t\t\t\t\t"
                     "total using memory:\t\t\t\t%10ldK\n"
                     "\ncurrent status:\t\t\t\t\t\t\t\t\t\t"
                     "active objects: %10lu\t\t\tfreelist objects: %10lu"
                     "\naccumulative results:\t\t\t\t\t\t\t\t\t\t"
                     "new allocated: %10lu\t\t\treused allocated: %10lu\t\t\tfreed: %10lu\n",
-            mem_alloc_wasted_record_total/1024, mem_alloc_wasted_record_total*100/totalMem,
-            mem_blowup_total/1024, mem_blowup_total*100/totalMem,
-            exfrag/1024, exfrag*100/totalMem,
             realMem/1024,
             100 - mem_alloc_wasted_record_total*100/totalMem - mem_blowup_total*100/totalMem - exfrag*100/totalMem,
             totalMem/1024,

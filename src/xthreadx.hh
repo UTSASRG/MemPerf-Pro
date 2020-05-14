@@ -8,7 +8,7 @@
 #include "memwaste.h"
 
 extern thread_local thread_data thrData;
-extern thread_local unsigned long long total_cycles_start;
+//extern thread_local unsigned long long total_cycles_start;
 //extern std::atomic<std::uint64_t> total_global_cycles;
 
 extern "C" void setThreadContention();
@@ -20,6 +20,82 @@ extern void initMyLocalMem();
 thread_local extern uint64_t thread_stack_start;
 thread_local extern uint64_t myThreadID;
 thread_local extern perf_info perfInfo;
+extern "C" void countEventsOutside(bool end);
+#define MAX_THREAD_NUMBER 1024
+extern uint64_t cycles_with_improve[MAX_THREAD_NUMBER];
+extern uint64_t cycles_without_improve[MAX_THREAD_NUMBER];
+extern uint64_t cycles_without_alloc[MAX_THREAD_NUMBER];
+uint64_t total_cycles_with_improve;
+uint64_t total_cycles_without_improve;
+uint64_t total_cycles_without_alloc;
+extern int threadcontention_index;
+extern spinlock improve_lock;
+int running_thread = 1;
+
+void improve_cycles_stage_count(int add) {
+    ///Jin
+    improve_lock.lock();
+    running_thread += add;
+
+    if(running_thread == 2 && add == 1) {
+
+        total_cycles_without_improve = cycles_without_improve[0];
+        total_cycles_with_improve = cycles_with_improve[0];
+        total_cycles_without_alloc = cycles_without_alloc[0];
+
+        cycles_without_improve[0] = 0;
+        cycles_with_improve[0] = 0;
+        cycles_without_alloc[0] = 0;
+
+    } else if(running_thread == 2 && add == -1) {
+
+        uint64_t critical_cycles_with_improve = 0;
+        uint64_t critical_cycles_without_improve = 0;
+        uint64_t critical_cycles_without_alloc = 0;
+
+        for(int t = 0; t <= threadcontention_index; ++t) {
+            if(cycles_without_alloc[t] > critical_cycles_without_alloc) {
+                critical_cycles_without_alloc = cycles_without_alloc[t];
+            }
+        }
+
+        for(int t = 0; t <= threadcontention_index; ++t) {
+            if (cycles_with_improve[t] > critical_cycles_with_improve) {
+                critical_cycles_with_improve = cycles_with_improve[t];
+            }
+        }
+
+        for(int t = 0; t <= threadcontention_index; ++t) {
+            if (cycles_without_improve[t] > critical_cycles_without_improve) {
+                critical_cycles_without_improve = cycles_without_improve[t];
+            }
+        }
+
+
+        if(critical_cycles_with_improve > critical_cycles_without_improve) {
+            critical_cycles_with_improve = critical_cycles_without_improve;
+        }
+        if(critical_cycles_without_alloc > critical_cycles_with_improve) {
+            critical_cycles_without_alloc = critical_cycles_with_improve;
+        }
+        total_cycles_without_alloc += critical_cycles_without_alloc;
+        total_cycles_with_improve += critical_cycles_with_improve;
+        total_cycles_without_improve += critical_cycles_without_improve;
+
+        cycles_without_improve[0] = 0;
+        cycles_with_improve[0] = 0;
+        cycles_without_alloc[0] = 0;
+
+    } else if(thrData.tid == 0) {
+
+        total_cycles_without_improve += cycles_without_improve[0];
+        total_cycles_with_improve += cycles_with_improve[0];
+        total_cycles_without_alloc += cycles_without_alloc[0];
+
+    }
+
+    improve_lock.unlock();
+}
 
 class xthreadx {
 	typedef void * threadFunction(void *);
@@ -38,13 +114,11 @@ class xthreadx {
 		children->startArg = arg;
 		children->startRoutine = fn;
 
-		total_cycles_start = rdtscp();
+		//total_cycles_start = rdtscp();
 		int result = RealX::pthread_create(tid, attr, xthreadx::startThread, (void *)children);
 		if(result) {
 			fprintf(stderr, "error: pthread_create failed: %s\n", strerror(errno));
 		}
-		unsigned long long total_cycles_end = rdtscp();
-		//total_global_cycles += total_cycles_end - total_cycles_start;
 
 		return result;
 	}
@@ -61,9 +135,6 @@ class xthreadx {
 		void * result = NULL;
 		size_t stackSize;
 		thread_t * current = (thread_t *) arg;
-
-//		pid_t tid = gettid();
-//		thrData.tid = tid;
 
 		#ifdef THREAD_OUTPUT
 		pid_t pid = getpid();
@@ -100,7 +171,9 @@ class xthreadx {
 
 		#ifndef NO_PMU
 		initPMU();
-		#endif
+        #endif
+        improve_cycles_stage_count(1);
+        countEventsOutside(false);
 		result = current->startRoutine(current->startArg);
 
 		threadExit();
@@ -108,7 +181,10 @@ class xthreadx {
 		return result;
 	}
 
+
   static void threadExit() {
+      countEventsOutside(true);
+      improve_cycles_stage_count(-1);
     #ifndef NO_PMU
     stopSampling();
     //doPerfCounterRead();
