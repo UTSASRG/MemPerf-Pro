@@ -7,6 +7,7 @@
 #include "real.hh"
 #include "memwaste.h"
 
+
 extern thread_local thread_data thrData;
 //extern thread_local unsigned long long total_cycles_start;
 //extern std::atomic<std::uint64_t> total_global_cycles;
@@ -32,12 +33,78 @@ extern int threadcontention_index;
 extern spinlock improve_lock;
 int running_thread = 1;
 
+
+/////Freq
+//struct freq_t {
+//    uint64_t num[5] = {0};
+//    uint64_t cycle[5] = {0};
+//} serial_freq, paralled_freq[MAX_THREAD_NUMBER], total_paralled_freq;
+//uint64_t avg_cycles_without_improve = 0;
+//int64_t freq_ans[16] = {0};
+
+//void freq_printout() {
+//    ///Freq
+//    freq_ans[0] = large_object_threshold;
+//
+//    for(int i = 0; i < 5; ++i) {
+//        if(serial_freq.num[i] == 0) {
+//            freq_ans[i+1] = -1;
+//        } else {
+//            freq_ans[i+1] = serial_freq.cycle[i] / serial_freq.num[i];
+//        }
+//    }
+//
+//    for(int t = 0; t <= threadcontention_index; ++t) {
+//        for(int i = 0; i < 5; ++i) {
+//            total_paralled_freq.num[i] += paralled_freq[t].num[i];
+//            total_paralled_freq.cycle[i] += paralled_freq[t].cycle[i];
+//        }
+//    }
+//
+//    for(int i = 0; i < 5; ++i) {
+//        if(total_paralled_freq.num[i] == 0) {
+//            freq_ans[6+i*2] = -1;
+//        } else {
+//            freq_ans[6+i*2] = total_paralled_freq.cycle[i] / total_paralled_freq.num[i];
+//        }
+//        if(avg_cycles_without_improve / 1000 == 0) {
+//            freq_ans[7+i*2] = -1;
+//        } else {
+//            freq_ans[7+i*2] = (int)((double)(total_paralled_freq.num[i]) * 1000000000 / (double) (avg_cycles_without_improve) / 1000);
+//        }
+//    }
+//
+//    ///freq
+//    //FILE * out_freq = fopen("/home/jinzhou/parsec/record_freq/frequency-cycles.txt", "a+");
+//    FILE * out_freq = fopen("frequency-cycles.txt", "a+");
+//    fprintf(out_freq, "%s\t", program_invocation_name);
+//    for(int i = 0; i < 16; ++i) {
+//        fprintf(out_freq, "%lld\t", freq_ans[i]);
+//    }
+//    fprintf(out_freq, "\n");
+//    fclose(out_freq);
+//}
+
+//extern char * program_invocation_name;
+
+//int max_running_thread = 2;
+
 void improve_cycles_stage_count(int add) {
     ///Jin
     improve_lock.lock();
     running_thread += add;
+//    if(running_thread >= max_running_thread) {
+//        max_running_thread = running_thread;
+//    }
 
-    if(running_thread == 2 && add == 1) {
+    if (running_thread == 2 && add == 1) {
+
+        if(cycles_with_improve[0] > cycles_without_improve[0]) {
+            cycles_with_improve[0] = cycles_without_improve[0];
+        }
+        if(cycles_without_alloc[0] > cycles_with_improve[0]) {
+            cycles_without_alloc[0] = cycles_with_improve[0];
+        }
 
         total_cycles_without_improve = cycles_without_improve[0];
         total_cycles_with_improve = cycles_with_improve[0];
@@ -47,35 +114,38 @@ void improve_cycles_stage_count(int add) {
         cycles_with_improve[0] = 0;
         cycles_without_alloc[0] = 0;
 
-    } else if(running_thread == 2 && add == -1) {
+//        max_running_thread = 2;
+
+    } else if (running_thread == 2 && add == -1) {
 
         uint64_t critical_cycles_with_improve = 0;
         uint64_t critical_cycles_without_improve = 0;
         uint64_t critical_cycles_without_alloc = 0;
 
-        for(int t = 0; t <= threadcontention_index; ++t) {
-            if(cycles_without_alloc[t] > critical_cycles_without_alloc) {
+        for (int t = 0; t <= threadcontention_index; ++t) {
+            if (cycles_without_alloc[t] > critical_cycles_without_alloc) {
                 critical_cycles_without_alloc = cycles_without_alloc[t];
             }
         }
 
-        for(int t = 0; t <= threadcontention_index; ++t) {
+        for (int t = 0; t <= threadcontention_index; ++t) {
             if (cycles_with_improve[t] > critical_cycles_with_improve) {
                 critical_cycles_with_improve = cycles_with_improve[t];
             }
         }
 
-        for(int t = 0; t <= threadcontention_index; ++t) {
+        for (int t = 0; t <= threadcontention_index; ++t) {
             if (cycles_without_improve[t] > critical_cycles_without_improve) {
                 critical_cycles_without_improve = cycles_without_improve[t];
             }
+//            avg_cycles_without_improve += cycles_without_improve[t] / max_running_thread;
         }
 
 
-        if(critical_cycles_with_improve > critical_cycles_without_improve) {
+        if (critical_cycles_with_improve > critical_cycles_without_improve) {
             critical_cycles_with_improve = critical_cycles_without_improve;
         }
-        if(critical_cycles_without_alloc > critical_cycles_with_improve) {
+        if (critical_cycles_without_alloc > critical_cycles_with_improve) {
             critical_cycles_without_alloc = critical_cycles_with_improve;
         }
         total_cycles_without_alloc += critical_cycles_without_alloc;
@@ -86,14 +156,22 @@ void improve_cycles_stage_count(int add) {
         cycles_with_improve[0] = 0;
         cycles_without_alloc[0] = 0;
 
-    } else if(thrData.tid == 0) {
+//        max_running_thread = 2;
+
+    } else if (thrData.tid == 0) {
+
+        if(cycles_with_improve[0] > cycles_without_improve[0]) {
+            cycles_with_improve[0] = cycles_without_improve[0];
+        }
+        if(cycles_without_alloc[0] > cycles_with_improve[0]) {
+            cycles_without_alloc[0] = cycles_with_improve[0];
+        }
 
         total_cycles_without_improve += cycles_without_improve[0];
         total_cycles_with_improve += cycles_with_improve[0];
         total_cycles_without_alloc += cycles_without_alloc[0];
 
     }
-
     improve_lock.unlock();
 }
 
@@ -126,7 +204,7 @@ class xthreadx {
 	static void * startThread(void * arg) {
 
 		myThreadID = pthread_self();
-  
+
     // set thread local storeage
     setThreadContention();
 

@@ -215,16 +215,17 @@ realMem = realMemory;
 extern size_t * class_sizes;
 
 uint64_t MemoryWaste::recordSumup() {
+    for (int t = 0; t <= threadcontention_index; t++) {
     for (int i = 0; i < num_class_sizes; ++i) {
-        for(int t = 0; t <= threadcontention_index; t++) {
-            mem_alloc_wasted_record_global[i] += mem_alloc_wasted_record[t*num_class_sizes+i];
-            num_alloc_active_record_global[i] += num_alloc_active_record[t*num_class_sizes+i];
-            num_freelist_record_global[i] += num_freelist_record[t*num_class_sizes+i];
-            num_alloc_record_global[i] += num_alloc_record[t*num_class_sizes+i];
-            num_allocFFL_record_global[i] += num_allocFFL_record[t*num_class_sizes+i];
-            num_free_record_global[i] += num_free_record[t*num_class_sizes+i];
+            mem_alloc_wasted_record_global[i] += mem_alloc_wasted_record[t * num_class_sizes + i];
+            num_alloc_active_record_global[i] += num_alloc_active_record[t * num_class_sizes + i];
+            num_freelist_record_global[i] += num_freelist_record[t * num_class_sizes + i];
+            num_alloc_record_global[i] += num_alloc_record[t * num_class_sizes + i];
+            num_allocFFL_record_global[i] += num_allocFFL_record[t * num_class_sizes + i];
+            num_free_record_global[i] += num_free_record[t * num_class_sizes + i];
         }
-
+    }
+    for (int i = 0; i < num_class_sizes; ++i) {
         if(mem_alloc_wasted_record_global[i] < 0) {
             mem_alloc_wasted_record_global[i] = 0;
         }
