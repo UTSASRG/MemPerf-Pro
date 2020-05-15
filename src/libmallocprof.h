@@ -262,17 +262,6 @@ allocation_metadata init_allocation(size_t sz, enum memAllocType type);
 //short getClassSizeIndex(size_t size);
 void initGlobalFreeArray();
 void initLocalFreeArray();
-//void initLocalNumAllocsBySizes ();
-//void initGlobalnumAllocsBySizes ();
-//void initLocalNumAllocsFFLBySizes ();
-//void initGlobalnumAllocsFFLBySizes ();
-
-//void initRealMemoryUsageBySizes();
-//void initMemoryUsageBySizes();
-//void initFreedMemoryUsageBySizes();
-//void initRealMemoryUsageBySizesWhenMax();
-//void initMemoryUsageBySizesWhenMax();
-//void initFreedMemoryUsageBySizesWhenMax();
 
 void initMyLocalMem();
 void* myLocalMalloc(size_t);

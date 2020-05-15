@@ -12,9 +12,6 @@ uint64_t* MemoryWaste::mem_alloc_wasted;
 uint64_t* MemoryWaste::mem_alloc_wasted_record;
 uint64_t* MemoryWaste::mem_alloc_wasted_record_global;
 
-spinlock MemoryWaste::record_lock;
-char MemoryWaste::record_time[1024];
-
 int64_t * MemoryWaste::num_alloc_active;
 int64_t * MemoryWaste::num_alloc_active_record;
 int64_t * MemoryWaste::num_alloc_active_record_global;
@@ -48,7 +45,10 @@ uint64_t MemoryWaste::num_alloc_total = 0;
 uint64_t MemoryWaste::num_allocFFL_total = 0;
 uint64_t MemoryWaste::num_free_total = 0;
 
+spinlock MemoryWaste::record_lock;
+
 long MemoryWaste::realMem = 0;
+long MemoryWaste::totalMem = 0;
 
 extern int threadcontention_index;
 
@@ -134,8 +134,13 @@ bool MemoryWaste::allocUpdate(allocation_metadata * allocData, void * address) {
 
     num_alloc_active[(allocData->tid*num_class_sizes)+classSizeIndex]++;
 
+    if(status->max_touched_bytes < allocData->size) {
+        status->max_touched_bytes = allocData->size;
+    }
     mem_alloc_wasted[(allocData->tid*num_class_sizes)+classSizeIndex] += classSize-allocData->size;
-    if(classSize-allocData->size >= PAGESIZE) {
+    if(classSize-status->max_touched_bytes >= PAGESIZE && classSize >= status->max_touched_bytes) {
+        mem_alloc_wasted[(allocData->tid*num_class_sizes)+classSizeIndex] -= (classSize-status->max_touched_bytes)/PAGESIZE*PAGESIZE;
+    } else if(classSize-allocData->size >= PAGESIZE) {
         mem_alloc_wasted[(allocData->tid*num_class_sizes)+classSizeIndex] -= (classSize-allocData->size)/PAGESIZE*PAGESIZE;
     }
 
@@ -170,31 +175,29 @@ void MemoryWaste::freeUpdate(allocation_metadata * allocData, void* address) {
     allocData->size = size;
     allocData->classSize = classSize;
 
-    if(classSize-size >= PAGESIZE) {
+    if(classSize-status->max_touched_bytes >= PAGESIZE && classSize >= status->max_touched_bytes) {
+        mem_alloc_wasted[(allocData->tid*num_class_sizes)+classSizeIndex] += (classSize-status->max_touched_bytes)/PAGESIZE*PAGESIZE;
+    } else if(classSize-allocData->size >= PAGESIZE) {
         mem_alloc_wasted[(allocData->tid*num_class_sizes)+classSizeIndex] += (classSize-allocData->size)/PAGESIZE*PAGESIZE;
     }
     mem_alloc_wasted[(allocData->tid*num_class_sizes)+classSizeIndex] -= classSize-size;
 
 
-    status->size_using = 0;
-    status->classSize = classSize;
+//    status->size_using = 0;
+//    status->classSize = classSize;
 
         blowupflag[classSizeIndex]++;
 
 }
 
 
-bool MemoryWaste::recordMemory(long realMemory) {
-
+bool MemoryWaste::recordMemory(long realMemory, long totalMemory) {
 
     record_lock.lock();
 
-//    FILE *fp = NULL;
-//    fp = popen("time 2>&1", "r");
-//    while(fgets(record_time, 1024, fp)) {fprintf(stderr, record_time);}
-//    pclose(fp);
-
 realMem = realMemory;
+totalMem = totalMemory;
+
 
     memcpy(mem_alloc_wasted_record, mem_alloc_wasted, (threadcontention_index+1) * num_class_sizes * sizeof(uint64_t));
 
@@ -208,6 +211,7 @@ realMem = realMemory;
     memcpy(blowupflag_record, blowupflag, num_class_sizes * sizeof(int64_t));
 
     record_lock.unlock();
+
 
     return true;
 }
@@ -252,7 +256,7 @@ uint64_t MemoryWaste::recordSumup() {
 }
 
 
-void MemoryWaste::reportMaxMemory(FILE * output, long totalMem) {
+void MemoryWaste::reportMaxMemory(FILE * output) {
 
     if(output == nullptr) {
         output = stderr;
@@ -267,9 +271,7 @@ void MemoryWaste::reportMaxMemory(FILE * output, long totalMem) {
             }
 
         if(mem_alloc_wasted_record_global[i]/1024 == 0 && blowup/1024 == 0 &&
-                num_alloc_active_record_global[i] == 0 && num_freelist_record_global[i] == 0 &&
-                num_alloc_record_global[i] == 0 && num_allocFFL_record_global[i] == 0 &&
-                num_free_record_global[i] == 0) {
+                num_alloc_active_record_global[i] == 0 && num_freelist_record_global[i] == 0 ) {
             continue;
         }
 

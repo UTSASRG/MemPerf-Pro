@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <sys/ioctl.h>
 #include "libmallocprof.h"
+#include "spinlock.hh"
 
 #define PERF_GROUP_SIZE 5
 
@@ -18,7 +19,8 @@ long perf_event_open(struct perf_event_attr *hw_event, pid_t pid, int cpu, int g
 	return syscall(__NR_perf_event_open, hw_event, pid, cpu, group_fd, flags);
 }
 
-pthread_spinlock_t _perf_spin_lock;
+//pthread_spinlock_t _perf_spin_lock;
+spinlock _perf_spin_lock;
 extern thread_local thread_data thrData;
 thread_local perf_info perfInfo;
 thread_local bool isCountingInit = false;
@@ -27,6 +29,8 @@ int sample_type = PERF_SAMPLE_IP | PERF_SAMPLE_TIME | PERF_SAMPLE_TID |
 									PERF_SAMPLE_ADDR | PERF_SAMPLE_DATA_SRC;
 
 int read_format = PERF_FORMAT_GROUP;
+
+extern thread_local bool realing, inAllocation;
 
 struct read_format {
 	uint64_t nr;
@@ -43,11 +47,13 @@ struct read_cache_misses_outside_format {
 };
 
 inline void acquireGlobalPerfLock() {
-		pthread_spin_lock(&_perf_spin_lock);
+		//pthread_spin_lock(&_perf_spin_lock);
+    _perf_spin_lock.lock();
 }
 
 inline void releaseGlobalPerfLock() {
-		pthread_spin_unlock(&_perf_spin_lock);
+//		pthread_spin_unlock(&_perf_spin_lock);
+    _perf_spin_lock.unlock();
 }
 
 inline int create_perf_event(perf_event_attr * attr, int group) {
@@ -210,12 +216,15 @@ void sampleHandler(int signum, siginfo_t *info, void *p) {
   #ifndef NDEBUG
   perfInfo->numSignalsRecvd++;
   #endif
+
+  if(de!realing) {
   // If the overflow counter has reached zero (indicated by the POLL_HUP code),
   // read the sample data and reset the overflow counter to start again.
   if(info->si_code == POLL_HUP) {
 			doSampleRead();
 			ioctl(perfInfo.perf_fd, PERF_EVENT_IOC_REFRESH, OVERFLOW_INTERVAL);
 			ioctl(perfInfo.perf_fd2, PERF_EVENT_IOC_REFRESH, OVERFLOW_INTERVAL);
+  }
   }
 }
 
@@ -419,7 +428,9 @@ int initPMU(void) {
 				isSamplingInit = true;
 		}
 
-		pthread_spin_init(&_perf_spin_lock, PTHREAD_PROCESS_PRIVATE);
+		//pthread_spin_init(&_perf_spin_lock, PTHREAD_PROCESS_PRIVATE);
+    _perf_spin_lock.init();
+
 
 		perfInfo.tid = gettid();
 
