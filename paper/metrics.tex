@@ -1,3 +1,4 @@
+\begin{comment}
 \renewcommand{\arraystretch}{1.5}
 \begin{table}[!ht]
   \centering
@@ -13,15 +14,21 @@
     
     \end{tabular}
 \end{table}
+	
+\end{comment}
 
-We also have some common observations on a performant allocator. 
+\subsubsection{Observations for Allocators:} 
 
-\paragraph{Synchronization:} It is better to design per-thread cache, such as TcMalloc, jemalloc, so that there is no need to acquire a lock if an allocation can be satisfied from a per-thread heap. Hoard, although with its per-thread heap design, actually can be slowed down a lot via its hashing mechanism, and . 
+We have some observations on commonalities of a performant allocator. 
 
-\paragraph{Active/Passive False Sharing:} TcMalloc although with the good performance, but it has very serious both active and passive false sharing. This could significantly slowdown the performance, even if it has almost the fast allocation/deallocation. For instance, 
+\paragraph{Synchronization:} It is better to reduce lock usages for an allocator. For instance, TcMalloc and jemalloc utilize per-thread cache to store objects, so that there is no need to acquire a lock if an allocation can be satisfied from a per-thread heap. Hoard, although with its per-thread heap design, actually can be slowed down a lot via its hashing mechanism. The other two counterexamples are OpenBSD's allocator and DieHarder. They both use the same lock to manage different size classes, which is one most important issue for their big slowdown. 
 
-\paragraph{Cache Misses:} 
+\paragraph{Active/Passive False Sharing:} TcMalloc although with the good performance, but it has very serious both active and passive false sharing. This could significantly slowdown the performance, even if it has almost the fast allocation/deallocation speed.  
 
-\paragraph{Kernel space synchronization:} Kernel contention is actually very common based on our evaluation. But it is sometimes difficult to evaluate its potential impact.
+\paragraph{Cache Misses:} Some allocators, such as DieHarder, Hoard, and  OpenBSD, have multiple cache misses per operation. That could sometime be the reason for their slowdown. The opposite for them is TcMalloc and jemalloc that always have fewer cache misses. We believe that this issue can be reduced with a better design, such as with better metadata design.  
 
-\paragraph{Fine-grained size:} The Linux allocator is the only allocator has very fine-grained size, where two continuous size classes only have the difference of 16 bytes. This mechanism may impose less internal fragmentation. However, it has the issue of external fragmentation. Although the Linux allocator also can coalesce and split objects to reduce internal fragmentation, it will need to pay the performance cost. That is the reason why the Linux allocator is typically slower than TcMalloc for most applications.   
+\paragraph{Kernel space synchronization:} Kernel contention is actually very common based on our evaluation. We could observe this from the runtime of memory related system calls.  However, it is sometimes difficult to evaluate its potential impact.
+
+\paragraph{Fine-grained size:} The Linux allocator is the only allocator has very fine-grained size, where two continuous size classes only have the difference of 16 bytes. This mechanism may impose less internal fragmentation. However, it will has the issue of external fragmentation. Although the Linux allocator also can coalesce and split objects to reduce internal fragmentation, it will pay some additional performance cost. That is the reason why the Linux allocator is typically slower than TcMalloc for most applications.
+
+\paragraph{Re-used allocations and deallocations of small objects:} Based on our observation these two aspects are the most important to the  performance of applications, due to its large number. This is also the fast path, which should have less conflicts and fewer instructions.  

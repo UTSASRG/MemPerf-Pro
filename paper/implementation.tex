@@ -114,6 +114,9 @@ For cache contention events, \MP{} relies on sampled memory accesses. Upon each 
 \MP{} also reports the number of cache contention events on cache lines without active/passive false sharing issues, using the same method. In fact, cache contention events on these cache lines can be caused by internal-object false sharing or true sharing, but they cannot be solved with a different memory allocator. However, the reported data could help understand whether an application is running slow or not. Note that \MP{} is not designed to be false/true sharing detection tool. If \MP{} reports a big cache contention rate, users may resort to specific tools to identify specific issues inside the application~\cite{Sheriff, Predator, DBLP:conf/ppopp/ChabbiWL18}. 
    
 
+\begin{comment}
+
+
 \subsection{Predicting Performance Impact}
 \label{sec:predict}
 
@@ -123,6 +126,8 @@ For the standard runtime of every memory management operation, \MP{} utilizes th
 
 To predict the runtime reduction, \MP{} further collects the runtime outside memory management operations with the RDTSC instruction. 
      
+	
+\end{comment}
 
 \subsection{Adapting To Different Allocators}
 \label{sec:understandingallocators}

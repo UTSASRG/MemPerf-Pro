@@ -14,24 +14,24 @@ Experiments were performed on a two-processor machine, where each processor is I
 \subsection{Effectiveness}
 \label{sec:effectiveness}
 
-In order to evaluate the effectiveness, we evaluate \MP{} with five general purpose allocators, e.g. two versions of the Linux allocator (version 2.21 and 2.28), TCMalloc~\citep{tcmalloc}, jemalloc, and Hoard, and two secure allocators, i.e. DieHarder and OpenBSD. These allocators include both sequential and BiBOP-style allocators. Secure allocators were included, since they have their memory management policy, representing some unique possibilities for \MP{}. 
+In order to evaluate the effectiveness, we evaluate \MP{} with five general purpose allocators, e.g. two versions of the Linux allocator (version 2.21 and 2.28), TCMalloc~\citep{tcmalloc}, jemalloc, and Hoard, and two secure allocators, i.e. DieHarder and OpenBSD. These allocators include both sequential and BiBOP-style allocators. Secure allocators were included, since they have their memory management policies. 
 
-For the evaluation, we use their default configuration. However, we do make some changes, mostly due to the interception of synchronizations. Since Linux allocators are included in \texttt{glibc} libraries, they invokes the internal synchronizations as \texttt{lll\_lock}, which cannot be intercepted by \MP{}. They are compiled separately as a stand-alone library. Since Hoard are using \texttt{std::lock\_guard} for its synchronization, which cannot be intercepted, we replaced them with POSIX spin locks to track its synchronization behavior.
+For the evaluation, we use the default configurations of these allocators. However, we make some changes in order to the interception of synchronizations. Since Linux allocators are included in \texttt{glibc} libraries, they invokes the internal synchronizations as \texttt{lll\_lock}, which cannot be intercepted by \MP{}. They are compiled separately as a stand-alone library. Since Hoard are using \texttt{std::lock\_guard} for its synchronization, which cannot be intercepted, we replaced them with POSIX spin locks to track its synchronization behavior.
 
-\todo{Let's use a table to list all dramatic difference between these allocators. This gives us some evidence of allocators}
-
-\input{metrics}
-
-For a performant allocator, what's the common things within the average allocator. We could utilize a table to list the average points of each allocator. Potentially, we could utilize these parameters to evaluate a new allocator. 
-
-For evaluating purpose, we could provide two information, one is the average with all evaluated allocators, another one is to omit one allocator with the lowest scores. 
-
-
-It seems that BIBOP style allocators are the trend of allocators, which not only has a better performance overhead on average, but also has better safety by separating the metadata from the actual heap. 
-
-\subsection{Issues Identified in Different Allocators}
+%\todo{Let's use a table to list all dramatic difference between these allocators. This gives us some evidence of allocators}
+%\subsection{Issues Identified in Different Allocators}
 
 \input{applications} 
+\input{metrics}
+
+%For a performant allocator, what's the common things within the average allocator. We could utilize a table to list the average points of each allocator. Potentially, we could utilize these parameters to evaluate a new allocator. 
+
+%For evaluating purpose, we could provide two information, one is the average with all evaluated allocators, another one is to omit one allocator with the lowest scores. 
+
+
+%It seems that BIBOP style allocators are the trend of allocators, which not only has a better performance overhead on average, but also has better safety by separating the metadata from the actual heap. 
+
+
 
 \subsection{Performance Overhead}
 \label{sec:perf}
@@ -43,8 +43,12 @@ We will evaluate the performance overhead of the profiler itself.
 
 We will evaluate the performance overhead of the profiler itself. 
 
+\begin{comment}
+
 \subsection{Range of Allocator Metrics}
 We will provide the metrics to evaluate the allocators, based on the averaged value. 
 \todo{What types of metrics should we used? For instance, what type of policy should we used to exclude an allocator, and then get the value of the allocator. 20\%}
 We will provide a table that can be utilized to evaluate all future allocators. 
+	
+\end{comment}
 

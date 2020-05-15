@@ -1,27 +1,78 @@
-\paragraph{glibc-2.21:}
-This allocator of glibc-2.21 has a bug that invokes excessively large number of \texttt{madvise} systems calls under certain memory use patterns~\cite{madvise}, which is exhibited clearly when running the dedup application. \MP{} reports around 31218 invocations of \texttt{madvise} per second, and the runtime of each \texttt{madvise} is about $26548$ cycles that is $12\times$ of the normal runtime.  That is clearly indicates that too many \texttt{madvise} system calls introduces kernel contention inside. \todo{Simply by changing the threshold of madvise, then the number of system calls is reduced by , and then the performance is improved by 20\%.}
 
-\paragraph{DieHarder:}
-DieHarder often performs much slower than other secure allocators for many applications, with some cases as high as $8x$ runtime overhead compared to the default Linux allocator. This can been attributed to several design elements of DieHarder, including its use of bitmaps to track heap objects, and the specific implementation details regarding how randomization is performed. Upon allocation, objects are chosen from a potentially large number of ``miniheaps'', without regard for the temporal locality of previously freed objects. Additionally, if the chosen object is currently in-use, the allocator will then continue to repeat this random selection process until it is success in locating an available object. These design decisions result in higher cache misses, as well as an increase in instruction count along allocation/deallocation pathways.
-As evidence for this, we can see the results of \MP{}'s analysis of DieHarder when used to run the \texttt{dedup}, which runs about $3.4x$ slower as compared to glibc 2.24. \MP{} reports a $320x$ increase in CPU cycles for newly allocated objects in DieHarder, as well as a $3.7x$ increase in cycles for reused objects, and a $7.7x$ increase in cycles for freed objects.
-While part of this increase is attributable to the over $16x$ increase in allocation instructions, there is also a large and noticeable difference between the number of mutex waits performed ($24x$), which corresponds to an increase of $1552x$ more cycles spent waiting on these mutex locks. While there were roughly the same number of critical sections entered by both allocators, DieHarder spent $26x$ longer within them than did glibc.
-Finally, there was significantly more cache line owner conflicts seen in DieHarder than in glibc (a ratio of about $14x$). Application friendliness data shows that DieHarder had significantly lower values for average cache and page utilization, about 45\% and 57\% lower, respectively.
-
-Next, in the case of freqmine, DieHarder performs $8.8x$ slower than glibc 2.24. \MP{} reveals that in this case, DieHarder had $58x$ more CPU cycles spent within in the object-reuse allocation pathway, and $61x$ more cycles spent in the object deallocation path.
-	Additionally, we see $102x$ more read TLB misses along reused object allocation paths, and $188x$ more on deallocation paths.
+\begin{table}[h]
+  \centering
+  \footnotesize
+  \setlength{\tabcolsep}{0.2em}
+\begin{tabular}{l | l | l | l | l}
+\hline
+Applications & Allocator & Abnormal Metrics & Possible Root Cause \\ \hline
+cache-thrash & TcMalloc & $47.7\times$ slowdown & Contention rate for PFS lines: 50\% & Root Cause \RN{1} \\ \hline
+dedup & glibc-2.21 & 20\% slowdown &  \# of Madvise for small allocations: & Root Cause \RN{2} \\ \hline
+freqmine & jemalloc &  Memory consumption & memory blowup: 2174230K (37\%) & Root Cause \RN{3} \\ 
+ & &  & external fragmentation: 1132045K (19\%) \\ \hline
+swaptions  &  DieHarder  & $9\times$ slowdown  & 
+	Small reused alloc: 377476 cycles 	& Root Cause \RN{4} \\
+& & & Small free: 331745 cycles, and 4.9 cache misses & \\ 
+& & & Per-lock acquisition: 353448 cycles & \\\cline{4-5}
+& & & External fragmentation: 1878K(37\%) & Root Cause \RN{5} \\
+& & & cache utilization 55\%, page utilization 35\% & \\\cline{2-5}
+& Hoard & $6.3\times$ slowdown & 
+	Small reused alloc: 68933 cycles, 9.4 cache misses 	& Root Cause \RN{6} \\
 	
-	Further, we see $7091$ mmap system calls with DieHarder versus only 189 for glibc, as well as almost $10x$ mutex lock acquisitions, resulting in an enormous increase in the number of cycles spent waiting on these lock acquisitions (about 5 million times longer).
-	Finally, we see DieHarder with about $4x$ as many cache owner conflicts as in glibc.
+& & & Small free: 53402 cycles, 11.8 cache misses & \\ 
+& & & 1.54 locks per-operation & \\
+\cline{4-5}
+& & & Memory blowup: 4789K( 81\%) & Root Cause \RN{7} \\
+& & & cache utilization 62\%, page utilization 51\% & \\\cline{2-5}
+& OpenBSD & $8\times$ slowdown & Small re-used alloc: 98962 cycles, 4.5 cache misses & Root Cause \RN{8}\\ 
+& & & Small free: 101081 cycles, 7 cache misses & \\ 
+& & & 1.1 locks per-operation &  \\ \hline
 
-\paragraph{jemalloc:}
-During evaluation, the \texttt{reverse\_index} benchmark was found to perform approximately 21\% slower when paired with \texttt{jemalloc} versus the default Linux allocator. Upon inspection, we find that, with \texttt{jemalloc}, the program exhibited over $2x$ the number of CPU cycles associated with the deallocation execution path, as well as a 34\% increase in critical section duration (i.e., the cycles spent within outermost critical sections).
 
-\paragraph{TcMalloc:}
-Despite its BIBOP-style memory layout, \texttt{TcMalloc} typically performs very well, often performing as well or better than the default Linux allocator. However, in the case of \texttt{swaptions}, it runs around 21\% runtime slower compared to the default Linux alocator. Using \MP{}, we find that the runtime of new allocations  is $2.6x$ greater than that of \texttt{glibc}. We additionally see (albeit smaller) increases in the number of reused object allocation cycles as well as deallocation cycles.
-TcMalloc is very slow for synthetic applications, such as cache-thrash, cache-scratch, and threadtest, due to active and passive false sharing. 
-Active false sharing: TcMalloc gets one object at first from the central freelist, which actually cause false sharing in thrash, since the next object will be obtained by another thread. 
+%\multirow{2}{*}{Performance} & {Alloc/Free runtime} & Timestamp\\ \cline{2-3}
 
+  \end{tabular}
+  \centering
+  \caption{Abnormal metrics of allocators for different applications.\label{table:abnormal}}
+\end{table}
+
+Due to the space limit, we only select multiple examples with abnormal metrics of allocators for the analysis. We aim to cover all allocators, with their abnormal data as shown in Table~\ref{table:abnormal}. Based on these listed metrics, we will show the helpful guidelines provided by \MP{} when analyzing the performance and memory issue. In the end of this section, we also provide some observations based on the evaluation of these allocators.  
+
+ \paragraph{TcMalloc:}
+\texttt{TcMalloc} typically performs very well in almost all applications, except for few synthetic applications, such as \texttt{cache-thrash}, \texttt{cache-scratch}, and \texttt{threadtest}. 
+
+\textit{Root Cause \RN{1}}:
+For \texttt{cache-thrash}, it runs around $47.7\times$ slower compared to the default Linux allocator. Using \MP{}, we find that the runtime of allocations and deallocations of TcMalloc is actually at a normal range. The only obvious issue is that it has around 50\% cache contention rate for cache lines with passive false sharing issues, which is the major reason caused the big slowdown. By checking the source code, we observe that TcMalloc will actually has both active and passive false sharing issue. For active false sharing, TcMalloc will get one object for a thread from its central heap, so that two continuous objects can be utilized by two different threads. Since TcMalloc always places a freed object to the current thread's per-thread cache, which will also passive false sharing issue. In comparison, the Linux allocator always returns an object back to its original owner, avoiding passive false sharing.  
+
+\paragraph{glibc-2.21:}
+\textit{Root Cause \RN{2}}: The allocator of glibc-2.21 has a bug that invokes excessively large number of \texttt{madvise} systems calls under certain memory use patterns~\cite{madvise}, which is exhibited clearly when running the dedup application. \MP{} reports around 31218 invocations of \texttt{madvise} per second (with a total of 505773 in 16.2 seconds), and the runtime of each \texttt{madvise} is about $23598$ cycles that is $10\times$ of the normal runtime. That is clearly indicates that too many \texttt{madvise} system calls introduces kernel contention inside. Changing the threshold of \texttt{madvise}  improves the performance by 20\%.
+
+\paragraph{jemalloc:} jemalloc typically has good performance, but has more memory consumption. 
+
+\textit{Root Cause \RN{3}}: For \texttt{freqmine} application, jemalloc utilizes 6\% more memory than the default Linux allocator, and 36\% than TcMalloc. Via the report, we can know that jemalloc introduces around 37\% memory blowup and 19\% of external fragmentation of its total memory consumption. In comparison, TcMalloc only has 1\% memory blowup and 13\% external fragmentation.  
+
+\paragraph{DieHarder:} DieHarder performs much slower than other allocators for many applications, which runs $9\times$ slower than the default Linux allocator for \texttt{swaptions}.
+
+\textit{Root Cause \RN{4}}:Based on evaluation results in Table~\ref{table:abnormal}, DieHarder has multiple design issues. From the runtime and lock related information, we could know that this allocator introduces an abnormal high cache misses (4.9) for each deallocation. By examining the code, DieHarder has to check all miniheaps to identify whether an object is belonging to a particular miniheap. This design is not only very slow, but also introduce multiple cache misses by its search. Also, DieHarder utilizes a central lock for all allocations and deallocations, with 4 locks in total. This design will introduce large slowdown for parallel applications, which explains why each lock acquisition will take 353448 cycles. 
+
+\texttt{Root Cause \RN{5}}: we also notice that DieHarder introduces external fragmentation, around 37\%. As described before, this also includes the size of skipped objects, which is caused by DieHarder's over-provision allocation mechanism. Since DieHarder will also randomly choose some objects, that is maybe the cause of its low cache utilization and page utilization. 
 
 
 \paragraph{Hoard:} 
-We actually find out multiple un-known design issues of \texttt{Hoard}. By checking the output of \texttt{swaptions}, we have found the following issues: (1) the runtime of every allocation and deallocation is around XX times larger than the suggested metric. (2) the number of cache misses  is up to 6.6 for each re-used allocation, and 6.3XX for each deallocation. 
+ \texttt{Hoard} is running around $6.3\times$ slower than the default allocator. Based on our analysis, it can be caused by multiple reasons.
+ 
+ \texttt{Root Cause \RN{6}:}
+ The output of \MP{} shows that it has a large runtime for each allocation and deallocation, and has around 11.8 cache misses. Also, \MP{} reports that it has 1.54 lock acquisitions per call. Clearly, Hoard has a big issue of using locks. By checking the code, we found that Hoard at least acquires a lock for each allocation and deallocation, which is $95713\times$ more than of locks of TcMalloc. TcMalloc utilizes a per-thread cache that there is no need to acquire the lock if an allocation can be satisfied from the per-thread cache. Instead, by using too many locks, Hoard will introduce more cache misses unnecessarily. Another issue is that Hoard are using so many instructions due to its deep-level of templates. For instance, its per-deallocation will has around 1322 instructions, while TcMalloc only has 73.7 instructions and 222 cycles.  
+ 
+ \texttt{Root Cause \RN{7}:} Hoard also has a big issue of memory blowup, with 81\% memory blowup for \texttt{swaptions}. Also, it also much lower cache utilization and page utilization rate than TcMalloc, where TcMalloc's cache and page utilization rate is 80\% and 73\%. That is, all of these factors of Hoard will contribute to the slowdown on this application.
+ 
+\paragraph{OpenBSD:} \texttt{Root Cause \RN{8}:}  OpenBSD has $8\times$ slowdown for \texttt{swaptions}, comparing to the default allocator. Based on its report, we find out that OpenBSD has the similar issue as Hoard, since it acquires more than one lock for each operation. By checking the code, we find out that OpenBSD has the same global lock for all allocations and deallocations, which is the possible reason for its big slowdown. Also, OpenBSD also has a big cache misses for its re-used allocations and deallocations for small objects, which is possibly another reason why it has a big slowdown. For OpenBSD, we also observe that it has significant big number of instructions than other allocators, which as 430 instructions for deallocating a small object, and 295 instructions for a re-used allocation. This is possibly another reason for its big slowdown. 
+
+
+
+%\paragraph{jemalloc:}
+%During evaluation, the \texttt{reverse\_index} benchmark was found to perform approximately 21\% slower when paired with \texttt{jemalloc} versus the default Linux allocator. Upon inspection, we find that, with \texttt{jemalloc}, the program exhibited over $2x$ the number of CPU cycles associated with the deallocation execution path, as well as a 34\% increase in critical section duration (i.e., the cycles spent within outermost critical sections).
+
+
+
+
