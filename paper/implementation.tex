@@ -117,11 +117,12 @@ For cache contention events, \MP{} relies on sampled memory accesses. Upon each 
 \subsection{Predicting Performance Impact}
 \label{sec:predict}
 
-Predicting: 
+In order to help users determine whether an allocator is the culprit of the performance issue, \MP{} further predicts the potential performance improvement after switching to  a better allocator. Predicting the performance impact is very complicated, since an application can be affected by multiple factors, such as hardware/software  contention and synchronization. From the point view of an allocator, it can be affected by both cache friendliness and memory management overhead. \MP{} only focuses on the latter one, which provides an lower bound on the potential improvement. Basically, \MP{} replaces the runtime of memory management operations with a standard runtime, and then predicts the reduction of the total runtime.  
 
-fork-join:
+For the standard runtime of every memory management operation, \MP{} utilizes the median values collected from a range of applications. Basically, based on our evaluation, the default Linux, TcMalloc, and jemalloc are three best allocators in terms of the performance. Then we choose the best allocator for each application in terms of cycles for each memory management operation, and then select the median value for each operation. Note that there are different choices to choose the standard runtime for every operation, and we only utilizes a simple one to proof the concept. We have thought about that the runtime of a memory management operation can be related with the parallelization and the frequency of allocation. However, it is challenging to build a direct relationship based on our evaluation results. For instance, a serial allocation can also take tens of thousands of cycles. 
 
-We will use the performant allocator, such as TcMalloc as the prediction. 
+To predict the runtime reduction, \MP{} further collects the runtime outside memory management operations with the RDTSC instruction. 
+     
 
 \subsection{Adapting To Different Allocators}
 \label{sec:understandingallocators}
