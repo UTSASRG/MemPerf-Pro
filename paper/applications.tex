@@ -18,6 +18,9 @@ During evaluation, the \texttt{reverse\_index} benchmark was found to perform ap
 
 \paragraph{TcMalloc:}
 Despite its BIBOP-style memory layout, \texttt{TcMalloc} typically performs very well, often performing as well or better than the default Linux allocator. However, in the case of \texttt{swaptions}, it runs around 21\% runtime slower compared to the default Linux alocator. Using \MP{}, we find that the runtime of new allocations  is $2.6x$ greater than that of \texttt{glibc}. We additionally see (albeit smaller) increases in the number of reused object allocation cycles as well as deallocation cycles.
+TcMalloc is very slow for synthetic applications, such as cache-thrash, cache-scratch, and threadtest, due to active and passive false sharing. 
+Active false sharing: TcMalloc gets one object at first from the central freelist, which actually cause false sharing in thrash, since the next object will be obtained by another thread. 
+
 
 
 \paragraph{Hoard:} 

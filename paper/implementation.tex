@@ -69,6 +69,7 @@ In fact, the simple data could actually uncover serious scalability issues of a 
 
 %Currently, the Linux kernel has supported PMUs starting from 2009 (Linux-2.6.31)~\cite{pmulinuxsupport}, where users could set up performance monitoring via  the \texttt{perf\_event\_open} system call. After collecting events, the user program could fetch these events. 
 
+\begin{comment}
 Cache line utilization: 
 Shadow memory. 
 Cache line: real using memory.
@@ -82,10 +83,13 @@ We will report the percentage with write.
 False sharing, 
 active/passive: 
 how many lines with active and passive. 
- 
-For application friendliness, \MP{} focuses on the following parameters, including (1)~the average cache line utilization rate; (2)~the average page utilization rate; (3)~the number of cache misses. As discussed in Section~\ref{sec:friendliness}, a user-friendly allocator should have high cache-line and page utilization rates, but with a low number of cache misses.  
+	
+\end{comment}
 
-\MP{} employs the PMU-based sampling to track the average cache utilize and page utilization. Basically, \MP{} samples memory accesses periodically, with a default sampling period of 5,000. Upon every sampled event, \MP{} collects the number of used bytes for the current cache line and the current page, and also increments the number of sampled cache lines and pages. In the end, \MP{} computes the utilization rate with a simple division. For cache utilization rate, the dividend is the total number of used bytes, and the divisor is the the total number of bytes for these cache lines. The page utilization rate is computed similarly, but focusing on the page level instead. 
+ 
+For application friendliness, \MP{} focuses on the following metrics, including cache/page utilization rate, cache contention rate, and false sharing effect. \MP{} employs PMUs to sample memory accesses periodically, with a default sampling period of 100,000. Then \MP{} updates these metrics upon every sampled access. \MP{} employs the shadow memory to track the information, in order to compute these values. 
+
+For cache and page utilization rate, \MP{} maintains the number of used bytes for the  the current cache line and the current page, which will be updated on each allocation and deallocation. Upon every sampled event, \MP{} increments the number of cache lines and pages that have been accessed, and also increments the counter to track the total number of bytes on this cache line. In the end, \MP{} computes the utilization rate with a simple division. For cache utilization rate, the dividend is the total number of used bytes, and the divisor is the the total number of bytes for these cache lines. The page utilization rate is computed similarly, but focusing on the page level instead. 
 
 However, the challenge is to quickly locate the  metadata for each cache line and each page, since the metadata should be updated upon every allocation and deallocation, and upon every sampled event. During its implementation, \MP{} has tried multiple mechanisms. First, \MP{} designed a red-black tree to hold memory mappings of the heap, and then stored the address of corresponding metadata on the tree node. This mechanism was found to be in-efficient, since some allocators (e.g., OpenBSD) includes thousands of mappings, which may introduce tens of comparisons unfortunately. Second, \MP{} utilized a hash map to store the memory mappings. But it is difficult to decide the right number of buckets for the hash table, where a small number may cause too many conflicts, with significant performance overhead by traversing the link list.  Finally, \MP{} designs a fast lookup mechanism by taking advantage of the vast address space of 64-bits machines, where the detailed design is discussed as follows. 
 
@@ -101,7 +105,14 @@ complexity to obtain the metadata.
 \caption{Three-level Lookup Mechanism.\label{fig:lookup}}
 \end{figure*}
 
-Note that this design is also efficient in memory consumption. If a range of addresses are not used, then there is no need to allocate physical memory for the corresponding page entries and cache entries. This design is able to adapt to different allocators, where memory mappings of a heap is varied from a few to hundreds of thousands, and these mappings can be scattered along the whole address space of a process. To track valid memory mappings dynamically, \MP{} intercepts memory related system calls inside allocations/deallocations, such as \texttt{sbrk}, \texttt{mmap}, \texttt{munmap}, \texttt{mremap}. 
+Note that this design is also efficient in memory consumption. If a range of addresses are not used, then there is no need to allocate physical memory for the corresponding page entries and cache entries. This design is able to adapt to different allocators, where memory mappings of a heap is varied from a few to hundreds of thousands, and these mappings can be scattered along the whole address space of a process. 
+%To track valid memory mappings dynamically, \MP{} intercepts memory related system calls inside allocations/deallocations, such as \texttt{sbrk}, \texttt{mmap}, \texttt{munmap}, \texttt{mremap}. 
+
+For false sharing effect, \MP{} focuses on two aspects: the number of cache lines that has false sharing, either active or passive false sharing, and the number of cache contention events on these cache lines. Identifying active and passive false sharing is relatively intuitive based on the definition, by checking the number of threads in each cache line. We employ three-level lookup table as discussed above to store the threads information that are allocated from the same cache line. 
+For cache contention events, \MP{} relies on sampled memory accesses. Upon each sampled event, \MP{} checks whether the event is a write access. For each write, \MP{} updates the last thread to write on the corresponding cache line to be the current thread. If the current thread is different from the recorded last thread, \MP{} increments the number of cache contention events. In the end, \MP{} reports the percentage of cache contention on identified cache lines with false sharing issue. 
+
+\MP{} also reports the number of cache contention events on cache lines without active/passive false sharing issues, using the same method. In fact, cache contention events on these cache lines can be caused by internal-object false sharing or true sharing, but they cannot be solved with a different memory allocator. However, the reported data could help understand whether an application is running slow or not. Note that \MP{} is not designed to be false/true sharing detection tool. If \MP{} reports a big cache contention rate, users may resort to specific tools to identify specific issues inside the application~\cite{Sheriff, Predator, DBLP:conf/ppopp/ChabbiWL18}. 
+   
 
 \subsection{Predicting Performance Impact}
 \label{sec:predict}
@@ -119,13 +130,18 @@ We will use the performant allocator, such as TcMalloc as the prediction.
 
 In order to identify the style of allocator, the prerun routine will check whether two subsequent allocations with different sizes (small objects, apparently from different size classes) are allocated from the same page or not. If yes, then the allocator is a sequential-style allocator, which is similar to the default Linux allocator. Otherwise, the allocator belongs to a BiBOP-style allocator. 
 
-The second step is to identify the sizes of different size classes. The prerun routine begins by allocating an object of 8 bytes, and continues to allocate additional objects using a stride increase of 8 bytes each time. The determination of size classes depends on the style of an allocator. For BiBOP-style allocators, an allocation with a different size class will be satisfied from a different bag, locating in a different page. For sequential allocators, such as the Linux allocator, the distance between two contiguously-allocated objects (with distinct sizes) is utilized to determine the size class. As shown in Fig.~\ref{fig:sizeclass}, if the size of $Obj_1$ and $Obj_2$ is the same, judging from the distance of between two continuous objects, then they belong to the same size class. Otherwise, they belong to different size class, such as $Obj_3$ in the figure. By checking the size of two objects belonging to different objects, we could determine the sizes of different size classes.  
+The second step is to identify the sizes of different size classes. The prerun routine begins by allocating an object of 8 bytes, and continues to allocate additional objects using a stride increase of 8 bytes each time. The determination of size classes depends on the style of an allocator. For BiBOP-style allocators, an allocation with a different size class will be satisfied from a different bag, locating in a different page. For sequential allocators, such as the Linux allocator, we employ the \texttt{malloc\_usable\_size} to  return the bag size for an allocation with the specified size. 
+
+%the distance between two contiguously-allocated objects (with distinct sizes) is utilized to determine the size class. As shown in Fig.~\ref{fig:sizeclass}, if the size of $Obj_1$ and $Obj_2$ is the same, judging from the distance of between two continuous objects, then they belong to the same size class. Otherwise, they belong to different size class, such as $Obj_3$ in the figure. By checking the size of two objects belonging to different objects, we could determine the sizes of different size classes.  
+\begin{comment}
 
 \begin{figure}[!ht]
 \centering
 \includegraphics[width=5in]{figures/sequentialclasssize}
 \caption{Determining the size class of a sequential allocator by the distance between continuous allocations. \\The boxes with 10\% dotted pattern are the metadata, and the boxes with diagonal stripes\\ are actual heap objects. The number above every box is the size of the corresponding object. \label{fig:sizeclass}}
 \end{figure}
+	
+\end{comment}
 
 
 The threshold for big objects are typically detected by checking whether there is an explicit \texttt{mmap} system calls upon the allocation. Typically, most allocators utilize a direct \texttt{mmap} system call to satisfy the allocation for a big object initially. However, this threshold requires the manual confirmation. 

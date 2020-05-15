@@ -22,4 +22,6 @@ We also have some common observations on a performant allocator.
 
 \paragraph{Cache Misses:} 
 
-\paragraph{Kernel space synchronization:} Kernel contention is actually very common based on our evaluation. But it is sometimes difficult to evaluate its potential impact. 
+\paragraph{Kernel space synchronization:} Kernel contention is actually very common based on our evaluation. But it is sometimes difficult to evaluate its potential impact.
+
+\paragraph{Fine-grained size:} The Linux allocator is the only allocator has very fine-grained size, where two continuous size classes only have the difference of 16 bytes. This mechanism may impose less internal fragmentation. However, it has the issue of external fragmentation. Although the Linux allocator also can coalesce and split objects to reduce internal fragmentation, it will need to pay the performance cost. That is the reason why the Linux allocator is typically slower than TcMalloc for most applications.   
