@@ -13,7 +13,7 @@
 #include <unistd.h>
 #include <stdarg.h>
 #include <sched.h>
-
+#include <string.h>
 
 #define MAX_THREAD_NUMBER 1024
 int threadcontention_index = -1;
@@ -37,6 +37,122 @@ extern initStatus profilerInitialized;
 extern MemoryUsage max_mu;
 extern bool inRealMain;
 
+///rid
+extern void getPerfCounts(PerfReadInfo*);
+thread_local PerfReadInfo whole_before, whole_after, real_before, real_after;
+thread_local uint64_t whole_before_t, whole_after_t, real_before_t, real_after_t;
+
+void remove_mmprof_counting(allocation_metadata *metadata) {
+
+    uint64_t cache_misses = whole_after.cache_misses - real_after.cache_misses;
+    uint64_t faults = whole_after.faults - real_after.faults;
+    uint64_t tlb_read_misses = whole_after.tlb_read_misses - real_after.tlb_read_misses;
+    uint64_t tlb_write_misses = whole_after.tlb_write_misses - real_after.tlb_write_misses;
+    uint64_t instructions = whole_after.instructions - real_after.instructions;
+    uint64_t tsc = whole_after_t = real_after_t;
+
+    if(cache_misses > 10000000000) {
+        cache_misses = 0;
+    }
+    if(faults > 10000000000) {
+        faults = 0;
+    }
+    if(tlb_read_misses > 10000000000) {
+        tlb_read_misses = 0;
+    }
+    if(tlb_write_misses > 10000000000) {
+        tlb_write_misses = 0;
+    }
+    if(instructions > 10000000000) {
+        instructions = 0;
+    }
+    if(tsc > 10000000000) {
+        tsc = 0;
+    }
+
+    metadata->after.cache_misses -= cache_misses;
+    metadata->after.faults -= faults;
+    metadata->after.tlb_read_misses -= tlb_read_misses;
+    metadata->after.tlb_write_misses -= tlb_write_misses;
+    metadata->after.instructions -= instructions;
+    metadata->tsc_after -= tsc;
+
+    memset(&real_after, 0, sizeof(real_after));
+    memset(&whole_after, 0, sizeof(whole_after));
+    real_after_t = 0;
+    whole_after_t = 0;
+
+}
+
+void do_whole_before() {
+    getPerfCounts(&whole_before);
+    whole_before_t = rdtscp();
+}
+void do_whole_after() {
+    getPerfCounts(&whole_after);
+    whole_after_t = rdtscp();
+
+    whole_after.cache_misses -= whole_before.cache_misses;
+    whole_after.faults -= whole_before.faults;
+    whole_after.tlb_read_misses -= whole_before.tlb_read_misses;
+    whole_after.tlb_write_misses -= whole_before.tlb_write_misses;
+    whole_after.instructions -= whole_before.instructions;
+    whole_after_t -= whole_before_t;
+
+    if(whole_after.cache_misses > 10000000000) {
+        whole_after.cache_misses = 0;
+    }
+    if(whole_after.faults > 10000000000) {
+        whole_after.faults = 0;
+    }
+    if(whole_after.tlb_read_misses > 10000000000) {
+        whole_after.tlb_read_misses = 0;
+    }
+    if(whole_after.tlb_write_misses > 10000000000) {
+        whole_after.tlb_write_misses = 0;
+    }
+    if(whole_after.instructions > 10000000000) {
+        whole_after.instructions = 0;
+    }
+    if(whole_after_t > 10000000000) {
+        whole_after_t = 0;
+    }
+}
+void do_real_before() {
+    getPerfCounts(&real_before);
+    real_before_t = rdtscp();
+}
+void do_real_after() {
+    getPerfCounts(&real_after);
+    real_after_t = rdtscp();
+
+    real_after.cache_misses -= real_before.cache_misses;
+    real_after.faults -= real_before.faults;
+    real_after.tlb_read_misses -= real_before.tlb_read_misses;
+    real_after.tlb_write_misses -= real_before.tlb_write_misses;
+    real_after.instructions -= real_before.instructions;
+    real_after_t -= real_before_t;
+
+    if(real_after.cache_misses > 10000000000) {
+        real_after.cache_misses = 0;
+    }
+    if(real_after.faults > 10000000000) {
+        real_after.faults = 0;
+    }
+    if(real_after.tlb_read_misses > 10000000000) {
+        real_after.tlb_read_misses = 0;
+    }
+    if(real_after.tlb_write_misses > 10000000000) {
+        real_after.tlb_write_misses = 0;
+    }
+    if(real_after.instructions > 10000000000) {
+        real_after.instructions = 0;
+    }
+    if(real_after_t > 10000000000) {
+        real_after_t = 0;
+    }
+}
+
 typedef struct {
   LockType     type;  // What is the lock type 
   unsigned int calls;        // How many invocations
@@ -44,7 +160,7 @@ typedef struct {
   int contendThreads;    // How many are waiting
   int maxContendThreads; // How many threads are contending on this lock
   unsigned long cycles; // Total cycles
-    unsigned int percalls[4] = {0, 0, 0, 0};
+    unsigned long percalls[4] = {0, 0, 0, 0};
     unsigned long percycles[4] = {0, 0, 0, 0};
 } PerLockData;
 
@@ -128,6 +244,7 @@ void divideSmallAlloc(size_t sz, bool reused) {
   if (!realing || !inRealMain) { \
     return lockfuncs[LOCK_TYPE].realLock((void *)LOCK); \
   } \
+  do_whole_before(); \
   PerPrimitiveData *pmdata = &threadContention->pmdata[LOCK_TYPE]; \
   PerLockData * thisLock = lockUsage.find((uint64_t)LOCK, sizeof(uint64_t)); \
   if(thisLock == NULL)  { \
@@ -144,9 +261,15 @@ void divideSmallAlloc(size_t sz, bool reused) {
   if(contendThreads > thisLock->maxContendThreads){ \
     thisLock->maxContendThreads = contendThreads; \
   }\
+  do_real_before(); \
   uint64_t timeStart = rdtscp();\
   int result = lockfuncs[LOCK_TYPE].realLock((void *)LOCK); \
   uint64_t timeStop = rdtscp(); \
+  do_real_after(); \
+  uint64_t timediff = 0; \
+  if(timeStop > timeStart) { \
+    timediff = timeStop - timeStart; \
+} \
     if(!inFree) {\
 if(now_size < large_object_threshold) {\
 pmdata->calls[0]++; \
@@ -178,6 +301,7 @@ pmdata->cycles[3] += (timeStop - timeStart); \
     threadContention->critical_section_start = timeStop; \
   } \
   threadContention->lock_counter++; \
+  do_whole_after(); \
   return result;
 
 int pthread_mutex_lock(pthread_mutex_t *mutex) {
@@ -203,6 +327,7 @@ int pthread_mutex_trylock(pthread_mutex_t *mutex) {
     return 0; \
   } \
   if (realing && inRealMain) { \
+  do_whole_before(); \
     PerLockData * thisLock = lockUsage.find((uint64_t)lock, sizeof(uint64_t)); \
     thisLock->contendThreads--; \
     threadContention->lock_counter--; \
@@ -211,12 +336,18 @@ int pthread_mutex_trylock(pthread_mutex_t *mutex) {
       threadContention->critical_section_duration += duration; \
       threadContention->critical_section_counter++; \
     } \
+    do_real_before(); \
+    int result = unlockfuncs[LOCK_TYPE].realUnlock((void *)lock); \
+    do_real_after(); \
+    do_whole_after(); \
+    return result; \
   } \
   int result = unlockfuncs[LOCK_TYPE].realUnlock((void *)lock); \
   return result;
 
 // PTHREAD_MUTEX_UNLOCK
 int pthread_mutex_unlock(pthread_mutex_t *mutex) {
+
   PTHREAD_UNLOCK_HANDLE(LOCK_TYPE_MUTEX, mutex);
 }
 
@@ -247,12 +378,16 @@ void * yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offs
     if(!realing || !inRealMain) {
         return RealX::mmap (addr, length, prot, flags, fd, offset);
     }
+
+    do_whole_before();
     //thread_local
     inMmap = true;
 
+    do_real_before();
     uint64_t timeStart = rdtscp();
     void* retval = RealX::mmap(addr, length, prot, flags, fd, offset);
     uint64_t timeStop = rdtscp();
+    do_real_after();
 
     uint64_t address = (uint64_t)retval;
 
@@ -281,6 +416,7 @@ void * yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offs
 	// ran. If it hasn't, we can't call isAllocatorInCallStack()
 
   inMmap = false;
+    do_whole_after();
   return retval;
 }
 
@@ -294,6 +430,8 @@ int madvise(void *addr, size_t length, int advice){
     return RealX::madvise(addr, length, advice);
   }
 
+    do_whole_before();
+
   if (advice == MADV_DONTNEED) {
     uint returned = PAGESIZE * ShadowMemory::cleanupPages((uintptr_t)addr, length);
     if(threadContention->totalMemoryUsage > returned) {
@@ -302,10 +440,11 @@ int madvise(void *addr, size_t length, int advice){
       __atomic_sub_fetch(&mu.totalMemoryUsage, returned, __ATOMIC_RELAXED);
   }
 
-
+    do_real_before();
   uint64_t timeStart = rdtscp();
   int result = RealX::madvise(addr, length, advice);
   uint64_t timeStop = rdtscp();
+    do_real_after();
 
   if(!inFree) {
       if(now_size < large_object_threshold) {
@@ -324,6 +463,9 @@ int madvise(void *addr, size_t length, int advice){
           threadContention->madvise_wait_cycles_free_large += (timeStop - timeStart);
       }
   }
+
+    do_whole_after();
+
   return result;
 }
 
@@ -333,9 +475,13 @@ void *sbrk(intptr_t increment){
   if(profilerInitialized != INITIALIZED || !realing  || !inRealMain)
       return RealX::sbrk(increment);
 
+    do_whole_before();
+
+    do_real_before();
   uint64_t timeStart = rdtscp();
   void *retptr = RealX::sbrk(increment);
   uint64_t timeStop = rdtscp();
+do_real_after();
 
   if(!inFree) {
       if(now_size < large_object_threshold) {
@@ -355,6 +501,8 @@ void *sbrk(intptr_t increment){
       }
   }
 
+    do_whole_after();
+
   return retptr;
 }
 
@@ -367,9 +515,13 @@ int mprotect(void* addr, size_t len, int prot) {
     return RealX::mprotect(addr, len, prot);
   }
 
+  do_whole_before();
+
+  do_real_before();
   uint64_t timeStart = rdtscp();
   int ret =  RealX::mprotect(addr, len, prot);
   uint64_t timeStop = rdtscp();
+  do_real_after();
 
     if(!inFree) {
         if(now_size < large_object_threshold) {
@@ -389,6 +541,8 @@ int mprotect(void* addr, size_t len, int prot) {
         }
     }
 
+    do_whole_after();
+
   return ret;
 }
 
@@ -401,6 +555,8 @@ int munmap(void *addr, size_t length) {
       return RealX::munmap(addr, length);
   }
 
+  do_whole_before();
+
   // It is extremely important that the call to cleanupPages() occurs BEFORE the call
   // to RealX::unmap(). If the orders were switched, it would then be possible for
   // another thread to reallocate the unmapped region *while* the current thread is
@@ -411,9 +567,11 @@ int munmap(void *addr, size_t length) {
   }
     __atomic_sub_fetch(&mu.totalMemoryUsage, returned, __ATOMIC_RELAXED);
 
+  do_real_before();
   uint64_t timeStart = rdtscp();
   int ret =  RealX::munmap(addr, length);
   uint64_t timeStop = rdtscp();
+  do_real_after();
 
   if(!inFree) {
       if(now_size < large_object_threshold) {
@@ -432,6 +590,9 @@ int munmap(void *addr, size_t length) {
           threadContention->munmap_wait_cycles_free_large += (timeStop - timeStart);
       }
   }
+
+  do_whole_after();
+
   return ret;
 }
 
@@ -440,18 +601,26 @@ void *mremap(void *old_address, size_t old_size, size_t new_size,
     int flags, ... /*  void *new_address */) {
   if (!realInitialized) RealX::initializer();
 
-  va_list ap;
-  va_start(ap, flags);
-  void* new_address = va_arg(ap, void*);
-  va_end(ap);
-
   if(!realing || !inRealMain){
+      va_list ap;
+      va_start(ap, flags);
+      void* new_address = va_arg(ap, void*);
+      va_end(ap);
     return RealX::mremap(old_address, old_size, new_size, flags, new_address);
   }
 
+    do_whole_before();
+
+    va_list ap;
+    va_start(ap, flags);
+    void* new_address = va_arg(ap, void*);
+    va_end(ap);
+
+    do_real_before();
   uint64_t timeStart = rdtscp();
   void* ret =  RealX::mremap(old_address, old_size, new_size, flags, new_address);
   uint64_t timeStop = rdtscp();
+    do_real_after();
 
     if(!inFree) {
         if(now_size < large_object_threshold) {
@@ -471,6 +640,7 @@ void *mremap(void *old_address, size_t old_size, size_t new_size,
         }
     }
 
+    do_whole_after();
 
   return ret;
 }
@@ -706,7 +876,7 @@ void writeThreadContention() {
     fprintf (thrData.output, ">>> realMemoryUsage\t\t\t\t%20zuK\n", realMem/1024);
     fprintf (thrData.output, ">>> realAllocatedMemoryUsage%18zuK\n", realAllocMem/1024);
     fprintf (thrData.output, ">>> totalMemoryUsage\t\t\t%20zuK\n", totalMem/1024);
-    MemoryWaste::reportMaxMemory(thrData.output, totalMem);
+    MemoryWaste::reportMaxMemory(thrData.output);
 }
 
 #endif

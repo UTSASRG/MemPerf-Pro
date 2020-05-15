@@ -93,6 +93,7 @@ void improve_cycles_stage_count(int add) {
     ///Jin
     improve_lock.lock();
     running_thread += add;
+    improve_lock.unlock();
 //    if(running_thread >= max_running_thread) {
 //        max_running_thread = running_thread;
 //    }
@@ -172,7 +173,6 @@ void improve_cycles_stage_count(int add) {
         total_cycles_without_alloc += cycles_without_alloc[0];
 
     }
-    improve_lock.unlock();
 }
 
 class xthreadx {

@@ -7,6 +7,7 @@
 #include "real.hh"
 #include "test/alloc.cpp"
 #include "memwaste.h"
+#include "spinlock.hh"
 
 PageMapEntry ** ShadowMemory::mega_map_begin = nullptr;
 PageMapEntry * ShadowMemory::page_map_begin = nullptr;
@@ -15,8 +16,10 @@ PageMapEntry * ShadowMemory::page_map_bump_ptr = nullptr;
 CacheMapEntry * ShadowMemory::cache_map_begin = nullptr;
 CacheMapEntry * ShadowMemory::cache_map_end = nullptr;
 CacheMapEntry * ShadowMemory::cache_map_bump_ptr = nullptr;
-pthread_spinlock_t ShadowMemory::cache_map_lock;
-pthread_spinlock_t ShadowMemory::mega_map_lock;
+//pthread_spinlock_t ShadowMemory::cache_map_lock;
+//pthread_spinlock_t ShadowMemory::mega_map_lock;
+spinlock ShadowMemory::cache_map_lock;
+spinlock ShadowMemory::mega_map_lock;
 
 eMapInitStatus ShadowMemory::isInitialized = E_MAP_INIT_NOT;
 
@@ -26,8 +29,10 @@ bool ShadowMemory::initialize() {
 	}
 	isInitialized = E_MAP_INIT_WORKING; 
 
-	pthread_spin_init(&cache_map_lock, PTHREAD_PROCESS_PRIVATE);
-	pthread_spin_init(&mega_map_lock, PTHREAD_PROCESS_PRIVATE);
+//	pthread_spin_init(&cache_map_lock, PTHREAD_PROCESS_PRIVATE);
+//	pthread_spin_init(&mega_map_lock, PTHREAD_PROCESS_PRIVATE);
+cache_map_lock.init();
+mega_map_lock.init();
 
 	// Allocate 1MB-to-4KB mapping region
 	if((void *)(mega_map_begin = (PageMapEntry **)mmap((void *)MEGABYTE_MAP_START, MEGABYTE_MAP_SIZE,
@@ -184,7 +189,6 @@ unsigned ShadowMemory::cleanupPages(uintptr_t uintaddr, size_t length) {
 }
 
 void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType) {
-
 
 		// Only used for debug output (see end of function below)
 		const char * strAccessType;
@@ -355,13 +359,16 @@ PageMapEntry * ShadowMemory::getPageMapEntry(unsigned long mega_idx, unsigned pa
 
 PageMapEntry ** ShadowMemory::getMegaMapEntry(unsigned long mega_index) {
 		PageMapEntry ** mega_entry = mega_map_begin + mega_index;
+
 		if(__builtin_expect(__atomic_load_n(mega_entry, __ATOMIC_RELAXED) == NULL, 0)) {
 				// Create a new page entries
-				RealX::pthread_spin_lock(&mega_map_lock);
+//				RealX::pthread_spin_lock(&mega_map_lock);
+            mega_map_lock.lock();
 				if(__builtin_expect(__atomic_load_n(mega_entry, __ATOMIC_RELAXED) == NULL, 1)) {
 						__atomic_store_n(mega_entry, doPageMapBumpPointer(), __ATOMIC_RELAXED);
 				}
-				RealX::pthread_spin_unlock(&mega_map_lock);
+//				RealX::pthread_spin_unlock(&mega_map_lock);
+            mega_map_lock.unlock();
 		}
 
 		return mega_entry;
@@ -530,14 +537,21 @@ bool PageMapEntry::updateCacheLines(uintptr_t uintaddr, unsigned long mega_index
 }
 
 CacheMapEntry * PageMapEntry::getCacheMapEntry(bool mvBumpPtr) {
-		if(mvBumpPtr && __builtin_expect(__atomic_load_n(&cache_map_entry, __ATOMIC_RELAXED) == NULL, 0)) {
-				// Create a new entries
-				RealX::pthread_spin_lock(&ShadowMemory::cache_map_lock);
-				if(__builtin_expect(__atomic_load_n(&cache_map_entry, __ATOMIC_RELAXED) == NULL, 1)) {
-						__atomic_store_n(&cache_map_entry, ShadowMemory::doCacheMapBumpPointer(), __ATOMIC_RELAXED);
-				}
-				RealX::pthread_spin_unlock(&ShadowMemory::cache_map_lock);
-		}
+    if(!mvBumpPtr) {
+        return cache_map_entry;
+    }
+
+    if(__builtin_expect(__atomic_load_n(&cache_map_entry, __ATOMIC_RELAXED) == NULL, 0)) {
+        // Create a new page entries
+//				RealX::pthread_spin_lock(&mega_map_lock);
+        ShadowMemory::cache_map_lock.lock();
+        if(__builtin_expect(__atomic_load_n(&cache_map_entry, __ATOMIC_RELAXED) == NULL, 1)) {
+            __atomic_store_n(&cache_map_entry, ShadowMemory::doCacheMapBumpPointer(), __ATOMIC_RELAXED);
+        }
+//				RealX::pthread_spin_unlock(&mega_map_lock);
+        ShadowMemory::cache_map_lock.unlock();
+    }
+
 
 		return cache_map_entry;
 }

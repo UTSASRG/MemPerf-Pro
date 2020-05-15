@@ -366,9 +366,9 @@ void collectAllocMetaData(allocation_metadata *metadata);
 uint64_t cycles_with_improve[MAX_THREAD_NUMBER] = {0};
 uint64_t cycles_without_improve[MAX_THREAD_NUMBER] = {0};
 uint64_t cycles_without_alloc[MAX_THREAD_NUMBER] = {0};
-const size_t improved_cycles_serial[5] = {5586, 640, 472, 11736, 6780};
-const size_t improved_cycles_parallel[5] = {603376, 1303, 1053, 20893, 6624};
-const size_t improved_large_obj_thres = 204808;
+const uint64_t improved_cycles_serial[5] = {5586, 640, 472, 11736, 6780};
+const uint64_t improved_cycles_parallel[5] = {603376, 1303, 1053, 20893, 6624};
+const uint64_t improved_large_obj_thres = 204808;
 
 
 thread_local PerfReadInfo eventOutside_before;
@@ -498,12 +498,12 @@ extern "C" {
 		object = RealX::malloc(sz);
         //fprintf(stderr, "malloc ptr = %p, size = %d\n", object, sz);
         doAfter(&allocData);
-        //fprintf(stderr, "malloc done %d %p\n", sz, object);
-//        allocData.address = (uint64_t) object;
+
         allocData.reused = MemoryWaste::allocUpdate(&allocData, object);
         divideSmallAlloc(allocData.size, allocData.reused);
         size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject(object, allocData.size, false);
         incrementMemoryUsage(sz, allocData.classSize, new_touched_bytes, object);
+
         //Do after
         //fprintf(stderr, "*** malloc(%zu) -> %p\n", sz, object);
 
@@ -569,6 +569,7 @@ extern "C" {
 		object = RealX::calloc(nelem, elsize);
         //fprintf(stderr, "calloc ptr = %p, size = %d\n", object, nelem * elsize);
         doAfter(&allocData);
+
         allocData.reused = MemoryWaste::allocUpdate(&allocData, object);
         divideSmallAlloc(allocData.size, allocData.reused);
         size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject(object, allocData.size, false);
@@ -1558,6 +1559,8 @@ void doBefore (allocation_metadata *metadata) {
     realing = true;
 }
 
+extern void remove_mmprof_counting(allocation_metadata *metadata);
+
 void doAfter (allocation_metadata *metadata) {
     //fprintf(stderr, "Doafter, %d, %d\n", metadata->size, metadata->type);
     realing = false;
@@ -1571,10 +1574,12 @@ void doAfter (allocation_metadata *metadata) {
 	metadata->after.cache_misses -= metadata->before.cache_misses;
 	metadata->after.instructions -= metadata->before.instructions;
 
-	if(metadata->tsc_after > 10000000000) {
+    remove_mmprof_counting(metadata);
+
+    if(metadata->tsc_after > 10000000000) {
 //	    fprintf(stderr, "metadata->tsc_after = %llu\n", metadata->tsc_after);
         metadata->tsc_after = 0;
-	}
+    }
     if(metadata->after.faults > 10000000000) {
 //        fprintf(stderr, "metadata->after.faults = %llu\n", metadata->after.faults);
         metadata->after.faults = 0;
@@ -1595,7 +1600,6 @@ void doAfter (allocation_metadata *metadata) {
 //        fprintf(stderr, "metadata->after.instructions = %llu\n", metadata->after.instructions);
         metadata->after.instructions = 0;
     }
-
 }
 
 void incrementGlobalMemoryAllocation(size_t size) {
@@ -1614,10 +1618,18 @@ void checkGlobalRealMemoryUsage() {
 
 
 void checkGlobalTotalMemoryUsage() {
-    if (mu.totalMemoryUsage > max_mu.totalMemoryUsage) {
-        max_mu.totalMemoryUsage = mu.totalMemoryUsage;
-        MemoryWaste::recordMemory(mu.realMemoryUsage);
+    if(max_mu.totalMemoryUsage >= 100*ONE_MEGABYTE) {
+        if (mu.totalMemoryUsage > max_mu.totalMemoryUsage + 10*ONE_MEGABYTE) {
+            max_mu.totalMemoryUsage = mu.totalMemoryUsage;
+            MemoryWaste::recordMemory(mu.realMemoryUsage, max_mu.totalMemoryUsage);
+        }
+    } else {
+        if (mu.totalMemoryUsage > max_mu.totalMemoryUsage + ONE_MEGABYTE) {
+            max_mu.totalMemoryUsage = mu.totalMemoryUsage;
+            MemoryWaste::recordMemory(mu.realMemoryUsage, max_mu.totalMemoryUsage);
+        }
     }
+
 }
 
 void incrementMemoryUsage(size_t size, size_t classSize, size_t new_touched_bytes, void * object) {
@@ -1852,14 +1864,23 @@ void readAllocatorFile() {
 			num_class_sizes = atoi(token);
 
 			class_sizes = (size_t*) myMalloc (num_class_sizes*sizeof(size_t));
-			for (int i = 0; i < num_class_sizes; i++) {
-				token = strtok(NULL, " ");
-				class_sizes[i] = (size_t) atoi(token);
+			if(bibop) {
+                for (int i = 0; i < num_class_sizes; i++) {
+                    token = strtok(NULL, " ");
+                    class_sizes[i] = (size_t) atoi(token);
+                }
+            } else {
+                for (int i = 0; i < num_class_sizes; i++) {
+                    class_sizes[i] = (size_t) 24 + 16 * i;
+                }
 			}
 			continue;
 		} else if ((strcmp(token, "large_object_threshold")) == 0) {
 			token = strtok(NULL, " ");
 			large_object_threshold = (size_t) atoi(token);
+			if(!bibop) {
+			    class_sizes[num_class_sizes-1] = large_object_threshold;
+			}
 			continue;
 		}
 	}

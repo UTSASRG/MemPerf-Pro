@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <malloc.h>
 #include "libmallocprof.h"
+#include "spinlock.hh"
 
 #define PAGESIZE 4096
 #define NUM_CACHELINES_PER_PAGE 64
@@ -125,11 +126,13 @@ class ShadowMemory {
 				static CacheMapEntry * cache_map_begin;
 				static CacheMapEntry * cache_map_end;
 				static CacheMapEntry * cache_map_bump_ptr;
-				static pthread_spinlock_t mega_map_lock;
+				//static pthread_spinlock_t mega_map_lock;
+                static spinlock mega_map_lock;
 				static eMapInitStatus isInitialized;
 
 		public:
-				static pthread_spinlock_t cache_map_lock;
+				//static pthread_spinlock_t cache_map_lock;
+				static spinlock cache_map_lock;
 				static void doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType);
 				static bool initialize();
 				static inline PageMapEntry ** getMegaMapEntry(unsigned long mega_index);

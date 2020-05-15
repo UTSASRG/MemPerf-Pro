@@ -12,7 +12,7 @@
 #include "libmallocprof.h"
 #include "memsample.h"
 
-#define MAX_OBJ_NUM 4096*4*64
+#define MAX_OBJ_NUM 4096*16*64
 //#define MAX_PAGE_NUM 4096
 
 
@@ -20,16 +20,15 @@ extern int num_class_sizes;
 
 typedef struct {
     //pid_t tid;
-    size_t size_using;
-    size_t classSize;
-    short classSizeIndex;
+    size_t size_using = 0;
+    size_t classSize = 0;
+    short classSizeIndex = 0;
+    size_t max_touched_bytes = 0;
 } objStatus;
 
 class MemoryWaste{
 private:
     static HashMap <void*, objStatus, spinlock, PrivateHeap> objStatusMap;
-    static spinlock record_lock;
-    static char record_time[1024];
 
     static uint64_t* mem_alloc_wasted;
     static uint64_t * mem_alloc_wasted_record;
@@ -69,6 +68,9 @@ private:
     static uint64_t num_free_total;
 
     static long realMem;
+    static long totalMem;
+
+    static spinlock record_lock;
 
 public:
 
@@ -77,9 +79,9 @@ public:
     static bool allocUpdate(allocation_metadata * allocData, void * address);
     static void freeUpdate(allocation_metadata * allocData, void* address);
     ///Here
-    static bool recordMemory(long totalMemory);
+    static bool recordMemory(long realMemory, long totalMemory);
     static uint64_t recordSumup();
-    static void reportMaxMemory(FILE * output, long realMem);
+    static void reportMaxMemory(FILE * output);
 };
 
 #endif //MMPROF_MEMWASTE_H
