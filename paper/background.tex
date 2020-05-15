@@ -19,7 +19,7 @@ BiBOP stands for ''Big Bag of Pages''~\citep{hanson1980}. For BiBOP-style alloca
 
 \label{sec:factors}
 
-Every memory allocator has its own design choices. But they share some similar factors, such as performance, memory, scalability, and application-friendliness. This section will list important metrics of these different factors, which are also collected by \MP{}. 
+Every memory allocator has its own design choices. But they share some similar factors, such as performance, memory, scalability, and application-friendliness. This section will list important metrics for these factors, which are also reported by \MP{}. 
 
 \subsubsection{Performance}
 \label{sec:performance}
@@ -37,10 +37,12 @@ In order to reveal a specific design issue, \MP{} further collects the averaged 
 Memory consumption is a serious concern across different platforms. Therefore, it is important to memory consumption/waste of a memory allocator. Sometimes, an allocator may waste more memory than memory leaks of an application. 
 
 %The memory overhead of an allocator comes from multiple aspects, including metadata overhead, internal fragmentation, external fragmentation, memory blowup, or explicit objects skipping. 
-Based on our understanding, memory consumption of an allocator may have multiple sources. First, it may originate from metadata, such as the memory to track the size or availability of every heap object. Second, it may come from internal fragmentation caused by using size classes. 
- As discussed above, memory allocators utilize multiple size classes to manage heap objects, instead of using the exact size. The difference between the requested size and the size of the corresponding class is internal fragmentation, which cannot be utilized to satisfy other requests. For instance, Hoard manages objects with power-of-2 sizes~\citep{Hoard}, which may waste the memory if the requested size is not power-of-2. 
+Based on our understanding, memory consumption of an allocator may have multiple sources. First, it may originate from metadata, such as the memory to track the size or availability of every heap object. 
+
+
+Second, it may come from internal fragmentation caused by using size classes.  As discussed above, memory allocators utilize multiple size classes to manage heap objects, instead of using the exact size. The difference between the requested size and the size of the corresponding class is internal fragmentation, which cannot be utilized to satisfy other requests. For instance, Hoard manages objects with power-of-2 sizes~\citep{Hoard}, which may waste the memory if the requested size is not power-of-2. 
  
-Third, memory allocators may come from memory blowup. Memory blowup occurs due to the use of multiple heaps for the scalability purpose, where memory deallocations from one heap cannot be utilized to satisfy  concurrent memory requests of another thread~\cite{Hoard}. 
+Third, memory allocators may come from memory blowup. Memory blowup occurs due to the use of multiple heaps for the scalability purpose, where memory deallocations from one heap cannot be utilized to satisfy  subsequent memory requests from another thread~\cite{Hoard}. 
 %In order to solve this issue, Li et. al. employ heuristics to adjust the synchronization frequency dynamically~\cite{DBLP:conf/iwmm/LiLD19}. 
 Since modern allocators typically utilize per-thread heaps or multiple arenas to reduce the contention overhead, memory blowup is a big source of memory consumption. But it is challenging to profile memory blowup, as further described in Section~\ref{sec:profilingmemory}.   
 
@@ -52,89 +54,73 @@ Sometimes, it is impossible to change the size class for few objects inside the 
  Last, some secure allocators may voluntarily skip some objects in order to tolerate buffer overflows~\citep{DieHard, DieHarder, Guarder}. If a buffer overflow lands on non-used objects, it will cause no harm to the applications. However, it is extremely difficult to differentiate explicit skipping and external fragmentation. 
 
 
-For memory consumption, \MP{} reports the number and portion of internal fragmentation, memory blowup, and other overhead separately. Other overhead includes external fragmentation, metadata overhead, and the sum of skipped objects. It is difficult for \MP{} to have the precise data about metadata and the sum of skipped objects. Therefore, \MP{} reports a summary for other memory overhead by subtracting from the total memory usage. For the total memory usage, \MP{} tracks memory related system calls (e.g., \texttt{mmap} or \texttt{sbrk}). \MP{} also reports the real memory usage by tracking memory allocations and deallocations.  
+Overall, for memory consumption, \MP{} reports the number and portion of real memory usage, internal fragmentation, memory blowup, and other overhead separately. Other overhead includes external fragmentation, metadata overhead, and the sum of skipped objects. It is difficult for \MP{} to have the precise information about metadata and the sum of skipped objects. Therefore, \MP{} reports a summary for other memory overhead by subtracting the mentioned ones from the total memory usage. For the total memory usage, \MP{} tracks memory related system calls (e.g., \texttt{mmap} or \texttt{sbrk}). 
+%Overall, \MP{} provides real memory usage of t
+%\MP{} also reports real memory usage by tracking memory allocations and deallocations.  
 
 
 \subsubsection{Scalability} 
 \label{sec:scalability}
 
-The scalability of an allocator can be affected by both hardware and software contention. Hardware contention is mostly related to cache contention. Software contention includes user space contention and kernel contention. 
+The scalability of an allocator can be affected by both hardware and software contention. Hardware contention is mostly related to cache or page contention, which is discussed in Section~\ref{sec: friendliness}. Software contention is the focus here, further including user space contention and kernel contention. 
 
-User space contention of an allocator is typically caused by the usage of locks inside memory management operations. Different allocators have different considerations to reduce user space contention. A common method is utilize multiple arenas~\citep{dlmalloc} or per-thread heaps~\citep{Hoard}, in order to reduce user space contention. Then if an allocation can be satisfied from a per-thread heap, there is no need to acquire a lock~\citep{tcmalloc, jemalloc}. However, this method requires to balance between the performance/scalability and memory blowup~\citep{Hoard}, since blowup will occur if memory deallocations from one thread can not be utilized to satisfy concurrent memory requests of another thread~\cite{Hoard}. 
+\paragraph{User Space Contention} User space contention of an allocator is typically caused by the use of locks inside memory management operations. Based on our observation, different allocators have significant behaviors on lock usage. Some allocators, such as TcMalloc~\citep{tcmalloc} or jemalloc~\citep{jemalloc}, minimize the use of locks via per-thread cache. If an allocation can be satisfied from a per-thread cache, there is no need to acquire a lock. However, some allocators, such as Hoard~\citep{Hoard}, acquire at least a lock for each allocation, although with its per-thread heap. Some allocators, such as DieHarder and OpenBSD, utilize a central heap (and a lock) for each size class, causing too much contention. 
 
-%In order to reduce memory blowup caused by multiple heaps~\citep{Hoard}, allocators also maintain a central heap to balance the memory usage: when the number of freed objects in a per-thread heap is larger than a threshold, objects will be moved to a central heap; when a per-thread heap is running out of memory, it obtains freed objects from the central heap before obtaining from the OS directly. However, using the central heap may introduce lock contention, impacting the scalability.  
+%The average time for each lock acquisition indicates potential lock contention inside. The average time of each critical section helps expose whether the lock contention is due to the heavy workload inside the critical section or not. For instance, if the contention is high, but the average time inside the critical section is low, then this allocator should employ more fine-grained locks to distribute its overhead. In contrast, if the average time inside the critical section is high, then the allocator should possibly move some computation out of the critical section or simplify its management. 
 
+To evaluate user space contention, \MP{} collects per acquisition data, per-operation data, per-lock data, and total information of locks. Per-acquisition data includes the runtime of each lock acquisition and the runtime of each critical section. For per operation, \MP{} reports the number of locks and the average runtime of per-acquisition for different operations, such as new small allocation, re-used small allocation, small deallocation, and large allocation and deallocation.  Further, \MP{} reports the total number of locks inside the allocator, and then reports the number of acquisitions, the contention rate, and the number of acquisitions for each operation for every suspicious lock that may have contention issue. 
  
- Allocators may introduce kernel contention by invoking memory-related system calls frequently, such as \texttt{mmap}, \texttt{munmap}, \texttt{madvise}, and \texttt{mprotect}. These system calls may conflict with each other and with the page fault handler, since a per-process lock should be acquired whenever manipulating  page table or virtual memory of a process. Based on our evaluation, a version of the Linux allocator slows down an application by more than 20\%, due to extensive invocations of the \texttt{madvise} system call. Therefore, it is important to measure  kernel space contention for memory allocators.
- 
- \label{sec:scaleidea}
+\paragraph{Kernel Space Contention} 
+ An allocator may introduce kernel contention by invoking memory-related system calls frequently, such as \texttt{mmap}, \texttt{munmap}, \texttt{madvise}, and \texttt{mprotect}. These system calls may conflict with each other and with the page fault handler. By examining the source code of the Linux kernel, they all acquire a process-based lock (e.g. \texttt{mmap\_sem}) upon the entry of these system calls, causing kernel contention. Based on our evaluation, a version of the Linux allocator slows down an application by more than 20\%, due to extensive invocations of the \texttt{madvise} system call. Therefore, it is important to measure  kernel space contention caused by an memory allocator. \MP{} proposes to utilize the average runtime of each system call to evaluate potential kernel contention, without the change of the kernel code.
 
-\MP{} profiles the scalability issues caused by user-space contention and kernel-space contention separately. 
-
-\paragraph{User Space Contention:} User-space contention can be evaluated by explicit uses of locks. \MP{} obtains the number of lock acquisitions, the average time for each lock acquisition, and the average time of spending under the protection of each lock. \MP{} intercepts standard synchronizations in order to collect the data. 
-%Therefore, some allocators, such as the default Linux allocators or Hoard, will be changed to use the standard synchronizations.  
-
-The average time for each lock acquisition indicates potential lock contention inside. The average time of each critical section helps expose whether the lock contention is due to the heavy workload inside the critical section or not. For instance, if the contention is high, but the average time inside the critical section is low, then this allocator should employ more fine-grained locks to distribute its overhead. In contrast, if the average time inside the critical section is high, then the allocator should possibly move some computation out of the critical section or simplify its management. 
-
-%\MP{} obtains the average acquisition time for locks without the contention at first. Then it could show whether the lock contention of an allocator is significant high or not.
-
-%At the same time, \MP{} also acquires the time within the critical section. This could help expose whether the lock contention is due to the heavy workload inside the critical section or not. This may require the programmers to take two different actions. 
-%In order to reduce unnecessary contention, \MP{} avoids the cache-line based contention. In particular, it utilizes a thread-local pointer that saves the address of thread-local storage. 
-
-\subsubsection{Kernel Contention}
-\MP{} also evaluates the potential kernel contention caused by the allocators, since an allocator may interact with the OS substantially. \MP{} does not require to change the kernel directly to achieve this target. Instead, \MP{} monitors the number and the duration time of memory-related system calls inside the user space, such as \texttt{mmap}, \texttt{munmap}, \texttt{madvise}, \texttt{sbrk}, \texttt{madvise}, or \texttt{mremap}. By examining the source code of the Linux kernel, they will acquire a process-based lock (e.g. \texttt{mmap\_sem}) upon the entry of these system calls, causing the kernel-level contention. If an allocator invokes a much larger number of system calls, or if the average time spending on a system call is higher than the execution time of this system call without the contention, which indicating significant contention side, then the allocator should be improved. 
-
-\MP{} intercepts invocations of these system calls, utilizes the RDTSC timestamps to collect the duration time of each system calls, and saves the duration and the number of invocations to the thread-local storage. In the end, it computes the average time and the number of invocations for each system call. Similarly, the average time can be compared with the time without the contention. Therefore, it is easy to know whether there exists kernel contention or not. Therefore, an allocator can be improved by reducing frequent system calls. This method helps to detect an issue of the Linux allocator, which causes significant slowdown on one application. 
-
- 
-
+For kernel contention, \MP{} reports the average time and the number of invocations for each memory-related system call. Since different operations (e.g., small and large allocation) have different execution paths, \MP{} further reports the number for each particular operation. The differentiation helps identify an issue that may only appear in a particular operation. 
 
 \subsubsection{Application Friendliness}
 \label{sec: friendliness}
 
-Application friendliness indicates whether memory allocations are actually tapped with access patterns of an application. Based on our understanding, multiple metrics, such as cache utilization rate, page utilization rate, and false sharing rate, will significantly impact the performance (and therefore should be measured). For instance, an allocator with a low cache utilization rate may lead to more cache misses and greatly slow down the application, since more cache lines are required to hold the same amount of data. 
+Application friendliness indicates whether memory allocations are tapped with access patterns of an application. Sometimes, application friendliness may have a bigger impact on the performance than memory management performance. For instance, TcMalloc typically has a less memory management overhead than the default allocator, but runs around $48\times$ slower  for \texttt{cache-thrash}. The major reason is that TcMalloc introduces both active and passive false sharing~\cite{tcmallocsharing}. \MP{} reports multiple important metrics that evaluate application-friendliness. 
 
-Application friendliness helps explain the performance difference of using different allocators. For instance, a well-performed allocator (in its allocation and deallocation) may still greatly slowdown the performance of an application, if it is not cache-friendly. Based on our observation, there are multiple factors that could impact the performance of an application.
 
-The first parameter is the cache utilization rate. Cache utilization rate is the percentage of words that are actually holding actual objects. An allocator with a high cache utilization rate will cause less cache misses, benefiting the overall performance. Multiple reason may affect the cache utilization rate. First, some allocators (e.g., the Linux allocator) that  prepend the metadata just before each object may reduce the cache utilization rate. This design is efficient for its memory management, but reduces the performance for normal memory accesses. Every cache load operation caused by a memory access is forced to load the metadata unnecessarily, which is not used during normal executions. 
- %which could load useful data otherwise.  
+The first parameter is cache utilization rate. Cache utilization rate is the percentage of words that are actually holding actual objects. An allocator with a high cache utilization rate will cause less cache misses, benefiting the overall performance. Multiple reason may affect the cache utilization rate. First, some allocators (e.g., the Linux allocator) that prepend the metadata just before each object may reduce  cache utilization rate. Every cache load operation will load the metadata that is not referenced during normal memory access. 
  Second, a coarse-grained size class may also reduce cache utilization rate, due to internal fragmentation. Third, freed objects that are not reutilized timely may also cause a low cache utilization rate. 
 
  %Similarly, if page utilization rate is low, it may cause high TLB misses and prohibitive memory consumption. \MP{} samples memory accesses, and checks the corresponding cache utilization rate and page utilization rate. Overall, \MP{} could report an average cache utilization rate and page utilization rate over all samples. 
 
-The second parameter is page utilization rate. Page utilization rate indicates the percentage of a page that are actively utilized for holding the actual heap data. An allocator with a higher page utilization rate will introduce less page faults and less Translation Lookaside Buffer (TLB) misses. Less page faults and less TLB misses will benefit the performance, since it is  slow to serve a page fault and handle a TLB miss due to the multi-level page table design. Similar to the reasons described above, a low page utilization rate can be caused by the prepending of the metadata, coarse-grained size class, and untimely reutilization of freed objects. 
+The second parameter is page utilization rate. Page utilization rate indicates the percentage of a page that are actively utilized for holding actual data. An allocator with a higher page utilization rate will introduce less page faults and less Translation Lookaside Buffer (TLB) misses. Page utilization rate can be caused by the similar reasons as cache utilization rate.  
 
-The third parameter is cache misses of applications. Cache misses can be caused by conflicting or falsely-shared misses. Upon cache misses, the data has to be loaded from the main memory, which is much slower than accessing the cache directly. 
+The third parameter is active/passive false sharing. False sharing indicates that multiple threads are concurrently accessing different words in the same cache line. Active false sharing is introduced upon first allocations of objects, where an allocator cannot allocate continuous objects in the cache line to the same thread. Passive false sharing is introduced upon deallocations, where a freed object will be utilized by another thread and then cause false sharing in the same cache line. 
 
-Overall, \MP{} employs the PMU hardware to collect these parameters. It employs the PMU-based sampling to sample memory accesses, and collects the data of cache and page utilization data upon sample events, as described in Section~\ref{sec:profilefriendliness}. \MP{} employs PMU to collect cache misses/page faults outside memory management.
+The fourth parameter is cache contention rate outside the allocation. Cache misses can be caused by conflicting or falsely-shared misses. Upon cache misses, the data has to be loaded from the main memory, which is much slower than accessing the cache directly. 
 
-\subsubsection{Important Metrics}
+Overall, \MP{} reports cache utilization rate, page utilization rate, cache contention rate, and false sharing effect. For false sharing effect, \MP{} not only reports the number of cache lines that have active and passive false sharing, but also reports the rate of conflicting accesses. The reported result also helps explain the performance slowdown issue. 
+%employs the PMU hardware to collect these parameters. It employs the PMU-based sampling to sample memory accesses, and collects the data of cache and page utilization data upon sample events, as described in Section~\ref{sec:profilefriendliness}. \MP{} employs PMU to collect cache misses/page faults outside memory management.
 
+\subsubsection{Summary of Important Metrics}
 
-Based on the above description. 
+As described above, \MP{} reports many important metrics of an allocator, as further described in Table~\ref{table:metrics}. These metrics help answer whether an allocator is the culprit of performance issue, and help identify a particular design issue inside the allocator. Table ~\ref{table:metrics} also provides collection techniques for specific metrics, which is further discussed in Section~\ref{sec:idea}. 
+
 \begin{table}[h]
   \centering
   \footnotesize
  % \setlength{\tabcolsep}{1.0em}
 \begin{tabular}{l | l | l}
 \hline
-Category & Metrics & Collection Techniques \\ \hline
-\multirow{2}{*}{Performance Overhead} & {Alloc/Free runtime} & RDTSC Timestamp\\ \cline{2-3}
+Category & Important Metrics & Collection Techniques \\ \hline
+\multirow{2}{*}{Performance} & {Alloc/Free runtime} & Timestamp\\ \cline{2-3}
 & {Cache misses, page faults, TLB misses, instructions} & Performance Monitoring Units (PMU) \\ \hline
-\multirow{3}{*}{Memory Overhead} & Internal fragmentation & \\ \cline{2-3}
+\multirow{4}{*}{Memory} & Internal fragmentation & \\ \cline{2-3}
 	& Memory blowup &  \\ \cline{2-3}
-& {External fragmentation \& others} &  \\ \hline
-\multirow{2}{*}{Scalability} & Lock's acquisition, contention rate, runtime & RDTSC timestamp\\ \cline{2-3}
-& {Number and runtime of memory related syscalls} &  RDTSC timestamp \\ \hline
-\multirow{4}{*}{Application Friendliness} & Cache/page utilization rate & PMU  \\ \cline{2-3}
-& Active/Passive False Sharing &  PMU\\ \cline{2-3}
-& Inside-Object Cache Contention &  PMU \\ \cline{2-3}
-& Cache misses, page faults, TLB misses & PMU\\ \hline
+& {Other overhead (e.g., external fragmentation)} &  \\ \cline{2-3}
+& Real memory usage & \\ \hline
+\multirow{2}{*}{Scalability} & \specialcell{User space contention: per-lock data} & Timestamp\\ \cline{2-3}
+& {Kernel space contention: per-syscall data} &  Timestamp \\ \hline
+\multirow{3}{*}{Application Friendliness} & Cache/page utilization rate & PMU  \\ \cline{2-3}
+& False sharing effect &  PMU\\ \cline{2-3}
+& Cache contention rate &  PMU \\ \hline
   \end{tabular}
   \centering
-  \caption{Allocator metrics and collection methods.\label{table:alldata}}
+  \caption{Important metrics and collection methods.\label{table:metrics}}
 \end{table}
 
-\paragraph{Overall Metrics:} 
 
 

@@ -13,3 +13,13 @@
     
     \end{tabular}
 \end{table}
+
+We also have some common observations on a performant allocator. 
+
+\paragraph{Synchronization:} It is better to design per-thread cache, such as TcMalloc, jemalloc, so that there is no need to acquire a lock if an allocation can be satisfied from a per-thread heap. Hoard, although with its per-thread heap design, actually can be slowed down a lot via its hashing mechanism, and . 
+
+\paragraph{Active/Passive False Sharing:} TcMalloc although with the good performance, but it has very serious both active and passive false sharing. This could significantly slowdown the performance, even if it has almost the fast allocation/deallocation. For instance, 
+
+\paragraph{Cache Misses:} 
+
+\paragraph{Kernel space synchronization:} Kernel contention is actually very common based on our evaluation. But it is sometimes difficult to evaluate its potential impact. 
