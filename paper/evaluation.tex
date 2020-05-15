@@ -38,18 +38,19 @@ For the evaluation, we use the default configurations of these allocators. Howev
 
 \begin{figure}[!ht]
 \centering
-\includegraphics[width=3in]{figures/perfoverhead}
+\includegraphics[width=5.5in]{figures/perfoverhead}
 \caption{Performance overhead of \texttt{mmprof}, normalized to the runtime of default Linux allocator.\label{fig:overhead}}
 \end{figure}
 
-We will evaluate the performance overhead of the profiler itself. 
+We also evaluate the performance overhead of 
+\MP{} using two benchmark suites, Phonix and PARSEC, and four synthetics applications. The performance overhead can be seen in Figure~\ref{fig:overhead}. 
+
+For this figure, we can see that \MP{} runs $2.6\times$ slower than the default allocator. Multiple reasons may contribute to the overhead. 
 
 
 \subsection{Memory Overhead}
 \label{sec:memory}
-
-We will evaluate the performance overhead of the profiler itself. 
-
+\input{memory}
 \begin{comment}
 
 \subsection{Range of Allocator Metrics}
