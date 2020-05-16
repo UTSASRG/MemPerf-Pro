@@ -19,7 +19,7 @@ In order to investigate the performance impact, we evaluated the following alloc
 
 \begin{figure}[!ht]
 \centering
-\includegraphics[width=5in]{figures/regular-performance}
+\includegraphics[width=\columnwidth,height=125pt]{figures/regular-performance}
 \caption{Performance Difference When Using Different Allocators\label{fig:motivation}}
 \end{figure}
 
@@ -82,12 +82,12 @@ Overall, this paper makes the following contributions.
 
 \begin{itemize}
 \item It will quantify application-friendliness, which is not available in existing work, and which helps users to decide which allocator should be used for a specific application. 
-\item It will provide the memory usage (overhead) information, such as internal fragmentation, and objects that are not freed but ynot used at all. 
-\item It will provide some information that only exists in multiple profilers, for instance, the average number of instructions of each allocation and deallocation, the average time spending in each allocation and deallocation (PMU sampling will be placed outside the time spanning), (not how long this allocation and deallocation has been sampled), whether there are some contentions during allocation (user space and kernel space), how many lock acquisitions.  
+\item It will provide the memory usage (overhead) information, such as internal fragmentation, and objects that are not freed but yet which remain unused. 
+\item It will provide some information that only exists across multiple profilers, for instance, the average number of instructions of each allocation and deallocation, the average time spent within each allocation and deallocation (PMU sampling will be placed outside of the time span, thus not avoiding an erroneous measurement of how long this allocation and deallocation request has been sampled), whether there are some contentions during allocation (user space and kernel space), how many lock acquisitions.  
 \end{itemize}
  	
 \end{comment}
 
 \subsection*{Outline}
 
-The remained of this paper is organized as follows. Section~\ref{sec:background} discusses the background of memory allocators, and the basic idea and challenges of \MP{}. Then Section~\ref{sec:implementation} presents the detailed implementation. After that, Section~\ref{sec:evaluation} shows the results of experiments on different allocators using \MP{}, and Section~{sec:limitation} discusses some limitation. In the end,  Section~\ref{sec:relatedwork} discusses related work in this field, and Section~\ref{sec:conclusion} concludes this paper. 
+The remained of this paper is organized as follows. Section~\ref{sec:background} discusses the background of memory allocators, and the basic idea and challenges of \MP{}. Then Section~\ref{sec:implementation} presents the detailed implementation. After that, Section~\ref{sec:evaluation} shows the results of experiments on different allocators using \MP{}, and Section~\ref{sec:limitation} discusses some limitations. In the end, Section~\ref{sec:relatedwork} discusses related work in this field, and Section~\ref{sec:conclusion} concludes this paper.

@@ -44,18 +44,23 @@ For the evaluation, we use the default configurations of these allocators. Howev
 We also evaluate the performance overhead of 
 \MP{} using PARSEC~\citep{parsec},  Phoenix~\citep{phoenix}, and multiple synthetic applications from Hoard~\cite{Hoard}. The performance overhead can be seen in Figure~\ref{fig:overhead}, which is the average value of five executions. From this figure, we can see that \MP{} runs $2.6\times$ slower than the default allocator, where two applications (\texttt{histogram} and \texttt{threadtest}) impose over $5\times$ performance overhead. Based on our understanding, both the number of memory operations and the number of lock acquisitions can significant impact  the performance overhead of \MM{}. To help the explanation, we further collect the characteristics of these applications, as shown in Table~\ref{table:characteristics}.  
 
-First, if some applications invoke extensive applications and deallocations in a short period of time, then \MP{} may introduce a large performance overhead. For each memory operation, \MP{} invokes two RDTSC instructions to collect the runtime,  updates multiple counters, and updates the state in the global hash table.  For instance, \todo{}. 
+First, if an application invokes extensive applications and deallocations in a short period of time, then \MP{} may introduce a large performance overhead. For each memory operation, \MP{} invokes two RDTSC instructions to collect the runtime,  updates multiple counters, and updates the state in the global hash table.  Second, the number of lock acquisitions inside memory operations could also significantly affect the performance. Similarly, \MP{} also collects the runtime data of each lock acquisition via the RDTSC instruction, and update different counters. 
+Since \texttt{canneal} invokes 11 million memory operations and 0.3 million locks acquisitions per second, and \texttt{threadtest} will has 6 million memory operations and 33 lock acquisitions per second, that explains why these applications have larger performance overhead with \MP{}.  
 
-Second, the number of lock acquisitions inside memory operations could also significantly affect the performance. Similarly, \MP{} also collects the runtime data of each lock acquisition via the RDTSC instruction, and update different counters. 
+\texttt{histogram} program is an exception, since it has a small number of allocations. For this application, \MP{} has an initialization phase to perform the initialization, and an finalization phase to analyze the data and write out results to the external file. But \texttt{histogram} only takes 0.12 seconds to finish. Therefore, \MP{} adds more overhead than the program's execution time. \texttt{linear\_regression} has the same issue, with the total execution time of 0.3 seconds.  
+%for some tiny applications like \texttt{histogram}, which only takes 0.1 second when running along, \MP{}'s initialization and conclusion would take more time than themselves. Thus, performance overhead ratios for tiny applications could be larger.
+%\texttt{threadtest} actually imposes more performance overhead, due to the reason that most memory opeations are actually 
+
+
 
 %some applications invoke allocations intensively and almost simultaneously from different threads, \MP{} may introduce more contention in the hash table when checking every object's status, and higher contention rates would cause programs' slowdown.
-
+\begin{comment}
 For example, according to \ref{sec:memory}, 
-canneal 2.86x   11438194.73 (alloc+free)/sec    42282925 alloc+free
-reverse_index 4.59x 973245.43 (alloc+free)/sec 40000387 alloc+free
-threadtest 7.21x 6228715.40 (alloc+free)/sec 256000203 alloc+free
+canneal 2.86x   11438194.73 (alloc+free)/sec    42282925 alloc+free 311044.69 lockacqs/sec
+reverse_index 4.59x 973245.43 (alloc+free)/sec 40000387 alloc+free 120407.33 lockacqs/sec
+threadtest 7.21x 6 228 715.40 (alloc+free)/sec 256000203 alloc+free 33 239 532.98 lockacqs/sec
 
-\MP{} has a serial stage of initialization, and an ending part for writing results. Therefore for some tiny applications like \texttt{histogram}, which only takes 0.1 second when running along, \MP{}'s initialization and conclusion would take more time than themselves. Thus, performance overhead ratios for tiny applications could be larger.
+
 
 For example, according to \ref{sec:memory}, 
 linear_regression 4.56x, 0.3s when running alone, 2 alloc+free
@@ -63,6 +68,8 @@ word_count 4.26x, 1.71s when running alone, 1 alloc
 histogram 10.23x, 0.12s when running alone, 4 alloc+free
 
 Upon every allocation and deallocation, \MP{} collects the runtime and acquisition information.
+
+\end{comment}
 
 \begin{table}[h]
   \centering
