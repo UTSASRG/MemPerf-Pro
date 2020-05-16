@@ -6,10 +6,10 @@
   \setlength{\tabcolsep}{0.2em}
 \begin{tabular}{l | l | l | l | l}
 \hline
-Applications & Allocator & Abnormal Metrics & Possible Root Cause \\ \hline
+Applications & Allocator & Behavior & Abnormal Metrics & Possible Root Cause \\ \hline
 cache-thrash & TcMalloc & $47.7\times$ slowdown & Contention rate for PFS lines: 50\% & Root Cause \RN{1} \\ \hline
 dedup & glibc-2.21 & 20\% slowdown &  \# of Madvise for small allocations: & Root Cause \RN{2} \\ \hline
-freqmine & jemalloc &  Memory consumption & memory blowup: 2174230K (37\%) & Root Cause \RN{3} \\ 
+freqmine & jemalloc &  Excessive Memory consumption & memory blowup: 2174230K (37\%) & Root Cause \RN{3} \\ 
  & &  & external fragmentation: 1132045K (19\%) \\ \hline
 swaptions  &  DieHarder  & $9\times$ slowdown  & 
 	Small reused alloc: 377476 cycles 	& Root Cause \RN{4} \\
