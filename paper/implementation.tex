@@ -149,6 +149,4 @@ The second step is to identify the sizes of the various different size classes. 
 	
 \end{comment}
 
-
-The threshold for big objects are typically detected by checking whether there is an explicit \texttt{mmap} system call upon the allocation. Typically, most allocators utilize a direct \texttt{mmap} system call to satisfy the allocation for a big object initially. However, this threshold requires the manual confirmation. 
-
+The threshold for big objects are typically detected by checking whether there is an explicit \texttt{mmap} system call upon the allocation request. Typically, most allocators utilize a direct \texttt{mmap} system call to satisfy the allocation of a big object initially. However, this threshold requires manual confirmation.

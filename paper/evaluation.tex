@@ -1,21 +1,21 @@
 \section{Experimental Evaluation}
 \label{sec:evaluation}
 
-The experimental evaluation will answer the following questions:
+This experimental evaluation will answer the following questions:
 \begin{itemize}
-\item How is the effectiveness of \MP{}? (Section~\ref{sec:effectiveness}) 	
+\item What is the effectiveness of \MP{}? (Section~\ref{sec:effectiveness}) 	
 \item What is the performance overhead of \MP{}? (Section~\ref{sec:perf})
 \item What is the memory overhead of \MP{}? (Section~\ref{sec:memory})
 \end{itemize}
 
-Experiments were performed on a two-processor machine, where each processor is Intel(R) Xeon(R) Gold 6230 and each processor has 20 cores. This machine has 256GB of main memory, 20MB of L2 cache, and 1280KB L1 cache. The underlying OS is Ubuntu 18.04.3 LTS, installed with the Linux-5.3.0-40. All applications were compiled using GCC-7.5.0, with -O2 and -g flags.
+Experiments were performed on a two-processor machine, where each processor is Intel(R) Xeon(R) Gold 6230 and each processor has 20 cores. This machine has 256GB of main memory, 20MB of L2 cache, and 1280KB L1 cache. The underlying OS is Ubuntu 18.04.3 LTS, installed with the Linux-5.3.0-40. All applications were compiled using GCC-7.5.0, with \texttt{-O2} and \texttt{-g} flags.
 
 \subsection{Effectiveness}
 \label{sec:effectiveness}
 
 In order to evaluate the effectiveness, we evaluate \MP{} with five widely-used allocators, including two versions of the Linux allocator (version 2.21 and 2.28), TCMalloc~\citep{tcmalloc}, jemalloc, and Hoard, and two secure allocators, i.e. DieHarder and OpenBSD. These allocators include both sequential and BiBOP-style allocators. Secure allocators were included, since they have their unique memory management policies. 
 
-For the evaluation, we use the default configurations of these allocators. However, we make some changes in order to  intercept synchronizations. Since Linux allocators are included in \texttt{glibc} libraries, they invoke the internal synchronizations ( \texttt{lll\_lock}) directly, which cannot be intercepted by \MP{}. They are recompiled separately as a stand-alone library. Since Hoard are using \texttt{std::lock\_guard} for its synchronization,  we replaced them with POSIX spin locks to track its synchronization behavior.
+For the evaluation, we use the default configurations of these allocators. However, we make some changes in order to  intercept synchronizations. Since Linux allocators are included in \texttt{glibc} libraries, they invoke the internal synchronizations (\texttt{lll\_lock}) directly, which cannot be intercepted by \MP{}. They are recompiled separately as a stand-alone library. Because Hoard is using \texttt{std::lock\_guard} for its synchronization, we replaced them with POSIX spin locks to track its synchronization behavior.
 
 %\todo{Let's use a table to list all dramatic difference between these allocators. This gives us some evidence of allocators}
 %\subsection{Issues Identified in Different Allocators}
