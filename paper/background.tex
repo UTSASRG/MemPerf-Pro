@@ -1,23 +1,25 @@
 \section{Motivated Example}
 \label{sec:motivation}
 
-As described above, existing profilers cannot help identify some performance issues caused by the memory allocator. Let us use \texttt{threadtest} shown in Figure~\ref{fig:motivation} as an example. For this application, TcMalloc runs around $48\times$ slower than the default Linux allocator. We are using perf, gprof, and Coz for analyzing the performance of using the TcMalloc data.  The perf's result is shown in Figure~\ref{fig:mot1}, and gprof's result is shown as Figure~\ref{fig:mot3}. 
+As described above, existing profilers cannot help identify some performance issues caused by the memory allocator. Let us use \texttt{cache-thrash} shown in Figure~\ref{fig:motivation} as an example. For this application, TcMalloc runs around $48\times$ slower than the default Linux allocator. We are using perf, gprof, and Coz to analyze the performance issue.  The perf's result is shown in Figure~\ref{fig:mot1}, and gprof's result is shown as Figure~\ref{fig:mot3}. 
 
-The perf tool reports that over 43\% time is actually spending inside \texttt{ld.so.2} library, which has nothing to do with the real example. For this application, TcMalloc actually introduces both active and passive false sharing issue, which is the major cause for this large slowdown. The gperf tool actually reports that 100\% time is spending inside the worker function, which also has no relation with the real issue. Similarly, Coz also cannot identify the issue that are caused by hardware contention~\cite{DBLP:conf/osdi/ZhouGMW18}. For this example, the first line of the code that can be improved by $XX$ is actually located in line $XX$ of \texttt{} file. That is also nothing related to the allocator.  
+The perf tool reports that over 99.81\% time is actually spending inside the \texttt{worker} function, without pinpointing the real issue. Similarly, The gprof tool actually reports that 100\% time is spending inside the \texttt{worker} function. Coz is a little better, which reports the program lines of exercising the objects with passive false sharing issues, i.e. line 85-87 of \texttt{cache-thrash.cpp}. Coz further predicts that the performance can be improved up to 10\% if these lines are improved by 100\%. However, Coz cannot tell whether these lines are actually caused by passive false sharing issues caused by the corresponding allocators. 
+
+%For this application, TcMalloc actually introduces both active and passive false sharing issue, which is the major cause for this large slowdown.  Similarly, Coz also cannot identify the issue that are caused by hardware contention~\cite{DBLP:conf/osdi/ZhouGMW18}. For this example, the first line of the code that can be improved by $XX$ is actually located in line $XX$ of \texttt{} file. That is also nothing related to the allocator.  
 
 \begin{figure}[!ht]
 \centering
-\includegraphics[width=\columnwidth]{figures/threadtest-tcmalloc}
-\caption{Profiling result of perf, for \texttt{threadtest} with the TcMalloc allocator. \label{fig:mot1}}
+\includegraphics[width=\columnwidth]{figures/perf-cache-thrash-tcmalloc}
+\caption{Profiling result of perf, for \texttt{cache-thrash} with the TcMalloc allocator. \label{fig:mot1}}
 \end{figure}
 
 \begin{figure}[!ht]
 \centering
-\includegraphics[width=\columnwidth]{figures/regular-performance}
-\caption{Profiling result of gprof\label{fig:mot2}}
-\end{figure}
+\includegraphics[width=\columnwidth]{figures/gprof-cache-thrash-tcmalloc}
+\caption{Profiling result of gprof, for \texttt{cache-thrash} with the TcMalloc allocator.\label{fig:mot2}}
+\end{figure}    
 
-In contrast, \MP{} reports this problem as passive false sharing issue, which is the real issue caused by the allocator. \MP{} reports a range of metrics for evaluating an allocator, such as memory overhead, and other issues. 
+In contrast, \MP{} reports this problem as passive false sharing issues caused by the allocator, only one parameter inside application-friendliness. \MP{} also reports a range of metrics for evaluating an allocator, such as memory overhead.   
 
 \section{Background and Overview}
 \label{sec:background}
