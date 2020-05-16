@@ -13,7 +13,7 @@ Experiments were performed on a two-processor machine, where each processor is I
 \subsection{Effectiveness}
 \label{sec:effectiveness}
 
-In order to evaluate the effectiveness, we evaluate \MP{} with five general purpose allocators, e.g. two versions of the Linux allocator (version 2.21 and 2.28), TCMalloc~\citep{tcmalloc}, jemalloc, and Hoard, and two secure allocators, i.e. DieHarder and OpenBSD. These allocators include both sequential and BiBOP-style allocators. Secure allocators were included, since they have their memory management policies. 
+In order to evaluate the effectiveness, we evaluate \MP{} with five general purpose allocators, e.g. two versions of the Linux allocator (version 2.21 and 2.28), TCMalloc~\citep{tcmalloc}, jemalloc, and Hoard, and two secure allocators, i.e. DieHarder and OpenBSD. These allocators include both sequential and BiBOP-style allocators. Secure allocators were included, since they have their unique memory management policies. 
 
 For the evaluation, we use the default configurations of these allocators. However, we make some changes in order to the interception of synchronizations. Since Linux allocators are included in \texttt{glibc} libraries, they invokes the internal synchronizations as \texttt{lll\_lock}, which cannot be intercepted by \MP{}. They are compiled separately as a stand-alone library. Since Hoard are using \texttt{std::lock\_guard} for its synchronization, which cannot be intercepted, we replaced them with POSIX spin locks to track its synchronization behavior.
 
@@ -42,20 +42,70 @@ For the evaluation, we use the default configurations of these allocators. Howev
 \end{figure}
 
 We also evaluate the performance overhead of 
-\MP{} using two benchmark suites, Phonix and PARSEC, and four synthetics applications. The performance overhead can be seen in Figure~\ref{fig:overhead}. 
+\MP{} using PARSEC~\citep{parsec},  Phoenix~\citep{phoenix}, and multiple synthetic applications from Hoard~\cite{Hoard}. The performance overhead can be seen in Figure~\ref{fig:overhead}. 
 
-For this figure, we can see that \MP{} runs $2.6\times$ slower than the default allocator. Multiple reasons may contribute to the overhead. 
+For this figure, we can see that \MP{} runs $2.6\times$ slower than the default allocator, where only two applications, such as \texttt{histogram} and \texttt{threadtest}, impose over $5\times$ performance overhead. Based on our understanding, the following factors contribute to the performance overhead. 
 
+Upon every allocation and deallocation, \MP{} collects the runtime and acquisition information.
 
+\begin{table}[h]
+  \centering
+  \footnotesize
+  \setlength{\tabcolsep}{0.2em}
+\begin{tabular}{l|c|r|r|r|r}
+\hline
+\multicolumn{1}{c|}{Application} & 
+\multicolumn{1}{c|}{Runtime}    & 
+\multicolumn{1}{c|}{New Alloc}     & 
+\multicolumn{1}{c|}{Reused Alloc}     & 
+\multicolumn{1} {c|}{Free}     & 
+\multicolumn{1}{c}{Lock Acqs} \\ \hline
+  blackscholes &  & \\ \hline   
+   bodytrack& &  \\ \hline    
+   cache-scratch & &\\ \hline    
+   cache-thrash& &\\ \hline    
+   canneal& & \\ \hline    
+   dedup& & \\ \hline    
+   facesim& & \\ \hline    
+   ferret& & \\ \hline    
+   fluidanimate& & \\ \hline    
+   freqmine& & \\ \hline    
+   histogram& & \\ \hline    
+   kmeans& & \\ \hline    
+   larson& & \\ \hline    
+   linear_regression& & \\ \hline    
+   matrix_multiply& & \\ \hline    
+   pca& & \\ \hline    
+   raytrace& & \\ \hline    
+   reverse_index&&\\ \hline    
+   streamcluster&&\\ \hline    
+   string_match&&\\ \hline    
+   swaptions&&\\ \hline    
+   threadtest&&\\ \hline    
+   vips&&\\ \hline    
+   word_count&&\\ \hline   
+   x264&&\\ \hline    \hline 
+      Total&{\bf }&{\bf }\cr\hline   
+  
+     \hline
+  \end{tabular}
+  \caption{Characteristics of applications\label{table:characteristics}}
+\end{table}
 \subsection{Memory Overhead}
 \label{sec:memory}
 \input{memory}
+
+
 \begin{comment}
 
 \subsection{Range of Allocator Metrics}
 We will provide the metrics to evaluate the allocators, based on the averaged value. 
 \todo{What types of metrics should we used? For instance, what type of policy should we used to exclude an allocator, and then get the value of the allocator. 20\%}
 We will provide a table that can be utilized to evaluate all future allocators. 
-	
+
+
+%Jin
+
+
 \end{comment}
 
