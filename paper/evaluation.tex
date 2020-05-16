@@ -42,9 +42,25 @@ For the evaluation, we use the default configurations of these allocators. Howev
 \end{figure}
 
 We also evaluate the performance overhead of 
-\MP{} using PARSEC~\citep{parsec},  Phoenix~\citep{phoenix}, and multiple synthetic applications from Hoard~\cite{Hoard}. The performance overhead can be seen in Figure~\ref{fig:overhead}. 
+\MP{} using PARSEC~\citep{parsec},  Phoenix~\citep{phoenix}, and multiple synthetic applications from Hoard~\cite{Hoard}. The performance overhead can be seen in Figure~\ref{fig:overhead}, which is the average value of five executions. From this figure, we can see that \MP{} runs $2.6\times$ slower than the default allocator, where two applications (as \texttt{histogram} and \texttt{threadtest}) impose over $5\times$ performance overhead. Based on our understanding, the following factors contribute to the performance overhead of \MM{}. To help the explanation, we further collect the  details of these applications, as shown in Table~\ref{table:characteristics}. 
 
-For this figure, we can see that \MP{} runs $2.6\times$ slower than the default allocator, where only two applications, such as \texttt{histogram} and \texttt{threadtest}, impose over $5\times$ performance overhead. Based on our understanding, the following factors contribute to the performance overhead. 
+First, if some applications invoke extensive applications and deallocations in a short period of time, then \MP{} may introduce a large performance overhead. For each memory operation, \MP{} invokes two RDTSC instructions to collect the runtime,  updates multiple counters, and updates the state in the global hash table.  For instance, \todo{}. 
+
+Second, the number of lock acquisitions inside memory operations could also significantly affect the performance. Similarly, \MP{} also collects the runtime data of each lock acquisition via the RDTSC instruction, and update different counters. 
+
+%some applications invoke allocations intensively and almost simultaneously from different threads, \MP{} may introduce more contention in the hash table when checking every object's status, and higher contention rates would cause programs' slowdown.
+
+For example, according to \ref{sec:memory}, 
+canneal 2.86x   11438194.73 (alloc+free)/sec    42282925 alloc+free
+reverse_index 4.59x 973245.43 (alloc+free)/sec 40000387 alloc+free
+threadtest 7.21x 6228715.40 (alloc+free)/sec 256000203 alloc+free
+
+\MP{} has a serial stage of initialization, and an ending part for writing results. Therefore for some tiny applications like \texttt{histogram}, which only takes 0.1 second when running along, \MP{}'s initialization and conclusion would take more time than themselves. Thus, performance overhead ratios for tiny applications could be larger.
+
+For example, according to \ref{sec:memory}, 
+linear_regression 4.56x 0.3s when running alone 2 alloc+free
+word_count
+
 
 Upon every allocation and deallocation, \MP{} collects the runtime and acquisition information.
 
@@ -60,31 +76,31 @@ Upon every allocation and deallocation, \MP{} collects the runtime and acquisiti
 \multicolumn{1}{c|}{Reused Alloc}     & 
 \multicolumn{1} {c|}{Free}     & 
 \multicolumn{1}{c}{Lock Acqs} \\ \hline
-  blackscholes 16.7 & 8 & 1 & 7 & 11 \\ \hline   
-   bodytrack& 8.5 & 20150 & 460616 & 480765 & 871397 \\ \hline    
-   cache-scratch \\ \hline    
-   cache-thrash  \\ \hline  
+  blackscholes & 16.7 & 8 & 1 & 7 & 11 \\ \hline   
+   bodytrack & 8.5 & 20150 & 460616 & 480765 & 871397 \\ \hline    
+   cache-scratch & 3.0 & 44 & 400000 & 400043 & 47 \\ \hline    
+   cache-thrash  & 2.4 & 43 & 3999960 & 4000002 & 45\\ \hline  
    canneal & 29.4 & 8756242 & 12385221 & 21141462 & 9144714 \\ \hline    
    dedup & 12.7 & 3384984 & 683368 & 1750378 & 4864027 \\ \hline    
    facesim & 159.2 & 953143 & 3955049 & 4094483 & 1678963 \\ \hline    
    ferret & 25.3 & 149680 & 236867 & 415914 & 417370\\ \hline    
-   fluidanimate 12.3 & 229912 & 1 & 229913 & 307124 \\ \hline    
-   freqmine 20.2 & 1810 & 4 & 1070 & 15926 \\ \hline    
-   histogram 0.12 & 2 & 0 & 2 & 3 \\ \hline    
-   kmeans 16.4 & 200691 & 533 & 200579 & 303705 \\ \hline    
-   larson& & \\ \hline    
-   linear_regression 0.3 & 1 & 0 & 1 & 2 \\ \hline    
-   matrix_multiply 4.8 & 83 & 0 & 82 & 85 \\ \hline    
-   pca 9.2 & 16131 & 29 & 72 & 16466 \\ \hline    
-   raytrace 41.1 & 5000115 & 15000100 & 20000172 & 5000240 \\ \hline   
-   reverse_index 1.5 & 1632810 & 106173 & 1738982 & 1806110\\ \hline  
-   streamcluster 23.5 & 47 & 8798 & 8844 & 17622\\ \hline    
-   string_match 0.6 & 8 & 0 & 7 & 10 \\ \hline    
-   swaptions 14.5 & 2040 & 47999756 & 48000385 & 48002039\\ \hline    
-   threadtest&&\\ \hline    
+   fluidanimate & 12.3 & 229912 & 1 & 229913 & 307124 \\ \hline    
+   freqmine & 20.2 & 1810 & 4 & 1070 & 15926 \\ \hline    
+   histogram & 0.12 & 2 & 0 & 2 & 3 \\ \hline    
+   kmeans & 16.4 & 200691 & 533 & 200579 & 303705 \\ \hline    
+   larson & 15.1 & 2408955 & 33726797 & 36095750 & 38088835 \\ \hline   
+   linear_regression & 0.3 & 1 & 0 & 1 & 2 \\ \hline    
+   matrix_multiply & 4.8 & 83 & 0 & 82 & 85 \\ \hline    
+   pca & 9.2 & 16131 & 29 & 72 & 16466 \\ \hline    
+   raytrace & 41.1 & 5000115 & 15000100 & 20000172 & 5000240 \\ \hline   
+   reverse_index & 1.5 & 1632810 & 106173 & 1738982 & 1806110\\ \hline  
+   streamcluster & 23.5 & 47 & 8798 & 8844 & 17622\\ \hline    
+   string_match & 0.6 & 8 & 0 & 7 & 10 \\ \hline    
+   swaptions & 14.5 & 2040 & 47999756 & 48000385 & 48002039\\ \hline    
+   threadtest & 7.7 & 1280122 & 126720000 & 128000081 & 255944404\\ \hline    
    vips 6.5 & 8128 & 1420072 & 1428019 & 1526404\\ \hline    
-   word_count 1.7 & 1 & 0 & 0 & 2\\ \hline   
-   x264 24.2 & 10 & 0 & 9 & 13\\ \hline    \hline 
+   word_count & 1.7 & 1 & 0 & 0 & 2\\ \hline   
+   x264 & 24.2 & 10 & 0 & 9 & 13\\ \hline    \hline 
    
      \hline
   \end{tabular}

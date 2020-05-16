@@ -19,7 +19,7 @@ BiBOP stands for ''Big Bag of Pages''~\citep{hanson1980}. For BiBOP-style alloca
 
 \label{sec:factors}
 
-Every memory allocator has its own design choices. But they share some similar factors, such as performance, memory, scalability, and application-friendliness. This section will list important metrics for these factors, which are also reported by \MP{}. 
+Every memory allocator has its own design choices. But they share some similar factors, such as performance, memory, scalability, and application-friendliness. This section will list important metrics for these factors, which will be also reported by \MP{}. 
 
 \subsubsection{Performance}
 \label{sec:performance}
@@ -29,22 +29,19 @@ The performance of using a memory allocator depends on two aspects, the performa
 The performance overhead can be evaluated with the average number of instructions and the average runtime for each allocation and deallocation. The average data is more intuitive and understandable than the summary value. As described above, a memory allocator has different execution paths for different types of allocations/deallocations. Therefore, \MP{} further differentiates the type of memory operation during the profiling, such as new or re-used allocations for small objects, deallocations for small objects, and allocations/deallocations for large objects. By doing this, \MP{} is able to identify an issue inside one particular execution path. 
 %\MP{} relies on a configuration file to obtain the threshold between small and big objects, and . 
 
-In order to reveal a specific design issue, \MP{} further collects the averaged number of instructions, cache misses, and TLB misses for each operation, which are important reasons for the performance issue. For instance, a large number of instructions possibly indicates an inefficient design of an allocator. 
+In order to reveal a specific design issue, \MP{} further collects the averaged number of instructions, cache misses, and TLB misses for each operation, which are important factors for diagnosing the performance issue. For instance, we use the number of cache misses inside DieHarder to diagnose its design issue for its memory deallocations. 
+%a large number of instructions possibly indicates an inefficient design of an allocator. 
 
 \subsubsection{Memory Consumption}
 \label{sec:memoryconsumption}
 
-Memory consumption is a serious concern across different platforms. Therefore, it is important to memory consumption/waste of a memory allocator. Sometimes, an allocator may waste more memory than memory leaks of an application. 
-
-%The memory overhead of an allocator comes from multiple aspects, including metadata overhead, internal fragmentation, external fragmentation, memory blowup, or explicit objects skipping. 
-Based on our understanding, memory consumption of an allocator may have multiple sources. First, it may originate from metadata, such as the memory to track the size or availability of every heap object. 
-
+Memory consumption is a serious concern across different platforms. Therefore, it is important to memory consumption/waste of a memory allocator. Sometimes, an allocator may waste more memory than memory leaks of an application. Based on our understanding, memory consumption of an allocator may have multiple sources. First, it may originate from the metadata, such as the memory to track the size or availability of every heap object. 
 
 Second, it may come from internal fragmentation caused by using size classes.  As discussed above, memory allocators utilize multiple size classes to manage heap objects, instead of using the exact size. The difference between the requested size and the size of the corresponding class is internal fragmentation, which cannot be utilized to satisfy other requests. For instance, Hoard manages objects with power-of-2 sizes~\citep{Hoard}, which may waste the memory if the requested size is not power-of-2. 
  
-Third, memory allocators may come from memory blowup. Memory blowup occurs due to the use of multiple heaps for the scalability purpose, where memory deallocations from one heap cannot be utilized to satisfy  subsequent memory requests from another thread~\cite{Hoard}. 
+Third, memory allocators may come from memory blowup. Memory blowup occurs due to the use of multiple heaps for the scalability purpose, where memory deallocations from one heap cannot be utilized to satisfy subsequent memory requests from another thread~\cite{Hoard}. 
 %In order to solve this issue, Li et. al. employ heuristics to adjust the synchronization frequency dynamically~\cite{DBLP:conf/iwmm/LiLD19}. 
-Since modern allocators typically utilize per-thread heaps or multiple arenas to reduce the contention overhead, memory blowup is a big source of memory consumption. But it is challenging to profile memory blowup, as further described in Section~\ref{sec:profilingmemory}.   
+Since modern allocators typically utilize per-thread heaps or multiple arenas to reduce the contention overhead, memory blowup is a big source of memory consumption. But it is challenging to actually quantify memory blowup, as further described in Section~\ref{sec:profilingmemory}.   
 
 Fourth, memory consumption may come from external fragmentation. External fragmentation occurs, when the total amount of the available memory is sufficient to satisfy a request but fail to do so due to non-contiguous memory. External fragmentation is also related to the use of size classes, because allocators rarely or never perform objects coalescing and splitting.
 Sometimes, it is impossible to change the size class for few objects inside the bag, since BiBOP-style allocators typically use a single size for all objects in the whole bag. 
@@ -53,8 +50,7 @@ Sometimes, it is impossible to change the size class for few objects inside the 
 
  Last, some secure allocators may voluntarily skip some objects in order to tolerate buffer overflows~\citep{DieHard, DieHarder, Guarder}. If a buffer overflow lands on non-used objects, it will cause no harm to the applications. However, it is extremely difficult to differentiate explicit skipping and external fragmentation. 
 
-
-Overall, for memory consumption, \MP{} reports the number and portion of real memory usage, internal fragmentation, memory blowup, and other overhead separately. Other overhead includes external fragmentation, metadata overhead, and the sum of skipped objects. It is difficult for \MP{} to have the precise information about metadata and the sum of skipped objects. Therefore, \MP{} reports a summary for other memory overhead by subtracting the mentioned ones from the total memory usage. For the total memory usage, \MP{} tracks memory related system calls (e.g., \texttt{mmap} or \texttt{sbrk}). 
+Overall, for memory consumption, \MP{} reports the number and ratio of real memory usage, internal fragmentation, memory blowup, and other overhead separately. Other overhead includes external fragmentation, metadata overhead, and the sum of skipped objects. It is difficult for \MP{} to have the precise information about metadata and the sum of skipped objects. Therefore, \MP{} reports a summary for other memory overhead by subtracting the mentioned ones from the total memory usage. For the total memory usage, \MP{} tracks memory related system calls (e.g., \texttt{mmap} or \texttt{sbrk}). 
 %Overall, \MP{} provides real memory usage of t
 %\MP{} also reports real memory usage by tracking memory allocations and deallocations.  
 
