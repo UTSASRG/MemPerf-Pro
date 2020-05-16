@@ -13,9 +13,9 @@ Experiments were performed on a two-processor machine, where each processor is I
 \subsection{Effectiveness}
 \label{sec:effectiveness}
 
-In order to evaluate the effectiveness, we evaluate \MP{} with five widely-used allocators, including two versions of the Linux allocator (version 2.21 and 2.28), TCMalloc~\citep{tcmalloc}, jemalloc, and Hoard, and two secure allocators, i.e. DieHarder and OpenBSD. These allocators include both sequential and BiBOP-style allocators. Secure allocators were included, since they have their unique memory management policies. 
+In order to evaluate the effectiveness, we evaluate \MP{} with five widely-used allocators, including two versions of the Linux allocator (versions 2.21 and 2.28), TCMalloc~\citep{tcmalloc}, jemalloc, and Hoard, and two secure allocators, i.e. DieHarder and OpenBSD. These allocators include both sequential and BiBOP-style allocators. Secure allocators were included, since they have their unique memory management policies. 
 
-For the evaluation, we use the default configurations of these allocators. However, we make some changes in order to  intercept synchronizations. Since Linux allocators are included in \texttt{glibc} libraries, they invoke the internal synchronizations (\texttt{lll\_lock}) directly, which cannot be intercepted by \MP{}. They are recompiled separately as a stand-alone library. Because Hoard is using \texttt{std::lock\_guard} for its synchronization, we replaced them with POSIX spin locks to track its synchronization behavior.
+For the evaluation, we use the default configurations of these allocators. However, we make some changes in order to  intercept synchronizations. Since the Linux allocators are included within the \texttt{glibc} libraries, they invoke the internal synchronizations (\texttt{lll\_lock}) directly, which cannot be intercepted by \MP{}. They are thus recompiled separately as a stand-alone library for the purposes of evaluation. Because Hoard is using \texttt{std::lock\_guard} for its synchronization, we replaced these with POSIX spinlocks to track its synchronization behavior.
 
 %\todo{Let's use a table to list all dramatic difference between these allocators. This gives us some evidence of allocators}
 %\subsection{Issues Identified in Different Allocators}
@@ -37,7 +37,7 @@ For the evaluation, we use the default configurations of these allocators. Howev
 
 \begin{figure}[!ht]
 \centering
-\includegraphics[width=5.5in]{figures/perfoverhead}
+\includegraphics[width=\columnwidth]{figures/perfoverhead}
 \caption{Performance overhead of \texttt{mmprof}, normalized to the runtime of default Linux allocator.\label{fig:overhead}}
 \end{figure}
 
@@ -47,7 +47,7 @@ We evaluate the performance overhead of
 First, if an application invokes extensive applications and deallocations in a short period of time, then \MP{} may introduce a large performance overhead. For each memory operation, \MP{} invokes two RDTSC instructions to collect the runtime, updates multiple counters, and updates the state in the global hash table. Second, the number of lock acquisitions inside memory operations could also significantly affect the performance. Similarly, \MP{} also collects the runtime data of each lock acquisition via the RDTSC instruction, and update different counters. 
 Since \texttt{canneal} invokes 11 million memory operations and 0.3 million locks acquisitions per second, and \texttt{threadtest} has 6 million memory operations and 33 lock acquisitions per second, that explains why these applications have a large overhead with \MP{}.  
 
-\texttt{histogram} and \texttt{linear\_regression} are two exceptions, since they have a small number of allocations. For these two applications, \texttt{histogram}'s execution time is 0.12 seconds and  \texttt{linear\_regression} is 0.3 seconds.  \MP{} has an initialization phase to perform the initialization, and an finalization phase to analyze the data and write out results to the external file, which may add more overhead than a program's execution time. 
+\texttt{histogram} and \texttt{linear\_regression} are two exceptions, since they have a small number of allocations. For these two applications, \texttt{histogram}'s execution time is 0.12 seconds and \texttt{linear\_regression} is 0.3 seconds. \MP{} has an initialization phase to perform the initialization, and an finalization phase to analyze the data and write out results to the external file, which may add more overhead than a program's execution time. 
 %For instance, \texttt{histogram} only takes 0.12 seconds to finish. Therefore, \MP{} adds more overhead than the program's execution time.  has the same issue, with the total execution time of 0.3 seconds.  
 %for some tiny applications like \texttt{histogram}, which only takes 0.1 second when running along, \MP{}'s initialization and conclusion would take more time than themselves. Thus, performance overhead ratios for tiny applications could be larger.
 %\texttt{threadtest} actually imposes more performance overhead, due to the reason that most memory opeations are actually 
@@ -74,6 +74,7 @@ Upon every allocation and deallocation, \MP{} collects the runtime and acquisiti
 
 \begin{table}[h]
   \centering
+   \caption{Characteristics of applications\label{table:characteristics}}
   \footnotesize
   \setlength{\tabcolsep}{0.2em}
 \begin{tabular}{l|c|r|r|r|r}
@@ -111,8 +112,9 @@ Upon every allocation and deallocation, \MP{} collects the runtime and acquisiti
    x264 & 24.2 & 10 & 0 & 9 & 13\\ \hline    \hline 
    \hline
   \end{tabular}
-  \caption{Characteristics of applications\label{table:characteristics}}
 \end{table}
+
+
 \subsection{Memory Overhead}
 \label{sec:memory}
 \input{memory}
