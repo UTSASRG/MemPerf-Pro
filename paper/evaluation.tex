@@ -64,7 +64,7 @@ threadtest 7.21x 6 228 715.40 (alloc+free)/sec 256000203 alloc+free 33 239 532.9
 
 For example, according to \ref{sec:memory}, 
 linear_regression 4.56x, 0.3s when running alone, 2 alloc+free
-word_count 4.26x, 1.71s when running alone, 1 alloc
+word_count 4.26x, 1.71s when running alone, 481 alloc
 histogram 10.23x, 0.12s when running alone, 4 alloc+free
 
 Upon every allocation and deallocation, \MP{} collects the runtime and acquisition information.
@@ -106,7 +106,7 @@ Upon every allocation and deallocation, \MP{} collects the runtime and acquisiti
    swaptions & 14.5 & 2040 & 47999756 & 48000385 & 48002039\\ \hline    
    threadtest & 7.7 & 1280122 & 126720000 & 128000081 & 255944404\\ \hline    
    vips 6.5 & 8128 & 1420072 & 1428019 & 1526404\\ \hline    
-   word_count & 1.7 & 1 & 0 & 0 & 2\\ \hline   
+   word_count & 1.7 & 481 & 0 & 0 & 481\\ \hline   
    x264 & 24.2 & 10 & 0 & 9 & 13\\ \hline    \hline 
    
      \hline
