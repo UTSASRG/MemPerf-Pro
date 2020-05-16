@@ -42,7 +42,7 @@ For the evaluation, we use the default configurations of these allocators. Howev
 \end{figure}
 
 We evaluate the performance overhead of 
-\MP{} using PARSEC~\citep{parsec},  Phoenix~\citep{phoenix}, and synthetic applications from Hoard~\cite{Hoard}. The performance overhead can be seen in Figure~\ref{fig:overhead}, which is the average runtime of five executions. From this figure, we can see that \MP{} runs $2.6\times$ slower than the default allocator, where two applications (\texttt{histogram} and \texttt{threadtest}) impose over $5\times$ performance overhead. Based on our understanding, both the number of memory operations and the number of lock acquisitions can significantly impact the performance overhead. To help the explanation, we further collect the characteristics of these applications, as shown in Table~\ref{table:characteristics}.  
+\MP{} using PARSEC~\citep{parsec},  Phoenix~\citep{phoenix}, and synthetic applications from Hoard~\cite{Hoard}. The performance overhead can be seen in Fig.~\ref{fig:overhead}, which is the average runtime of five executions. From this figure, we can see that \MP{} runs $2.6\times$ slower than the default allocator, where two applications (\texttt{histogram} and \texttt{threadtest}) impose over $5\times$ performance overhead. Based on our understanding, both the number of memory operations and the number of lock acquisitions can significantly impact the performance overhead. To help the explanation, we further collect the characteristics of these applications, as shown in Table~\ref{table:characteristics}.  
 
 First, if an application invokes extensive applications and deallocations in a short period of time, then \MP{} may introduce a large performance overhead. For each memory operation, \MP{} invokes two RDTSC instructions to collect the runtime, updates multiple counters, and updates the state in the global hash table. Second, the number of lock acquisitions inside memory operations could also significantly affect the performance. Similarly, \MP{} also collects the runtime data of each lock acquisition via the RDTSC instruction, and update different counters. 
 Since \texttt{canneal} invokes 11 million memory operations and 0.3 million locks acquisitions per second, and \texttt{threadtest} has 6 million memory operations and 33 lock acquisitions per second, that explains why these applications have a large overhead with \MP{}.  
@@ -74,7 +74,7 @@ Upon every allocation and deallocation, \MP{} collects the runtime and acquisiti
 
 \begin{table}[h]
   \centering
-   \caption{Characteristics of applications\label{table:characteristics}}
+  \caption{Characteristics of applications\label{table:characteristics}}
   \footnotesize
   \setlength{\tabcolsep}{0.2em}
 \begin{tabular}{l|c|r|r|r|r}
@@ -107,9 +107,9 @@ Upon every allocation and deallocation, \MP{} collects the runtime and acquisiti
    string\_match & 0.6 & 8 & 0 & 7 & 10 \\ \hline    
    swaptions & 14.5 & 2040 & 47999756 & 48000385 & 48002039\\ \hline    
    threadtest & 7.7 & 1280122 & 126720000 & 128000081 & 255944404\\ \hline    
-   vips 6.5 & 8128 & 1420072 & 1428019 & 1526404\\ \hline    
+   vips & 6.5 & 8128 & 1420072 & 1428019 & 1526404\\ \hline    
    word\_count & 1.7 & 481 & 0 & 0 & 481\\ \hline   
-   x264 & 24.2 & 10 & 0 & 9 & 13\\ \hline    \hline 
+   x264 & 24.2 & 10 & 0 & 9 & 13\\     
    \hline
   \end{tabular}
 \end{table}

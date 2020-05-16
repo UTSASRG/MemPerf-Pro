@@ -1,32 +1,34 @@
 \section{Motivated Example}
 \label{sec:motivation}
 
-As described above, existing profilers cannot help identify some performance issues caused by the memory allocator. Let us use \texttt{cache-thrash} shown in Figure~\ref{fig:motivation} as an example. For this application, TcMalloc runs around $48\times$ slower than the default Linux allocator. We are using perf, gprof, and Coz to analyze the performance issue. The perf result is shown in Figure~\ref{fig:mot1}, and gprof's result is shown in Figure~\ref{fig:mot3}. 
+ Existing profilers cannot help identify some performance issues caused by the memory allocator. Let us use \texttt{cache-thrash} shown in Figure~\ref{fig:motivation} as an example. For this application, TcMalloc runs around $48\times$ slower than the default Linux allocator. We are using perf, gprof, and Coz to analyze the performance issue. The perf result is shown in Figure~\ref{fig:mot1}. 
 
-The perf tool reports that over 99.81\% of time is actually spent inside the \texttt{worker} function, without pinpointing the real issue. Similarly, The gprof tool actually reports that 100\% of time is spent inside this function. Coz is slightly better, reporting the program lines of exercising the objects with passive false sharing issues, i.e. lines 85-87 of \texttt{cache-thrash.cpp}. Coz further predicts that the performance can be improved up to 10\% if these lines are improved by 100\%. However, Coz cannot determine whether these lines are actually caused by passive false sharing issues caused by the corresponding allocators. 
+The perf tool reports that over 99.81\% of time is actually spent inside the \texttt{worker} function, without pinpointing the real issue. Similarly, the gprof tool actually reports that 100\% of time is spent inside this function. Coz is slightly better, reporting the program lines of exercising the objects with passive false sharing issues, i.e. lines 85-87 of \texttt{cache-thrash.cpp}. Coz further predicts that the performance can be improved up to \textbf{10\%} if these lines are improved by 100\%. However, Coz cannot determine whether these lines are actually caused by passive false sharing issues caused by the corresponding allocators.  
 
 %For this application, TcMalloc actually introduces both active and passive false sharing issue, which is the major cause for this large slowdown.  Similarly, Coz also cannot identify the issue that are caused by hardware contention~\cite{DBLP:conf/osdi/ZhouGMW18}. For this example, the first line of the code that can be improved by $XX$ is actually located in line $XX$ of \texttt{} file. That is also nothing related to the allocator.  
 
 \begin{figure}[!ht]
 \centering
-\includegraphics[width=\columnwidth]{figures/perf-cache-thrash-tcmalloc}
-\caption{Profiling result of perf, for \texttt{cache-thrash} with the TcMalloc allocator. \label{fig:mot1}}
+\includegraphics[width=0.9\columnwidth]{figures/perf-cache-thrash-tcmalloc}
+\caption{Profiling result of perf for \texttt{cache-thrash}, with the TcMalloc allocator. \label{fig:mot1}}
 \end{figure}
 
+\begin{comment}
 \begin{figure}[!ht]
 \centering
-\includegraphics[width=\columnwidth]{figures/gprof-cache-thrash-tcmalloc}
-\caption{Profiling result of gprof, for \texttt{cache-thrash} with the TcMalloc allocator.\label{fig:mot2}}
+\includegraphics[width=0.9\columnwidth]{figures/gprof-cache-thrash-tcmalloc}
+\caption{Profiling result of gprof for \texttt{cache-thrash}, with the TcMalloc allocator.\label{fig:mot2}}
 \end{figure}    
+\end{comment}
 
-In contrast, \MP{} reports this problem as passive false sharing issues caused by the allocator, represented by only one parameter inside its application-friendliness metrics. \MP{} also reports a range of metrics for evaluating an allocator, such as memory overhead.   
+In contrast, \MP{} reports this problem as passive false sharing issues caused by the allocator, represented by only one parameter inside its application-friendliness metrics. \MP{} also reports a range of metrics for evaluating an allocator, such as memory overhead.    
 
 \section{Background and Overview}
 \label{sec:background}
 
-This section presents the background about memory allocators, and some important general factors of allocators. Then, the basic idea of \MP{} is presented. 
+This section presents the background about memory allocators, and some important factors of allocators. Then the basic idea of \MP{} is presented. 
 
-\subsection{Background of Allocators}
+\subsection{Background of Allocator}
 
 \label{sec:allocator}
 Memory allocators are typically responsible for managing virtual memory inside the user space by satisfying memory requests from applications. Since the number of small objects is significantly larger than that of big objects, most allocators utilize different mechanisms to manage small and big objects. For big objects, allocators may obtain a block of memory from the OS directly during the allocation, and then return it to the OS upon the deallocation~\citep{Hoard}. For small objects, allocators may utilize freelists or bitmaps to track freed objects upon deallocations. In order to reduce external fragmentation and encourage memory utilization, memory blocks are managed by size classes, and every allocation will be rounded to its next largest size class.  
@@ -35,7 +37,8 @@ Based on the management of small objects, allocators can be further classified i
 
 For sequential allocators, subsequent memory allocations are satisfied in a continuous memory block. Typically, a pointer is utilized to track the starting position of available space~\citep{Cling}. After an allocation, the pointer is bumped to the end of the current object, which is why this class is also known as ``bump-pointer allocators.'' For such allocators, objects with different sizes can be allocated continuously. Upon deallocation, a freed object is typically placed into the freelist of its size class. The size information of each object is typically physically placed just prior to the object. Such allocators include the default Linux allocator (originating from dlmalloc~\citep{dlmalloc}) and the Windows allocator~\citep{DieHarder}.  
 
-BiBOP-style allocators, which stands for ''Big Bag of Pages''~\citep{hanson1980}, utilize one or multiple continuous pages that are treated as a ``bag'' used to hold objects of the same size class. The metadata of these heap objects, such as their size and availability information, are typically stored in a separate area. Thus, BiBOP-style allocators improve security and reliability by avoiding metadata corruption caused by buffer overflows. Many performance-oriented allocators, such as TcMalloc~\citep{tcmalloc}, \texttt{jemalloc}~\citep{jemalloc}, Hoard~\citep{Hoard}, Scalloc~\citep{Scalloc}, and most of secure allocators, such as OpenBSD~\citep{OpenBSD} and DieHarder~\citep{DieHarder}, belong to this category. BiBOP-style allocators may utilize freelists or bitmaps to manage the availability of objects. When using a bitmap, only a single bit is sufficient to track the availability of an object, which may introduce less memory overhead for the metadata, but possibly with a higher performance overhead due to the manipulation of the bitmap and the loss of temporal locality.  
+BiBOP-style allocators, which stands for ''Big Bag of Pages''~\citep{hanson1980}, utilize one or multiple continuous pages that are treated as a ``bag'' used to hold objects of the same size class. The metadata of these heap objects, such as their size and availability information, are typically stored in a separate area. Thus, BiBOP-style allocators improve security and reliability by avoiding metadata corruption caused by buffer overflows. Many performance-oriented allocators, such as TcMalloc~\citep{tcmalloc}, \texttt{jemalloc}~\citep{jemalloc}, Hoard~\citep{Hoard}, Scalloc~\citep{Scalloc}, and most of secure allocators, such as OpenBSD~\citep{openbsd} and DieHarder~\citep{DieHarder}, belong to this category. BiBOP-style allocators may utilize freelists or bitmaps to manage the availability of objects. 
+%When using a bitmap, only a single bit is sufficient to track the availability of an object, which may introduce less memory overhead for the metadata, but possibly with a higher performance overhead due to the manipulation of the bitmap and the loss of temporal locality.  
 
 
 \subsection{Important Metrics of Allocators}
@@ -60,14 +63,17 @@ In order to reveal a specific design issue, \MP{} further collects the averaged 
 
 Memory consumption is a serious concern across different platforms. Therefore, it is important to assess the memory consumption and wastage of a memory allocator. Sometimes, an allocator may waste more memory than that caused by memory leaks within an application. Based on our understanding, the memory consumption of an allocator may be attributed to multiple sources. First, it may originate from the metadata, such as the memory used to track the size or availability of every heap object. 
 
-Second, it may be caused by internal fragmentation due to the particular set of size classes used (e.g. such as those used in a BiBOP-style allocator). As discussed above, memory allocators utilize multiple size classes to manage heap objects rather than using an exact size. The difference between the requested size and the size of the corresponding class represents its internal fragmentation, and this space cannot be utilized to satisfy other allocation requests. For instance, Hoard manages objects using power-of-two size classes~\citep{Hoard}, which thus may waste memory if the requested size is not an exact power-of-two. 
+Second, it may be caused by internal fragmentation due to the use of size classes.  The difference between the requested size and the size of the corresponding class represents its internal fragmentation, and this space cannot be utilized to satisfy other allocation requests. For instance, Hoard manages objects using power-of-two size classes~\citep{Hoard}, which thus may waste memory if the requested size is not an exact power-of-two. 
+%As discussed above, memory allocators utilize multiple size classes to manage heap objects rather than using an exact size.
  
-Third, memory allocator wastage may come from ``memory blowup.'' Memory blowup occurs due to the use of multiple heaps for the scalability purpose, where memory deallocations from one heap cannot be utilized to satisfy subsequent memory requests from another thread~\cite{Hoard}. 
+Third, memory allocator wastage may come from ``memory blowup.'' Memory blowup occurs when memory deallocations from one heap cannot be utilized to satisfy subsequent memory requests from another thread~\cite{Hoard}. 
 %In order to solve this issue, Li et. al. employ heuristics to adjust the synchronization frequency dynamically~\cite{DBLP:conf/iwmm/LiLD19}. 
 Since modern allocators typically utilize per-thread heaps or multiple arenas to reduce the contention overhead, memory blowup is a major source of memory consumption. However, it is challenging to actually quantify memory blowup, as further described in Section~\ref{sec:profilingmemory}.   
 
-Fourth, memory consumption may come from external fragmentation. External fragmentation occurs when the total amount of the available memory is sufficient to satisfy a request but fails to do so due to the availability of only non-contiguous memory. External fragmentation is also related to the use of size classes, because allocators rarely or never perform object coalescing and splitting.
-Usually it is impossible to change the size class for a few objects inside the bag, since BiBOP-style allocators typically use a single size for all objects in the entire bag. 
+Fourth, memory consumption may come from external fragmentation. External fragmentation occurs when the total amount of the available memory is sufficient to satisfy a request but fails to do so due to  non-contiguous memory. External fragmentation is also related to the use of size classes, 
+%because allocators rarely or never perform object coalescing and splitting.
+since it is typically impossible to change the size class.  
+%for a few objects inside the bag, since BiBOP-style allocators typically use a single size for all objects in the entire bag. 
 %That is, objects cannot be changed to other size classes, until all objects in the whole bag are freed. 
 %This design may cause extensive external fragmentation overhead. 
 
@@ -116,11 +122,13 @@ Overall, \MP{} reports the cache utilization rate, page utilization rate, cache 
 
 \subsubsection{Summary of Important Metrics}
 
-As described above, \MP{} reports many important metrics of an allocator, and is further shown in Table~\ref{table:metrics}. These metrics help answer whether an allocator is the culprit of a performance issue, and helps identify a particular design issue within the allocator. Table ~\ref{table:metrics} also provides collection techniques for specific metrics, which are further discussed in Section~\ref{sec:idea}. 
+As described above, \MP{} reports many important metrics of an allocator, as shown in Table~\ref{table:metrics}. 
+%These metrics help answer whether an allocator is the culprit of a performance issue, and helps identify a particular design issue within the allocator. 
+Table~\ref{table:metrics} also provides collection techniques for specific metrics, which are further discussed in Section~\ref{sec:idea}. 
 
 \begin{table}[h]
   \centering
-  \caption{Important metrics and collection methods. Empty methods indicate that the metrics can be collected with simple counters.\label{table:metrics}}
+  \caption{Important metrics and corresponding collection techniques.\label{table:metrics}}
   \footnotesize
  % \setlength{\tabcolsep}{1.0em}
 \begin{tabular}{l | l | l}

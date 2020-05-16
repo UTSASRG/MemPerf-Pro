@@ -102,7 +102,7 @@ complexity to obtain the metadata.
 \begin{figure*}[!h]
 \centering
 \includegraphics[width=\columnwidth]{figures/lookup}
-\caption{Three-level Lookup Mechanism.\label{fig:lookup}}
+\caption{Three-level lookup mechanism of \MP{}.\label{fig:lookup}}
 \end{figure*}
 
 Note that this design is also efficient in memory consumption. If a range of addresses are not used, then there is no need to allocate physical memory for the corresponding page entries and cache entries. This design is able to adapt to different allocators, where memory mappings of a heap is varied from a few to hundreds of thousands, and these mappings can be scattered along the whole address space of a process. 
