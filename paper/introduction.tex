@@ -55,7 +55,7 @@ If the memory overhead is mainly caused by an allocator, e.g., TcMalloc uses $1.
 
 %To address these challenges, we design \MP{} in a principled way to determine what events to sample and what profile knowledge the sampled events contribute to. Briefly speaking, \MP{} always intercepts the allocator library calls to figure out when the program execution is inside the allocator, during which it samples both performance related PMU events (e.g., cache misses) to determine the implementation issues and intercepts OS kernel calls to understand OS-level contention. When the program execution is outside of the allocator, \MP{} samples specific PMU events to determine cache line- and page-level utilization ratio, and cache contention rate, which could directly and significantly impact the performance of the corresponding applications. To maintain low overhead, \MP{} employs a fast lookup mechanism that enables fast checking on the size information of each object, and on the cache line usage and page usage upon each sampled access. ??(WB) one more sentence about the low overhead?? ??(WB) It allocates its internal memory on ...??
 
-Based on our extensive evaluation, \MP{} successfully identifies multiple design/implementation issues found inside popular allocators, as further described in Section~\ref{sec:effectiveness}. \MP{} also provides metrics to evaluate the performance, memory overhead, scalability, and application-friendliness of an allocator, which can serve as a basis when developing a new allocator. Due to its careful design, \MP{}'s performance overhead is around $2.5\times$, and memory overhead is around $56\%$, while sampling a large number of events and collecting a large amount of information. This efficient design reduces \MP{}'s interference to the original execution, allows it reporting the metrics confidently. 
+Based on our extensive evaluation, \MP{} successfully identifies multiple design/implementation issues found inside popular allocators, as further described in Section~\ref{sec:effectiveness}. \MP{} also provides metrics to evaluate the performance, memory overhead, scalability, and application-friendliness of an allocator, which can serve as a basis when developing a new allocator. Due to its careful design, \MP{}'s performance overhead is around $2.5\times$, its memory overhead is around $56\%$, all while sampling a large number of events and collecting a large amount of information. This efficient design reduces \MP{}'s interference to the original execution, which allows its reporting of the metrics confidently. 
 
 %\todo{one way to highlight the contribution is to emphasize on the **complex** considerations of designing good allocators and the challenges to identify design problems. We want to let the reviewer know that it's difficult to do. }
 
@@ -64,15 +64,15 @@ Based on our extensive evaluation, \MP{} successfully identifies multiple design
 Overall, this paper makes the following contributions. 
 
 \begin{itemize}
-\item It proposes the first general profiler--\MP{}--to profile  different memory allocators, without the need of changing allocators and applications.  
+\item It proposes the first general profiler--\MP{}--to profile different memory allocators, without the need for changing allocators and applications.  
 
-\item \MP{} employs Performance Monitoring Units (PMUs), time-stamp counter, and simple counters together to profile allocators quantitatively. 
+\item \MP{} employs CPU Performance Monitoring Units (PMU's), time-stamp counters, and simple counters acting together to profile allocators quantitatively. 
 
 \item \MP{} collects a range of metrics to evaluate memory allocators, and proposes practical methods to profile some of them quantitatively for the first time. 
 %profile cache/page utilization rate, memory blowup, active/passive false sharing, and kernel contention for the first time.
 %, and attributes the data to each allocation and deallocation, helps discover designing issues that cannot be discovered with general profilers.  
  
-\item This paper performs extensive experiments to confirm its effectiveness, performance, and memory overhead.    
+\item This paper performs extensive experimentation to confirm its effectiveness, performance, and memory overhead.    
 
 \end{itemize} 
 
@@ -81,8 +81,8 @@ Overall, this paper makes the following contributions.
 %\todo{What is new in this tool? Whether it could provide some information that is not available in an existing allocator.}
 
 \begin{itemize}
-\item It will provide the application friendliness that is not available in existing work, which helps users to decide which allocator should be used for the specific allocator. 
-\item It will provide the memory usage (overhead) information, such as internal fragmentation, and objects that are not freed but not used at all. 
+\item It will quantify application-friendliness, which is not available in existing work, and which helps users to decide which allocator should be used for a specific application. 
+\item It will provide the memory usage (overhead) information, such as internal fragmentation, and objects that are not freed but ynot used at all. 
 \item It will provide some information that only exists in multiple profilers, for instance, the average number of instructions of each allocation and deallocation, the average time spending in each allocation and deallocation (PMU sampling will be placed outside the time spanning), (not how long this allocation and deallocation has been sampled), whether there are some contentions during allocation (user space and kernel space), how many lock acquisitions.  
 \end{itemize}
  	
