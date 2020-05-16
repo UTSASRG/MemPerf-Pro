@@ -8,14 +8,14 @@ The experimental evaluation will answer the following questions:
 \item What is the memory overhead of \MP{}? (Section~\ref{sec:memory})
 \end{itemize}
 
-Experiments were performed on a two-processor machine, where each processor is Intel(R) Xeon(R) Gold 6230. Each processor has 20 cores in total. This machine has 256GB of main memory, 20MB of L2 cache, and 1280KB L1 cache. The underlying OS is Ubuntu 18.04.3 LTS, installed with the Linux-5.3.0-40. All applications were compiled using GCC-7.5.0, with -O2 and -g flags.
+Experiments were performed on a two-processor machine, where each processor is Intel(R) Xeon(R) Gold 6230 and each processor has 20 cores. This machine has 256GB of main memory, 20MB of L2 cache, and 1280KB L1 cache. The underlying OS is Ubuntu 18.04.3 LTS, installed with the Linux-5.3.0-40. All applications were compiled using GCC-7.5.0, with -O2 and -g flags.
 
 \subsection{Effectiveness}
 \label{sec:effectiveness}
 
-In order to evaluate the effectiveness, we evaluate \MP{} with five general purpose allocators, e.g. two versions of the Linux allocator (version 2.21 and 2.28), TCMalloc~\citep{tcmalloc}, jemalloc, and Hoard, and two secure allocators, i.e. DieHarder and OpenBSD. These allocators include both sequential and BiBOP-style allocators. Secure allocators were included, since they have their unique memory management policies. 
+In order to evaluate the effectiveness, we evaluate \MP{} with five widely-used allocators, including two versions of the Linux allocator (version 2.21 and 2.28), TCMalloc~\citep{tcmalloc}, jemalloc, and Hoard, and two secure allocators, i.e. DieHarder and OpenBSD. These allocators include both sequential and BiBOP-style allocators. Secure allocators were included, since they have their unique memory management policies. 
 
-For the evaluation, we use the default configurations of these allocators. However, we make some changes in order to the interception of synchronizations. Since Linux allocators are included in \texttt{glibc} libraries, they invokes the internal synchronizations as \texttt{lll\_lock}, which cannot be intercepted by \MP{}. They are compiled separately as a stand-alone library. Since Hoard are using \texttt{std::lock\_guard} for its synchronization, which cannot be intercepted, we replaced them with POSIX spin locks to track its synchronization behavior.
+For the evaluation, we use the default configurations of these allocators. However, we make some changes in order to  intercept synchronizations. Since Linux allocators are included in \texttt{glibc} libraries, they invoke the internal synchronizations ( \texttt{lll\_lock}) directly, which cannot be intercepted by \MP{}. They are recompiled separately as a stand-alone library. Since Hoard are using \texttt{std::lock\_guard} for its synchronization,  we replaced them with POSIX spin locks to track its synchronization behavior.
 
 %\todo{Let's use a table to list all dramatic difference between these allocators. This gives us some evidence of allocators}
 %\subsection{Issues Identified in Different Allocators}
@@ -41,13 +41,14 @@ For the evaluation, we use the default configurations of these allocators. Howev
 \caption{Performance overhead of \texttt{mmprof}, normalized to the runtime of default Linux allocator.\label{fig:overhead}}
 \end{figure}
 
-We also evaluate the performance overhead of 
-\MP{} using PARSEC~\citep{parsec},  Phoenix~\citep{phoenix}, and multiple synthetic applications from Hoard~\cite{Hoard}. The performance overhead can be seen in Figure~\ref{fig:overhead}, which is the average value of five executions. From this figure, we can see that \MP{} runs $2.6\times$ slower than the default allocator, where two applications (\texttt{histogram} and \texttt{threadtest}) impose over $5\times$ performance overhead. Based on our understanding, both the number of memory operations and the number of lock acquisitions can significant impact  the performance overhead of \MM{}. To help the explanation, we further collect the characteristics of these applications, as shown in Table~\ref{table:characteristics}.  
+We evaluate the performance overhead of 
+\MP{} using PARSEC~\citep{parsec},  Phoenix~\citep{phoenix}, and synthetic applications from Hoard~\cite{Hoard}. The performance overhead can be seen in Figure~\ref{fig:overhead}, which is the average runtime of five executions. From this figure, we can see that \MP{} runs $2.6\times$ slower than the default allocator, where two applications (\texttt{histogram} and \texttt{threadtest}) impose over $5\times$ performance overhead. Based on our understanding, both the number of memory operations and the number of lock acquisitions can significantly impact the performance overhead. To help the explanation, we further collect the characteristics of these applications, as shown in Table~\ref{table:characteristics}.  
 
-First, if an application invokes extensive applications and deallocations in a short period of time, then \MP{} may introduce a large performance overhead. For each memory operation, \MP{} invokes two RDTSC instructions to collect the runtime,  updates multiple counters, and updates the state in the global hash table.  Second, the number of lock acquisitions inside memory operations could also significantly affect the performance. Similarly, \MP{} also collects the runtime data of each lock acquisition via the RDTSC instruction, and update different counters. 
-Since \texttt{canneal} invokes 11 million memory operations and 0.3 million locks acquisitions per second, and \texttt{threadtest} will has 6 million memory operations and 33 lock acquisitions per second, that explains why these applications have larger performance overhead with \MP{}.  
+First, if an application invokes extensive applications and deallocations in a short period of time, then \MP{} may introduce a large performance overhead. For each memory operation, \MP{} invokes two RDTSC instructions to collect the runtime, updates multiple counters, and updates the state in the global hash table. Second, the number of lock acquisitions inside memory operations could also significantly affect the performance. Similarly, \MP{} also collects the runtime data of each lock acquisition via the RDTSC instruction, and update different counters. 
+Since \texttt{canneal} invokes 11 million memory operations and 0.3 million locks acquisitions per second, and \texttt{threadtest} has 6 million memory operations and 33 lock acquisitions per second, that explains why these applications have a large overhead with \MP{}.  
 
-\texttt{histogram} program is an exception, since it has a small number of allocations. For this application, \MP{} has an initialization phase to perform the initialization, and an finalization phase to analyze the data and write out results to the external file. But \texttt{histogram} only takes 0.12 seconds to finish. Therefore, \MP{} adds more overhead than the program's execution time. \texttt{linear\_regression} has the same issue, with the total execution time of 0.3 seconds.  
+\texttt{histogram} and \texttt{linear\_regression} are two exceptions, since they have a small number of allocations. For these two applications, \texttt{histogram}'s execution time is 0.12 seconds and  \texttt{linear\_regression} is 0.3 seconds.  \MP{} has an initialization phase to perform the initialization, and an finalization phase to analyze the data and write out results to the external file, which may add more overhead than a program's execution time. 
+%For instance, \texttt{histogram} only takes 0.12 seconds to finish. Therefore, \MP{} adds more overhead than the program's execution time.  has the same issue, with the total execution time of 0.3 seconds.  
 %for some tiny applications like \texttt{histogram}, which only takes 0.1 second when running along, \MP{}'s initialization and conclusion would take more time than themselves. Thus, performance overhead ratios for tiny applications could be larger.
 %\texttt{threadtest} actually imposes more performance overhead, due to the reason that most memory opeations are actually 
 
@@ -96,20 +97,19 @@ Upon every allocation and deallocation, \MP{} collects the runtime and acquisiti
    histogram & 0.12 & 2 & 0 & 2 & 3 \\ \hline    
    kmeans & 16.4 & 200691 & 533 & 200579 & 303705 \\ \hline    
    larson & 15.1 & 2408955 & 33726797 & 36095750 & 38088835 \\ \hline   
-   linear_regression & 0.3 & 1 & 0 & 1 & 2 \\ \hline    
-   matrix_multiply & 4.8 & 83 & 0 & 82 & 85 \\ \hline    
+   linear\_regression & 0.3 & 1 & 0 & 1 & 2 \\ \hline    
+   matrix\_multiply & 4.8 & 83 & 0 & 82 & 85 \\ \hline    
    pca & 9.2 & 16131 & 29 & 72 & 16466 \\ \hline    
    raytrace & 41.1 & 5000115 & 15000100 & 20000172 & 5000240 \\ \hline   
-   reverse_index & 1.5 & 1632810 & 106173 & 1738982 & 1806110\\ \hline  
+   reverse\_index & 1.5 & 1632810 & 106173 & 1738982 & 1806110\\ \hline  
    streamcluster & 23.5 & 47 & 8798 & 8844 & 17622\\ \hline    
-   string_match & 0.6 & 8 & 0 & 7 & 10 \\ \hline    
+   string\_match & 0.6 & 8 & 0 & 7 & 10 \\ \hline    
    swaptions & 14.5 & 2040 & 47999756 & 48000385 & 48002039\\ \hline    
    threadtest & 7.7 & 1280122 & 126720000 & 128000081 & 255944404\\ \hline    
    vips 6.5 & 8128 & 1420072 & 1428019 & 1526404\\ \hline    
-   word_count & 1.7 & 481 & 0 & 0 & 481\\ \hline   
+   word\_count & 1.7 & 481 & 0 & 0 & 481\\ \hline   
    x264 & 24.2 & 10 & 0 & 9 & 13\\ \hline    \hline 
-   
-     \hline
+   \hline
   \end{tabular}
   \caption{Characteristics of applications\label{table:characteristics}}
 \end{table}

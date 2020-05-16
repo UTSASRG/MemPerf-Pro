@@ -98,23 +98,23 @@ For kernel contention, \MP{} reports the average time and the number of invocati
 Application friendliness indicates whether memory allocations are suited toward the access patterns of a particular application. Sometimes, application friendliness may have a larger impact on an application's performance than its memory management performance. For instance, TcMalloc typically has less memory management overhead than the default allocator, but runs around $48\times$ slower for \texttt{cache-thrash}. The major reason for this is that TcMalloc introduces both active and passive false-sharing~\cite{tcmallocsharing}. \MP{} reports multiple important metrics that evaluate application-friendliness.
 
 
-The first parameter utis cache utilization rate. Cache utilization rate is the percentage of words that are actually holding actual objects. An allocator with a high cache utilization rate will cause less cache misses, benefiting the overall performance. Multiple reason may affect the cache utilization rate. First, some allocators (e.g., the Linux allocator) that prepend the metadata just before each object may reduce  cache utilization rate. Every cache load operation will load the metadata that is not referenced during normal memory access. 
- Second, a coarse-grained size class may also reduce cache utilization rate, due to internal fragmentation. Third, freed objects that are not reutilized timely may also cause a low cache utilization rate. 
+The first parameter measured is the cache utilization rate. The cache utilization rate is the percentage of words that are currently holding actual objects. An allocator with a high cache utilization rate will cause less cache misses, benefiting the overall performance. Multiple causes may affect the cache utilization rate. First, some allocators (e.g., the Linux allocator) that prepend the metadata just prior to each object may reduce the cache utilization rate. Every cache load operation will load the metadata that is not referenced during normal memory access. 
+ Second, a coarse-grained size class may also harm the cache utilization rate, due to internal fragmentation. Third, freed objects that are not reutilized in a timely manner may also cause a lower cache utilization rate. 
 
  %Similarly, if page utilization rate is low, it may cause high TLB misses and prohibitive memory consumption. \MP{} samples memory accesses, and checks the corresponding cache utilization rate and page utilization rate. Overall, \MP{} could report an average cache utilization rate and page utilization rate over all samples. 
 
-The second parameter is page utilization rate. Page utilization rate indicates the percentage of a page that are actively utilized for holding actual data. An allocator with a higher page utilization rate will introduce less page faults and less Translation Lookaside Buffer (TLB) misses. Page utilization rate can be caused by the similar reasons as cache utilization rate.  
+The second parameter reported is the page utilization rate. The page utilization rate indicates the percentage of pages that are actively utilized for holding actual data. An allocator with a higher page utilization rate will introduce less page faults and less Translation Lookaside Buffer (TLB) misses. Lower page utilization rates can be caused by reasons similar to those that lower the cache utilization rate.  
 
-The third parameter is active/passive false sharing. False sharing indicates that multiple threads are concurrently accessing different words in the same cache line. Active false sharing is introduced upon first allocations of objects, where an allocator cannot allocate continuous objects in the cache line to the same thread. Passive false sharing is introduced upon deallocations, where a freed object will be utilized by another thread and then cause false sharing in the same cache line. 
+The third parameter is the active/passive false sharing. False sharing indicates that multiple threads are concurrently accessing different words within the same cache line. Active false sharing is introduced upon the first allocations of objects, where an allocator cannot allocate continuous objects in the cache line to the same thread. Passive false sharing is introduced upon deallocations, where a freed object will be utilized by another thread, causing false sharing within the same cache line. 
 
-The fourth parameter is cache contention rate outside the allocation. Cache misses can be caused by conflicting or falsely-shared misses. Upon cache misses, the data has to be loaded from the main memory, which is much slower than accessing the cache directly. 
+The fourth parameter is the cache contention rate outside of the allocation. Cache misses can be caused by conflicting or falsely-shared misses. Upon cache misses, the data has to be loaded from the main memory, which is significantly slower than accessing the cache directly. 
 
-Overall, \MP{} reports cache utilization rate, page utilization rate, cache contention rate, and false sharing effect. For false sharing effect, \MP{} not only reports the number of cache lines that have active and passive false sharing, but also reports the rate of conflicting accesses. The reported result also helps explain the performance slowdown issue. 
+Overall, \MP{} reports the cache utilization rate, page utilization rate, cache contention rate, and false sharing effect. For the false sharing effect, \MP{} not only reports the number of cache lines that have active and passive false sharing, but also reports the rate of conflicting accesses. The reported result also helps explain the performance slowdown issue. 
 %employs the PMU hardware to collect these parameters. It employs the PMU-based sampling to sample memory accesses, and collects the data of cache and page utilization data upon sample events, as described in Section~\ref{sec:profilefriendliness}. \MP{} employs PMU to collect cache misses/page faults outside memory management.
 
 \subsubsection{Summary of Important Metrics}
 
-As described above, \MP{} reports many important metrics of an allocator, as further described in Table~\ref{table:metrics}. These metrics help answer whether an allocator is the culprit of performance issue, and help identify a particular design issue inside the allocator. Table ~\ref{table:metrics} also provides collection techniques for specific metrics, which is further discussed in Section~\ref{sec:idea}. 
+As described above, \MP{} reports many important metrics of an allocator, and is further shown in Table~\ref{table:metrics}. These metrics help answer whether an allocator is the culprit of a performance issue, and helps identify a particular design issue within the allocator. Table ~\ref{table:metrics} also provides collection techniques for specific metrics, which are further discussed in Section~\ref{sec:idea}. 
 
 \begin{table}[h]
   \centering
@@ -136,7 +136,7 @@ Category & Important Metrics & Collection Techniques \\ \hline
 & Cache contention rate &  PMU \\ \hline
   \end{tabular}
   \centering
-  \caption{Important metrics and collection methods. The empty methods indicate that the metrics can be collected with simple counters.\label{table:metrics}}
+  \caption{Important metrics and collection methods. Empty methods indicate that the metrics can be collected with simple counters.\label{table:metrics}}
 \end{table}
 
 

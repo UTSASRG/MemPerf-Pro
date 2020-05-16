@@ -132,11 +132,11 @@ To predict the runtime reduction, \MP{} further collects the runtime outside mem
 \subsection{Adapting To Different Allocators}
 \label{sec:understandingallocators}
 
-\MP{} is designed as a general profiler for sequential and BiBOP-style allocators, as described in Section~\ref{sec:allocator}. The challenge is to adapt  to different allocators. \MP{} interprets a configuration file to identify the difference of every allocator in its initialization phase, such as the allocator's style (BiBOP-style versus sequential), sizes of different classes, the threshold of separating small objects from large objects. This configuration can be provided manually. \MP{} also provides a prerun program to understand these details of an allocator. 
+\MP{} is designed as a general profiler for sequential and BiBOP-style allocators, as described in Section~\ref{sec:allocator}. The primary challenge is to adapt to different allocators. \MP{} interprets a configuration file to identify the differences and unique characteristics of every allocator during its initialization phase, such as the allocator's style (BiBOP-style versus sequential), the sizes of its different classes, and the threshold separating small objects from large objects. Alternatively, this configuration can also be provided manually. \MP{} also provides a pre-run program to automatically determine these details for a given allocator.
 
-In order to identify the style of allocator, the prerun routine will check whether two subsequent allocations with different sizes (small objects, apparently from different size classes) are allocated from the same page or not. If yes, then the allocator is a sequential-style allocator, which is similar to the default Linux allocator. Otherwise, the allocator belongs to a BiBOP-style allocator. 
+In order to identify the style of allocator, the pre-run routine will check whether two subsequent allocations with different sizes (small objects, apparently from different size classes) are satisfied from the same virtual page. If they were, then the allocator is a sequential-style allocator, which is similar to the default Linux allocator. Otherwise, the allocator belongs to a BiBOP-style allocator. 
 
-The second step is to identify the sizes of different size classes. The prerun routine begins by allocating an object of 8 bytes, and continues to allocate additional objects using a stride increase of 8 bytes each time. The determination of size classes depends on the style of an allocator. For BiBOP-style allocators, an allocation with a different size class will be satisfied from a different bag, locating in a different page. For sequential allocators, such as the Linux allocator, we employ the \texttt{malloc\_usable\_size} to  return the bag size for an allocation with the specified size. 
+The second step is to identify the sizes of the various different size classes. The pre-run routine begins by allocating an object of 8 bytes, and continues to allocate additional objects using a stride increase of 8 bytes each time. The determination of size classes depends on the style of the allocator. For BiBOP-style allocators, an allocation with a different size class will be satisfied from a different bag, located in a different page. For sequential allocators, such as the Linux allocator, we employ the \texttt{malloc\_usable\_size} routine to return the bag size for an allocation of the specified size. 
 
 %the distance between two contiguously-allocated objects (with distinct sizes) is utilized to determine the size class. As shown in Fig.~\ref{fig:sizeclass}, if the size of $Obj_1$ and $Obj_2$ is the same, judging from the distance of between two continuous objects, then they belong to the same size class. Otherwise, they belong to different size class, such as $Obj_3$ in the figure. By checking the size of two objects belonging to different objects, we could determine the sizes of different size classes.  
 \begin{comment}
@@ -144,11 +144,11 @@ The second step is to identify the sizes of different size classes. The prerun r
 \begin{figure}[!ht]
 \centering
 \includegraphics[width=5in]{figures/sequentialclasssize}
-\caption{Determining the size class of a sequential allocator by the distance between continuous allocations. \\The boxes with 10\% dotted pattern are the metadata, and the boxes with diagonal stripes\\ are actual heap objects. The number above every box is the size of the corresponding object. \label{fig:sizeclass}}
+\caption{Determining the size class of a sequential allocator by the distance between continuous allocations. \\The boxes with 10\% dotted pattern are the metadata, while the boxes with diagonal stripes\\ are actual heap objects. The number above each box represents the size of the corresponding object. \label{fig:sizeclass}}
 \end{figure}
 	
 \end{comment}
 
 
-The threshold for big objects are typically detected by checking whether there is an explicit \texttt{mmap} system calls upon the allocation. Typically, most allocators utilize a direct \texttt{mmap} system call to satisfy the allocation for a big object initially. However, this threshold requires the manual confirmation. 
+The threshold for big objects are typically detected by checking whether there is an explicit \texttt{mmap} system call upon the allocation. Typically, most allocators utilize a direct \texttt{mmap} system call to satisfy the allocation for a big object initially. However, this threshold requires the manual confirmation. 
 
