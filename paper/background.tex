@@ -1,9 +1,9 @@
 \section{Motivated Example}
 \label{sec:motivation}
 
-As described above, existing profilers cannot help identify some performance issues caused by the memory allocator. Let us use \texttt{cache-thrash} shown in Figure~\ref{fig:motivation} as an example. For this application, TcMalloc runs around $48\times$ slower than the default Linux allocator. We are using perf, gprof, and Coz to analyze the performance issue.  The perf's result is shown in Figure~\ref{fig:mot1}, and gprof's result is shown as Figure~\ref{fig:mot3}. 
+As described above, existing profilers cannot help identify some performance issues caused by the memory allocator. Let us use \texttt{cache-thrash} shown in Figure~\ref{fig:motivation} as an example. For this application, TcMalloc runs around $48\times$ slower than the default Linux allocator. We are using perf, gprof, and Coz to analyze the performance issue. The perf result is shown in Figure~\ref{fig:mot1}, and gprof's result is shown in Figure~\ref{fig:mot3}. 
 
-The perf tool reports that over 99.81\% time is actually spending inside the \texttt{worker} function, without pinpointing the real issue. Similarly, The gprof tool actually reports that 100\% time is spending inside the \texttt{worker} function. Coz is a little better, which reports the program lines of exercising the objects with passive false sharing issues, i.e. line 85-87 of \texttt{cache-thrash.cpp}. Coz further predicts that the performance can be improved up to 10\% if these lines are improved by 100\%. However, Coz cannot tell whether these lines are actually caused by passive false sharing issues caused by the corresponding allocators. 
+The perf tool reports that over 99.81\% of time is actually spent inside the \texttt{worker} function, without pinpointing the real issue. Similarly, The gprof tool actually reports that 100\% of time is spent inside this function. Coz is slightly better, reporting the program lines of exercising the objects with passive false sharing issues, i.e. lines 85-87 of \texttt{cache-thrash.cpp}. Coz further predicts that the performance can be improved up to 10\% if these lines are improved by 100\%. However, Coz cannot determine whether these lines are actually caused by passive false sharing issues caused by the corresponding allocators. 
 
 %For this application, TcMalloc actually introduces both active and passive false sharing issue, which is the major cause for this large slowdown.  Similarly, Coz also cannot identify the issue that are caused by hardware contention~\cite{DBLP:conf/osdi/ZhouGMW18}. For this example, the first line of the code that can be improved by $XX$ is actually located in line $XX$ of \texttt{} file. That is also nothing related to the allocator.  
 
@@ -19,14 +19,14 @@ The perf tool reports that over 99.81\% time is actually spending inside the \te
 \caption{Profiling result of gprof, for \texttt{cache-thrash} with the TcMalloc allocator.\label{fig:mot2}}
 \end{figure}    
 
-In contrast, \MP{} reports this problem as passive false sharing issues caused by the allocator, only one parameter inside application-friendliness. \MP{} also reports a range of metrics for evaluating an allocator, such as memory overhead.   
+In contrast, \MP{} reports this problem as passive false sharing issues caused by the allocator, represented by only one parameter inside its application-friendliness metrics. \MP{} also reports a range of metrics for evaluating an allocator, such as memory overhead.   
 
 \section{Background and Overview}
 \label{sec:background}
 
-This section presents the background about memory allocators, and some important factors of allocators. Then the basic idea of \MP{} is presented. 
+This section presents the background about memory allocators, and some important general factors of allocators. Then, the basic idea of \MP{} is presented. 
 
-\subsection{Background of Allocator}
+\subsection{Background of Allocators}
 
 \label{sec:allocator}
 Memory allocators are typically responsible for managing virtual memory inside the user space by satisfying memory requests from applications. Since the number of small objects is significantly larger than that of big objects, most allocators utilize different mechanisms to manage small and big objects. For big objects, allocators may obtain a block of memory from the OS directly during the allocation, and then return it to the OS upon the deallocation~\citep{Hoard}. For small objects, allocators may utilize freelists or bitmaps to track freed objects upon deallocations. In order to reduce external fragmentation and encourage memory utilization, memory blocks are managed by size classes, and every allocation will be rounded to its next largest size class.  
