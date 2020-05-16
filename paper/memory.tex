@@ -9,7 +9,8 @@ However, for applications with large footprint, such as \texttt{freqmine} and \t
 %Some applications have higher ratios of memory overheads with MMProf and ones without MMProf, such as vips. One reason is that MMProf uses some per-size variables to calculate memory distributions.  For our evaluation, Glibc-2.28 has 8265 classes, therefore MMProf's per-size variable would cost more space than running other allocators. Meanwhile, vips has lower scale than other applications, which make its ratios look high.But actually, for applications with medium scales(more than 100MB memory overhead when running alone), our evaluation shows MMProf's memory overheads ratio are always lower than 3.
 
 \begin{table}[!tp]  
-\centering    
+\centering
+ \caption{Memory consumption of \MP{}\label{tab:memory_consumption}}
 \begin{tabular}{|l|r|r|}    
 \hline    
 Applications &  Default  & With \MP{}\\ \hline   
@@ -40,5 +41,4 @@ Applications &  Default  & With \MP{}\\ \hline
    x264&1029130&1178769\\ \hline    \hline 
     Total&{\bf 20930289}&{\bf 32143509}\cr\hline   
    \end{tabular}
-   \caption{Memory consumption of \MP{}\label{tab:memory_consumption}}    
    \end{table}

@@ -118,6 +118,7 @@ As described above, \MP{} reports many important metrics of an allocator, and is
 
 \begin{table}[h]
   \centering
+  \caption{Important metrics and collection methods. Empty methods indicate that the metrics can be collected with simple counters.\label{table:metrics}}
   \footnotesize
  % \setlength{\tabcolsep}{1.0em}
 \begin{tabular}{l | l | l}
@@ -131,12 +132,10 @@ Category & Important Metrics & Collection Techniques \\ \hline
 & Real memory usage & \\ \hline
 \multirow{2}{*}{Scalability} & \specialcell{User space contention: per-lock data} & Timestamp\\ \cline{2-3}
 & {Kernel space contention: per-syscall data} &  Timestamp \\ \hline
-\multirow{3}{*}{Application Friendliness} & Cache/page utilization rate & PMU  \\ \cline{2-3}
+\multirow{3}{*}{\specialcell{Application \\ Friendliness}} & Cache/page utilization rate & PMU  \\ \cline{2-3}
 & False sharing effect &  PMU\\ \cline{2-3}
 & Cache contention rate &  PMU \\ \hline
   \end{tabular}
-  \centering
-  \caption{Important metrics and collection methods. Empty methods indicate that the metrics can be collected with simple counters.\label{table:metrics}}
 \end{table}
 
 

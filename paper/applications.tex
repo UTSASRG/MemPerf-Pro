@@ -1,6 +1,7 @@
 
 \begin{table}[h]
   \centering
+  \caption{Abnormal metrics of allocators for different applications.\label{table:abnormal}}
   \footnotesize
   \setlength{\tabcolsep}{0.2em}
 \begin{tabular}{l | l | l | l | l}
@@ -32,8 +33,6 @@ swaptions  &  DieHarder  & $9\times$ slowdown  &
 %\multirow{2}{*}{Performance} & {Alloc/Free runtime} & Timestamp\\ \cline{2-3}
 
   \end{tabular}
-  \centering
-  \caption{Abnormal metrics of allocators for different applications.\label{table:abnormal}}
 \end{table}
 
 Due to the space limit, we only select multiple examples with abnormal metrics of allocators for the analysis. We aim to cover all allocators, with their abnormal data as shown in Table~\ref{table:abnormal}. Based on these listed metrics, we will show the helpful guidelines provided by \MP{} when analyzing the performance and memory issue. In the end of this section, we also provide some observations based on the evaluation of these allocators.  
