@@ -1,9 +1,9 @@
-\section{Motivated Example}
+\section{Motivation Example}
 \label{sec:motivation}
 
- Existing profilers cannot help identify some performance issues caused by the memory allocator. Let us use \texttt{cache-thrash} shown in Figure~\ref{fig:motivation} as an example. For this application, TcMalloc runs around $48\times$ slower than the default Linux allocator. We are using perf, gprof, and Coz to analyze the performance issue. The perf result is shown in Figure~\ref{fig:mot1}. 
-
-The perf tool reports that over 99.81\% of time is actually spent inside the \texttt{worker} function, without pinpointing the real issue. Similarly, the gprof tool actually reports that 100\% of time is spent inside this function. Coz is slightly better, reporting the program lines of exercising the objects with passive false sharing issues, i.e. lines 85-87 of \texttt{cache-thrash.cpp}. Coz further predicts that the performance can be improved up to \textbf{10\%} if these lines are improved by 100\%. However, Coz cannot determine whether these lines are actually caused by passive false sharing issues caused by the corresponding allocators.  
+ Existing profilers cannot help identify some performance issues caused by the memory allocator. Let us use \texttt{cache-thrash} shown in Figure~\ref{fig:motivation} as an example. For this application, TcMalloc runs around $48\times$ slower than the default Linux allocator. We are using perf, gprof, and Coz to analyze the performance issue. 
+ 
+ The perf's result is shown in Figure~\ref{fig:mot1}. It reports that over 99.81\% of time is actually spent inside the \texttt{worker} function, without pinpointing the real issue. Similarly, the gprof tool actually reports that 100\% of time is spent inside this function. Coz reports the program lines of exercising the objects with passive false sharing issues, i.e. lines 85-87 of \texttt{cache-thrash.cpp}, and predicts that the performance can be improved up to \textbf{10\%} if these lines can be improved by 100\%. But there are two issues. First, the impact is obviously much smaller than the real one. This will mislead the programmers. Second, programmers may not know how to improve the performance for three reported statements, since Coz does not pinpoint the real reason for the slowdown, which are passive false sharing issues caused by the corresponding allocators. In summary, existing profilers are not very useful to figure out most performance issues caused by an allocator.   
 
 %For this application, TcMalloc actually introduces both active and passive false sharing issue, which is the major cause for this large slowdown.  Similarly, Coz also cannot identify the issue that are caused by hardware contention~\cite{DBLP:conf/osdi/ZhouGMW18}. For this example, the first line of the code that can be improved by $XX$ is actually located in line $XX$ of \texttt{} file. That is also nothing related to the allocator.  
 
@@ -21,7 +21,7 @@ The perf tool reports that over 99.81\% of time is actually spent inside the \te
 \end{figure}    
 \end{comment}
 
-In contrast, \MP{} reports this problem as passive false sharing issues caused by the allocator, represented by only one parameter inside its application-friendliness metrics. \MP{} also reports a range of metrics for evaluating an allocator, such as memory overhead.    
+In contrast, \MP{} reports this problem as passive false sharing issues caused by the allocator, with one parameter inside its application-friendliness metrics. \MP{} also reports a range of metrics for evaluating an allocator, such as other cache friendliness metrics or memory overhead, where those metrics are useful for diagnosing the performance and memory issues caused by an allocator.     
 
 \section{Background and Overview}
 \label{sec:background}
