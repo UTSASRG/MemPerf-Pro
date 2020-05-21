@@ -23,8 +23,11 @@
 #include "recordscale.hh"
 #include "memwaste.h"
 #include <sched.h>
+#include <stdlib.h>
+#include "programstatus.h"
+#include "mymalloc.h"
 
-spinlock improve_lock;
+//spinlock improve_lock;
 //Globals
 uint64_t total_cycles;
 bool bibop = false;
@@ -34,31 +37,20 @@ bool inRealMain = false;
 bool mapsInitialized = false;
 bool opening_maps_file = false;
 bool realInitialized = false;
-bool selfmapInitialized = false;
-//std::atomic<bool> creatingThread (false);
+
 bool inConstructor = false;
-char* allocator_name;
-char* allocatorFileName;
+
 char smaps_fileName[30];
-//extern char data_start;
-//extern char _etext;
+
 extern char * program_invocation_name;
-extern void * __libc_stack_end;
 //float memEfficiency = 0;
-initStatus profilerInitialized = NOT_INITIALIZED;
 pid_t pid;
 //size_t alignment = 0;
 size_t large_object_threshold = 0;
-size_t smaps_bufferSize = 1024;
-//FILE* smaps_infile = nullptr;
-char* smaps_buffer;
-struct itimerspec stopTimer;
-struct itimerspec resumeTimer;
-//unsigned timer_nsec = 333000000;
-unsigned timer_nsec = 0;
-//unsigned timer_sec = 0;
-unsigned timer_sec = 1;
-//Smaps Sampling-------------//
+
+
+
+
 
 //Array of class sizes
 int num_class_sizes;
@@ -81,11 +73,6 @@ thread_local thread_alloc_data localTAD;
 thread_local bool globalized = false;
 thread_alloc_data globalTAD;
 
-thread_local void* myLocalMem;
-thread_local void* myLocalMemEnd;
-thread_local uint64_t myLocalPosition;
-thread_local uint64_t myLocalAllocations;
-thread_local bool myLocalMemInitialized = false;
 //thread_local PerfAppFriendly friendliness;
 
 thread_local size_t the_old_size;
@@ -94,26 +81,11 @@ thread_local short the_old_classSizeIndex;
 
 spinlock globalize_lck;
 
-// Pre-init private allocator memory
-char myMem[TEMP_MEM_SIZE];
-void* myMemEnd;
-uint64_t myMemPosition = 0;
-uint64_t myMemAllocations = 0;
-spinlock myMemLock;
-
-char* myMem_hash;
-void* myMemEnd_hash;
-uint64_t myMemPosition_hash = 0;
-uint64_t myMemAllocations_hash = 0;
-spinlock myMemLock_hash;
-unsigned long long HASH_SIZE = (unsigned long long)1024*1024*1024*2;
-
 friendly_data globalFriendlyData;
 
 HashMap <uint64_t, PerLockData, spinlock, PrivateHeap> lockUsage;
 
 // pre-init private allocator memory
-char myBuffer[TEMP_MEM_SIZE];
 typedef int (*main_fn_t)(int, char **, char **);
 main_fn_t real_main_mallocprof;
 
@@ -130,8 +102,6 @@ extern "C" {
 	void * valloc(size_t) __attribute__ ((weak, alias("yyvalloc")));
 	void * mmap(void *addr, size_t length, int prot, int flags,
                   int fd, off_t offset) __attribute__ ((weak, alias("yymmap")));
-	void * aligned_alloc(size_t, size_t) __attribute__ ((weak,
-				alias("yyaligned_alloc")));
 	void * memalign(size_t, size_t) __attribute__ ((weak, alias("yymemalign")));
 	void * pvalloc(size_t) __attribute__ ((weak, alias("yypvalloc")));
 	int posix_memalign(void **, size_t, size_t) __attribute__ ((weak,
@@ -149,123 +119,16 @@ extern "C" {
  }
 
 // Constructor
-__attribute__((constructor)) initStatus initializer() {
+__attribute__((constructor)) void initializer() {
 
-	if(profilerInitialized == INITIALIZED){
-			return profilerInitialized;
-	}
-	
-	profilerInitialized = IN_PROGRESS;
-
-	inConstructor = true;
-
-	// Ensure we are operating on a system using 64-bit pointers.
-	// This is necessary, as later we'll be taking the low 8-byte word
-	// of callsites. This could obviously be expanded to support 32-bit systems
-	// as well, in the future.
-	size_t ptrSize = sizeof(void *);
-	if(ptrSize != EIGHT_BYTES) {
-		fprintf(stderr, "error: unsupported pointer size: %zu\n", ptrSize);
-		abort();
-    }
-    myMemEnd = (void*) (myMem + TEMP_MEM_SIZE);
-    myMemLock.init();
-
-    globalize_lck.init();
-    pid = getpid();
-
-    // Allocate and initialize all shadow memory-related mappings
-    ShadowMemory::initialize();
+    ProgramStatus::checkSystemIs64Bits();
 
     RealX::initializer();
+    ShadowMemory::initialize();
+    ProgramStatus::initIO();
+	setMainThreadContention();
 
-    myMem_hash = (char*)RealX::mmap(NULL, HASH_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    myMemEnd_hash = (void*) (myMem_hash + HASH_SIZE);
-    //fprintf(stderr, "myMen_hash = %p, %p\n", myMem_hash, myMemEnd_hash);
-    myMemLock_hash.init();
-
-    improve_lock.init();
-
-	void * program_break = RealX::sbrk(0);
-
-	thrData.stackStart = (char *)__builtin_frame_address(0);
-	thrData.stackEnd = (char *)__libc_stack_end;
-
-	setThreadContention();
-
-	allocator_name = (char*) myMalloc(100);
-	selfmap::getInstance().getTextRegions();
-	selfmapInitialized = true;
-
-	//Build the name of the .info file
-	//This file should be located in the same directory
-	//as the allocator. readAllocatorFile() will open the file
-
-	allocatorFileName = (char*)myMalloc(128);
-	char* end_path = strrchr(allocator_name, '/');
-	char* end_name = strchr(end_path, '.') - 1;
-	char* start_name = end_path + 1;
-	uint64_t name_bytes = (uint64_t)end_name - (uint64_t)end_path;
-	uint64_t path_bytes = (uint64_t)start_name - (uint64_t)allocator_name;
-	short ext_bytes = 6;
-	void* r;
-
-	r = memcpy(allocatorFileName, allocator_name, path_bytes);
-	if (r != allocatorFileName) {perror("memcpy fail?"); abort();}
-	r = memcpy((allocatorFileName+path_bytes), start_name, name_bytes);
-	if (r != (allocatorFileName+path_bytes)) {perror("memcpy fail?"); abort();}
-	snprintf ((allocatorFileName+path_bytes+name_bytes), ext_bytes, ".info");
-    fprintf(stderr, "name: %s\n", allocatorFileName);
-	readAllocatorFile();
-
-	// Generate the name of our output file, then open it for writing.
-	char outputFile[MAX_FILENAME_LEN];
-//	snprintf(outputFile, MAX_FILENAME_LEN, "%s_libmallocprof_%d_main_thread.txt",
-//			program_invocation_name, pid);
-    snprintf(outputFile, MAX_FILENAME_LEN, "/home/jinzhou/parsec/records_t/%s_libmallocprof_%d_main_thread.txt",
-             program_invocation_name, pid);
-    fprintf(stderr, "%s\n", outputFile);
-	// Will overwrite current file; change the fopen flag to "a" for append.
-	thrData.output = fopen(outputFile, "w");
-	if(thrData.output == NULL) {
-		perror("error: unable to open output file to write");
-		return INIT_ERROR;
-	}
-
-	fprintf(thrData.output, ">>> stack start @ %p, stack end @ %p\n", thrData.stackStart, thrData.stackEnd);
-	fprintf(thrData.output, ">>> program break @ %p\n", program_break);
-	//fflush(thrData.output);
-
-
-	profilerInitialized = INITIALIZED;
-
-	smaps_buffer = (char*) myMalloc(smaps_bufferSize);
-	sprintf(smaps_fileName, "/proc/%d/smaps", pid);
-
-
-	resumeTimer.it_value.tv_sec = timer_sec;
-	resumeTimer.it_value.tv_nsec = timer_nsec;
-	resumeTimer.it_interval.tv_sec = timer_sec;
-	resumeTimer.it_interval.tv_nsec = timer_nsec;
-
-	stopTimer.it_value.tv_sec = 0;
-	stopTimer.it_value.tv_nsec = 0;
-	stopTimer.it_interval.tv_sec = 0;
-	stopTimer.it_interval.tv_nsec = 0;
-
-	//worstCaseOverhead.efficiency = 100.00;
-
-	#warning Disabled smaps functionality (timer, signal handler)
-	/*
-	start_smaps();
-	setupSignalHandler();
-	startSignalTimer();*/
-
-
-	//total_cycles_start = rdtscp();
-	inConstructor = false;
-    countEventsOutside(false);
-	return profilerInitialized;
+	ProgramStatus::setProfilerInitializedTrue();
 }
 
 __attribute__((destructor)) void finalizer_mallocprof () {}
@@ -280,12 +143,12 @@ void dumpHashmaps() {
 }
 
 
-extern void improve_cycles_stage_count();
+//extern void improve_cycles_stage_count();
 
 void exitHandler() {
-    countEventsOutside(true);
+    //countEventsOutside(true);
     inRealMain = false;
-    improve_cycles_stage_count(-1);
+    //improve_cycles_stage_count(-1);
 	#ifndef NO_PMU
 	stopSampling();
 
@@ -297,39 +160,12 @@ void exitHandler() {
 	globalizeTAD();
 	writeAllocData();
 
-	// Calculate and print the application friendliness numbers.
+//	 Calculate and print the application friendliness numbers.
 	calcAppFriendliness();
 
-    	if(thrData.output) {
-			fflush(thrData.output);
-	}
+			fflush(ProgramStatus::outputFile);
+		fclose(ProgramStatus::outputFile);
 
-	if(thrData.output) {
-		fclose(thrData.output);
-	}
-
-	#warning Disabled smaps functionality (output)
-	/*
-	uint64_t avg;
-	if(smap_samples != 0) {
-			avg = (smap_sample_cycles / smap_samples);
-	}
-
-	fprintf(stderr, "---WorstCaseOverhead---\n"
-					"Samples:              %lu\n"
-					"AvgCycles:            %lu\n"
-					"PhysicalMem:          %lu\n"
-					"Alignment:            %lu\n"
-					"Blowup:               %lu\n"
-					"Efficiency:           %.4f\n"
-					"-----------------------\n",
-					smap_samples,
-					avg,
-					worstCaseOverhead.kb,
-					worstCaseOverhead.alignment,
-					worstCaseOverhead.blowup,
-					worstCaseOverhead.efficiency);
-	*/
 }
 
 // MallocProf's main function
@@ -363,88 +199,15 @@ extern "C" int libmallocprof_libc_start_main(main_fn_t main_fn, int argc,
 
 void collectAllocMetaData(allocation_metadata *metadata);
 
-uint64_t cycles_with_improve[MAX_THREAD_NUMBER] = {0};
-uint64_t cycles_without_improve[MAX_THREAD_NUMBER] = {0};
-uint64_t cycles_without_alloc[MAX_THREAD_NUMBER] = {0};
-const uint64_t improved_cycles_serial[5] = {5586, 640, 472, 11736, 6780};
-const uint64_t improved_cycles_parallel[5] = {603376, 1303, 1053, 20893, 6624};
-const uint64_t improved_large_obj_thres = 204808;
-
-
-thread_local PerfReadInfo eventOutside_before;
-thread_local PerfReadInfo eventOutside_after;
-thread_local uint64_t eventOutside_timestart;
-thread_local uint64_t eventOutside_timestop;
-thread_local bool eventOutsideStart = false;
-
-void countEventsOutside(bool end) {
-    if(end && !eventOutsideStart) {
-        return;
-    }
-    eventOutsideStart = !end;
-    if(!end) {
-        getPerfCounts(&eventOutside_before);
-        eventOutside_timestart = rdtscp();
-    } else {
-        eventOutside_timestop = rdtscp();
-        getPerfCounts(&eventOutside_after);
-    }
-    if(end) {
-        eventOutside_after.cache_misses -= eventOutside_before.cache_misses;
-        eventOutside_after.faults -= eventOutside_before.faults;
-        eventOutside_after.tlb_read_misses -= eventOutside_before.tlb_read_misses;
-        eventOutside_after.tlb_write_misses -= eventOutside_before.tlb_write_misses;
-        uint64_t time_diff = eventOutside_timestop - eventOutside_timestart;
-
-        if(eventOutside_after.cache_misses > 10000000000) {
-            eventOutside_after.cache_misses = 0;
-        }
-        if(eventOutside_after.faults > 10000000000) {
-            eventOutside_after.faults = 0;
-        }
-        if(eventOutside_after.tlb_read_misses > 10000000000) {
-            eventOutside_after.tlb_read_misses = 0;
-        }
-        if(eventOutside_after.tlb_write_misses > 10000000000) {
-            eventOutside_after.tlb_write_misses = 0;
-        }
-        if(time_diff > 10000000000) {
-            time_diff = 0;
-        }
-        localTAD.numOutsideCacheMisses += eventOutside_after.cache_misses;
-        localTAD.numOutsideFaults += eventOutside_after.faults;
-        localTAD.numOutsideTlbReadMisses += eventOutside_after.tlb_read_misses;
-        localTAD.numOutsideTlbWriteMisses += eventOutside_after.tlb_write_misses;
-        localTAD.numOutsideCycles += time_diff;
-
-        cycles_with_improve[thrData.tid] += time_diff;
-        cycles_without_improve[thrData.tid] += time_diff;
-        cycles_without_alloc[thrData.tid] += time_diff;
-    }
-}
 
 thread_local bool realing = false;
 extern void divideSmallAlloc(size_t sz, bool reused);
 
-///Freq
-//extern int running_thread;
-//extern struct freq_t serial_freq, paralled_freq[MAX_THREAD_NUMBER];
-//void freq_add(int type, uint64_t cycles) {
-//    if(running_thread == 1) {
-//        serial_freq.num[type]++;
-//        serial_freq.cycle[type] += cycles;
-//    } else {
-//        paralled_freq[thrData.tid].num[type]++;
-//        paralled_freq[thrData.tid].cycle[type] += cycles;
-//    }
-//}
 
 
 // Memory management functions
 extern "C" {
 	void * yymalloc(size_t sz) {
-
-        countEventsOutside(true);
 
         if(sz == 0) {
             return NULL;
@@ -464,25 +227,17 @@ extern "C" {
         // reference to the real malloc routine.
         // Also, we can't call initializer() from here, because the initializer
         // itself will call malloc().
-        if((profilerInitialized != INITIALIZED) || (!selfmapInitialized)) {
-            void* ptr = myMalloc (sz);
-            //fprintf(stderr, "malloc 0 ptr = %p, size = %d\n", ptr, sz);
+        if(ProgramStatus::profilerInitializedIsTrue() || !ProgramStatus::selfMapInitializedIsTrue()) {
+            void* ptr = MyMalloc::malloc(sz);
             return ptr;
-            //return myMalloc (sz);
         }
 
         //Malloc is being called by a thread that is already in malloc
-        if (inAllocation) {
+        if (inAllocation || !inRealMain) {
             void* ptr = RealX::malloc(sz);
-            //fprintf(stderr, "malloc 1 ptr = %p, size = %d\n", ptr, sz);
             return ptr;
         }
 
-        if (!inRealMain) {
-            void* ptr = RealX::malloc(sz);
-            //fprintf(stderr, "malloc 2 ptr = %p, size = %d\n", ptr, sz);
-            return ptr;
-        }
         //thread_local
         inFree = false;
         now_size = sz;
@@ -504,20 +259,13 @@ extern "C" {
         size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject(object, allocData.size, false);
         incrementMemoryUsage(sz, allocData.classSize, new_touched_bytes, object);
 
-        //Do after
-        //fprintf(stderr, "*** malloc(%zu) -> %p\n", sz, object);
 
 		allocData.cycles = allocData.tsc_after;
 
-		// Gets overhead, address usage, mmap usage, memHWM, and prefInfo
         collectAllocMetaData(&allocData);
-
-		//fprintf(stderr, "ptr = %p, size = %d\n\n", object, sz);
 
 		// thread_local
         inAllocation = false;
-
-        countEventsOutside(false);
 
         return object;
 
@@ -525,13 +273,13 @@ extern "C" {
 
 	void * yycalloc(size_t nelem, size_t elsize) {
 
-        countEventsOutside(true);
+        //countEventsOutside(true);
 
 		if((nelem * elsize) == 0) {
 				return NULL;
 		}
 
-		if (profilerInitialized != INITIALIZED) {
+		if (ProgramStatus::profilerInitializedIsTrue()) {
 			void * ptr = NULL;
 			ptr = yymalloc (nelem * elsize);
             //fprintf(stderr, "calloc 0 ptr = %p, size = %d\n", ptr, nelem * elsize);
@@ -551,66 +299,60 @@ extern "C" {
 		    return ptr;
 		}
 
-		PMU_init_check();
+//		PMU_init_check();
+//
+//		// thread_local
+//		inFree = false;
+//		now_size = nelem * elsize;
+//		inAllocation = true;
+//
+//		// Data we need for each allocation
+//		allocation_metadata allocData = init_allocation(nelem * elsize, CALLOC);
+//		void* object;
+//
+//		// Do before
+//		doBefore(&allocData);
 
-		// thread_local
-		inFree = false;
-		now_size = nelem * elsize;
-		inAllocation = true;
-
-		// Data we need for each allocation
-		allocation_metadata allocData = init_allocation(nelem * elsize, CALLOC);
-		void* object;
-
-		// Do before
-		doBefore(&allocData);
-
-		// Do allocation
-		object = RealX::calloc(nelem, elsize);
+		// Do allocationwriteAllocData
+		return(RealX::calloc(nelem, elsize));
         //fprintf(stderr, "calloc ptr = %p, size = %d\n", object, nelem * elsize);
-        doAfter(&allocData);
-
-        allocData.reused = MemoryWaste::allocUpdate(&allocData, object);
-        divideSmallAlloc(allocData.size, allocData.reused);
-        size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject(object, allocData.size, false);
-        incrementMemoryUsage(nelem * elsize, allocData.classSize, new_touched_bytes, object);
-        // Do after
-
-		allocData.cycles = allocData.tsc_after;
-
-        collectAllocMetaData(&allocData);
+//        doAfter(&allocData);
+//
+//        allocData.reused = MemoryWaste::allocUpdate(&allocData, object);
+//        divideSmallAlloc(allocData.size, allocData.reused);
+//        size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject(object, allocData.size, false);
+//        incrementMemoryUsage(nelem * elsize, allocData.classSize, new_touched_bytes, object);
+//        // Do after
+//
+//		allocData.cycles = allocData.tsc_after;
+//
+//        collectAllocMetaData(&allocData);
 
 		//thread_local
-		inAllocation = false;
+//		inAllocation = false;
 
-        countEventsOutside(false);
+        ///countEventsOutside(false);
 
-		return object;
+//		return object;
 	}
 
 	void yyfree(void * ptr) {
 
-        countEventsOutside(true);
+        //countEventsOutside(true);
 
 		if (!realInitialized) RealX::initializer();
         if(ptr == NULL) return;
         // Determine whether the specified object came from our global memory;
         // only call RealX::free() if the object did not come from here.
-        if (ptr >= (void *)myMem && ptr <= myMemEnd) {
-            //fprintf(stderr, "free 0 ptr = %p\n", ptr);
-            myFree (ptr);
+        if ( !ProgramStatus::profilerInitializedIsTrue() || !inRealMain) {
+            MyMalloc::free(ptr);
             return;
         }
-        if (ptr >= (void *)myMem_hash && ptr <= myMemEnd_hash) {
-            //fprintf(stderr, "free 1 ptr = %p\n", ptr);
+        if (MyMalloc::inProfilerMemory(ptr)) {
+            MyMalloc::free(ptr);
             return;
         }
-        if ((profilerInitialized != INITIALIZED) || !inRealMain) {
-            //fprintf(stderr, "free 2 ptr = %p\n", ptr);
-            myFree(ptr);
-            return;
-        }
-        //fprintf(stderr, "free ptr = %p\n", ptr);
+
         PMU_init_check();
 
         //thread_local
@@ -640,21 +382,7 @@ extern "C" {
 		doAfter(&allocData);
 
             if (__builtin_expect(!globalized, true)) {
-                cycles_without_improve[thrData.tid] += allocData.tsc_after;
-                ///Jin
-                if(allocData.size < improved_large_obj_thres) {
-                    if(running_thread == 1) {
-                        cycles_with_improve[thrData.tid] += improved_cycles_serial[2];
-                    } else {
-                        cycles_with_improve[thrData.tid] += improved_cycles_parallel[2];
-                    }
-                } else {
-                    if(running_thread == 1) {
-                        cycles_with_improve[thrData.tid] += improved_cycles_serial[4];
-                    } else {
-                        cycles_with_improve[thrData.tid] += improved_cycles_parallel[4];
-                    }
-                }
+
                 if(allocData.size < large_object_threshold) {
 
                     ///Freq
@@ -704,17 +432,14 @@ extern "C" {
             }
         inAllocation = false;
 
-        countEventsOutside(false);
+        //countEventsOutside(false);
 
     }
 
 	void * yyrealloc(void * ptr, size_t sz) {
 
-        countEventsOutside(true);
-
-	    //fprintf(stderr, "yyrealloc...%p, %d\n", ptr, sz);
 		if (!realInitialized) RealX::initializer();
-		if((profilerInitialized != INITIALIZED) || (ptr >= (void *)myMem && ptr <= myMemEnd)) {
+		if( ProgramStatus::profilerInitializedIsTrue() || MyMalloc::inProfilerMemory(ptr)) {
 			if(ptr == NULL) {
                 return yymalloc(sz);
             }
@@ -745,59 +470,58 @@ extern "C" {
             //fprintf(stderr, "realloc 3 ptr = %p, new ptr = %p, size = %d\n", ptr, object, sz);
             return object;
         }
-		PMU_init_check();
-
-		//Data we need for each allocation
-		allocation_metadata allocData = init_allocation(sz, REALLOC);
-
-		// allocated object
-		void * object;
-
-		//thread_local
-		inFree = false;
-		now_size = sz;
-		inAllocation = true;
-
-		//Do before
-
-        if(ptr) {
-            MemoryWaste::freeUpdate(&allocData, ptr);
-            ShadowMemory::updateObject(ptr, allocData.size, true);
-            decrementMemoryUsage(allocData.size, allocData.classSize, ptr);
-        }
-
-        doBefore(&allocData);
+//		PMU_init_check();
+//
+//		//Data we need for each allocation
+//		allocation_metadata allocData = init_allocation(sz, REALLOC);
+//
+//		// allocated object
+//		void * object;
+//
+//		//thread_local
+//		inFree = false;
+//		now_size = sz;
+//		inAllocation = true;
+//
+//		//Do before
+//
+//        if(ptr) {
+//            MemoryWaste::freeUpdate(&allocData, ptr);
+//            ShadowMemory::updateObject(ptr, allocData.size, true);
+//            decrementMemoryUsage(allocData.size, allocData.classSize, ptr);
+//        }
+//
+//        doBefore(&allocData);
         //Do allocation
-        object = RealX::realloc(ptr, sz);
+        return(RealX::realloc(ptr, sz));
         //fprintf(stderr, "realloc ptr = %p, new ptr = %p, size = %d\n", ptr, object, sz);
         //Do after
-        doAfter(&allocData);
-        allocData.size = sz;
-        allocData.reused = MemoryWaste::allocUpdate(&allocData, object);
-        divideSmallAlloc(allocData.size, allocData.reused);
-        size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject(object, sz, false);
-        incrementMemoryUsage(sz, allocData.classSize, new_touched_bytes, object);
+//        doAfter(&allocData);
+//        allocData.size = sz;
+//        allocData.reused = MemoryWaste::allocUpdate(&allocData, object);
+//        divideSmallAlloc(allocData.size, allocData.reused);
+//        size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject(object, sz, false);
+//        incrementMemoryUsage(sz, allocData.classSize, new_touched_bytes, object);
+//
+//
+//		// cyclesForRealloc = tsc_after - tsc_before;
+//		allocData.cycles = allocData.tsc_after;
+//
+//		//Gets overhead, address usage, mmap usage
+//		//analyzeAllocation(&allocData);
+//        //analyzePerfInfo(&allocData);
+//        ///collectAllocMetaData(&allocData);
+//
+//		//thread_local
+//		inAllocation = false;
 
+        ///countEventsOutside(false);
 
-		// cyclesForRealloc = tsc_after - tsc_before;
-		allocData.cycles = allocData.tsc_after;
-
-		//Gets overhead, address usage, mmap usage
-		//analyzeAllocation(&allocData);
-        //analyzePerfInfo(&allocData);
-        collectAllocMetaData(&allocData);
-
-		//thread_local
-		inAllocation = false;
-
-        countEventsOutside(false);
-
-		return object;
+//		return object;
 	}
 
 	inline void logUnsupportedOp() {
-		fprintf(thrData.output,
-				"ERROR: call to unsupported memory function: %s\n",
+		fprintf(stderr, "ERROR: call to unsupported memory function: %s\n",
 				__FUNCTION__);
 	}
 
@@ -809,36 +533,36 @@ extern "C" {
 
 
 	int yyposix_memalign(void **memptr, size_t alignment, size_t size) {
-        countEventsOutside(true);
+        //countEventsOutside(true);
     if (!inRealMain) return RealX::posix_memalign(memptr, alignment, size);
 
-    //thread_local
-    inFree = false;
-    now_size = size;
-    inAllocation = true;
-
-		PMU_init_check();
-
-    //Data we need for each allocation
-    allocation_metadata allocData = init_allocation(size, MALLOC);
-
-    //Do allocation
-    doBefore(&allocData);
-    int retval = RealX::posix_memalign(memptr, alignment, size);
-    doAfter(&allocData);
-    void * object = *memptr;
-    allocData.reused = MemoryWaste::allocUpdate(&allocData, object);
-        divideSmallAlloc(allocData.size, allocData.reused);
-    //Do after
-    size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject(object, allocData.size, false);
-    incrementMemoryUsage(size, allocData.classSize, new_touched_bytes, object);
-
-        allocData.cycles = allocData.tsc_after;
-        collectAllocMetaData(&allocData);
-    // thread_local
-    inAllocation = false;
-        countEventsOutside(false);
-    return retval;
+//    //thread_local
+//    inFree = false;
+//    now_size = size;
+//    inAllocation = true;
+//
+//		PMU_init_check();
+//
+//    //Data we need for each allocation
+//    allocation_metadata allocData = init_allocation(size, MALLOC);
+//
+//    //Do allocation
+//    doBefore(&allocData);
+    return(RealX::posix_memalign(memptr, alignment, size));
+//    doAfter(&allocData);
+//    void * object = *memptr;
+//    allocData.reused = MemoryWaste::allocUpdate(&allocData, object);
+//        divideSmallAlloc(allocData.size, allocData.reused);
+//    //Do after
+//    size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject(object, allocData.size, false);
+//    incrementMemoryUsage(size, allocData.classSize, new_touched_bytes, object);
+//
+//        allocData.cycles = allocData.tsc_after;
+//        collectAllocMetaData(&allocData);
+//    // thread_local
+//    inAllocation = false;
+        ///countEventsOutside(false);
+//    return retval;
 	}
 
 
@@ -849,36 +573,36 @@ extern "C" {
 
 
  void * yymemalign(size_t alignment, size_t size) {
-     countEventsOutside(true);
+     //countEventsOutside(true);
     // fprintf(stderr, "yymemalign alignment %d, size %d\n", alignment, size);
      if (!inRealMain) return RealX::memalign(alignment, size);
 
-     //thread_local
-     inFree = false;
-     now_size = size;
-     inAllocation = true;
-
-     PMU_init_check();
-
-     //Data we need for each allocation
-     allocation_metadata allocData = init_allocation(size, MALLOC);
-
-     //Do allocation
-     doBefore(&allocData);
-     void * object = RealX::memalign(alignment, size);
-     doAfter(&allocData);
-     allocData.reused = MemoryWaste::allocUpdate(&allocData, object);
-     divideSmallAlloc(allocData.size, allocData.reused);
-     //Do after
-    size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject(object, allocData.size, false);
-    incrementMemoryUsage(size, allocData.classSize, new_touched_bytes, object);
-
-     allocData.cycles = allocData.tsc_after;
-     collectAllocMetaData(&allocData);
-    // thread_local
-    inAllocation = false;
-     countEventsOutside(false);
-    return object;
+//     //thread_local
+//     inFree = false;
+//     now_size = size;
+//     inAllocation = true;
+//
+//     PMU_init_check();
+//
+//     //Data we need for each allocation
+//     allocation_metadata allocData = init_allocation(size, MALLOC);
+//
+//     //Do allocation
+//     doBefore(&allocData);
+     return(RealX::memalign(alignment, size));
+//     doAfter(&allocData);
+//     allocData.reused = MemoryWaste::allocUpdate(&allocData, object);
+//     divideSmallAlloc(allocData.size, allocData.reused);
+//     //Do after
+//    size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject(object, allocData.size, false);
+//    incrementMemoryUsage(size, allocData.classSize, new_touched_bytes, object);
+//
+//     allocData.cycles = allocData.tsc_after;
+//     ///collectAllocMetaData(&allocData);
+//    // thread_local
+//    inAllocation = false;
+//     countEventsOutside(false);
+//    return object;
 	}
 
 
@@ -887,32 +611,6 @@ extern "C" {
 		return NULL;
 	}
 
-
-	/*
-	 * This function returns the total usable size of an object allocated
-	 * using glibc malloc (and therefore it does not include the space occupied
-	 * by its 8 byte header).
-	 */
-	size_t getTotalAllocSize(size_t sz) {
-		size_t totalSize, usableSize;
-
-		// Smallest possible total object size (including header) is 32 bytes,
-		// thus making the total usable object size equal to 32-8=24 bytes.
-		if(sz <= 24) {
-			return 24;
-		}
-
-		// Calculate a total object size that is double-word aligned.
-		totalSize = sz + 8;
-		if(totalSize % 16 != 0) {
-			totalSize = 16 * (((sz + 8) / 16) + 1);
-			usableSize = totalSize - 8;
-		} else {
-			usableSize = sz;
-		}
-
-		return usableSize;
-	}
 
 	// PTHREAD_CREATE
 	int pthread_create(pthread_t * tid, const pthread_attr_t * attr,
@@ -1020,7 +718,6 @@ allocation_metadata init_allocation(size_t sz, enum memAllocType type) {
 	PerfReadInfo empty;
 	allocation_metadata new_metadata = {
 		reused : false,
-		//tid : gettid(),
 		tid: thrData.tid,
 		before : empty,
 		after : empty,
@@ -1037,83 +734,6 @@ allocation_metadata init_allocation(size_t sz, enum memAllocType type) {
 		tad : NULL
 	};
 	return new_metadata;
-}
-
-void* myMalloc (size_t size) {
-	if (myLocalMemInitialized) {
-		return myLocalMalloc(size);
-	}
-	myMemLock.lock ();
-    void* p;
-	if((myMemPosition + size + MY_METADATA_SIZE) < TEMP_MEM_SIZE) {
-		unsigned * metadata = (unsigned *)(myMem + myMemPosition);
-		*metadata = size;
-		p = (void *)(myMem + myMemPosition + MY_METADATA_SIZE);
-		myMemPosition += size + MY_METADATA_SIZE;
-		myMemAllocations++;
-	}
-	else {
-		fprintf(stderr, "Error: myMem out of memory\n");
-		fprintf(stderr, "requestedSize= %zu, TEMP_MEM_SIZE= %d, myMemPosition= %lu, myMemAllocations= %lu\n",
-				size, TEMP_MEM_SIZE, myMemPosition, myMemAllocations);
-		dumpHashmaps();
-		abort();
-	}
-	myMemLock.unlock ();
-	return p;
-}
-
-void myFree (void* ptr) {
-	if (ptr == NULL) return;
-	if (ptr >= myLocalMem && ptr <= myLocalMemEnd) {
-		myLocalFree(ptr);
-		return;
-	}
-	myMemLock.lock();
-	if (ptr >= (void*)myMem && ptr <= myMemEnd) {
-		myMemAllocations--;
-		if(myMemAllocations == 0) myMemPosition = 0;
-	}
-	myMemLock.unlock();
-}
-
-void* myMalloc_hash (size_t size) {
-    if (myLocalMemInitialized) {
-        return myLocalMalloc(size);
-    }
-
-    myMemLock_hash.lock ();
-    void* p;
-    if((myMemPosition_hash + size + MY_METADATA_SIZE) < HASH_SIZE) {
-        unsigned * metadata = (unsigned *)(myMem_hash + myMemPosition_hash);
-        *metadata = size;
-        p = (void *)(myMem_hash + myMemPosition_hash + MY_METADATA_SIZE);
-        myMemPosition_hash += size + MY_METADATA_SIZE;
-        myMemAllocations_hash++;
-    }
-    else {
-        fprintf(stderr, "Error: myMem_hash out of memory\n");
-        fprintf(stderr, "requestedSize= %zu, TEMP_MEM_SIZE= %d, myMemPosition_hash= %lu, myMemAllocations_hash= %lu\n",
-                size, HASH_SIZE, myMemPosition_hash, myMemAllocations_hash);
-        dumpHashmaps();
-        abort();
-    }
-    myMemLock_hash.unlock ();
-    return p;
-}
-
-void myFree_hash (void* ptr) {
-    if (ptr == NULL) return;
-    if (ptr >= myLocalMem && ptr <= myLocalMemEnd) {
-        myLocalFree(ptr);
-        return;
-    }
-    myMemLock_hash.lock();
-    if (ptr >= (void*)myMem_hash && ptr <= myMemEnd_hash) {
-        myMemAllocations_hash--;
-        if(myMemAllocations_hash == 0) myMemPosition_hash = 0;
-    }
-    myMemLock_hash.unlock();
 }
 
 void globalizeTAD() {
@@ -1180,10 +800,10 @@ void globalizeTAD() {
 }
 
 void writeAllocData () {
-	fprintf(thrData.output, ">>> large_object_threshold\t%20zu\n", large_object_threshold);
+	fprintf(ProgramStatus::outputFile, ">>> large_object_threshold\t%20zu\n", large_object_threshold);
 	writeThreadMaps();
 	writeThreadContention();
-	fflush (thrData.output);
+	fflush (ProgramStatus::outputFile);
 }
 
 uint64_t total_lock_cycles;
@@ -1193,7 +813,7 @@ void writeThreadMaps () {
 ///Here
     total_cycles = globalTAD.numOutsideCycles + globalTAD.cycles_alloc + globalTAD.cycles_allocFFL + globalTAD.cycles_free +
             globalTAD.cycles_alloc_large + globalTAD.cycles_free_large;
-    fprintf (thrData.output, "total cycles\t\t\t\t%20lu\n", total_cycles);
+    fprintf (ProgramStatus::outputFile, "total cycles\t\t\t\t%20lu\n", total_cycles);
 
 	double numAllocs = safeDivisor(globalTAD.numAllocs);
 	double numAllocsFFL = safeDivisor(globalTAD.numAllocsFFL);
@@ -1201,63 +821,63 @@ void writeThreadMaps () {
 	double numAllocs_large = safeDivisor(globalTAD.numAllocs_large);
     double numFrees_large = safeDivisor(globalTAD.numFrees_large);
 
-  fprintf (thrData.output, "\n>>>>>>>>>>>>>>>    ALLOCATION NUM    <<<<<<<<<<<<<<<\n");
-	fprintf (thrData.output, "small new allocations\t\t\t\t%20lu\n", globalTAD.numAllocs);
-	fprintf (thrData.output, "small reused allocations\t\t%20lu\n", globalTAD.numAllocsFFL);
-	fprintf (thrData.output, "small deallocations\t\t\t\t\t%20lu\n", globalTAD.numFrees);
-    fprintf (thrData.output, "large allocations\t\t\t\t\t\t%20lu\n", globalTAD.numAllocs_large);
-    fprintf (thrData.output, "large deallocations\t\t\t\t\t%20lu\n", globalTAD.numFrees_large);
+  fprintf (ProgramStatus::outputFile, "\n>>>>>>>>>>>>>>>    ALLOCATION NUM    <<<<<<<<<<<<<<<\n");
+	fprintf (ProgramStatus::outputFile, "small new allocations\t\t\t\t%20lu\n", globalTAD.numAllocs);
+	fprintf (ProgramStatus::outputFile, "small reused allocations\t\t%20lu\n", globalTAD.numAllocsFFL);
+	fprintf (ProgramStatus::outputFile, "small deallocations\t\t\t\t\t%20lu\n", globalTAD.numFrees);
+    fprintf (ProgramStatus::outputFile, "large allocations\t\t\t\t\t\t%20lu\n", globalTAD.numAllocs_large);
+    fprintf (ProgramStatus::outputFile, "large deallocations\t\t\t\t\t%20lu\n", globalTAD.numFrees_large);
 	uint64_t leak;
 	if(globalTAD.numAllocs+globalTAD.numAllocsFFL+globalTAD.numAllocs_large > globalTAD.numFrees+globalTAD.numFrees_large) {
 	    leak = (globalTAD.numAllocs+globalTAD.numAllocsFFL+globalTAD.numAllocs_large) - (globalTAD.numFrees+globalTAD.numFrees_large);
 	} else {
 	    leak = 0;
 	}
-    fprintf (thrData.output, "potential leak num\t\t\t\t\t%20lu\n", leak);
-	fprintf (thrData.output, "\n");
+    fprintf (ProgramStatus::outputFile, "potential leak num\t\t\t\t\t%20lu\n", leak);
+	fprintf (ProgramStatus::outputFile, "\n");
 
-  fprintf (thrData.output, "\n>>>>>>>>>>>>>>>    SMALL NEW ALLOCATIONS (%lu)   <<<<<<<<<<<<<<<\n", globalTAD.numAllocs);
-	fprintf (thrData.output, "cycles\t\t\t\t\t\t\t\t\t\t\t%20lu(%3d%%)\tavg = %0.1lf\n", globalTAD.cycles_alloc, globalTAD.cycles_alloc/(total_cycles/100), (globalTAD.cycles_alloc / numAllocs));
-	fprintf (thrData.output, "faults\t\t\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numAllocationFaults, (globalTAD.numAllocationFaults*100 / numAllocs));
-	fprintf (thrData.output, "tlb read misses\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numAllocationTlbReadMisses, (globalTAD.numAllocationTlbReadMisses*100 / numAllocs));
-	fprintf (thrData.output, "tlb write misses\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numAllocationTlbWriteMisses, (globalTAD.numAllocationTlbWriteMisses*100 / numAllocs));
-	fprintf (thrData.output, "cache misses\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.numAllocationCacheMisses, (globalTAD.numAllocationCacheMisses / numAllocs));
-	fprintf (thrData.output, "instructions\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.numAllocationInstrs, (globalTAD.numAllocationInstrs / numAllocs));
-	fprintf (thrData.output, "\n");
+  fprintf (ProgramStatus::outputFile, "\n>>>>>>>>>>>>>>>    SMALL NEW ALLOCATIONS (%lu)   <<<<<<<<<<<<<<<\n", globalTAD.numAllocs);
+	fprintf (ProgramStatus::outputFile, "cycles\t\t\t\t\t\t\t\t\t\t\t%20lu(%3d%%)\tavg = %0.1lf\n", globalTAD.cycles_alloc, globalTAD.cycles_alloc/(total_cycles/100), (globalTAD.cycles_alloc / numAllocs));
+	fprintf (ProgramStatus::outputFile, "faults\t\t\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numAllocationFaults, (globalTAD.numAllocationFaults*100 / numAllocs));
+	fprintf (ProgramStatus::outputFile, "tlb read misses\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numAllocationTlbReadMisses, (globalTAD.numAllocationTlbReadMisses*100 / numAllocs));
+	fprintf (ProgramStatus::outputFile, "tlb write misses\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numAllocationTlbWriteMisses, (globalTAD.numAllocationTlbWriteMisses*100 / numAllocs));
+	fprintf (ProgramStatus::outputFile, "cache misses\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.numAllocationCacheMisses, (globalTAD.numAllocationCacheMisses / numAllocs));
+	fprintf (ProgramStatus::outputFile, "instructions\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.numAllocationInstrs, (globalTAD.numAllocationInstrs / numAllocs));
+	fprintf (ProgramStatus::outputFile, "\n");
 
-	fprintf (thrData.output, "\n>>>>>>>>>>>>>>>    SMALL FREELIST ALLOCATIONS (%lu)  <<<<<<<<<<<<<<<\n", globalTAD.numAllocsFFL);
-	fprintf (thrData.output, "cycles\t\t\t\t\t\t\t\t\t\t\t%20lu(%3d%%)\tavg = %0.1lf\n", globalTAD.cycles_allocFFL, globalTAD.cycles_allocFFL/(total_cycles/100), (globalTAD.cycles_allocFFL / numAllocsFFL));
-	fprintf (thrData.output, "faults\t\t\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numAllocationFaultsFFL, (globalTAD.numAllocationFaultsFFL*100 / numAllocsFFL));
-	fprintf (thrData.output, "tlb read misses\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numAllocationTlbReadMissesFFL, (globalTAD.numAllocationTlbReadMissesFFL*100 / numAllocsFFL));
-	fprintf (thrData.output, "tlb write misses\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numAllocationTlbWriteMissesFFL, (globalTAD.numAllocationTlbWriteMissesFFL*100 / numAllocsFFL));
-	fprintf (thrData.output, "cache misses\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.numAllocationCacheMissesFFL, (globalTAD.numAllocationCacheMissesFFL / numAllocsFFL));
-	fprintf (thrData.output, "instructions\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.numAllocationInstrsFFL, (globalTAD.numAllocationInstrsFFL / numAllocsFFL));
-	fprintf (thrData.output, "\n");
+	fprintf (ProgramStatus::outputFile, "\n>>>>>>>>>>>>>>>    SMALL FREELIST ALLOCATIONS (%lu)  <<<<<<<<<<<<<<<\n", globalTAD.numAllocsFFL);
+	fprintf (ProgramStatus::outputFile, "cycles\t\t\t\t\t\t\t\t\t\t\t%20lu(%3d%%)\tavg = %0.1lf\n", globalTAD.cycles_allocFFL, globalTAD.cycles_allocFFL/(total_cycles/100), (globalTAD.cycles_allocFFL / numAllocsFFL));
+	fprintf (ProgramStatus::outputFile, "faults\t\t\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numAllocationFaultsFFL, (globalTAD.numAllocationFaultsFFL*100 / numAllocsFFL));
+	fprintf (ProgramStatus::outputFile, "tlb read misses\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numAllocationTlbReadMissesFFL, (globalTAD.numAllocationTlbReadMissesFFL*100 / numAllocsFFL));
+	fprintf (ProgramStatus::outputFile, "tlb write misses\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numAllocationTlbWriteMissesFFL, (globalTAD.numAllocationTlbWriteMissesFFL*100 / numAllocsFFL));
+	fprintf (ProgramStatus::outputFile, "cache misses\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.numAllocationCacheMissesFFL, (globalTAD.numAllocationCacheMissesFFL / numAllocsFFL));
+	fprintf (ProgramStatus::outputFile, "instructions\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.numAllocationInstrsFFL, (globalTAD.numAllocationInstrsFFL / numAllocsFFL));
+	fprintf (ProgramStatus::outputFile, "\n");
 
-	fprintf (thrData.output, "\n>>>>>>>>>>>>>>>    SMALL DEALLOCATIONS (%lu)   <<<<<<<<<<<<<<<\n", globalTAD.numFrees);
-	fprintf (thrData.output, "cycles\t\t\t\t\t\t\t\t\t\t\t%20lu(%3d%%)\tavg = %0.1lf\n", globalTAD.cycles_free, globalTAD.cycles_free/(total_cycles/100), (globalTAD.cycles_free / numFrees));
-	fprintf (thrData.output, "faults\t\t\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numDeallocationFaults, (globalTAD.numDeallocationFaults*100 / numFrees));
-	fprintf (thrData.output, "tlb read misses\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numDeallocationTlbReadMisses, (globalTAD.numDeallocationTlbReadMisses*100 / numFrees));
-	fprintf (thrData.output, "tlb write misses\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numDeallocationTlbWriteMisses, (globalTAD.numDeallocationTlbWriteMisses*100 / numFrees));
-	fprintf (thrData.output, "cache misses\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.numDeallocationCacheMisses, (globalTAD.numDeallocationCacheMisses / numFrees));
-	fprintf (thrData.output, "instrctions\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.numDeallocationInstrs, (globalTAD.numDeallocationInstrs / numFrees));
+	fprintf (ProgramStatus::outputFile, "\n>>>>>>>>>>>>>>>    SMALL DEALLOCATIONS (%lu)   <<<<<<<<<<<<<<<\n", globalTAD.numFrees);
+	fprintf (ProgramStatus::outputFile, "cycles\t\t\t\t\t\t\t\t\t\t\t%20lu(%3d%%)\tavg = %0.1lf\n", globalTAD.cycles_free, globalTAD.cycles_free/(total_cycles/100), (globalTAD.cycles_free / numFrees));
+	fprintf (ProgramStatus::outputFile, "faults\t\t\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numDeallocationFaults, (globalTAD.numDeallocationFaults*100 / numFrees));
+	fprintf (ProgramStatus::outputFile, "tlb read misses\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numDeallocationTlbReadMisses, (globalTAD.numDeallocationTlbReadMisses*100 / numFrees));
+	fprintf (ProgramStatus::outputFile, "tlb write misses\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numDeallocationTlbWriteMisses, (globalTAD.numDeallocationTlbWriteMisses*100 / numFrees));
+	fprintf (ProgramStatus::outputFile, "cache misses\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.numDeallocationCacheMisses, (globalTAD.numDeallocationCacheMisses / numFrees));
+	fprintf (ProgramStatus::outputFile, "instrctions\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.numDeallocationInstrs, (globalTAD.numDeallocationInstrs / numFrees));
 
-    fprintf (thrData.output, "\n>>>>>>>>>>>>>>>    LARGE ALLOCATIONS (%lu)   <<<<<<<<<<<<<<<\n", globalTAD.numAllocs_large);
-    fprintf (thrData.output, "cycles\t\t\t\t\t\t\t\t\t\t\t%20lu(%3d%%)\tavg = %0.1lf\n", globalTAD.cycles_alloc_large, globalTAD.cycles_alloc_large/(total_cycles/100), (globalTAD.cycles_alloc_large / numAllocs_large));
-    fprintf (thrData.output, "faults\t\t\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numAllocationFaults_large, (globalTAD.numAllocationFaults_large*100 / numAllocs_large));
-    fprintf (thrData.output, "tlb read misses\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numAllocationTlbReadMisses_large, (globalTAD.numAllocationTlbReadMisses_large*100 / numAllocs_large));
-    fprintf (thrData.output, "tlb write misses\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numAllocationTlbWriteMisses_large, (globalTAD.numAllocationTlbWriteMisses_large*100 / numAllocs_large));
-    fprintf (thrData.output, "cache misses\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.numAllocationCacheMisses_large, (globalTAD.numAllocationCacheMisses_large / numAllocs_large));
-    fprintf (thrData.output, "instructions\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.numAllocationInstrs_large, (globalTAD.numAllocationInstrs_large / numAllocs_large));
-    fprintf (thrData.output, "\n");
+    fprintf (ProgramStatus::outputFile, "\n>>>>>>>>>>>>>>>    LARGE ALLOCATIONS (%lu)   <<<<<<<<<<<<<<<\n", globalTAD.numAllocs_large);
+    fprintf (ProgramStatus::outputFile, "cycles\t\t\t\t\t\t\t\t\t\t\t%20lu(%3d%%)\tavg = %0.1lf\n", globalTAD.cycles_alloc_large, globalTAD.cycles_alloc_large/(total_cycles/100), (globalTAD.cycles_alloc_large / numAllocs_large));
+    fprintf (ProgramStatus::outputFile, "faults\t\t\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numAllocationFaults_large, (globalTAD.numAllocationFaults_large*100 / numAllocs_large));
+    fprintf (ProgramStatus::outputFile, "tlb read misses\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numAllocationTlbReadMisses_large, (globalTAD.numAllocationTlbReadMisses_large*100 / numAllocs_large));
+    fprintf (ProgramStatus::outputFile, "tlb write misses\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numAllocationTlbWriteMisses_large, (globalTAD.numAllocationTlbWriteMisses_large*100 / numAllocs_large));
+    fprintf (ProgramStatus::outputFile, "cache misses\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.numAllocationCacheMisses_large, (globalTAD.numAllocationCacheMisses_large / numAllocs_large));
+    fprintf (ProgramStatus::outputFile, "instructions\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.numAllocationInstrs_large, (globalTAD.numAllocationInstrs_large / numAllocs_large));
+    fprintf (ProgramStatus::outputFile, "\n");
 
-    fprintf (thrData.output, "\n>>>>>>>>>>>>>>>    LARGE DEALLOCATIONS (%lu)   <<<<<<<<<<<<<<<\n", globalTAD.numFrees_large);
-    fprintf (thrData.output, "cycles\t\t\t\t\t\t\t\t\t\t\t%20lu(%3d%%)\tavg = %0.1lf\n", globalTAD.cycles_free_large, globalTAD.cycles_free_large/(total_cycles/100), (globalTAD.cycles_free_large / numFrees_large));
-    fprintf (thrData.output, "faults\t\t\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numDeallocationFaults_large, (globalTAD.numDeallocationFaults_large*100 / numFrees_large));
-    fprintf (thrData.output, "tlb read misses\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numDeallocationTlbReadMisses_large, (globalTAD.numDeallocationTlbReadMisses_large*100 / numFrees_large));
-    fprintf (thrData.output, "tlb write misses\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numDeallocationTlbWriteMisses_large, (globalTAD.numDeallocationTlbWriteMisses_large*100 / numFrees_large));
-    fprintf (thrData.output, "cache misses\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.numDeallocationCacheMisses_large, (globalTAD.numDeallocationCacheMisses_large / numFrees_large));
-    fprintf (thrData.output, "instrctions\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.numDeallocationInstrs_large, (globalTAD.numDeallocationInstrs_large / numFrees_large));
+    fprintf (ProgramStatus::outputFile, "\n>>>>>>>>>>>>>>>    LARGE DEALLOCATIONS (%lu)   <<<<<<<<<<<<<<<\n", globalTAD.numFrees_large);
+    fprintf (ProgramStatus::outputFile, "cycles\t\t\t\t\t\t\t\t\t\t\t%20lu(%3d%%)\tavg = %0.1lf\n", globalTAD.cycles_free_large, globalTAD.cycles_free_large/(total_cycles/100), (globalTAD.cycles_free_large / numFrees_large));
+    fprintf (ProgramStatus::outputFile, "faults\t\t\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numDeallocationFaults_large, (globalTAD.numDeallocationFaults_large*100 / numFrees_large));
+    fprintf (ProgramStatus::outputFile, "tlb read misses\t\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numDeallocationTlbReadMisses_large, (globalTAD.numDeallocationTlbReadMisses_large*100 / numFrees_large));
+    fprintf (ProgramStatus::outputFile, "tlb write misses\t\t\t\t\t\t%20lu\tavg = %0.1lf%%\n", globalTAD.numDeallocationTlbWriteMisses_large, (globalTAD.numDeallocationTlbWriteMisses_large*100 / numFrees_large));
+    fprintf (ProgramStatus::outputFile, "cache misses\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.numDeallocationCacheMisses_large, (globalTAD.numDeallocationCacheMisses_large / numFrees_large));
+    fprintf (ProgramStatus::outputFile, "instrctions\t\t\t\t\t\t\t\t\t%20lu\tavg = %0.1lf\n", globalTAD.numDeallocationInstrs_large, (globalTAD.numDeallocationInstrs_large / numFrees_large));
 
     ThreadContention globalizedThreadContention;
     for(int i = 0; i <= threadcontention_index; i++) {
@@ -1289,149 +909,149 @@ void writeThreadMaps () {
 
 
 
-    fprintf (thrData.output, "\n>>>>>>>>>>>>>>>     LOCK TOTALS     <<<<<<<<<<<<<<<\n");
-    fprintf (thrData.output, "total_lock_calls\t\t\t\t\t%20u\n", total_lock_calls);
+    fprintf (ProgramStatus::outputFile, "\n>>>>>>>>>>>>>>>     LOCK TOTALS     <<<<<<<<<<<<<<<\n");
+    fprintf (ProgramStatus::outputFile, "total_lock_calls\t\t\t\t\t%20u\n", total_lock_calls);
     if(total_lock_calls > 0) {
-        fprintf (thrData.output, "total_lock_cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", total_lock_cycles,
+        fprintf (ProgramStatus::outputFile, "total_lock_cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", total_lock_cycles,
                  total_lock_cycles / (total_cycles / 100 ), (double)total_lock_cycles / safeDivisor(total_lock_calls));
 
-        fprintf (thrData.output, "\npthread mutex locks\t\t\t\t\t%20u\n", globalTAD.lock_nums[0]);
+        fprintf (ProgramStatus::outputFile, "\npthread mutex locks\t\t\t\t\t%20u\n", globalTAD.lock_nums[0]);
         if(globalTAD.lock_nums[0] > 0) {
-            fprintf (thrData.output, "small new alloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[0].new_calls);
-            fprintf (thrData.output, "small new alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[0].new_calls / safeDivisor(globalTAD.numAllocs));
-            fprintf (thrData.output, "small new alloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[0].new_cycles,
+            fprintf (ProgramStatus::outputFile, "small new alloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[0].new_calls);
+            fprintf (ProgramStatus::outputFile, "small new alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[0].new_calls / safeDivisor(globalTAD.numAllocs));
+            fprintf (ProgramStatus::outputFile, "small new alloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[0].new_cycles,
                      globalizedThreadContention.pmdata[0].new_cycles / (total_cycles/100),
                      (double)globalizedThreadContention.pmdata[0].new_cycles / safeDivisor(globalizedThreadContention.pmdata[0].new_calls));
 
-            fprintf (thrData.output, "small reused alloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[0].ffl_calls);
-            fprintf (thrData.output, "small reused alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[0].ffl_calls / safeDivisor(globalTAD.numAllocsFFL));
-            fprintf (thrData.output, "small reused alloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[0].ffl_cycles,
+            fprintf (ProgramStatus::outputFile, "small reused alloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[0].ffl_calls);
+            fprintf (ProgramStatus::outputFile, "small reused alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[0].ffl_calls / safeDivisor(globalTAD.numAllocsFFL));
+            fprintf (ProgramStatus::outputFile, "small reused alloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[0].ffl_cycles,
                      globalizedThreadContention.pmdata[0].ffl_cycles / (total_cycles/100),
                      (double)globalizedThreadContention.pmdata[0].ffl_cycles / safeDivisor(globalizedThreadContention.pmdata[0].ffl_calls));
 
-            fprintf (thrData.output, "large alloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[0].calls[1]);
-            fprintf (thrData.output, "large alloc alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[0].calls[1] / safeDivisor(globalTAD.numAllocs_large));
-            fprintf (thrData.output, "large alloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[0].cycles[1],
+            fprintf (ProgramStatus::outputFile, "large alloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[0].calls[1]);
+            fprintf (ProgramStatus::outputFile, "large alloc alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[0].calls[1] / safeDivisor(globalTAD.numAllocs_large));
+            fprintf (ProgramStatus::outputFile, "large alloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[0].cycles[1],
                      globalizedThreadContention.pmdata[0].cycles[1] / (total_cycles/100),
                      (double)globalizedThreadContention.pmdata[0].cycles[1] / safeDivisor(globalizedThreadContention.pmdata[0].calls[1]));
 
-            fprintf (thrData.output, "small dealloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[0].calls[2]);
-            fprintf (thrData.output, "small dealloc alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[0].calls[2] / safeDivisor(globalTAD.numFrees));
-            fprintf (thrData.output, "small dealloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[0].cycles[2],
+            fprintf (ProgramStatus::outputFile, "small dealloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[0].calls[2]);
+            fprintf (ProgramStatus::outputFile, "small dealloc alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[0].calls[2] / safeDivisor(globalTAD.numFrees));
+            fprintf (ProgramStatus::outputFile, "small dealloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[0].cycles[2],
                      globalizedThreadContention.pmdata[0].cycles[2] / (total_cycles/100),
                      (double)globalizedThreadContention.pmdata[0].cycles[2] / safeDivisor(globalizedThreadContention.pmdata[0].calls[2]));
 
-            fprintf (thrData.output, "large dealloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[0].calls[3]);
-            fprintf (thrData.output, "large dealloc alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[0].calls[3] / safeDivisor(globalTAD.numFrees_large));
-            fprintf (thrData.output, "large dealloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[0].cycles[3],
+            fprintf (ProgramStatus::outputFile, "large dealloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[0].calls[3]);
+            fprintf (ProgramStatus::outputFile, "large dealloc alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[0].calls[3] / safeDivisor(globalTAD.numFrees_large));
+            fprintf (ProgramStatus::outputFile, "large dealloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[0].cycles[3],
                      globalizedThreadContention.pmdata[0].cycles[3] / (total_cycles/100),
                      (double)globalizedThreadContention.pmdata[0].cycles[3] / safeDivisor(globalizedThreadContention.pmdata[0].calls[3]));
         }
 
 
-        fprintf (thrData.output, "\npthread spin locks\t\t\t\t\t%20u\n", globalTAD.lock_nums[1]);
+        fprintf (ProgramStatus::outputFile, "\npthread spin locks\t\t\t\t\t%20u\n", globalTAD.lock_nums[1]);
         if(globalTAD.lock_nums[1] > 0) {
-            fprintf (thrData.output, "small new alloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[1].new_calls);
-            fprintf (thrData.output, "small new alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[1].new_calls / safeDivisor(globalTAD.numAllocs));
-            fprintf (thrData.output, "small new alloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[1].new_cycles,
+            fprintf (ProgramStatus::outputFile, "small new alloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[1].new_calls);
+            fprintf (ProgramStatus::outputFile, "small new alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[1].new_calls / safeDivisor(globalTAD.numAllocs));
+            fprintf (ProgramStatus::outputFile, "small new alloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[1].new_cycles,
                      globalizedThreadContention.pmdata[1].new_cycles / (total_cycles/100),
                      (double)globalizedThreadContention.pmdata[1].new_cycles / safeDivisor(globalizedThreadContention.pmdata[1].new_calls));
 
-            fprintf (thrData.output, "small reused alloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[1].ffl_calls);
-            fprintf (thrData.output, "small reused alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[1].ffl_calls / safeDivisor(globalTAD.numAllocsFFL));
-            fprintf (thrData.output, "small reused alloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[1].ffl_cycles,
+            fprintf (ProgramStatus::outputFile, "small reused alloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[1].ffl_calls);
+            fprintf (ProgramStatus::outputFile, "small reused alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[1].ffl_calls / safeDivisor(globalTAD.numAllocsFFL));
+            fprintf (ProgramStatus::outputFile, "small reused alloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[1].ffl_cycles,
                      globalizedThreadContention.pmdata[1].ffl_cycles / (total_cycles/100),
                      (double)globalizedThreadContention.pmdata[1].ffl_cycles / safeDivisor(globalizedThreadContention.pmdata[1].ffl_calls));
 
-            fprintf (thrData.output, "large alloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[1].calls[1]);
-            fprintf (thrData.output, "large alloc alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[1].calls[1] / safeDivisor(globalTAD.numAllocs_large));
-            fprintf (thrData.output, "large alloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[1].cycles[1],
+            fprintf (ProgramStatus::outputFile, "large alloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[1].calls[1]);
+            fprintf (ProgramStatus::outputFile, "large alloc alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[1].calls[1] / safeDivisor(globalTAD.numAllocs_large));
+            fprintf (ProgramStatus::outputFile, "large alloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[1].cycles[1],
                      globalizedThreadContention.pmdata[1].cycles[1] / (total_cycles/100),
                      (double)globalizedThreadContention.pmdata[1].cycles[1] / safeDivisor(globalizedThreadContention.pmdata[1].calls[1]));
 
-            fprintf (thrData.output, "small dealloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[1].calls[2]);
-            fprintf (thrData.output, "small dealloc alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[1].calls[2] / safeDivisor(globalTAD.numFrees));
-            fprintf (thrData.output, "small dealloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[1].cycles[2],
+            fprintf (ProgramStatus::outputFile, "small dealloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[1].calls[2]);
+            fprintf (ProgramStatus::outputFile, "small dealloc alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[1].calls[2] / safeDivisor(globalTAD.numFrees));
+            fprintf (ProgramStatus::outputFile, "small dealloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[1].cycles[2],
                      globalizedThreadContention.pmdata[1].cycles[2] / (total_cycles/100),
                      (double)globalizedThreadContention.pmdata[1].cycles[2] / safeDivisor(globalizedThreadContention.pmdata[1].calls[2]));
 
-            fprintf (thrData.output, "large dealloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[1].calls[3]);
-            fprintf (thrData.output, "large dealloc alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[1].calls[3] / safeDivisor(globalTAD.numFrees_large));
-            fprintf (thrData.output, "large dealloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[1].cycles[3],
+            fprintf (ProgramStatus::outputFile, "large dealloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[1].calls[3]);
+            fprintf (ProgramStatus::outputFile, "large dealloc alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[1].calls[3] / safeDivisor(globalTAD.numFrees_large));
+            fprintf (ProgramStatus::outputFile, "large dealloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[1].cycles[3],
                      globalizedThreadContention.pmdata[1].cycles[3] / (total_cycles/100),
                      (double)globalizedThreadContention.pmdata[1].cycles[3] / safeDivisor(globalizedThreadContention.pmdata[1].calls[3]));
 
         }
 
-        fprintf (thrData.output, "\npthread trylocks\t\t\t\t\t\t%20u\n", globalTAD.lock_nums[2]);
+        fprintf (ProgramStatus::outputFile, "\npthread trylocks\t\t\t\t\t\t%20u\n", globalTAD.lock_nums[2]);
         if(globalTAD.lock_nums[2] > 0) {
-            fprintf (thrData.output, "small new alloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[2].new_calls);
-            fprintf (thrData.output, "small new alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[2].new_calls / safeDivisor(globalTAD.numAllocs));
-            fprintf (thrData.output, "small new alloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[2].new_cycles,
+            fprintf (ProgramStatus::outputFile, "small new alloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[2].new_calls);
+            fprintf (ProgramStatus::outputFile, "small new alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[2].new_calls / safeDivisor(globalTAD.numAllocs));
+            fprintf (ProgramStatus::outputFile, "small new alloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[2].new_cycles,
                      globalizedThreadContention.pmdata[2].new_cycles / (total_cycles/100),
                      (double)globalizedThreadContention.pmdata[2].new_cycles / safeDivisor(globalizedThreadContention.pmdata[2].new_calls));
 
-            fprintf (thrData.output, "small reused alloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[2].ffl_calls);
-            fprintf (thrData.output, "small reused alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[2].ffl_calls / safeDivisor(globalTAD.numAllocsFFL));
-            fprintf (thrData.output, "small reused alloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[2].ffl_cycles,
+            fprintf (ProgramStatus::outputFile, "small reused alloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[2].ffl_calls);
+            fprintf (ProgramStatus::outputFile, "small reused alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[2].ffl_calls / safeDivisor(globalTAD.numAllocsFFL));
+            fprintf (ProgramStatus::outputFile, "small reused alloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[2].ffl_cycles,
                      globalizedThreadContention.pmdata[2].ffl_cycles / (total_cycles/100),
                      (double)globalizedThreadContention.pmdata[2].ffl_cycles / safeDivisor(globalizedThreadContention.pmdata[2].ffl_calls));
 
-            fprintf (thrData.output, "large alloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[2].calls[1]);
-            fprintf (thrData.output, "large alloc alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[2].calls[1] / safeDivisor(globalTAD.numAllocs_large));
-            fprintf (thrData.output, "large alloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[2].cycles[1],
+            fprintf (ProgramStatus::outputFile, "large alloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[2].calls[1]);
+            fprintf (ProgramStatus::outputFile, "large alloc alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[2].calls[1] / safeDivisor(globalTAD.numAllocs_large));
+            fprintf (ProgramStatus::outputFile, "large alloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[2].cycles[1],
                      globalizedThreadContention.pmdata[2].cycles[1] / (total_cycles/100),
                      (double)globalizedThreadContention.pmdata[2].cycles[1] / safeDivisor(globalizedThreadContention.pmdata[2].calls[1]));
 
-            fprintf (thrData.output, "small dealloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[2].calls[2]);
-            fprintf (thrData.output, "small dealloc alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[2].calls[2] / safeDivisor(globalTAD.numFrees));
-            fprintf (thrData.output, "small dealloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[2].cycles[2],
+            fprintf (ProgramStatus::outputFile, "small dealloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[2].calls[2]);
+            fprintf (ProgramStatus::outputFile, "small dealloc alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[2].calls[2] / safeDivisor(globalTAD.numFrees));
+            fprintf (ProgramStatus::outputFile, "small dealloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[2].cycles[2],
                      globalizedThreadContention.pmdata[2].cycles[2] / (total_cycles/100),
                      (double)globalizedThreadContention.pmdata[2].cycles[2] / safeDivisor(globalizedThreadContention.pmdata[2].calls[2]));
 
-            fprintf (thrData.output, "large dealloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[2].calls[3]);
-            fprintf (thrData.output, "large dealloc alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[2].calls[3] / safeDivisor(globalTAD.numFrees_large));
-            fprintf (thrData.output, "large dealloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[2].cycles[3],
+            fprintf (ProgramStatus::outputFile, "large dealloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[2].calls[3]);
+            fprintf (ProgramStatus::outputFile, "large dealloc alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[2].calls[3] / safeDivisor(globalTAD.numFrees_large));
+            fprintf (ProgramStatus::outputFile, "large dealloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[2].cycles[3],
                      globalizedThreadContention.pmdata[2].cycles[3] / (total_cycles/100),
                      (double)globalizedThreadContention.pmdata[2].cycles[3] / safeDivisor(globalizedThreadContention.pmdata[2].calls[3]));
         }
 
 
-        fprintf (thrData.output, "\npthread spin trylocks\t\t\t\t%20u\n", globalTAD.lock_nums[3]);
+        fprintf (ProgramStatus::outputFile, "\npthread spin trylocks\t\t\t\t%20u\n", globalTAD.lock_nums[3]);
         if(globalTAD.lock_nums[3] > 0) {
-            fprintf (thrData.output, "small new alloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[3].new_calls);
-            fprintf (thrData.output, "small new alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[3].new_calls / safeDivisor(globalTAD.numAllocs));
-            fprintf (thrData.output, "small new alloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[3].new_cycles,
+            fprintf (ProgramStatus::outputFile, "small new alloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[3].new_calls);
+            fprintf (ProgramStatus::outputFile, "small new alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[3].new_calls / safeDivisor(globalTAD.numAllocs));
+            fprintf (ProgramStatus::outputFile, "small new alloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[3].new_cycles,
                      globalizedThreadContention.pmdata[3].new_cycles / (total_cycles/100),
                      (double)globalizedThreadContention.pmdata[3].new_cycles / safeDivisor(globalizedThreadContention.pmdata[3].new_calls));
 
-            fprintf (thrData.output, "small reused alloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[3].ffl_calls);
-            fprintf (thrData.output, "small reused alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[3].ffl_calls / safeDivisor(globalTAD.numAllocsFFL));
-            fprintf (thrData.output, "small reused alloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[3].ffl_cycles,
+            fprintf (ProgramStatus::outputFile, "small reused alloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[3].ffl_calls);
+            fprintf (ProgramStatus::outputFile, "small reused alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[3].ffl_calls / safeDivisor(globalTAD.numAllocsFFL));
+            fprintf (ProgramStatus::outputFile, "small reused alloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[3].ffl_cycles,
                      globalizedThreadContention.pmdata[3].ffl_cycles / (total_cycles/100),
                      (double)globalizedThreadContention.pmdata[3].ffl_cycles / safeDivisor(globalizedThreadContention.pmdata[3].ffl_calls));
 
-            fprintf (thrData.output, "large alloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[3].calls[1]);
-            fprintf (thrData.output, "large alloc alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[3].calls[1] / safeDivisor(globalTAD.numAllocs_large));
-            fprintf (thrData.output, "large alloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[3].cycles[1],
+            fprintf (ProgramStatus::outputFile, "large alloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[3].calls[1]);
+            fprintf (ProgramStatus::outputFile, "large alloc alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[3].calls[1] / safeDivisor(globalTAD.numAllocs_large));
+            fprintf (ProgramStatus::outputFile, "large alloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[3].cycles[1],
                      globalizedThreadContention.pmdata[3].cycles[1] / (total_cycles/100),
                      (double)globalizedThreadContention.pmdata[3].cycles[1] / safeDivisor(globalizedThreadContention.pmdata[3].calls[1]));
 
-            fprintf (thrData.output, "small dealloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[3].calls[2]);
-            fprintf (thrData.output, "small dealloc alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[3].calls[2] / safeDivisor(globalTAD.numFrees));
-            fprintf (thrData.output, "small dealloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[3].cycles[2],
+            fprintf (ProgramStatus::outputFile, "small dealloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[3].calls[2]);
+            fprintf (ProgramStatus::outputFile, "small dealloc alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[3].calls[2] / safeDivisor(globalTAD.numFrees));
+            fprintf (ProgramStatus::outputFile, "small dealloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[3].cycles[2],
                      globalizedThreadContention.pmdata[3].cycles[2] / (total_cycles/100),
                      (double)globalizedThreadContention.pmdata[3].cycles[2] / safeDivisor(globalizedThreadContention.pmdata[3].calls[2]));
 
-            fprintf (thrData.output, "large dealloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[3].calls[3]);
-            fprintf (thrData.output, "large dealloc alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[3].calls[3] / safeDivisor(globalTAD.numFrees_large));
-            fprintf (thrData.output, "large dealloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[3].cycles[3],
+            fprintf (ProgramStatus::outputFile, "large dealloc calls\t\t\t\t\t\t\t\t\t\t\t\t%20u\n", globalizedThreadContention.pmdata[3].calls[3]);
+            fprintf (ProgramStatus::outputFile, "large dealloc alloc calls per alloc\t\t\t\t\t\t\t\t\t\t\t\t%10.1f\n", (double)globalizedThreadContention.pmdata[3].calls[3] / safeDivisor(globalTAD.numFrees_large));
+            fprintf (ProgramStatus::outputFile, "large dealloc cycles\t\t\t\t\t%20lu(%3d%%)\tavg =%10.1f\n\n", globalizedThreadContention.pmdata[3].cycles[3],
                      globalizedThreadContention.pmdata[3].cycles[3] / (total_cycles/100),
                      (double)globalizedThreadContention.pmdata[3].cycles[3] / safeDivisor(globalizedThreadContention.pmdata[3].calls[3]));
     }
-        fprintf (thrData.output, ">>>\n critical_section\t\t\t\t%20lu\n",
+        fprintf (ProgramStatus::outputFile, ">>>\n critical_section\t\t\t\t%20lu\n",
                  globalizedThreadContention.critical_section_counter);
-        fprintf (thrData.output, ">>> critical_section_cycles\t\t%18lu(%3d%%)\tavg = %.1f\n",
+        fprintf (ProgramStatus::outputFile, ">>> critical_section_cycles\t\t%18lu(%3d%%)\tavg = %.1f\n",
                  globalizedThreadContention.critical_section_duration,
                  globalizedThreadContention.critical_section_duration / (total_cycles/100),
                  ((double)globalizedThreadContention.critical_section_duration / safeDivisor(globalizedThreadContention.critical_section_counter)));
@@ -1441,116 +1061,33 @@ void writeThreadMaps () {
 
 void writeContention () {
 
-		fprintf(thrData.output, "\n>>>>>>>>>>>>>>>>>>>>>>>>> DETAILED LOCK USAGE <<<<<<<<<<<<<<<<<<<<<<<<<\n");
+		fprintf(ProgramStatus::outputFile, "\n>>>>>>>>>>>>>>>>>>>>>>>>> DETAILED LOCK USAGE <<<<<<<<<<<<<<<<<<<<<<<<<\n");
 		for(auto lock : lockUsage) {
 				PerLockData * data = lock.getValue();
 				if(data->contendCalls*100/data->calls >= 2 || data->cycles/data->calls >= (double)total_lock_cycles / safeDivisor(total_lock_calls)) {
-                    fprintf(thrData.output, "lockAddr = %#lx\t\ttype = %s\t\tmax contention thread = %5d\t\t",
+                    fprintf(ProgramStatus::outputFile, "lockAddr = %#lx\t\ttype = %s\t\tmax contention thread = %5d\t\t",
                             lock.getKey(), LockTypeToString(data->type), data->maxContendThreads);
-                    fprintf(thrData.output, "invocations = %10u\t\tcontention times = %10u\t\tcontention rate = %3u%%\t\t", data->calls, data->contendCalls, data->contendCalls*100/data->calls);
-                    fprintf(thrData.output, "cycles = %20lu(%3d%%)\n", data->cycles, data->cycles/(total_cycles/100));
-                    fprintf(thrData.output, "avg cycles = %10u\n", data->cycles/data->calls);
-                    fprintf(thrData.output, "small alloc calls = %10lu\t\tsmall alloc cycles = %20lu(%3d%%)\tavg=%10.1f\n", data->percalls[0],
+                    fprintf(ProgramStatus::outputFile, "invocations = %10u\t\tcontention times = %10u\t\tcontention rate = %3u%%\t\t", data->calls, data->contendCalls, data->contendCalls*100/data->calls);
+                    fprintf(ProgramStatus::outputFile, "cycles = %20lu(%3d%%)\n", data->cycles, data->cycles/(total_cycles/100));
+                    fprintf(ProgramStatus::outputFile, "avg cycles = %10u\n", data->cycles/data->calls);
+                    fprintf(ProgramStatus::outputFile, "small alloc calls = %10lu\t\tsmall alloc cycles = %20lu(%3d%%)\tavg=%10.1f\n", data->percalls[0],
                             data->percycles[0], data->percycles[0]/(total_cycles/100),
                             (double)data->percycles[0]/safeDivisor(data->percalls[0]));
-                    fprintf(thrData.output, "large alloc calls = %10lu\t\tlarge alloc cycles = %20lu(%3d%%)\tavg=%10.1f\n", data->percalls[1],
+                    fprintf(ProgramStatus::outputFile, "large alloc calls = %10lu\t\tlarge alloc cycles = %20lu(%3d%%)\tavg=%10.1f\n", data->percalls[1],
                             data->percycles[1], data->percycles[1]/(total_cycles/100),
                             (double)data->percycles[1]/safeDivisor(data->percalls[1]));
-                    fprintf(thrData.output, "small dealloc calls = %10lu\t\tsmall dealloc cycles = %20lu(%3d%%)\tavg=%10.1f\n", data->percalls[2],
+                    fprintf(ProgramStatus::outputFile, "small dealloc calls = %10lu\t\tsmall dealloc cycles = %20lu(%3d%%)\tavg=%10.1f\n", data->percalls[2],
                             data->percycles[2], data->percycles[2]/(total_cycles/100),
                             (double)data->percycles[2]/safeDivisor(data->percalls[2]));
-                    fprintf(thrData.output, "large dealloc calls = %10lu\t\tlarge dealloc cycles = %20lu(%3d%%)\tavg=%10.1f\n\n", data->percalls[3],
+                    fprintf(ProgramStatus::outputFile, "large dealloc calls = %10lu\t\tlarge dealloc cycles = %20lu(%3d%%)\tavg=%10.1f\n\n", data->percalls[3],
                             data->percycles[3], data->percycles[3]/(total_cycles/100),
                             (double)data->percycles[3]/safeDivisor(data->percalls[3]));
                 }
 		}
-        fprintf(thrData.output, "\n");
-		//fflush(thrData.output);
+        fprintf(ProgramStatus::outputFile, "\n");
+		//fflush(ProgramStatus::outputFile);
 }
 
-int num_used_pages(uintptr_t vstart, uintptr_t vend) {
-	char pagemap_filename[50];
-	snprintf (pagemap_filename, 50, "/proc/%d/pagemap", pid);
-	int fdmap;
-	uint64_t bitmap;
-	unsigned long pagenum_start, pagenum_end;
-	unsigned num_pages_read = 0;
-	unsigned num_pages_to_read = 0;
-	unsigned num_used_pages = 0;
-
-	if((fdmap = open(pagemap_filename, O_RDONLY)) == -1) {
-		return -1;
-	}
-
-	pagenum_start = vstart >> PAGE_BITS;
-	pagenum_end = vend >> PAGE_BITS;
-	num_pages_to_read = pagenum_end - pagenum_start + 1;
-	if(num_pages_to_read == 0) {
-		close(fdmap);
-		return -1;
-	}
-
-	if(lseek(fdmap, (pagenum_start * ENTRY_SIZE), SEEK_SET) == -1) {
-		close(fdmap);
-		return -1;
-	}
-
-	do {
-		if(read(fdmap, &bitmap, ENTRY_SIZE) != ENTRY_SIZE) {
-			close(fdmap);
-			return -1;
-		}
-
-		num_pages_read++;
-		if((bitmap >> 63) == 1) {
-			num_used_pages++;
-		}
-	} while(num_pages_read < num_pages_to_read);
-
-	close(fdmap);
-	return num_used_pages;
-}
-
-inline bool isAllocatorInCallStack() {
-        // Fetch the frame address of the topmost stack frame
-        struct stack_frame * current_frame =
-            (struct stack_frame *)(__builtin_frame_address(0));
-
-        // Initialize the prev_frame pointer to equal the current_frame. This
-        // simply ensures that the while loop below will be entered and
-        // executed and least once
-        struct stack_frame * prev_frame = current_frame;
-
-        void * stackEnd = thrData.stackEnd;
-		int allocatorLevel = -1;
-        int cur_depth = 0;
-
-        while(((void *)prev_frame <= stackEnd) && (prev_frame >= current_frame) &&
-				(cur_depth < CALLSITE_MAXIMUM_LENGTH)) {
-
-			void * caller_address = prev_frame->caller_address;
-
-			if(selfmap::getInstance().isAllocator(caller_address))
-				allocatorLevel = cur_depth;
-
-            //in some case, "prev" address is the same as current address
-            //or there is recursion
-            if(prev_frame == prev_frame->prev) {
-				cur_depth++;
-                break;
-            }
-
-            // Walk the prev_frame pointer backward in preparation for the
-            // next iteration of the loop
-            prev_frame = prev_frame->prev;
-            cur_depth++;
-		}
-
-	if(allocatorLevel > 0)
-		return true;
-
-	return false;
-}
 
 void doBefore (allocation_metadata *metadata) {
     //fprintf(stderr, "Dobefore, %d, %d\n", metadata->size, metadata->type);
@@ -1559,7 +1096,7 @@ void doBefore (allocation_metadata *metadata) {
     realing = true;
 }
 
-extern void remove_mmprof_counting(allocation_metadata *metadata);
+//extern void remove_mmprof_counting(allocation_metadata *metadata);
 
 void doAfter (allocation_metadata *metadata) {
     //fprintf(stderr, "Doafter, %d, %d\n", metadata->size, metadata->type);
@@ -1568,18 +1105,23 @@ void doAfter (allocation_metadata *metadata) {
 	getPerfCounts(&(metadata->after));
 
 	metadata->tsc_after -= metadata->tsc_before;
-	metadata->after.faults -= metadata->before.faults;
+
+//    fprintf(stderr, "0 metadata->tsc_after = %llu\n", metadata->tsc_after);
+
+
+    metadata->after.faults -= metadata->before.faults;
 	metadata->after.tlb_read_misses -= metadata->before.tlb_read_misses;
 	metadata->after.tlb_write_misses -= metadata->before.tlb_write_misses;
 	metadata->after.cache_misses -= metadata->before.cache_misses;
 	metadata->after.instructions -= metadata->before.instructions;
 
-    remove_mmprof_counting(metadata);
+//    remove_mmprof_counting(metadata);
 
     if(metadata->tsc_after > 10000000000) {
 //	    fprintf(stderr, "metadata->tsc_after = %llu\n", metadata->tsc_after);
         metadata->tsc_after = 0;
     }
+
     if(metadata->after.faults > 10000000000) {
 //        fprintf(stderr, "metadata->after.faults = %llu\n", metadata->after.faults);
         metadata->after.faults = 0;
@@ -1685,22 +1227,10 @@ void decrementMemoryUsage(size_t size, size_t classSize, void * addr) {
 
 void collectAllocMetaData(allocation_metadata *metadata) {
     if (__builtin_expect(!globalized, true)) {
-        cycles_without_improve[thrData.tid] += metadata->cycles;
+//        cycles_without_improve[thrData.tid] += metadata->cycles;
         ///Jin
         if (!metadata->reused) {
-            if(metadata->size < improved_large_obj_thres) {
-                if(running_thread == 1) {
-                    cycles_with_improve[thrData.tid] += improved_cycles_serial[0];
-                } else {
-                    cycles_with_improve[thrData.tid] += improved_cycles_parallel[0];
-                }
-            } else {
-                if(running_thread == 1) {
-                    cycles_with_improve[thrData.tid] += improved_cycles_serial[3];
-                } else {
-                    cycles_with_improve[thrData.tid] += improved_cycles_parallel[3];
-                }
-            }
+
             if(metadata->size < large_object_threshold) {
 
                 ///Freq
@@ -1727,19 +1257,7 @@ void collectAllocMetaData(allocation_metadata *metadata) {
                     localTAD.numAllocationInstrs_large += metadata->after.instructions;
                 }
             } else {
-            if(metadata->size < improved_large_obj_thres) {
-                if(running_thread == 1) {
-                    cycles_with_improve[thrData.tid] += improved_cycles_serial[1];
-                } else {
-                    cycles_with_improve[thrData.tid] += improved_cycles_parallel[1];
-                }
-            } else {
-                if(running_thread == 1) {
-                    cycles_with_improve[thrData.tid] += improved_cycles_serial[3];
-                } else {
-                    cycles_with_improve[thrData.tid] += improved_cycles_parallel[3];
-                }
-            }
+
                 if(metadata->size < large_object_threshold) {
 
                     ///Freq
@@ -1832,98 +1350,6 @@ void collectAllocMetaData(allocation_metadata *metadata) {
 //*/
 //}
 
-void readAllocatorFile() {
-
-	size_t bufferSize = 1024;
-	FILE* infile = nullptr;
-	char* buffer = (char*) myMalloc(bufferSize);
-	char* token;
-	fprintf(stderr, "Opening allocator info file %s...\n", allocatorFileName);
-	if ((infile = fopen (allocatorFileName, "r")) == NULL) {
-		perror("Failed to open allocator info file");
-		abort();
-	}
-
-	while ((getline(&buffer, &bufferSize, infile)) > 0) {
-
-		token = strtok(buffer, " ");
-
-		if ((strcmp(token, "style")) == 0) {
-
-			token = strtok(NULL, " ");
-
-			if ((strcmp(token, "bibop\n")) == 0) {
-				bibop = true;
-			} else {
-				bumpPointer = true;
-			}
-			continue;
-		} else if ((strcmp(token, "class_sizes")) == 0) {
-
-			token = strtok(NULL, " ");
-			num_class_sizes = atoi(token);
-
-			class_sizes = (size_t*) myMalloc (num_class_sizes*sizeof(size_t));
-			if(bibop) {
-                for (int i = 0; i < num_class_sizes; i++) {
-                    token = strtok(NULL, " ");
-                    class_sizes[i] = (size_t) atoi(token);
-                }
-            } else {
-                for (int i = 0; i < num_class_sizes; i++) {
-                    class_sizes[i] = (size_t) 24 + 16 * i;
-                }
-			}
-			continue;
-		} else if ((strcmp(token, "large_object_threshold")) == 0) {
-			token = strtok(NULL, " ");
-			large_object_threshold = (size_t) atoi(token);
-			if(!bibop) {
-			    class_sizes[num_class_sizes-1] = large_object_threshold;
-			}
-			continue;
-		}
-	}
-
-	myFree(buffer);
-}
-
-void* myLocalMalloc(size_t size) {
-
-	void* p;
-	if((myLocalPosition + size) < LOCAL_BUF_SIZE) {
-		p = (void *)((char*)myLocalMem + myLocalPosition);
-		myLocalPosition += size;
-		myLocalAllocations++;
-	} else {
-		fprintf(stderr, "error: myLocalMem out of memory\n");
-		fprintf(stderr, "\t requested size = %zu, total size = %d, "
-				"total allocs = %lu\n", size, LOCAL_BUF_SIZE, myLocalAllocations);
-		dumpHashmaps();
-		abort();
-	}
-	return p;
-}
-
-void myLocalFree(void* p) {
-
-	if (p == NULL) return;
-	myLocalAllocations--;
-	if(myLocalAllocations == 0) myLocalPosition = 0;
-}
-
-void initMyLocalMem() {
-
-	myLocalMem = RealX::mmap(NULL, LOCAL_BUF_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-	if (myLocalMem == MAP_FAILED) {
-		fprintf (stderr, "Thread %lu failed to mmap myLocalMem\n", myThreadID);
-		abort();
-	}
-	myLocalMemEnd = (void*) ((char*)myLocalMem + LOCAL_BUF_SIZE);
-	myLocalPosition = 0;
-	myLocalMemInitialized = true;
-}
-
 pid_t gettid() {
     return syscall(__NR_gettid);
 }
@@ -1947,11 +1373,11 @@ void updateGlobalFriendlinessData() {
     __atomic_add_fetch(&globalFriendlyData.cachelines, thrFriendlyData->cachelines, __ATOMIC_SEQ_CST);
 
 		#ifdef THREAD_OUTPUT			// DEBUG BLOCK
-		if(thrData.output) {
+		if(ProgramStatus::outputFile) {
 				pid_t tid = thrData.tid;
 				double avgCacheUtil = (double) thrFriendlyData->numCacheBytes / (thrFriendlyData->numAccesses * CACHELINE_SIZE);
 				double avgPageUtil = (double) thrFriendlyData->numPageBytes / (thrFriendlyData->numAccesses * PAGESIZE);
-				FILE * outfd = thrData.output;
+				FILE * outfd = ProgramStatus::outputFile;
 				//FILE * outfd = stderr;
 				fprintf(outfd, "tid %d : num sampled accesses = %ld\n", tid, thrFriendlyData->numAccesses);
 				fprintf(outfd, "tid %d : total cache bytes accessed = %ld\n", tid, thrFriendlyData->numCacheBytes);
@@ -1965,17 +1391,14 @@ void updateGlobalFriendlinessData() {
 }
 
 extern long totalMem;
-extern uint64_t total_cycles_with_improve;
-extern  uint64_t total_cycles_without_improve;
-extern  uint64_t total_cycles_without_alloc;
-//extern void freq_printout();
+
 void calcAppFriendliness() {
 
     //freq_printout();
 
     // Final call to update the global data, using this (the main thread's) local data.
 
-    fprintf(thrData.output, "\n>>>>>>>>>>>>>>>>>>>>>>>>> APP FRIENDLINESS <<<<<<<<<<<<<<<<<<<<<<<<<\n");
+    fprintf(ProgramStatus::outputFile, "\n>>>>>>>>>>>>>>>>>>>>>>>>> APP FRIENDLINESS <<<<<<<<<<<<<<<<<<<<<<<<<\n");
 
 		updateGlobalFriendlinessData();
 
@@ -1997,7 +1420,7 @@ void calcAppFriendliness() {
 		        (double) totalCacheBytes / (totalAccesses * CACHELINE_SIZE);
 		double avgTotalPageUtil =
 		        (double) totalPageBytes / (totalAccesses * PAGESIZE);
-		FILE * outfd = thrData.output;
+		FILE * outfd = ProgramStatus::outputFile;
 		//FILE * outfd = stderr;
 		fprintf(outfd, "sampled accesses\t\t\t\t\t\t\t\t\t\t\t=%20ld\n", totalAccesses);
 		if(totalAccesses > 0) {
@@ -2021,34 +1444,6 @@ void calcAppFriendliness() {
             fprintf(outfd, "avg. page utilization\t\t\t\t\t\t\t\t\t=%19d%%\n", (int)(avgTotalPageUtil * 100));
 		}
 
-    fprintf(thrData.output, "\n>>>>>>>>>>>>>>>>>>>>>>>>> POTENTIAL SPEEDUP <<<<<<<<<<<<<<<<<<<<<<<<<\n");
-
-    double numAllocs = safeDivisor(globalTAD.numAllocs);
-    double numAllocsFFL = safeDivisor(globalTAD.numAllocsFFL);
-    double numFrees = safeDivisor(globalTAD.numFrees);
-    double numAllocs_large = safeDivisor(globalTAD.numAllocs_large);
-    double numFrees_large = safeDivisor(globalTAD.numFrees_large);
-
-//    fprintf(thrData.output, "expected small new alloc cycles\t=%16lu(%3d%%)\n", improved_cycles[0], (int)((double)improved_cycles[0]*100/safeDivisor(globalTAD.cycles_alloc / numAllocs)));
-//    fprintf(thrData.output, "expected small reused alloc cycles\t=%16lu(%3d%%)\n", improved_cycles[1], (int)((double)improved_cycles[1]*100/safeDivisor(globalTAD.cycles_allocFFL / numAllocsFFL)));
-//    fprintf(thrData.output, "expected small dealloc cycles\t=%16lu(%3d%%)\n", improved_cycles[2], (int)((double)improved_cycles[2]*100/safeDivisor(globalTAD.cycles_free / numFrees)));
-//    fprintf(thrData.output, "expected large alloc cycles\t=%16lu(%3d%%)\n", improved_cycles[3], (int)((double)improved_cycles[3]*100/safeDivisor(globalTAD.cycles_alloc_large / numAllocs_large)));
-//    fprintf(thrData.output, "expected large dealloc cycles\t=%16lu(%3d%%)\n", improved_cycles[4], (int)((double)improved_cycles[4]*100/safeDivisor(globalTAD.cycles_free_large / numFrees_large)));
-//    fprintf(thrData.output, "expected object threshold\t=%16u\n", improved_large_obj_thres);
-
-
-    fprintf(thrData.output, "critical cycles without improvement\t=%16lu\n", total_cycles_without_improve);
-    fprintf(thrData.output, "critical cycles with improvement\t=%16lu\n", total_cycles_with_improve);
-    fprintf(thrData.output, "critical cycles without allocs\t=%16lu\n", total_cycles_without_alloc);
-    fprintf(thrData.output, "critical cycles for allocs\t=%16lu(%3d%%)\n", (total_cycles_without_improve-total_cycles_without_alloc),
-             (int)((double)(total_cycles_without_improve-total_cycles_without_alloc)/safeDivisor(total_cycles_without_improve/100)));
-
-
-if(total_cycles_without_improve > total_cycles_with_improve) {
-    fprintf(thrData.output, "expected speedup\t=%5d%%\n", (int)((double)(total_cycles_without_improve-total_cycles_with_improve)/safeDivisor(total_cycles_with_improve/100)));
-} else {
-    fprintf(thrData.output, "expected speedup\t=0%%\n");
-}
 }
 
 const char * LockTypeToString(LockType type) {

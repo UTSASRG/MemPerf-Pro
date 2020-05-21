@@ -53,6 +53,7 @@ long MemoryWaste::totalMem = 0;
 extern int threadcontention_index;
 
 void MemoryWaste::initialize() {
+
     objStatusMap.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_OBJ_NUM);
 
     mem_alloc_wasted = (uint64_t*) myMalloc(MAX_THREAD_NUMBER * num_class_sizes * sizeof(uint64_t));
@@ -88,6 +89,7 @@ void MemoryWaste::initialize() {
 void getClassSizeForStyles(void* uintaddr, allocation_metadata * allocData);
 
 bool MemoryWaste::allocUpdate(allocation_metadata * allocData, void * address) {
+
     bool reused;
     size_t classSize;
     short classSizeIndex;
@@ -158,8 +160,7 @@ void MemoryWaste::freeUpdate(allocation_metadata * allocData, void* address) {
     /* Get old status */
     objStatus* status = objStatusMap.find(address, sizeof(void *));
     if (!status) {
-        fprintf(stderr, "objStatusMap key error: %p\n", address);
-        abort();
+        return;
     }
     size_t size = status->size_using;
     size_t classSize = status->classSize;
@@ -219,6 +220,7 @@ totalMem = totalMemory;
 extern size_t * class_sizes;
 
 uint64_t MemoryWaste::recordSumup() {
+
     for (int t = 0; t <= threadcontention_index; t++) {
     for (int i = 0; i < num_class_sizes; ++i) {
             mem_alloc_wasted_record_global[i] += mem_alloc_wasted_record[t * num_class_sizes + i];
