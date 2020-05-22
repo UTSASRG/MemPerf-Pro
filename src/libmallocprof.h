@@ -4,37 +4,7 @@
 #include "memsample.h"
 #include <signal.h>
 #include <limits.h>
-
-
-#define MAX(a,b) \
-    ({ __typeof__ (a) _a = (a); \
-     __typeof__ (b) _b = (b); \
-     _a > _b ? _a : _b; })
-#define MIN(a,b) \
-    ({ __typeof__ (a) _a = (a); \
-     __typeof__ (b) _b = (b); \
-     _a < _b ? _a : _b; })
-
-#define relaxed std::memory_order_relaxed
-#define acquire std::memory_order_acquire
-#define release std::memory_order_release
-#define CALLSITE_MAXIMUM_LENGTH 20
-#define ENTRY_SIZE 8
-
-//For libc, bump pointer
-#define LARGE_OBJECT 512
-#define SMALL_OBJECT 0
-#define BUMP_POINTER_KEY 0
-
-//Bump-pointer key to overhead hashmap
-//#define BP_OVERHEAD 0
-
-#define PAGE_BITS 12 
-#define MY_METADATA_SIZE 4
-#define TEMP_MEM_SIZE 1024 * 1024 * 1024 //1GB
-#define MAX_CLASS_SIZE 1050000
-//#define LOCAL_BUF_SIZE 204800000
-#define LOCAL_BUF_SIZE 204800000 * 4
+#include "definevalues.h"
 
 pid_t gettid();
 // TP BEGIN
@@ -172,14 +142,6 @@ struct stack_frame {
 	void * caller_address;		// the address of caller
 };
 
-//Enumerations
-enum initStatus{            //enum to keep track of libmallocprof's constuction status 
-    INIT_ERROR = -1,        //allocation calls are just passed on to RealX if libmallocprof isn't ready
-    NOT_INITIALIZED = 0, 
-    IN_PROGRESS = 1, 
-    INITIALIZED = 2
-};
-
 /*
  * AllocType
  *
@@ -263,7 +225,6 @@ allocation_metadata init_allocation(size_t sz, enum memAllocType type);
 void initGlobalFreeArray();
 void initLocalFreeArray();
 
-void initMyLocalMem();
 void* myLocalMalloc(size_t);
 void myLocalFree(void*);
 void initGlobalCSM();

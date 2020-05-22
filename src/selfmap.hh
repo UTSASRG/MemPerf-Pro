@@ -154,7 +154,7 @@ class selfmap {
 
     bool isAllocator(void* pcaddr) {
 		if (!haveTextRegions) {
-			getTextRegions();
+			getTextRegions(nullptr);
 		}
       return ((pcaddr >= _allocTextStart) && (pcaddr <= _allocTextEnd));
     }
@@ -171,7 +171,7 @@ class selfmap {
     static int getCallStack(void** array);
 
     /// Get information about global regions.
-	void getTextRegions() {
+	void getTextRegions(char * allocator_name) {
 		for(const auto& entry : _mappings) {
 			const mapping& m = entry.second;
 			if(m.isText()) {
@@ -179,12 +179,10 @@ class selfmap {
 					_mallocProfTextStart = (void*)m.getBase();
 					_mallocProfTextEnd = (void*)m.getLimit();
 					_currentLibrary = std::string(m.getFile());
-//					fprintf(thrData.output, ">>> libmallocprof @ %p ~ %p, file = %s\n",
-//					_mallocProfTextStart, _mallocProfTextEnd, _currentLibrary.c_str());
+
 				} else if(m.getFile() == _main_exe) {
 					_appTextStart = (void*)m.getBase();
 					_appTextEnd = (void*)m.getLimit();
-//					fprintf(thrData.output, ">>> application @ %p ~ %p\n", _appTextStart, _appTextEnd);
 				} else {
 					uintptr_t mallocSymbol = (uintptr_t)RealX::malloc;
 					uintptr_t libTextStart = (uintptr_t)m.getBase();
@@ -196,14 +194,10 @@ class selfmap {
 						_allocTextEnd = (void *)libTextEnd;
 						isLibc = (strcasestr(_allocLibrary.c_str(), LIBC_LIBRARY_NAME) != NULL);
 						strcpy (allocator_name, _allocLibrary.c_str());
-//						fprintf(thrData.output, ">>> allocator @ %p ~ %p, file = %s\n", _allocTextStart, _allocTextEnd, _allocLibrary.c_str());
-					} else {
-//						fprintf(thrData.output, ">>> unknown library @ %p ~ %p, file = %s\n", _allocTextStart, _allocTextEnd, _allocLibrary.c_str());
 					}
 				}
 			}
     	}
-		//fflush(thrData.output);
 		haveTextRegions = true;
 	}
 

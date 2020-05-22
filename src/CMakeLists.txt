@@ -35,7 +35,6 @@ add_executable(mmprof
         list.hh
         memsample.c
         memsample.h
-        mytest.cpp
         real.cpp
         real.hh
         recordfunctions.hh
@@ -44,4 +43,4 @@ add_executable(mmprof
         shadowmemory.cpp
         shadowmemory.hh
         spinlock.hh
-        xthreadx.hh)
+        xthreadx.hh programstatus.cpp programstatus.h definevalues.h cmake-build-debug/mymalloc.cpp cmake-build-debug/mymalloc.h mymalloc.cpp)

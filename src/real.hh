@@ -11,7 +11,6 @@
 
 namespace RealX {
 	void initializer();
-	DECLARE_WRAPPER(brk);
 	DECLARE_WRAPPER(sbrk);
 	DECLARE_WRAPPER(free);
 	DECLARE_WRAPPER(calloc);

@@ -217,7 +217,7 @@ void sampleHandler(int signum, siginfo_t *info, void *p) {
   perfInfo->numSignalsRecvd++;
   #endif
 
-  if(de!realing) {
+  if(!realing) {
   // If the overflow counter has reached zero (indicated by the POLL_HUP code),
   // read the sample data and reset the overflow counter to start again.
   if(info->si_code == POLL_HUP) {

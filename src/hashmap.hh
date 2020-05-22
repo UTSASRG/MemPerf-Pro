@@ -9,21 +9,11 @@
 #include "spinlock.hh"
 #include "real.hh"
 #include "hashlist.hh"
+#include "definevalues.h"
 
 #define LOCK_PROTECTION 1
-extern void* myMalloc_hash (size_t size);
-extern void myFree_hash(void *ptr);
 
 class PrivateHeap {
-public:
-  static void * allocate (size_t sz) {
-    //fprintf(stderr, "sz is %d\n", sz);
-    return myMalloc_hash (sz);
-  }
-
-  static void deallocate (void * ptr) {
-    myFree_hash (ptr);
-  }
 
 };
 
@@ -320,8 +310,7 @@ private:
 
   // Create a new Entry with specified key and value.
   struct Entry* createNewEntry(const KeyType& key, size_t keylen, ValueType value) {
-    struct Entry* entry = (struct Entry*)SourceHeap::allocate(sizeof(struct Entry));
-    //struct Entry* entry = (struct Entry*)Real::malloc(sizeof(struct Entry));
+    struct Entry* entry = (struct Entry*)RealX::malloc(sizeof(struct Entry));
     if(entry == NULL) {
       fprintf(stderr, "fail to create entry\n");
       exit(0);

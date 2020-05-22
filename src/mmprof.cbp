@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6"/>
+	<Project>
+		<Option title="mmprof"/>
+		<Option makefile_is_custom="1"/>
+		<Option compiler="gcc"/>
+		<Option virtualFolders="CMake Files\;"/>
+		<Build>
+			<Target title="all">
+				<Option working_dir="D:/mmprof/cmake-build-debug"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="C:/PROGRA~1/MINGW-~1/X86_64~1.0-W/mingw64/bin/mingw32-make.exe -f &quot;D:/mmprof/cmake-build-debug/Makefile&quot;  VERBOSE=1 all"/>
+					<CompileFile command="C:/PROGRA~1/MINGW-~1/X86_64~1.0-W/mingw64/bin/mingw32-make.exe -f &quot;D:/mmprof/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="C:/PROGRA~1/MINGW-~1/X86_64~1.0-W/mingw64/bin/mingw32-make.exe -f &quot;D:/mmprof/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="C:/PROGRA~1/MINGW-~1/X86_64~1.0-W/mingw64/bin/mingw32-make.exe -f &quot;D:/mmprof/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="edit_cache">
+				<Option working_dir="D:/mmprof/cmake-build-debug"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="C:/PROGRA~1/MINGW-~1/X86_64~1.0-W/mingw64/bin/mingw32-make.exe -f &quot;D:/mmprof/cmake-build-debug/Makefile&quot;  VERBOSE=1 edit_cache"/>
+					<CompileFile command="C:/PROGRA~1/MINGW-~1/X86_64~1.0-W/mingw64/bin/mingw32-make.exe -f &quot;D:/mmprof/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="C:/PROGRA~1/MINGW-~1/X86_64~1.0-W/mingw64/bin/mingw32-make.exe -f &quot;D:/mmprof/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="C:/PROGRA~1/MINGW-~1/X86_64~1.0-W/mingw64/bin/mingw32-make.exe -f &quot;D:/mmprof/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="mmprof">
+				<Option output="D:/mmprof/cmake-build-debug/mmprof.exe" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="D:/mmprof/cmake-build-debug"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add directory="D:/mmprof/."/>
+					<Add directory="D:/mmprof/libtestperf"/>
+					<Add directory="C:/Program Files/mingw-w64/x86_64-8.1.0-win32-sjlj-rt_v6-rev0/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/8.1.0/include/c++"/>
+					<Add directory="C:/Program Files/mingw-w64/x86_64-8.1.0-win32-sjlj-rt_v6-rev0/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/8.1.0/include/c++/x86_64-w64-mingw32"/>
+					<Add directory="C:/Program Files/mingw-w64/x86_64-8.1.0-win32-sjlj-rt_v6-rev0/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/8.1.0/include/c++/backward"/>
+					<Add directory="C:/Program Files/mingw-w64/x86_64-8.1.0-win32-sjlj-rt_v6-rev0/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/8.1.0/include"/>
+					<Add directory="C:/Program Files/mingw-w64/x86_64-8.1.0-win32-sjlj-rt_v6-rev0/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/8.1.0/include-fixed"/>
+					<Add directory="C:/Program Files/mingw-w64/x86_64-8.1.0-win32-sjlj-rt_v6-rev0/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/8.1.0/../../../../x86_64-w64-mingw32/include"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="C:/PROGRA~1/MINGW-~1/X86_64~1.0-W/mingw64/bin/mingw32-make.exe -f &quot;D:/mmprof/cmake-build-debug/Makefile&quot;  VERBOSE=1 mmprof"/>
+					<CompileFile command="C:/PROGRA~1/MINGW-~1/X86_64~1.0-W/mingw64/bin/mingw32-make.exe -f &quot;D:/mmprof/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="C:/PROGRA~1/MINGW-~1/X86_64~1.0-W/mingw64/bin/mingw32-make.exe -f &quot;D:/mmprof/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="C:/PROGRA~1/MINGW-~1/X86_64~1.0-W/mingw64/bin/mingw32-make.exe -f &quot;D:/mmprof/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="mmprof/fast">
+				<Option output="D:/mmprof/cmake-build-debug/mmprof.exe" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="D:/mmprof/cmake-build-debug"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add directory="D:/mmprof/."/>
+					<Add directory="D:/mmprof/libtestperf"/>
+					<Add directory="C:/Program Files/mingw-w64/x86_64-8.1.0-win32-sjlj-rt_v6-rev0/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/8.1.0/include/c++"/>
+					<Add directory="C:/Program Files/mingw-w64/x86_64-8.1.0-win32-sjlj-rt_v6-rev0/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/8.1.0/include/c++/x86_64-w64-mingw32"/>
+					<Add directory="C:/Program Files/mingw-w64/x86_64-8.1.0-win32-sjlj-rt_v6-rev0/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/8.1.0/include/c++/backward"/>
+					<Add directory="C:/Program Files/mingw-w64/x86_64-8.1.0-win32-sjlj-rt_v6-rev0/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/8.1.0/include"/>
+					<Add directory="C:/Program Files/mingw-w64/x86_64-8.1.0-win32-sjlj-rt_v6-rev0/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/8.1.0/include-fixed"/>
+					<Add directory="C:/Program Files/mingw-w64/x86_64-8.1.0-win32-sjlj-rt_v6-rev0/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/8.1.0/../../../../x86_64-w64-mingw32/include"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="C:/PROGRA~1/MINGW-~1/X86_64~1.0-W/mingw64/bin/mingw32-make.exe -f &quot;D:/mmprof/cmake-build-debug/Makefile&quot;  VERBOSE=1 mmprof/fast"/>
+					<CompileFile command="C:/PROGRA~1/MINGW-~1/X86_64~1.0-W/mingw64/bin/mingw32-make.exe -f &quot;D:/mmprof/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="C:/PROGRA~1/MINGW-~1/X86_64~1.0-W/mingw64/bin/mingw32-make.exe -f &quot;D:/mmprof/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="C:/PROGRA~1/MINGW-~1/X86_64~1.0-W/mingw64/bin/mingw32-make.exe -f &quot;D:/mmprof/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="rebuild_cache">
+				<Option working_dir="D:/mmprof/cmake-build-debug"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="C:/PROGRA~1/MINGW-~1/X86_64~1.0-W/mingw64/bin/mingw32-make.exe -f &quot;D:/mmprof/cmake-build-debug/Makefile&quot;  VERBOSE=1 rebuild_cache"/>
+					<CompileFile command="C:/PROGRA~1/MINGW-~1/X86_64~1.0-W/mingw64/bin/mingw32-make.exe -f &quot;D:/mmprof/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="C:/PROGRA~1/MINGW-~1/X86_64~1.0-W/mingw64/bin/mingw32-make.exe -f &quot;D:/mmprof/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="C:/PROGRA~1/MINGW-~1/X86_64~1.0-W/mingw64/bin/mingw32-make.exe -f &quot;D:/mmprof/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+		</Build>
+		<Unit filename="D:/mmprof/hashfuncs.hh">
+			<Option target="mmprof"/>
+		</Unit>
+		<Unit filename="D:/mmprof/hashmap.hh">
+			<Option target="mmprof"/>
+		</Unit>
+		<Unit filename="D:/mmprof/interval.hh">
+			<Option target="mmprof"/>
+		</Unit>
+		<Unit filename="D:/mmprof/libmallocprof.cpp">
+			<Option target="mmprof"/>
+		</Unit>
+		<Unit filename="D:/mmprof/libmallocprof.h">
+			<Option target="mmprof"/>
+		</Unit>
+		<Unit filename="D:/mmprof/libtestperf/libtestperf.cpp">
+			<Option target="mmprof"/>
+		</Unit>
+		<Unit filename="D:/mmprof/libtestperf/libtestperf.h">
+			<Option target="mmprof"/>
+		</Unit>
+		<Unit filename="D:/mmprof/libtestperf/real.cpp">
+			<Option target="mmprof"/>
+		</Unit>
+		<Unit filename="D:/mmprof/libtestperf/real.hh">
+			<Option target="mmprof"/>
+		</Unit>
+		<Unit filename="D:/mmprof/libtestperf/test-bestcase.c">
+			<Option target="mmprof"/>
+		</Unit>
+		<Unit filename="D:/mmprof/libtestperf/test-worstcase.c">
+			<Option target="mmprof"/>
+		</Unit>
+		<Unit filename="D:/mmprof/libtestperf/xthread.hh">
+			<Option target="mmprof"/>
+		</Unit>
+		<Unit filename="D:/mmprof/list.hh">
+			<Option target="mmprof"/>
+		</Unit>
+		<Unit filename="D:/mmprof/memsample.c">
+			<Option target="mmprof"/>
+		</Unit>
+		<Unit filename="D:/mmprof/memsample.h">
+			<Option target="mmprof"/>
+		</Unit>
+		<Unit filename="D:/mmprof/mytest.cpp">
+			<Option target="mmprof"/>
+		</Unit>
+		<Unit filename="D:/mmprof/prerun/libmallochelp.cpp">
+			<Option target="mmprof"/>
+		</Unit>
+		<Unit filename="D:/mmprof/prerun/runlib.cpp">
+			<Option target="mmprof"/>
+		</Unit>
+		<Unit filename="D:/mmprof/real.cpp">
+			<Option target="mmprof"/>
+		</Unit>
+		<Unit filename="D:/mmprof/real.hh">
+			<Option target="mmprof"/>
+		</Unit>
+		<Unit filename="D:/mmprof/recordfunctions.hh">
+			<Option target="mmprof"/>
+		</Unit>
+		<Unit filename="D:/mmprof/selfmap.cpp">
+			<Option target="mmprof"/>
+		</Unit>
+		<Unit filename="D:/mmprof/selfmap.hh">
+			<Option target="mmprof"/>
+		</Unit>
+		<Unit filename="D:/mmprof/shadowmemory.cpp">
+			<Option target="mmprof"/>
+		</Unit>
+		<Unit filename="D:/mmprof/shadowmemory.hh">
+			<Option target="mmprof"/>
+		</Unit>
+		<Unit filename="D:/mmprof/spinlock.hh">
+			<Option target="mmprof"/>
+		</Unit>
+		<Unit filename="D:/mmprof/test/alloc.cpp">
+			<Option target="mmprof"/>
+		</Unit>
+		<Unit filename="D:/mmprof/test/alloc2.cpp">
+			<Option target="mmprof"/>
+		</Unit>
+		<Unit filename="D:/mmprof/test/blackscholes-pthread.cpp">
+			<Option target="mmprof"/>
+		</Unit>
+		<Unit filename="D:/mmprof/test/fighting_with_the_heap.cpp">
+			<Option target="mmprof"/>
+		</Unit>
+		<Unit filename="D:/mmprof/test/madvise.cpp">
+			<Option target="mmprof"/>
+		</Unit>
+		<Unit filename="D:/mmprof/test/malloc-and-free.cpp">
+			<Option target="mmprof"/>
+		</Unit>
+		<Unit filename="D:/mmprof/test/malloc-then-free.cpp">
+			<Option target="mmprof"/>
+		</Unit>
+		<Unit filename="D:/mmprof/test/mmapmadvise.cpp">
+			<Option target="mmprof"/>
+		</Unit>
+		<Unit filename="D:/mmprof/test/pmu-test.cpp">
+			<Option target="mmprof"/>
+		</Unit>
+		<Unit filename="D:/mmprof/test/pmu-test2.cpp">
+			<Option target="mmprof"/>
+		</Unit>
+		<Unit filename="D:/mmprof/test/threadTest.cpp">
+			<Option target="mmprof"/>
+		</Unit>
+		<Unit filename="D:/mmprof/xthreadx.hh">
+			<Option target="mmprof"/>
+		</Unit>
+		<Unit filename="D:/mmprof/CMakeLists.txt">
+			<Option virtualFolder="CMake Files\"/>
+		</Unit>
+	</Project>
+</CodeBlocks_project_file>
