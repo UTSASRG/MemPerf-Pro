@@ -162,10 +162,6 @@ void MemoryWaste::freeUpdate(allocation_metadata * allocData, void* address) {
     }
     mem_alloc_wasted[(allocData->tid*num_class_sizes)+classSizeIndex] -= classSize-size;
 
-
-//    status->size_using = 0;
-//    status->classSize = classSize;
-
         blowupflag[classSizeIndex]++;
 
 }

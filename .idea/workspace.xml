@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CMakeRunConfigurationManager" shouldGenerate="true" shouldDeleteObsolete="true">
+    <generated />
+  </component>
+  <component name="CMakeSettings">
+    <configurations>
+      <configuration PROFILE_NAME="Debug" CONFIG_NAME="Debug" />
+    </configurations>
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="f07b8e7c-11f2-4582-b7c0-966bf3cde0cb" name="Default Changelist" comment="">
+      <change beforePath="$PROJECT_DIR$/src/libmallocprof.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/src/libmallocprof.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/libmallocprof.h" beforeDir="false" afterPath="$PROJECT_DIR$/src/libmallocprof.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/recordscale.hh" beforeDir="false" afterPath="$PROJECT_DIR$/src/recordscale.hh" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="ClangdSettings">
+    <option name="formatViaClangd" value="false" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="IgnoredFileRootStore">
+    <option name="generatedRoots">
+      <set>
+        <option value="D:\GitHub\mmprof\.idea" />
+      </set>
+    </option>
+  </component>
+  <component name="ProjectId" id="1b8rQjVmGo6T3XRbjoy1OOCWdM5" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showExcludedFiles" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">
+    <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
+    <property name="WebServerToolWindowFactoryState" value="true" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
+  </component>
+  <component name="SvnConfiguration">
+    <configuration />
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="f07b8e7c-11f2-4582-b7c0-966bf3cde0cb" name="Default Changelist" comment="" />
+      <created>1588024547865</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1588024547865</updated>
+      <workItem from="1588024549168" duration="1395000" />
+      <workItem from="1588026295017" duration="1025000" />
+      <workItem from="1588200470955" duration="907000" />
+    </task>
+    <servers />
+  </component>
+  <component name="WindowStateProjectService">
+    <state x="1328" y="-807" width="647" height="534" key="find.popup" timestamp="1588200505036">
+      <screen x="335" y="-1080" width="1920" height="1040" />
+    </state>
+    <state x="1328" y="-807" width="647" height="534" key="find.popup/0.0.1280.760/335.-1080.1920.1040@335.-1080.1920.1040" timestamp="1588200505036" />
+  </component>
+</project>
