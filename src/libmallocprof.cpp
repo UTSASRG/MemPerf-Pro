@@ -372,9 +372,6 @@ void operator delete[] (void * ptr) __THROW {
 
 void globalizeTAD() {
 
-    if (__builtin_expect(globalized, false)) {
-        fprintf(stderr, "The thread %lld has been globalized!\n", gettid());
-    }
     globalize_lck.lock();
 
     globalTAD.numAllocationFaults += localTAD.numAllocationFaults;
@@ -723,61 +720,6 @@ void writeContention () {
 }
 
 
-void doBefore (allocation_metadata *metadata) {
-    //fprintf(stderr, "Dobefore, %d, %d\n", metadata->size, metadata->type);
-	getPerfCounts(&(metadata->before));
-	metadata->tsc_before = rdtscp();
-    realing = true;
-}
-
-//extern void remove_mmprof_counting(allocation_metadata *metadata);
-
-void doAfter (allocation_metadata *metadata) {
-    //fprintf(stderr, "Doafter, %d, %d\n", metadata->size, metadata->type);
-    realing = false;
-    metadata->tsc_after = rdtscp();
-	getPerfCounts(&(metadata->after));
-
-	metadata->tsc_after -= metadata->tsc_before;
-
-//    fprintf(stderr, "0 metadata->tsc_after = %llu\n", metadata->tsc_after);
-
-
-    metadata->after.faults -= metadata->before.faults;
-	metadata->after.tlb_read_misses -= metadata->before.tlb_read_misses;
-	metadata->after.tlb_write_misses -= metadata->before.tlb_write_misses;
-	metadata->after.cache_misses -= metadata->before.cache_misses;
-	metadata->after.instructions -= metadata->before.instructions;
-
-//    remove_mmprof_counting(metadata);
-
-    if(metadata->tsc_after > 10000000000) {
-//	    fprintf(stderr, "metadata->tsc_after = %llu\n", metadata->tsc_after);
-        metadata->tsc_after = 0;
-    }
-
-    if(metadata->after.faults > 10000000000) {
-//        fprintf(stderr, "metadata->after.faults = %llu\n", metadata->after.faults);
-        metadata->after.faults = 0;
-    }
-    if(metadata->after.tlb_read_misses > 10000000000) {
-//        fprintf(stderr, "metadata->after.tlb_read_misses = %llu\n", metadata->after.tlb_read_misses);
-        metadata->after.tlb_read_misses = 0;
-    }
-    if(metadata->after.tlb_write_misses > 10000000000) {
-//        fprintf(stderr, "metadata->after.tlb_write_misses = %llu\n", metadata->after.tlb_write_misses);
-        metadata->after.tlb_write_misses = 0;
-    }
-    if(metadata->after.cache_misses > 10000000000) {
-//        fprintf(stderr, "metadata->after.cache_misses = %llu\n", metadata->after.cache_misses);
-        metadata->after.cache_misses = 0;
-    }
-    if(metadata->after.instructions > 10000000000) {
-//        fprintf(stderr, "metadata->after.instructions = %llu\n", metadata->after.instructions);
-        metadata->after.instructions = 0;
-    }
-}
-
 void incrementGlobalMemoryAllocation(size_t size) {
   __atomic_add_fetch(&mu.realMemoryUsage, size, __ATOMIC_RELAXED);
 }
@@ -959,33 +901,6 @@ void collectAllocMetaData(allocation_metadata *metadata) {
             }
             globalize_lck.unlock();
         }
-}
-//
-//void analyzePerfInfo(allocation_metadata *metadata) {
-//	collectAllocMetaData(metadata);
-//
-///*
-//	// DEBUG BLOCK
-//	if((metadata->after.instructions - metadata->before.instructions) != 0) {
-//		fprintf(stderr, "Malloc from thread       %d\n"
-//				"From free list:          %s\n"
-//				"Num faults:              %ld\n"
-//				"Num TLB read misses:     %ld\n"
-//				"Num TLB write misses:    %ld\n"
-//				"Num cache misses:        %ld\n"
-//				"Num instructions:        %ld\n\n",
-//				metadata->tid, metadata->reused ? "true" : "false",
-//				metadata->after.faults - metadata->before.faults,
-//				metadata->after.tlb_read_misses - metadata->before.tlb_read_misses,
-//				metadata->after.tlb_write_misses - metadata->before.tlb_write_misses,
-//				metadata->after.cache_misses - metadata->before.cache_misses,
-//				metadata->after.instructions - metadata->before.instructions);
-//	}
-//*/
-//}
-
-pid_t gettid() {
-    return syscall(__NR_gettid);
 }
 
 void updateGlobalFriendlinessData() {

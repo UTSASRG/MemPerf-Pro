@@ -74,7 +74,7 @@ public:
     static void initialize();
 ///Here
     static AllocatingTypeGotFromMemoryWaste allocUpdate(size_t size, void * address);
-    static void freeUpdate(allocation_metadata * allocData, void* address);
+    static AllocatingTypeWithSizeGotFromMemoryWaste freeUpdate(void* address);
     ///Here
     static bool recordMemory(long realMemory, long totalMemory);
     static uint64_t recordSumup();

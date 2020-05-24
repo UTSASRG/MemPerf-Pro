@@ -1,4 +1,0 @@
-style bibop
-class_sizes 9 16 32 64 128 256 512 1024 2048 4096 
-malloc_mmap_threshold 4096
-metadata_object 8

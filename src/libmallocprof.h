@@ -6,8 +6,6 @@
 #include <limits.h>
 #include "definevalues.h"
 
-pid_t gettid();
-// TP BEGIN
 typedef enum {
 		LOCK_TYPE_MUTEX,  // 0
 		LOCK_TYPE_SPINLOCK, // 1
@@ -152,33 +150,27 @@ typedef struct {
 inline bool isAllocatorInCallStack();
 size_t getClassSizeFor(size_t size);
 int num_used_pages(uintptr_t vstart, uintptr_t vend);
-void doBefore(allocation_metadata *metadata);
-void doAfter(allocation_metadata *metadata);
 void incrementMemoryUsage(size_t size, size_t classSize, size_t new_touched_bytes, void * object);
 void decrementMemoryUsage(size_t size, size_t classSize, void * addr);
 void getAddressUsage(size_t size, uint64_t address, uint64_t cycles);
-//void getAlignment(size_t, size_t);
-//void getBlowup(size_t size, size_t classSize, short class_size_index, bool*);
+
 void getMappingsUsage(size_t size, uint64_t address, size_t classSize);
 void getMetadata(size_t classSize);
-//void getOverhead(size_t size, uint64_t address, size_t classSize, short classSizeIndex, bool*);
+
 void getPerfCounts(PerfReadInfo*);
-//void getCacheMissesOutside(CacheMissesOutsideInfo*);
+
 void globalizeTAD();
-//void myFree (void* ptr);
-//void* myMalloc (size_t size);
+
 void readAllocatorFile();
 void writeAllocData ();
 void writeContention ();
 void writeMappings();
-//void writeOverhead();
+
 void writeThreadContention();
 void writeThreadMaps();
-//MmapTuple* newMmapTuple (uint64_t address, size_t length, int prot, char origin);
+
 ObjectTuple* newObjectTuple (uint64_t address, size_t size);
-//Overhead* newOverhead();
-//size_t updateFreeCounters(void * address);
-//short getClassSizeIndex(size_t size);
+
 void initGlobalFreeArray();
 void initLocalFreeArray();
 
@@ -186,8 +178,7 @@ void* myLocalMalloc(size_t);
 void myLocalFree(void*);
 void initGlobalCSM();
 SMapEntry* newSMapEntry();
-//void start_smaps();
-//void sampleMemoryOverhead(int, siginfo_t*, void*);
+
 void updateGlobalFriendlinessData();
 void calcAppFriendliness();
 const char * LockTypeToString(LockType type);

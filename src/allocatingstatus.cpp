@@ -71,13 +71,13 @@ void AllocatingStatus::updateFreeingStatusAfterRealFunction() {
 
 void AllocatingStatus::updateMemoryStatusAfterAllocation() {
     allocatingType.allocatingTypeGotFromMemoryWaste = MemoryWaste::allocUpdate(allocatingType.objectSize, allocatingType.objectAddress);
-    allocatingType.allocatingTypeGotFromShadowMemory = ShadowMemory::updateObject(object, allocData.size, false);
+    allocatingType.allocatingTypeGotFromShadowMemory = ShadowMemory::updateObject(allocatingType.objectAddress, allocatingType.objectSize, false);
     incrementTotalMemoryUsage();
 }
 
 void AllocatingStatus::updateMemoryStatusBeforeFree() {
-    allocatingType.switchFreeingTypeGotFromMemoryWaste(MemoryWaste::freeUpdate());
-    allocatingType.allocatingTypeGotFromShadowMemory = ShadowMemory::updateObject(ptr, allocData.size, true);
+    allocatingType.switchFreeingTypeGotFromMemoryWaste(MemoryWaste::freeUpdate(allocatingType.objectAddress));
+    allocatingType.allocatingTypeGotFromShadowMemory = ShadowMemory::updateObject(allocatingType.objectAddress, allocatingType.objectSize, true);
     decrementMemoryUsage();
 }
 

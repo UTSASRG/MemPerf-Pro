@@ -123,6 +123,7 @@ AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(size_t size, void * ad
     }
 
     num_alloc_active[ArrayIndexForCurrentThread(sizeClassSizeAndIndex.classSizeIndex)]++;
+
     mem_alloc_wasted[ArrayIndexForCurrentThread(sizeClassSizeAndIndex.classSizeIndex)] += classSize - size;
     mem_alloc_wasted[ArrayIndexForCurrentThread(sizeClassSizeAndIndex.classSizeIndex)] -= (classSize-status->max_touched_bytes)/PAGESIZE*PAGESIZE;
 
@@ -134,36 +135,24 @@ AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(size_t size, void * ad
     return AllocatingTypeGotFromMemoryWaste{reused, classSize};
 }
 
-void MemoryWaste::freeUpdate(allocation_metadata * allocData, void* address) {
+AllocatingTypeWithSizeGotFromMemoryWaste MemoryWaste::freeUpdate(void* address) {
 
     /* Get old status */
     objStatus* status = objStatusMap.find(address, sizeof(void *));
-    if (!status) {
-        return;
-    }
-    size_t size = status->size_using;
-    size_t classSize = status->classSize;
-    size_t classSizeIndex = status->classSizeIndex;
-    if(size == 0) {
-        return;
-    }
-    ///Here
-    num_free[(allocData->tid*num_class_sizes)+classSizeIndex]++;
-    num_freelist[(allocData->tid*num_class_sizes)+classSizeIndex]++;
-    num_alloc_active[(allocData->tid*num_class_sizes)+classSizeIndex]--;
 
-    allocData->size = size;
-    allocData->classSize = classSize;
+    SizeClassSizeAndIndex sizeClassSizeAndIndex = status->sizeClassSizeAndIndex;
 
-    if(classSize-status->max_touched_bytes >= PAGESIZE && classSize >= status->max_touched_bytes) {
-        mem_alloc_wasted[(allocData->tid*num_class_sizes)+classSizeIndex] += (classSize-status->max_touched_bytes)/PAGESIZE*PAGESIZE;
-    } else if(classSize-allocData->size >= PAGESIZE) {
-        mem_alloc_wasted[(allocData->tid*num_class_sizes)+classSizeIndex] += (classSize-allocData->size)/PAGESIZE*PAGESIZE;
-    }
-    mem_alloc_wasted[(allocData->tid*num_class_sizes)+classSizeIndex] -= classSize-size;
+    num_free[ArrayIndexForCurrentThread(sizeClassSizeAndIndex.classSizeIndex)]++;
+    num_freelist[ArrayIndexForCurrentThread(sizeClassSizeAndIndex.classSizeIndex)]++;
+    num_alloc_active[ArrayIndexForCurrentThread(sizeClassSizeAndIndex.classSizeIndex)]--;
 
-        blowupflag[classSizeIndex]++;
+    mem_alloc_wasted[ArrayIndexForCurrentThread(sizeClassSizeAndIndex.classSizeIndex)] += (classSize-status->max_touched_bytes)/PAGESIZE*PAGESIZE;
+    mem_alloc_wasted[ArrayIndexForCurrentThread(sizeClassSizeAndIndex.classSizeIndex)] -= classSize-size;
 
+    blowupflag[classSizeIndex]++;
+
+    return AllocatingTypeWithSizeGotFromMemoryWaste{sizeClassSizeAndIndex.size,
+                                                    AllocatingTypeGotFromMemoryWaste{false, sizeClassSizeAndIndex.classSize}};
 }
 
 

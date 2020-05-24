@@ -428,11 +428,10 @@ int initPMU(void) {
 				isSamplingInit = true;
 		}
 
-		//pthread_spin_init(&_perf_spin_lock, PTHREAD_PROCESS_PRIVATE);
     _perf_spin_lock.init();
 
 
-		perfInfo.tid = gettid();
+		perfInfo.tid = syscall(__NR_gettid);
 
 		struct sigaction sa;
 		sigemptyset(&sa.sa_mask);

@@ -184,7 +184,7 @@ SizeClassSizeAndIndex ProgramStatus::getClassSizeAndIndex(size_t size) {
             classSize = 24;
             classSizeIndex = 0;
         } else {
-            classSizeIndex = (allocData->size - 24) / 16 + 1;
+            classSizeIndex = (size - 24) / 16 + 1;
             classSize = class_sizes[allocData->classSizeIndex];
         }
     }
