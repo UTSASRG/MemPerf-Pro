@@ -15,7 +15,7 @@ INCS =	xthreadx.hh			\
 				hashfuncs.hh		\
 				interval.hh			\
 				selfmap.hh			\
-				recordscale.hh\
+				recordscale.hh \
 				spinlock.hh			\
 				shadowmemory.hh	\
 				memwaste.h          \

@@ -43,4 +43,4 @@ add_executable(mmprof
         shadowmemory.cpp
         shadowmemory.hh
         spinlock.hh
-        xthreadx.hh programstatus.cpp programstatus.h definevalues.h cmake-build-debug/mymalloc.cpp cmake-build-debug/mymalloc.h mymalloc.cpp)
+        xthreadx.hh programstatus.cpp programstatus.h definevalues.h cmake-build-debug/mymalloc.cpp cmake-build-debug/mymalloc.h mymalloc.cpp allocatingstatus.cpp allocatingstatus.h threadlocalstatus.cpp threadlocalstatus.h)

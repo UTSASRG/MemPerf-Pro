@@ -12,7 +12,7 @@
 #include "definevalues.h"
 
 struct ProfilerMemory {
-   // void * startPointer;
+
    char startPointer[THREAD_LOCAL_PROFILER_MEMORY_SIZE];
     void * endPointer = (void *) ((uint64_t)startPointer + THREAD_LOCAL_PROFILER_MEMORY_SIZE);
     void * overheadPointer = startPointer;

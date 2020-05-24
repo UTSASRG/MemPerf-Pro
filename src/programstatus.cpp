@@ -10,26 +10,25 @@
 #include "mymalloc.h"
 #include "string.h"
 
-extern void * __libc_stack_end;
-
 bool ProgramStatus::profilerInitialized = false;
 bool ProgramStatus::selfMapInitialized = false;
-bool ProgramStatus::allocatorStyleIsBibop;
-size_t ProgramStatus::largeObjectThreshold;
+
 FILE * ProgramStatus::inputInfoFile;
 FILE * ProgramStatus::outputFile;
 char ProgramStatus::inputInfoFileName[MAX_FILENAME_LEN];
 char ProgramStatus::outputFileName[MAX_FILENAME_LEN];
+
+bool ProgramStatus::allocatorStyleIsBibop;
+size_t ProgramStatus::largeObjectThreshold;
 size_t ProgramStatus::classSizes[10000];
 unsigned int ProgramStatus::numberOfClassSizes;
 
 void ProgramStatus::setProfilerInitializedTrue() {
     profilerInitialized = true;
 }
-bool ProgramStatus::profilerInitializedIsTrue() {
-    return profilerInitialized;
+bool ProgramStatus::profilerNotInitialized() {
+    return !profilerInitialized;
 }
-
 
 void ProgramStatus::setSelfMapInitializedTrue() {
     selfMapInitialized = true;
@@ -111,9 +110,9 @@ void ProgramStatus::readLargeObjectThresholdFromInfo(char * token) {
 void ProgramStatus::readInputInfoFile() {
 
     size_t bufferSize = 1024;
-    char buffer[bufferSize];
+    char * buffer = (char*)MyMalloc::malloc(bufferSize);
 
-    while (getline((char**)&buffer, &bufferSize, ProgramStatus::inputInfoFile) > 0) {
+    while (getline(&buffer, &bufferSize, ProgramStatus::inputInfoFile) > 0) {
         char *token = strtok(buffer, " ");
         readAllocatorStyleFromInfo(token);
         readAllocatorClassSizesFromInfo(token);
@@ -133,6 +132,7 @@ void ProgramStatus::openOutputFile() {
     snprintf(ProgramStatus::outputFileName, MAX_FILENAME_LEN, "/home/jinzhou/parsec/records_t/%s_libmallocprof_%d_main_thread.txt",
              program_invocation_name, getpid());
     fprintf(stderr, "%s\n", ProgramStatus::outputFileName);
+
     ProgramStatus::outputFile = fopen(ProgramStatus::outputFileName, "w");
     if(ProgramStatus::outputFile == NULL) {
         perror("error: unable to open output file to write");
@@ -146,6 +146,48 @@ void ProgramStatus::initIO() {
 }
 
 void ProgramStatus::printStackAddr() {
+    extern void * __libc_stack_end;
     fprintf(outputFile, ">>> stack start @ %p, stack end @ %p\n", (char *)__builtin_frame_address(0), (char *)__libc_stack_end);
     fprintf(outputFile, ">>> program break @ %p\n", RealX::sbrk(0));
+}
+
+bool ProgramStatus::isALargeObject(size_t size) {
+    return size > largeObjectThreshold;
+}
+
+SizeClassSizeAndIndex ProgramStatus::getClassSizeAndIndex(size_t size) {
+
+    if(size == cacheForGetClassSizeAndIndex.size) {
+        return cacheForGetClassSizeAndIndex;
+    }
+
+    size_t classSize;
+    unsigned int classSizeIndex;
+
+    if(size > largeObjectThreshold) {
+        classSize = size;
+        classSizeIndex = numberOfClassSizes - 1;
+        return SizeClassSizeAndIndex{size, classSize, classSizeIndex};
+    }
+
+    if(allocatorStyleIsBibop) {
+        for (int index = 0; index < numberOfClassSizes; index++) {
+            if (size <= classSizes[index]) {
+                classSize = classSizes[index];
+                classSizeIndex = index;
+                break;
+            }
+        }
+    }
+    else {
+        if(allocData->size <= 24) {
+            classSize = 24;
+            classSizeIndex = 0;
+        } else {
+            classSizeIndex = (allocData->size - 24) / 16 + 1;
+            classSize = class_sizes[allocData->classSizeIndex];
+        }
+    }
+    cacheForGetClassSizeAndIndex.updateValues(size, classSize, classSizeIndex);
+    return cacheForGetClassSizeAndIndex;
 }

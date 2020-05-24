@@ -26,6 +26,7 @@
 #include <stdlib.h>
 #include "programstatus.h"
 #include "mymalloc.h"
+#include "allocatingstatus.h"
 
 //spinlock improve_lock;
 //Globals
@@ -45,8 +46,6 @@ char smaps_fileName[30];
 extern char * program_invocation_name;
 //float memEfficiency = 0;
 pid_t pid;
-//size_t alignment = 0;
-size_t large_object_threshold = 0;
 
 
 
@@ -120,7 +119,6 @@ extern "C" {
 
 // Constructor
 __attribute__((constructor)) void initializer() {
-
     ProgramStatus::checkSystemIs64Bits();
 
     RealX::initializer();
@@ -213,403 +211,105 @@ extern "C" {
             return NULL;
         }
 
-        // Small allocation routine designed to service malloc requests made by
-        // the dlsym() function, as well as code running prior to dlsym(). Due
-        // to our linkage alias which redirects malloc calls to yymalloc
-        // located in this file; when dlsym calls malloc, yymalloc is called
-        // instead. Without this routine, yymalloc would simply rely on
-        // RealX::malloc to fulfill the request, however, RealX::malloc would not
-        // yet be assigned until the dlsym call returns. This results in a
-        // segmentation fault. To remedy the problem, we detect whether the RealX
-        // has finished initializing; if it has not, we fulfill malloc requests
-        // using a memory mapped region. Once dlsym finishes, all future malloc
-        // requests will be fulfilled by RealX::malloc, which itself is a
-        // reference to the real malloc routine.
-        // Also, we can't call initializer() from here, because the initializer
-        // itself will call malloc().
-        if(ProgramStatus::profilerInitializedIsTrue() || !ProgramStatus::selfMapInitializedIsTrue()) {
-            void* ptr = MyMalloc::malloc(sz);
-            return ptr;
+        if(AllocatingStatus::profilerNotInitialized()) {
+            return MyMalloc::malloc(sz);
         }
 
-        //Malloc is being called by a thread that is already in malloc
-        if (inAllocation || !inRealMain) {
-            void* ptr = RealX::malloc(sz);
-            return ptr;
-        }
 
-        //thread_local
-        inFree = false;
-        now_size = sz;
-        inAllocation = true;
-        PMU_init_check();
-
-		//Data we need for each allocation
-		allocation_metadata allocData = init_allocation(sz, MALLOC);
-		void* object;
-		//Do before
-		doBefore(&allocData);
-		//Do allocation
-		object = RealX::malloc(sz);
-        //fprintf(stderr, "malloc ptr = %p, size = %d\n", object, sz);
-        doAfter(&allocData);
-
-        allocData.reused = MemoryWaste::allocUpdate(&allocData, object);
-        divideSmallAlloc(allocData.size, allocData.reused);
-        size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject(object, allocData.size, false);
-        incrementMemoryUsage(sz, allocData.classSize, new_touched_bytes, object);
-
-
-		allocData.cycles = allocData.tsc_after;
-
-        collectAllocMetaData(&allocData);
-
-		// thread_local
-        inAllocation = false;
-
+        AllocatingStatus::updateAllocatingStatusBeforeRealFunction(MALLOC, sz);
+		void * object = RealX::malloc(sz);
+        AllocatingStatus::updateAllocatingStatusAfterRealFunction();
+        AllocatingStatus::updateAllocatingInfoToThreadLocalData();
         return object;
 
 	}
 
-	void * yycalloc(size_t nelem, size_t elsize) {
 
-        //countEventsOutside(true);
+	void * yycalloc(size_t nelem, size_t elsize) {
 
 		if((nelem * elsize) == 0) {
 				return NULL;
 		}
 
-		if (ProgramStatus::profilerInitializedIsTrue()) {
-			void * ptr = NULL;
-			ptr = yymalloc (nelem * elsize);
-            //fprintf(stderr, "calloc 0 ptr = %p, size = %d\n", ptr, nelem * elsize);
-            if (ptr) memset(ptr, 0, nelem * elsize);
-			return ptr;
+		if (AllocatingStatus::profilerNotInitialized()) {
+            return MyMalloc::malloc(sz);
 		}
 
-		if (inAllocation) {
-            void * ptr = RealX::calloc (nelem, elsize);
-            //fprintf(stderr, "calloc 1 ptr = %p, size = %d\n", ptr, nelem * elsize);
-		    return ptr;
-		}
-
-		if (!inRealMain) {
-            void * ptr = RealX::calloc (nelem, elsize);
-            //fprintf(stderr, "calloc 2 ptr = %p, size = %d\n", ptr, nelem * elsize);
-		    return ptr;
-		}
-
-//		PMU_init_check();
-//
-//		// thread_local
-//		inFree = false;
-//		now_size = nelem * elsize;
-//		inAllocation = true;
-//
-//		// Data we need for each allocation
-//		allocation_metadata allocData = init_allocation(nelem * elsize, CALLOC);
-//		void* object;
-//
-//		// Do before
-//		doBefore(&allocData);
-
-		// Do allocationwriteAllocData
-		return(RealX::calloc(nelem, elsize));
-        //fprintf(stderr, "calloc ptr = %p, size = %d\n", object, nelem * elsize);
-//        doAfter(&allocData);
-//
-//        allocData.reused = MemoryWaste::allocUpdate(&allocData, object);
-//        divideSmallAlloc(allocData.size, allocData.reused);
-//        size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject(object, allocData.size, false);
-//        incrementMemoryUsage(nelem * elsize, allocData.classSize, new_touched_bytes, object);
-//        // Do after
-//
-//		allocData.cycles = allocData.tsc_after;
-//
-//        collectAllocMetaData(&allocData);
-
-		//thread_local
-//		inAllocation = false;
-
-        ///countEventsOutside(false);
-
-//		return object;
+        AllocatingStatus::updateAllocatingStatusBeforeRealFunction(CALLOC, sz);
+        void * object = RealX::calloc(nelem, elsize));
+        AllocatingStatus::updateAllocatingStatusAfterRealFunction();
+        AllocatingStatus::updateAllocatingInfoToThreadLocalData();
+		return object;
 	}
+
 
 	void yyfree(void * ptr) {
 
-        //countEventsOutside(true);
-
-		if (!realInitialized) RealX::initializer();
         if(ptr == NULL) return;
-        // Determine whether the specified object came from our global memory;
-        // only call RealX::free() if the object did not come from here.
-        if ( !ProgramStatus::profilerInitializedIsTrue() || !inRealMain) {
-            MyMalloc::free(ptr);
-            return;
-        }
+
         if (MyMalloc::inProfilerMemory(ptr)) {
-            MyMalloc::free(ptr);
-            return;
+            return MyMalloc::free(ptr);
         }
 
-        PMU_init_check();
-
-        //thread_local
-        inFree = true;
-        inAllocation = true;
-
-		//Data we need for each free
-		allocation_metadata allocData = init_allocation(0, FREE);
-		//Do before free
-
-        MemoryWaste::freeUpdate(&allocData, ptr);
-        if(allocData.size == 0) {
-            RealX::free(ptr);
-            inAllocation = false;
-            return;
-        }
-        now_size = allocData.size;
-        decrementMemoryUsage(allocData.size, allocData.classSize, ptr);
-        ShadowMemory::updateObject(ptr, allocData.size, true);
-
-        //Update free counters
-        doBefore(&allocData);
-        //Do free
+        AllocatingStatus::updateFreeingStatusBeforeRealFunction(FREE, ptr);
         RealX::free(ptr);
-
-		//Do after free
-		doAfter(&allocData);
-
-            if (__builtin_expect(!globalized, true)) {
-
-                if(allocData.size < large_object_threshold) {
-
-                    ///Freq
-                    //freq_add(2, allocData.tsc_after);
-
-                    localTAD.numFrees++;
-                    localTAD.cycles_free += allocData.tsc_after;
-                    localTAD.numDeallocationFaults += allocData.after.faults;
-                    localTAD.numDeallocationTlbReadMisses += allocData.after.tlb_read_misses;
-                    localTAD.numDeallocationTlbWriteMisses += allocData.after.tlb_write_misses;
-                    localTAD.numDeallocationCacheMisses += allocData.after.cache_misses;
-                    localTAD.numDeallocationInstrs += allocData.after.instructions;
-                } else {
-
-//                    freq_add(4, allocData.tsc_after);
-
-                    localTAD.numFrees_large++;
-                    localTAD.cycles_free_large += allocData.tsc_after;
-                    localTAD.numDeallocationFaults_large += allocData.after.faults;
-                    localTAD.numDeallocationTlbReadMisses_large += allocData.after.tlb_read_misses;
-                    localTAD.numDeallocationTlbWriteMisses_large += allocData.after.tlb_write_misses;
-                    localTAD.numDeallocationCacheMisses_large += allocData.after.cache_misses;
-                    localTAD.numDeallocationInstrs_large += allocData.after.instructions;
-                }
-            } else {
-                if(allocData.size < large_object_threshold) {
-                    globalize_lck.lock();
-                    globalTAD.numFrees++;
-                    globalTAD.cycles_free += allocData.tsc_after;
-                    globalTAD.numDeallocationFaults += allocData.after.faults;
-                    globalTAD.numDeallocationTlbReadMisses += allocData.after.tlb_read_misses;
-                    globalTAD.numDeallocationTlbWriteMisses += allocData.after.tlb_write_misses;
-                    globalTAD.numDeallocationCacheMisses += allocData.after.cache_misses;
-                    globalTAD.numDeallocationInstrs += allocData.after.instructions;
-                    globalize_lck.unlock();
-                } else {
-                    globalize_lck.lock();
-                    globalTAD.numFrees_large++;
-                    globalTAD.cycles_free_large += allocData.tsc_after;
-                    globalTAD.numDeallocationFaults_large += allocData.after.faults;
-                    globalTAD.numDeallocationTlbReadMisses_large += allocData.after.tlb_read_misses;
-                    globalTAD.numDeallocationTlbWriteMisses_large += allocData.after.tlb_write_misses;
-                    globalTAD.numDeallocationCacheMisses_large += allocData.after.cache_misses;
-                    globalTAD.numDeallocationInstrs_large += allocData.after.instructions;
-                    globalize_lck.unlock();
-                }
-            }
-        inAllocation = false;
-
-        //countEventsOutside(false);
-
+        AllocatingStatus::updateFreeingStatusAfterRealFunction();
+        AllocatingStatus::updateAllocatingInfoToThreadLocalData();
     }
+
 
 	void * yyrealloc(void * ptr, size_t sz) {
 
-		if (!realInitialized) RealX::initializer();
-		if( ProgramStatus::profilerInitializedIsTrue() || MyMalloc::inProfilerMemory(ptr)) {
-			if(ptr == NULL) {
-                return yymalloc(sz);
-            }
-            int * metadata = (int *)ptr - 1;
-            unsigned old_size = *metadata;
-            if(sz <= old_size) {
-                return ptr;
-            }
-            void * new_obj = yymalloc(sz);
-            memcpy(new_obj, ptr, old_size);
-            yyfree(ptr);
-            //fprintf(stderr, "realloc 0 ptr = %p, new ptr = %p, size = %d\n", ptr, new_obj, sz);
-            return new_obj;
+		if(MyMalloc::inProfilerMemory(ptr)) {
+            MyMalloc::free(ptr);
+            return MyMalloc::malloc(sz);
 		}
 
-		if (!mapsInitialized) {
-		    void * object = RealX::realloc (ptr, sz);
-            //fprintf(stderr, "realloc 1 ptr = %p, new ptr = %p, size = %d\n", ptr, object, sz);
-		    return object;
-		}
-		if (inAllocation) {
-            void * object = RealX::realloc (ptr, sz);
-            //fprintf(stderr, "realloc 2 ptr = %p, new ptr = %p, size = %d\n", ptr, object, sz);
-            return object;
-        }
-		if (!inRealMain) {
-            void * object = RealX::realloc (ptr, sz);
-            //fprintf(stderr, "realloc 3 ptr = %p, new ptr = %p, size = %d\n", ptr, object, sz);
-            return object;
-        }
-//		PMU_init_check();
-//
-//		//Data we need for each allocation
-//		allocation_metadata allocData = init_allocation(sz, REALLOC);
-//
-//		// allocated object
-//		void * object;
-//
-//		//thread_local
-//		inFree = false;
-//		now_size = sz;
-//		inAllocation = true;
-//
-//		//Do before
-//
-//        if(ptr) {
-//            MemoryWaste::freeUpdate(&allocData, ptr);
-//            ShadowMemory::updateObject(ptr, allocData.size, true);
-//            decrementMemoryUsage(allocData.size, allocData.classSize, ptr);
-//        }
-//
-//        doBefore(&allocData);
-        //Do allocation
-        return(RealX::realloc(ptr, sz));
-        //fprintf(stderr, "realloc ptr = %p, new ptr = %p, size = %d\n", ptr, object, sz);
-        //Do after
-//        doAfter(&allocData);
-//        allocData.size = sz;
-//        allocData.reused = MemoryWaste::allocUpdate(&allocData, object);
-//        divideSmallAlloc(allocData.size, allocData.reused);
-//        size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject(object, sz, false);
-//        incrementMemoryUsage(sz, allocData.classSize, new_touched_bytes, object);
-//
-//
-//		// cyclesForRealloc = tsc_after - tsc_before;
-//		allocData.cycles = allocData.tsc_after;
-//
-//		//Gets overhead, address usage, mmap usage
-//		//analyzeAllocation(&allocData);
-//        //analyzePerfInfo(&allocData);
-//        ///collectAllocMetaData(&allocData);
-//
-//		//thread_local
-//		inAllocation = false;
-
-        ///countEventsOutside(false);
-
-//		return object;
-	}
-
-	inline void logUnsupportedOp() {
-		fprintf(stderr, "ERROR: call to unsupported memory function: %s\n",
-				__FUNCTION__);
-	}
-
-
-	void * yyvalloc(size_t size) {
-		logUnsupportedOp();
-		return NULL;
+        AllocatingStatus::updateFreeingStatusBeforeRealFunction(REALLOC, ptr);
+        AllocatingStatus::updateAllocatingStatusBeforeRealFunction(REALLOC, sz);
+        void * object = RealX::realloc(ptr, sz);
+        AllocatingStatus::updateAllocatingStatusAfterRealFunction(object);
+        AllocatingStatus::updateAllocatingInfoToThreadLocalData();
+        return object;
 	}
 
 
 	int yyposix_memalign(void **memptr, size_t alignment, size_t size) {
-        //countEventsOutside(true);
-    if (!inRealMain) return RealX::posix_memalign(memptr, alignment, size);
+        if(size == 0) {
+            return NULL;
+        }
 
-//    //thread_local
-//    inFree = false;
-//    now_size = size;
-//    inAllocation = true;
-//
-//		PMU_init_check();
-//
-//    //Data we need for each allocation
-//    allocation_metadata allocData = init_allocation(size, MALLOC);
-//
-//    //Do allocation
-//    doBefore(&allocData);
-    return(RealX::posix_memalign(memptr, alignment, size));
-//    doAfter(&allocData);
-//    void * object = *memptr;
-//    allocData.reused = MemoryWaste::allocUpdate(&allocData, object);
-//        divideSmallAlloc(allocData.size, allocData.reused);
-//    //Do after
-//    size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject(object, allocData.size, false);
-//    incrementMemoryUsage(size, allocData.classSize, new_touched_bytes, object);
-//
-//        allocData.cycles = allocData.tsc_after;
-//        collectAllocMetaData(&allocData);
-//    // thread_local
-//    inAllocation = false;
-        ///countEventsOutside(false);
-//    return retval;
-	}
+        if(AllocatingStatus::profilerNotInitialized()) {
+            return MyMalloc::malloc(sz);
+        }
 
 
-	void * yyaligned_alloc(size_t alignment, size_t size) {
-		logUnsupportedOp();
-		return NULL;
+        AllocatingStatus::updateAllocatingStatusBeforeRealFunction(POSIX_MEMALIGN, size);
+        int retval = RealX::posix_memalign(memptr, alignment, size);
+        AllocatingStatus::updateAllocatingStatusAfterRealFunction(*memptr);
+        AllocatingStatus::updateAllocatingInfoToThreadLocalData();
+        return retval;
+
 	}
 
 
  void * yymemalign(size_t alignment, size_t size) {
-     //countEventsOutside(true);
-    // fprintf(stderr, "yymemalign alignment %d, size %d\n", alignment, size);
-     if (!inRealMain) return RealX::memalign(alignment, size);
+     if(size == 0) {
+         return NULL;
+     }
 
-//     //thread_local
-//     inFree = false;
-//     now_size = size;
-//     inAllocation = true;
-//
-//     PMU_init_check();
-//
-//     //Data we need for each allocation
-//     allocation_metadata allocData = init_allocation(size, MALLOC);
-//
-//     //Do allocation
-//     doBefore(&allocData);
-     return(RealX::memalign(alignment, size));
-//     doAfter(&allocData);
-//     allocData.reused = MemoryWaste::allocUpdate(&allocData, object);
-//     divideSmallAlloc(allocData.size, allocData.reused);
-//     //Do after
-//    size_t new_touched_bytes = PAGESIZE * ShadowMemory::updateObject(object, allocData.size, false);
-//    incrementMemoryUsage(size, allocData.classSize, new_touched_bytes, object);
-//
-//     allocData.cycles = allocData.tsc_after;
-//     ///collectAllocMetaData(&allocData);
-//    // thread_local
-//    inAllocation = false;
-//     countEventsOutside(false);
-//    return object;
+     if(AllocatingStatus::profilerNotInitialized()) {
+         return MyMalloc::malloc(size);
+     }
+
+
+     AllocatingStatus::updateAllocatingStatusBeforeRealFunction(MEMALIGN, sz);
+     void * object = RealX::memalign(alignment, size);
+     AllocatingStatus::updateAllocatingStatusAfterRealFunction(object);
+     AllocatingStatus::updateAllocatingInfoToThreadLocalData();
+     return object;
 	}
 
-
-	void * yypvalloc(size_t size) {
-		logUnsupportedOp();
-		return NULL;
-	}
 
 
 	// PTHREAD_CREATE
@@ -669,72 +369,6 @@ void operator delete[] (void * ptr) __THROW {
 	yyfree (ptr);
 }
 
-void getClassSizeForStyles(void* uintaddr, allocation_metadata * allocData) {
-
-    if(allocData->size == the_old_size) {
-        allocData->classSize = the_old_classSize;
-        allocData->classSizeIndex = the_old_classSizeIndex;
-        return;
-    }
-
-    the_old_size = allocData->size;
-
-        if(allocData->size > large_object_threshold) {
-            allocData->classSize = allocData->size;
-            allocData->classSizeIndex = num_class_sizes -1;
-
-            the_old_classSize = allocData->classSize;
-            the_old_classSizeIndex = allocData->classSizeIndex;
-
-            return;
-        }
-        if(bibop) {
-            for (int i = 0; i < num_class_sizes; i++) {
-                size_t tempSize = class_sizes[i];
-                if (allocData->size <= tempSize) {
-                    allocData->classSize = tempSize;
-                    allocData->classSizeIndex = i;
-
-                    the_old_classSize = allocData->classSize;
-                    the_old_classSizeIndex = allocData->classSizeIndex;
-
-                    return;
-                }
-            }
-        } else {
-            if(allocData->size <= 24) {
-                allocData->classSizeIndex = 0;
-                allocData->classSize = 24;
-            } else {
-                allocData->classSizeIndex = (allocData->size - 24) / 16 + 1;
-                allocData->classSize = class_sizes[allocData->classSizeIndex];
-            }
-         }
-    the_old_classSize = allocData->classSize;
-    the_old_classSizeIndex = allocData->classSizeIndex;
-}
-
-allocation_metadata init_allocation(size_t sz, enum memAllocType type) {
-	PerfReadInfo empty;
-	allocation_metadata new_metadata = {
-		reused : false,
-		tid: thrData.tid,
-		before : empty,
-		after : empty,
-		size : sz,
-		//classSize : getClassSizeFor(sz),
-		classSize : 0,
-		//classSizeIndex : getClassSizeIndex(getClassSizeForStyles(sz)),
-		classSizeIndex : 0,
-		cycles : 0,
-//		address : 0,
-		tsc_before : 0,
-		tsc_after : 0,
-		type : type,
-		tad : NULL
-	};
-	return new_metadata;
-}
 
 void globalizeTAD() {
 

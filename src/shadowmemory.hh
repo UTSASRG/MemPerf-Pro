@@ -140,7 +140,7 @@ class ShadowMemory {
 				static CacheMapEntry * doCacheMapBumpPointer();
 				static PageMapEntry * doPageMapBumpPointer();
 				static PageMapEntry * getPageMapEntry(unsigned long mega_idx, unsigned page_idx);
-				static unsigned updateObject(void * address, size_t size, bool isFree);
+				static size_t updateObject(void * address, size_t size, bool isFree);
 				static map_tuple getMapTupleByAddress(uintptr_t uintaddr);
 };
 

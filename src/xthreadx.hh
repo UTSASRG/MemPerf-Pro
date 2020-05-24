@@ -30,7 +30,7 @@ class xthreadx {
 
 	public:
 	static int thread_create(pthread_t * tid, const pthread_attr_t * attr, threadFunction * fn, void * arg) {
-		thread_t * children = (thread_t *) myMalloc(sizeof(thread_t));
+		thread_t * children = (thread_t *) MyMalloc::malloc(sizeof(thread_t));
 		children->thread = tid;
 		children->startArg = arg;
 		children->startRoutine = fn;

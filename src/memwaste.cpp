@@ -4,6 +4,9 @@
 //#include <atomic>
 #include <stdio.h>
 #include "memwaste.h"
+#include "mymalloc.h"
+#include "threadlocalstatus.h"
+#include "programstatus.h"
 
 #define MAX_THREAD_NUMBER 1024
 
@@ -56,103 +59,79 @@ void MemoryWaste::initialize() {
 
     objStatusMap.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_OBJ_NUM);
 
-    mem_alloc_wasted = (uint64_t*) myMalloc(MAX_THREAD_NUMBER * num_class_sizes * sizeof(uint64_t));
-    mem_alloc_wasted_record = (uint64_t*) myMalloc(MAX_THREAD_NUMBER * num_class_sizes * sizeof(uint64_t));
-    mem_alloc_wasted_record_global = (uint64_t*) myMalloc(num_class_sizes * sizeof(uint64_t));
+    mem_alloc_wasted = (uint64_t*) MyMalloc::malloc(MAX_THREAD_NUMBER * num_class_sizes * sizeof(uint64_t));
+    mem_alloc_wasted_record = (uint64_t*) MyMalloc::malloc(MAX_THREAD_NUMBER * num_class_sizes * sizeof(uint64_t));
+    mem_alloc_wasted_record_global = (uint64_t*) MyMalloc::malloc(num_class_sizes * sizeof(uint64_t));
 
-    num_alloc_active = (int64_t*) myMalloc(MAX_THREAD_NUMBER * num_class_sizes * sizeof(int64_t));
-    num_alloc_active_record = (int64_t*) myMalloc(MAX_THREAD_NUMBER * num_class_sizes * sizeof(int64_t));
-    num_alloc_active_record_global = (int64_t*) myMalloc(num_class_sizes * sizeof(int64_t));
+    num_alloc_active = (int64_t*) MyMalloc::malloc(MAX_THREAD_NUMBER * num_class_sizes * sizeof(int64_t));
+    num_alloc_active_record = (int64_t*) MyMalloc::malloc(MAX_THREAD_NUMBER * num_class_sizes * sizeof(int64_t));
+    num_alloc_active_record_global = (int64_t*) MyMalloc::malloc(num_class_sizes * sizeof(int64_t));
 
-    num_freelist = (int64_t*) myMalloc(MAX_THREAD_NUMBER * num_class_sizes * sizeof(int64_t));
-    num_freelist_record = (int64_t*) myMalloc(MAX_THREAD_NUMBER * num_class_sizes * sizeof(int64_t));
-    num_freelist_record_global = (int64_t*) myMalloc(num_class_sizes * sizeof(int64_t));
+    num_freelist = (int64_t*) MyMalloc::malloc(MAX_THREAD_NUMBER * num_class_sizes * sizeof(int64_t));
+    num_freelist_record = (int64_t*) MyMalloc::malloc(MAX_THREAD_NUMBER * num_class_sizes * sizeof(int64_t));
+    num_freelist_record_global = (int64_t*) MyMalloc::malloc(num_class_sizes * sizeof(int64_t));
 
-    num_alloc = (uint64_t*) myMalloc(MAX_THREAD_NUMBER * num_class_sizes * sizeof(uint64_t));
-    num_allocFFL = (uint64_t*) myMalloc(MAX_THREAD_NUMBER * num_class_sizes * sizeof(uint64_t));
-    num_free = (uint64_t*) myMalloc(MAX_THREAD_NUMBER * num_class_sizes * sizeof(uint64_t));
+    num_alloc = (uint64_t*) MyMalloc::malloc(MAX_THREAD_NUMBER * num_class_sizes * sizeof(uint64_t));
+    num_allocFFL = (uint64_t*) MyMalloc::malloc(MAX_THREAD_NUMBER * num_class_sizes * sizeof(uint64_t));
+    num_free = (uint64_t*) MyMalloc::malloc(MAX_THREAD_NUMBER * num_class_sizes * sizeof(uint64_t));
 
-    num_alloc_record = (uint64_t*) myMalloc(MAX_THREAD_NUMBER * num_class_sizes * sizeof(uint64_t));
-    num_allocFFL_record = (uint64_t*) myMalloc(MAX_THREAD_NUMBER * num_class_sizes * sizeof(uint64_t));
-    num_free_record = (uint64_t*) myMalloc(MAX_THREAD_NUMBER * num_class_sizes * sizeof(uint64_t));
+    num_alloc_record = (uint64_t*) MyMalloc::malloc(MAX_THREAD_NUMBER * num_class_sizes * sizeof(uint64_t));
+    num_allocFFL_record = (uint64_t*) MyMalloc::malloc(MAX_THREAD_NUMBER * num_class_sizes * sizeof(uint64_t));
+    num_free_record = (uint64_t*) MyMalloc::malloc(MAX_THREAD_NUMBER * num_class_sizes * sizeof(uint64_t));
 
-    num_alloc_record_global = (uint64_t*) myMalloc(num_class_sizes * sizeof(uint64_t));
-    num_allocFFL_record_global = (uint64_t*) myMalloc(num_class_sizes * sizeof(uint64_t));
-    num_free_record_global = (uint64_t*) myMalloc(num_class_sizes * sizeof(uint64_t));
+    num_alloc_record_global = (uint64_t*) MyMalloc::malloc(num_class_sizes * sizeof(uint64_t));
+    num_allocFFL_record_global = (uint64_t*) MyMalloc::malloc(num_class_sizes * sizeof(uint64_t));
+    num_free_record_global = (uint64_t*) MyMalloc::malloc(num_class_sizes * sizeof(uint64_t));
 
-    blowupflag_record = (int64_t*) myMalloc(num_class_sizes * sizeof(int64_t));
-    blowupflag = (int64_t*) myMalloc(num_class_sizes * sizeof(int64_t));
+    blowupflag_record = (int64_t*) MyMalloc::malloc(num_class_sizes * sizeof(int64_t));
+    blowupflag = (int64_t*) MyMalloc::malloc(num_class_sizes * sizeof(int64_t));
 
     record_lock.init();
 }
 
-void getClassSizeForStyles(void* uintaddr, allocation_metadata * allocData);
+unsigned int ArrayIndexForCurrentThread(unsigned int classSizeIndex) {
+    return ThreadLocalStatus::runningThreadIndex * ProgramStatus::numberOfClassSizes + classSizeIndex;
+}
 
-bool MemoryWaste::allocUpdate(allocation_metadata * allocData, void * address) {
+AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(size_t size, void * address) {
 
     bool reused;
-    size_t classSize;
-    short classSizeIndex;
-    /* New or Reused? Get old status */
-    objStatus * status = objStatusMap.find(address, sizeof(unsigned long));;
+    SizeClassSizeAndIndex sizeClassSizeAndIndex;
+
+    objStatus * status = objStatusMap.find(address, sizeof(unsigned long));
     if(!status) {
         reused = false;
         /* new status */
-        getClassSizeForStyles(address, allocData);
-        classSize = allocData->classSize;
-        classSizeIndex = allocData->classSizeIndex;
-///Here
+        sizeClassSizeAndIndex = ProgramStatus::getClassSizeAndIndex(size);
+        status = objStatusMap.insert(address, sizeof(void *), objStatus{sizeClassSizeAndIndex, size});
 
-        num_alloc[(allocData->tid*num_class_sizes)+classSizeIndex]++;
-
-        objStatus newObj; 
-        //fprintf(stderr, "insert address %p\n", address);
-        newObj.size_using = allocData->size;
-        newObj.classSize = classSize;
-        newObj.classSizeIndex = classSizeIndex;
-        status = objStatusMap.insert(address, sizeof(void *), newObj);
+        num_alloc[ArrayIndexForCurrentThread(sizeClassSizeAndIndex.classSizeIndex)]++;
     }
     else {
         reused = true;
-        if(status->size_using == allocData->size) {
-            allocData->classSize = status->classSize;
-            allocData->classSizeIndex = status->classSizeIndex;
+        if(status->sizeClassSizeAndIndex.size == size) {
+            sizeClassSizeAndIndex = status->sizeClassSizeAndIndex;
         } else {
-            getClassSizeForStyles(address, allocData);
+            sizeClassSizeAndIndex = ProgramStatus::getClassSizeAndIndex(size);
+            status->sizeClassSizeAndIndex = sizeClassSizeAndIndex;
+            if(size > status->max_touched_bytes) {
+                status->max_touched_bytes = size;
+            }
         }
-
-        classSize = allocData->classSize;
-        classSizeIndex = allocData->classSizeIndex;
-///Here
-        num_allocFFL[(allocData->tid*num_class_sizes)+classSizeIndex]++;
-        num_freelist[(allocData->tid*num_class_sizes)+classSizeIndex]--;
-
-
-        status->size_using = allocData->size;
-        status->classSize = classSize;
-        status->classSizeIndex = classSizeIndex;
-
+        num_allocFFL[ArrayIndexForCurrentThread(sizeClassSizeAndIndex.classSizeIndex)]++;
+        num_freelist[ArrayIndexForCurrentThread(sizeClassSizeAndIndex.classSizeIndex)]--;
     }
 
-    num_alloc_active[(allocData->tid*num_class_sizes)+classSizeIndex]++;
+    num_alloc_active[ArrayIndexForCurrentThread(sizeClassSizeAndIndex.classSizeIndex)]++;
+    mem_alloc_wasted[ArrayIndexForCurrentThread(sizeClassSizeAndIndex.classSizeIndex)] += classSize - size;
+    mem_alloc_wasted[ArrayIndexForCurrentThread(sizeClassSizeAndIndex.classSizeIndex)] -= (classSize-status->max_touched_bytes)/PAGESIZE*PAGESIZE;
 
-    if(status->max_touched_bytes < allocData->size) {
-        status->max_touched_bytes = allocData->size;
-    }
-    mem_alloc_wasted[(allocData->tid*num_class_sizes)+classSizeIndex] += classSize-allocData->size;
-    if(classSize-status->max_touched_bytes >= PAGESIZE && classSize >= status->max_touched_bytes) {
-        mem_alloc_wasted[(allocData->tid*num_class_sizes)+classSizeIndex] -= (classSize-status->max_touched_bytes)/PAGESIZE*PAGESIZE;
-    } else if(classSize-allocData->size >= PAGESIZE) {
-        mem_alloc_wasted[(allocData->tid*num_class_sizes)+classSizeIndex] -= (classSize-allocData->size)/PAGESIZE*PAGESIZE;
-    }
-
-
-        if( blowupflag[classSizeIndex] > 0) {
-            blowupflag[classSizeIndex]--;
+        if( blowupflag[sizeClassSizeAndIndex.classSizeIndex] > 0) {
+            blowupflag[sizeClassSizeAndIndex.classSizeIndex]--;
         }
 
 
-    return reused;
+    return AllocatingTypeGotFromMemoryWaste{reused, classSize};
 }
 
 void MemoryWaste::freeUpdate(allocation_metadata * allocData, void* address) {

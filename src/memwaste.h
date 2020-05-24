@@ -19,10 +19,7 @@
 extern int num_class_sizes;
 
 typedef struct {
-    //pid_t tid;
-    size_t size_using = 0;
-    size_t classSize = 0;
-    short classSizeIndex = 0;
+    SizeClassSizeAndIndex sizeClassSizeAndIndex;
     size_t max_touched_bytes = 0;
 } objStatus;
 
@@ -76,7 +73,7 @@ public:
 
     static void initialize();
 ///Here
-    static bool allocUpdate(allocation_metadata * allocData, void * address);
+    static AllocatingTypeGotFromMemoryWaste allocUpdate(size_t size, void * address);
     static void freeUpdate(allocation_metadata * allocData, void* address);
     ///Here
     static bool recordMemory(long realMemory, long totalMemory);

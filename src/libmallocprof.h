@@ -142,34 +142,6 @@ struct stack_frame {
 	void * caller_address;		// the address of caller
 };
 
-/*
- * AllocType
- *
- *    Tracks which type of metadata should we obtain and
- *    what to add to the collected metadata
- */
-enum memAllocType {
-	REALLOC,
-	MALLOC,
-	CALLOC,
-	FREE
-};
-
-typedef struct  {
-	bool reused;
-	pid_t tid;
-	PerfReadInfo before;
-	PerfReadInfo after;
-	size_t size;
-	size_t classSize;
-	short classSizeIndex;
-	uint64_t cycles;
-//	uint64_t address;
-	uint64_t tsc_before;
-	uint64_t tsc_after;
-	enum memAllocType type;
-	thread_alloc_data *tad;
-} allocation_metadata;
 
 typedef struct {
 	void* start;
@@ -177,23 +149,9 @@ typedef struct {
 	unsigned kb;
 } SMapEntry;
 
-//typedef struct {
-//	uint64_t kb;
-//	uint64_t alignment;
-//	uint64_t blowup;
-//	float efficiency;
-//} OverheadSample;
-
-// Functions 
-//#ifdef MAPPINGS
-//bool mappingEditor (void* addr, size_t len, int prot);
-//#endif
 inline bool isAllocatorInCallStack();
 size_t getClassSizeFor(size_t size);
 int num_used_pages(uintptr_t vstart, uintptr_t vend);
-//void analyzePerfInfo(allocation_metadata *metadata);
-//void analyzeAllocation(allocation_metadata *metadata);
-//void calculateMemOverhead();
 void doBefore(allocation_metadata *metadata);
 void doAfter(allocation_metadata *metadata);
 void incrementMemoryUsage(size_t size, size_t classSize, size_t new_touched_bytes, void * object);
@@ -207,8 +165,8 @@ void getMetadata(size_t classSize);
 void getPerfCounts(PerfReadInfo*);
 //void getCacheMissesOutside(CacheMissesOutsideInfo*);
 void globalizeTAD();
-void myFree (void* ptr);
-void* myMalloc (size_t size);
+//void myFree (void* ptr);
+//void* myMalloc (size_t size);
 void readAllocatorFile();
 void writeAllocData ();
 void writeContention ();
@@ -219,7 +177,6 @@ void writeThreadMaps();
 //MmapTuple* newMmapTuple (uint64_t address, size_t length, int prot, char origin);
 ObjectTuple* newObjectTuple (uint64_t address, size_t size);
 //Overhead* newOverhead();
-allocation_metadata init_allocation(size_t sz, enum memAllocType type);
 //size_t updateFreeCounters(void * address);
 //short getClassSizeIndex(size_t size);
 void initGlobalFreeArray();

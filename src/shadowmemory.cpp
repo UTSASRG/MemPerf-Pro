@@ -69,7 +69,7 @@ mega_map_lock.init();
 	return true;
 }
 
-unsigned ShadowMemory::updateObject(void * address, size_t size, bool isFree) {
+size_t ShadowMemory::updateObject(void * address, size_t size, bool isFree) {
     if(address == NULL) {
 				fprintf(stderr, "ERROR: null pointer passed into %s at %s:%d\n",
                 __FUNCTION__, __FILE__, __LINE__);
@@ -92,7 +92,7 @@ unsigned ShadowMemory::updateObject(void * address, size_t size, bool isFree) {
     unsigned numNewPagesTouched = updatePages(uintaddr, mega_index, firstPageIdx, size, isFree);
     PageMapEntry::updateCacheLines(uintaddr, mega_index, firstPageIdx, size, isFree);
 
-    return numNewPagesTouched;
+    return numNewPagesTouched * PAGESIZE;
 }
 
 unsigned ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_index, unsigned page_index, unsigned size, bool isFree) {
