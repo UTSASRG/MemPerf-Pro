@@ -19,7 +19,7 @@
 #include "libmallocprof.h"
 #include "hashmap.hh"
 #include "memwaste.h"
-
+#include "allocatingstatus.h"
 
 #define MAX_THREAD_NUMBER 1024
 int threadcontention_index;
@@ -27,15 +27,6 @@ ThreadContention all_threadcontention_array[MAX_THREAD_NUMBER];
 extern thread_local thread_alloc_data localTAD;
 thread_local ThreadContention* threadContention;
 
-extern thread_local bool inAllocation;
-extern thread_local bool inFree;
-extern thread_local size_t now_size;
-extern thread_local bool inMmap;
-extern bool realInitialized;
-extern bool mapsInitialized;
-
-extern MemoryUsage max_mu;
-extern bool inRealMain;
 
 
 typedef struct {
@@ -49,8 +40,6 @@ typedef struct {
     unsigned long percycles[4] = {0, 0, 0, 0};
 } PerLockData;
 
-
-//extern HashMap <uint64_t, MmapTuple*, spinlock> mappings;
 extern HashMap <uint64_t, PerLockData, spinlock, PrivateHeap> lockUsage;
 typedef int (*myLockType) (void *);
 typedef int (*myUnlockType) (void *);
@@ -75,31 +64,8 @@ UnlockFuncs unlockfuncs [LOCK_TYPE_TOTAL] =
     (myUnlockType)RealX::pthread_mutex_unlock,
     (myUnlockType)RealX::pthread_spin_unlock };
 
-//void checkGlobalMemoryUsageBySizes();
-void checkGlobalRealMemoryUsage();
-//void checkGlobalAllocatedMemoryUsage();
-void checkGlobalTotalMemoryUsage();
-void checkGlobalMemoryUsage();
 
 extern "C" {
-
-void setMainThreadContention() {
-    int current_index = 0;
-    if(current_index >= MAX_THREAD_NUMBER) {
-        fprintf(stderr, "Please increase thread number: MAX_THREAD_NUMBER, %d\n", MAX_THREAD_NUMBER);
-        abort();
-    }
-    threadContention = &all_threadcontention_array[current_index];
-    threadContention->tid = current_index;
-    thrData.tid = current_index;
-
-//    cpu_set_t mask;
-//    CPU_ZERO(&mask);
-//    CPU_SET(thrData.tid%40, &mask);
-//    if(sched_setaffinity(0, sizeof(mask), &mask) < 0 ) {
-//        fprintf(stderr, "sched_setaffinity %d\n", thrData.tid);
-//    }
-}
 
 void setThreadContention() {
   int current_index = __atomic_add_fetch(&threadcontention_index, 1, __ATOMIC_RELAXED);
@@ -119,23 +85,6 @@ void setThreadContention() {
 //    }
 }
 
-//extern void countEventsOutside(bool end);
-extern thread_local bool realing;
-
-void divideSmallAlloc(size_t sz, bool reused) {
-    if(sz >= large_object_threshold) return;
-    for(int i = 0; i < 4; ++i) {
-        if(reused) {
-            threadContention->pmdata[i].ffl_calls += threadContention->pmdata[i].calls[0];
-            threadContention->pmdata[i].ffl_cycles += threadContention->pmdata[i].cycles[0];
-        } else {
-            threadContention->pmdata[i].new_calls += threadContention->pmdata[i].calls[0];
-            threadContention->pmdata[i].new_cycles += threadContention->pmdata[i].cycles[0];
-        }
-        threadContention->pmdata[i].calls[0] = 0;
-        threadContention->pmdata[i].cycles[0] = 0;
-    }
-}
 
 /* ************************Synchronization******************************** */
 // In the PTHREAD_LOCK_HANDLE, we will pretend the initialization
@@ -254,142 +203,78 @@ int pthread_spin_unlock(pthread_spinlock_t *lock) {
 /* ************************Systemn Calls******************************** */
 
 
+typedef enum {
+    MMAP,
+    MADVISE,
+    SBRK,
+    MPROTECT,
+    MUNMAP,
+    MREMAP,
+    NUM_OF_SYSTEMCALLTYPES
+} SystemCallTypes;
+
+struct SystemCallData {
+    uint64_t num;
+    uint64_t cycles;
+
+    void add(SystemCallData newSystemCallData) {
+        this->num += newSystemCallData->num;
+        this->cycles += newSystemCallData.cycles;
+    }
+};
+
 // MMAP
 void * yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset) {
-
-  if (!realInitialized) {
-      RealX::initializer();
-  }
-
-  if (!mapsInitialized) {
-      return RealX::mmap (addr, length, prot, flags, fd, offset);
-  }
-
-  if (inMmap) {
-      return RealX::mmap (addr, length, prot, flags, fd, offset);
-  }
-
-    if(!realing || !inRealMain) {
-        return RealX::mmap (addr, length, prot, flags, fd, offset);
+    if (!realInitialized) RealX::initializer();
+    if(AllocatingStatus::outsideTrackedAllocation()) {
+        return RealX::mmap(addr, length, prot, flags, fd, offset);
     }
 
-//    do_whole_before();
-    //thread_local
-    inMmap = true;
-
-//    do_real_before();
     uint64_t timeStart = rdtscp();
     void* retval = RealX::mmap(addr, length, prot, flags, fd, offset);
     uint64_t timeStop = rdtscp();
-//    do_real_after();
 
-    uint64_t address = (uint64_t)retval;
+    AllocatingStatus::addToSystemCallData(MMAP, SystemCallData{1, timeStop - timeStart});
 
-  //If this thread currently doing an allocation
-    if(!inFree) {
-        if(now_size < large_object_threshold) {
-            threadContention->mmap_waits_alloc++;
-            threadContention->mmap_wait_cycles_alloc += (timeStop - timeStart);
-        } else {
-            threadContention->mmap_waits_alloc_large++;
-            threadContention->mmap_wait_cycles_alloc_large += (timeStop - timeStart);
-        }
-    } else {
-        if(now_size < large_object_threshold) {
-            threadContention->mmap_waits_free++;
-            threadContention->mmap_wait_cycles_free += (timeStop - timeStart);
-        } else {
-            threadContention->mmap_waits_free_large++;
-            threadContention->mmap_wait_cycles_free_large += (timeStop - timeStart);
-        }
-    }
-
-    //mappings.insert(address, newMmapTuple(address, length, prot, 'a'));
-
-	// Need to check if selfmap.getInstance().getTextRegions() has
-	// ran. If it hasn't, we can't call isAllocatorInCallStack()
-
-  inMmap = false;
-//    do_whole_after();
   return retval;
 }
 
-extern MemoryUsage mu;
-
 // MADVISE
 int madvise(void *addr, size_t length, int advice){
-  if (!realInitialized) RealX::initializer();
-
-  if (!realing || !inRealMain) {
-    return RealX::madvise(addr, length, advice);
-  }
-
-//    do_whole_before();
-
-  if (advice == MADV_DONTNEED) {
-    uint returned = PAGESIZE * ShadowMemory::cleanupPages((uintptr_t)addr, length);
-    if(threadContention->totalMemoryUsage > returned) {
-      threadContention->totalMemoryUsage -= returned;
+    if (!realInitialized) RealX::initializer();
+    if(AllocatingStatus::outsideTrackedAllocation()) {
+        return RealX::madvise(addr, length, advice);
     }
-      __atomic_sub_fetch(&mu.totalMemoryUsage, returned, __ATOMIC_RELAXED);
-  }
 
-//    do_real_before();
-  uint64_t timeStart = rdtscp();
-  int result = RealX::madvise(addr, length, advice);
-  uint64_t timeStop = rdtscp();
-//    do_real_after();
+    if (advice == MADV_DONTNEED) {
+        uint returned = PAGESIZE * ShadowMemory::cleanupPages((uintptr_t)addr, length);
+        if(threadContention->totalMemoryUsage > returned) {
+            threadContention->totalMemoryUsage -= returned;
+        }
+        __atomic_sub_fetch(&mu.totalMemoryUsage, returned, __ATOMIC_RELAXED);
+    }
 
-  if(!inFree) {
-      if(now_size < large_object_threshold) {
-          threadContention->madvise_waits_alloc++;
-          threadContention->madvise_wait_cycles_alloc += (timeStop - timeStart);
-      } else {
-          threadContention->madvise_waits_alloc_large++;
-          threadContention->madvise_wait_cycles_alloc_large += (timeStop - timeStart);
-      }
-  } else {
-      if(now_size < large_object_threshold) {
-          threadContention->madvise_waits_free++;
-          threadContention->madvise_wait_cycles_free += (timeStop - timeStart);
-      } else {
-          threadContention->madvise_waits_free_large++;
-          threadContention->madvise_wait_cycles_free_large += (timeStop - timeStart);
-      }
-  }
+    uint64_t timeStart = rdtscp();
+    int result = RealX::madvise(addr, length, advice);
+    uint64_t timeStop = rdtscp();
 
-//    do_whole_after();
+    AllocatingStatus::addToSystemCallData(MADVISE, SystemCallData{1, timeStop - timeStart});
 
   return result;
 }
 
 // SBRK
 void *sbrk(intptr_t increment){
-  if (!realInitialized) RealX::initializer();
-  if(ProgramStatus::profilerInitializedIsTrue() || !realing  || !inRealMain)
-      return RealX::sbrk(increment);
+    if (!realInitialized) RealX::initializer();
+    if(AllocatingStatus::outsideTrackedAllocation()) {
+        return RealX::sbrk(increment);
+    }
 
   uint64_t timeStart = rdtscp();
   void *retptr = RealX::sbrk(increment);
   uint64_t timeStop = rdtscp();
 
-  if(!inFree) {
-      if(now_size < large_object_threshold) {
-          threadContention->sbrk_waits_alloc++;
-          threadContention->sbrk_wait_cycles_alloc += (timeStop - timeStart);
-      } else {
-          threadContention->sbrk_waits_alloc_large++;
-          threadContention->sbrk_wait_cycles_alloc_large += (timeStop - timeStart);
-      }
-  } else {
-      if(now_size < large_object_threshold) {
-          threadContention->sbrk_waits_free++;
-          threadContention->sbrk_wait_cycles_free += (timeStop - timeStart);
-      } else {
-          threadContention->sbrk_waits_free_large++;
-          threadContention->sbrk_wait_cycles_free_large += (timeStop - timeStart);
-      }
-  }
+    AllocatingStatus::addToSystemCallData(SBRK, SystemCallData{1, timeStop - timeStart});
 
   return retptr;
 }
@@ -398,38 +283,15 @@ void *sbrk(intptr_t increment){
 // MPROTECT
 int mprotect(void* addr, size_t len, int prot) {
   if (!realInitialized) RealX::initializer();
-
-  if(!realing || !inRealMain){
+  if(AllocatingStatus::outsideTrackedAllocation()) {
     return RealX::mprotect(addr, len, prot);
   }
 
-//  do_whole_before();
-
-//  do_real_before();
   uint64_t timeStart = rdtscp();
   int ret =  RealX::mprotect(addr, len, prot);
   uint64_t timeStop = rdtscp();
-//  do_real_after();
 
-    if(!inFree) {
-        if(now_size < large_object_threshold) {
-            threadContention->mprotect_waits_alloc++;
-            threadContention->mprotect_wait_cycles_alloc += (timeStop - timeStart);
-        } else {
-            threadContention->mprotect_waits_alloc_large++;
-            threadContention->mprotect_wait_cycles_alloc_large += (timeStop - timeStart);
-        }
-    } else {
-        if(now_size < large_object_threshold) {
-            threadContention->mprotect_waits_free++;
-            threadContention->mprotect_wait_cycles_free += (timeStop - timeStart);
-        } else {
-            threadContention->mprotect_waits_free_large++;
-            threadContention->mprotect_wait_cycles_free_large += (timeStop - timeStart);
-        }
-    }
-
-//    do_whole_after();
+    AllocatingStatus::addToSystemCallData(MPROTECT, SystemCallData{1, timeStop - timeStart});
 
   return ret;
 }
@@ -439,11 +301,9 @@ int munmap(void *addr, size_t length) {
 
   if (!realInitialized) RealX::initializer();
 
-  if(!realing || !inRealMain){
+  if(AllocatingStatus::outsideTrackedAllocation()) {
       return RealX::munmap(addr, length);
   }
-
-//  do_whole_before();
 
   // It is extremely important that the call to cleanupPages() occurs BEFORE the call
   // to RealX::unmap(). If the orders were switched, it would then be possible for
@@ -455,31 +315,12 @@ int munmap(void *addr, size_t length) {
   }
     __atomic_sub_fetch(&mu.totalMemoryUsage, returned, __ATOMIC_RELAXED);
 
-//  do_real_before();
   uint64_t timeStart = rdtscp();
   int ret =  RealX::munmap(addr, length);
   uint64_t timeStop = rdtscp();
-//  do_real_after();
 
-  if(!inFree) {
-      if(now_size < large_object_threshold) {
-          threadContention->munmap_waits_alloc++;
-          threadContention->munmap_wait_cycles_alloc += (timeStop - timeStart);
-      } else {
-          threadContention->munmap_waits_alloc_large++;
-          threadContention->munmap_wait_cycles_alloc_large += (timeStop - timeStart);
-      }
-  } else {
-      if(now_size < large_object_threshold) {
-          threadContention->munmap_waits_free++;
-          threadContention->munmap_wait_cycles_free += (timeStop - timeStart);
-      } else {
-          threadContention->munmap_waits_free_large++;
-          threadContention->munmap_wait_cycles_free_large += (timeStop - timeStart);
-      }
-  }
+    AllocatingStatus::addToSystemCallData(MUNMAP, SystemCallData{1, timeStop - timeStart});
 
-//  do_whole_after();
 
   return ret;
 }
@@ -489,46 +330,20 @@ void *mremap(void *old_address, size_t old_size, size_t new_size,
     int flags, ... /*  void *new_address */) {
   if (!realInitialized) RealX::initializer();
 
-  if(!realing || !inRealMain){
-      va_list ap;
-      va_start(ap, flags);
-      void* new_address = va_arg(ap, void*);
-      va_end(ap);
-    return RealX::mremap(old_address, old_size, new_size, flags, new_address);
-  }
-
-//    do_whole_before();
-
     va_list ap;
     va_start(ap, flags);
     void* new_address = va_arg(ap, void*);
     va_end(ap);
 
-//    do_real_before();
+    if(AllocatingStatus::outsideTrackedAllocation()) {
+    return RealX::mremap(old_address, old_size, new_size, flags, new_address);
+  }
+
   uint64_t timeStart = rdtscp();
   void* ret =  RealX::mremap(old_address, old_size, new_size, flags, new_address);
   uint64_t timeStop = rdtscp();
-//    do_real_after();
 
-    if(!inFree) {
-        if(now_size < large_object_threshold) {
-            threadContention->mremap_waits_alloc++;
-            threadContention->mremap_wait_cycles_alloc += (timeStop - timeStart);
-        } else {
-            threadContention->mremap_waits_alloc_large++;
-            threadContention->mremap_wait_cycles_alloc_large += (timeStop - timeStart);
-        }
-    } else {
-        if(now_size < large_object_threshold) {
-            threadContention->mremap_waits_free++;
-            threadContention->mremap_wait_cycles_free += (timeStop - timeStart);
-        } else {
-            threadContention->mremap_waits_free_large++;
-            threadContention->mremap_wait_cycles_free_large += (timeStop - timeStart);
-        }
-    }
-
-//    do_whole_after();
+    AllocatingStatus::addToSystemCallData(MREMAP, SystemCallData{1, timeStop - timeStart});
 
   return ret;
 }

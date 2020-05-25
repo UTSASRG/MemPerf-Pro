@@ -44,7 +44,6 @@ bool inConstructor = false;
 char smaps_fileName[30];
 
 extern char * program_invocation_name;
-//float memEfficiency = 0;
 pid_t pid;
 
 
@@ -54,9 +53,6 @@ pid_t pid;
 //Array of class sizes
 int num_class_sizes;
 size_t* class_sizes;
-
-MemoryUsage mu;
-MemoryUsage max_mu;
 
 /// REQUIRED!
 thread_local thread_data thrData;
@@ -90,7 +86,6 @@ main_fn_t real_main_mallocprof;
 
 extern "C" {
 	// Function prototypes
-	size_t getTotalAllocSize(size_t sz);
 	void exitHandler();
 
 	// Function aliases
@@ -98,11 +93,9 @@ extern "C" {
 	void * calloc(size_t, size_t) __attribute__ ((weak, alias("yycalloc")));
 	void * malloc(size_t) __attribute__ ((weak, alias("yymalloc")));
 	void * realloc(void *, size_t) __attribute__ ((weak, alias("yyrealloc")));
-	void * valloc(size_t) __attribute__ ((weak, alias("yyvalloc")));
 	void * mmap(void *addr, size_t length, int prot, int flags,
                   int fd, off_t offset) __attribute__ ((weak, alias("yymmap")));
 	void * memalign(size_t, size_t) __attribute__ ((weak, alias("yymemalign")));
-	void * pvalloc(size_t) __attribute__ ((weak, alias("yypvalloc")));
 	int posix_memalign(void **, size_t, size_t) __attribute__ ((weak,
 				alias("yyposix_memalign")));
 }
@@ -194,13 +187,6 @@ extern "C" int libmallocprof_libc_start_main(main_fn_t main_fn, int argc,
 	return real_libc_start_main(libmallocprof_main, argc, argv, init, fini,
 			rtld_fini, stack_end);
 }
-
-void collectAllocMetaData(allocation_metadata *metadata);
-
-
-thread_local bool realing = false;
-extern void divideSmallAlloc(size_t sz, bool reused);
-
 
 
 // Memory management functions
@@ -717,190 +703,6 @@ void writeContention () {
 		}
         fprintf(ProgramStatus::outputFile, "\n");
 		//fflush(ProgramStatus::outputFile);
-}
-
-
-void incrementGlobalMemoryAllocation(size_t size) {
-  __atomic_add_fetch(&mu.realMemoryUsage, size, __ATOMIC_RELAXED);
-}
-
-void decrementGlobalMemoryAllocation(size_t size) {
-  __atomic_sub_fetch(&mu.realMemoryUsage, size, __ATOMIC_RELAXED);
-}
-
-void checkGlobalRealMemoryUsage() {
-    if(mu.realMemoryUsage > max_mu.realMemoryUsage) {
-        max_mu.realMemoryUsage = mu.realMemoryUsage;
-    }
-}
-
-
-void checkGlobalTotalMemoryUsage() {
-    if(max_mu.totalMemoryUsage >= 100*ONE_MEGABYTE) {
-        if (mu.totalMemoryUsage > max_mu.totalMemoryUsage + 10*ONE_MEGABYTE) {
-            max_mu.totalMemoryUsage = mu.totalMemoryUsage;
-            MemoryWaste::recordMemory(mu.realMemoryUsage, max_mu.totalMemoryUsage);
-        }
-    } else {
-        if (mu.totalMemoryUsage > max_mu.totalMemoryUsage + ONE_MEGABYTE) {
-            max_mu.totalMemoryUsage = mu.totalMemoryUsage;
-            MemoryWaste::recordMemory(mu.realMemoryUsage, max_mu.totalMemoryUsage);
-        }
-    }
-
-}
-
-void incrementMemoryUsage(size_t size, size_t classSize, size_t new_touched_bytes, void * object) {
-
-
-    if(classSize-size > PAGESIZE) {
-        classSize -= (classSize-size)/PAGESIZE*PAGESIZE;
-    }
-
-    threadContention->realMemoryUsage += size;
-    threadContention->realAllocatedMemoryUsage += classSize;
-    if(new_touched_bytes > 0) {
-        threadContention->totalMemoryUsage += new_touched_bytes;
-    }
-
-    if(threadContention->realMemoryUsage > threadContention->maxRealMemoryUsage) {
-        threadContention->maxRealMemoryUsage = threadContention->realMemoryUsage;
-    }
-    if(threadContention->realAllocatedMemoryUsage > threadContention->maxRealAllocatedMemoryUsage) {
-            threadContention->maxRealAllocatedMemoryUsage = threadContention->realAllocatedMemoryUsage;
-        }
-    if(threadContention->totalMemoryUsage > threadContention->maxTotalMemoryUsage) {
-        threadContention->maxTotalMemoryUsage = threadContention->totalMemoryUsage;
-    }
-
-
-    incrementGlobalMemoryAllocation(size);
-    if(new_touched_bytes > 0) {
-        __atomic_add_fetch(&mu.totalMemoryUsage, new_touched_bytes, __ATOMIC_RELAXED);
-    }
-    checkGlobalRealMemoryUsage();
-            checkGlobalTotalMemoryUsage();
-
-}
-
-void decrementMemoryUsage(size_t size, size_t classSize, void * addr) {
-
-  if(addr == NULL) return;
-
-
-
-    if(classSize-size > PAGESIZE) {
-        classSize -= (classSize-size)/PAGESIZE*PAGESIZE;
-    }
-
-    threadContention->realMemoryUsage -= size;
-    threadContention->realAllocatedMemoryUsage -= classSize;
-
-  decrementGlobalMemoryAllocation(size);
-
-}
-
-
-void collectAllocMetaData(allocation_metadata *metadata) {
-    if (__builtin_expect(!globalized, true)) {
-//        cycles_without_improve[thrData.tid] += metadata->cycles;
-        ///Jin
-        if (!metadata->reused) {
-
-            if(metadata->size < large_object_threshold) {
-
-                ///Freq
-//                freq_add(0, metadata->cycles);
-
-                localTAD.cycles_alloc += metadata->cycles;
-                localTAD.numAllocs++;
-                localTAD.numAllocationFaults += metadata->after.faults;
-                localTAD.numAllocationTlbReadMisses += metadata->after.tlb_read_misses;
-                localTAD.numAllocationTlbWriteMisses += metadata->after.tlb_write_misses;
-                localTAD.numAllocationCacheMisses += metadata->after.cache_misses;
-                localTAD.numAllocationInstrs += metadata->after.instructions;
-            } else {
-
-                ///Freq
-//                freq_add(3, metadata->cycles);
-
-                    localTAD.cycles_alloc_large += metadata->cycles;
-                    localTAD.numAllocs_large++;
-                    localTAD.numAllocationFaults_large += metadata->after.faults;
-                    localTAD.numAllocationTlbReadMisses_large += metadata->after.tlb_read_misses;
-                    localTAD.numAllocationTlbWriteMisses_large += metadata->after.tlb_write_misses;
-                    localTAD.numAllocationCacheMisses_large += metadata->after.cache_misses;
-                    localTAD.numAllocationInstrs_large += metadata->after.instructions;
-                }
-            } else {
-
-                if(metadata->size < large_object_threshold) {
-
-                    ///Freq
-//                    freq_add(1, metadata->cycles);
-
-                    localTAD.cycles_allocFFL += metadata->cycles;
-                    localTAD.numAllocsFFL++;
-                    localTAD.numAllocationFaultsFFL += metadata->after.faults;
-                    localTAD.numAllocationTlbReadMissesFFL += metadata->after.tlb_read_misses;
-                    localTAD.numAllocationTlbWriteMissesFFL += metadata->after.tlb_write_misses;
-                    localTAD.numAllocationCacheMissesFFL += metadata->after.cache_misses;
-                    localTAD.numAllocationInstrsFFL += metadata->after.instructions;
-                } else {
-
-                    ///Freq
-//                    freq_add(3, metadata->cycles);
-
-                    localTAD.cycles_alloc_large += metadata->cycles;
-                    localTAD.numAllocs_large++;
-                    localTAD.numAllocationFaults_large += metadata->after.faults;
-                    localTAD.numAllocationTlbReadMisses_large += metadata->after.tlb_read_misses;
-                    localTAD.numAllocationTlbWriteMisses_large += metadata->after.tlb_write_misses;
-                    localTAD.numAllocationCacheMisses_large += metadata->after.cache_misses;
-                    localTAD.numAllocationInstrs_large += metadata->after.instructions;
-                }
-            }
-        } else {
-            globalize_lck.lock();
-            if (!metadata->reused) {
-                if(metadata->size < large_object_threshold) {
-                    globalTAD.cycles_alloc += metadata->cycles;
-                    globalTAD.numAllocs++;
-                    globalTAD.numAllocationFaults += metadata->after.faults;
-                    globalTAD.numAllocationTlbReadMisses += metadata->after.tlb_read_misses;
-                    globalTAD.numAllocationTlbWriteMisses += metadata->after.tlb_write_misses;
-                    globalTAD.numAllocationCacheMisses += metadata->after.cache_misses;
-                    globalTAD.numAllocationInstrs += metadata->after.instructions;
-                } else {
-                    globalTAD.cycles_alloc_large += metadata->cycles;
-                    globalTAD.numAllocs_large++;
-                    globalTAD.numAllocationFaults_large += metadata->after.faults;
-                    globalTAD.numAllocationTlbReadMisses_large += metadata->after.tlb_read_misses;
-                    globalTAD.numAllocationTlbWriteMisses_large += metadata->after.tlb_write_misses;
-                    globalTAD.numAllocationCacheMisses_large += metadata->after.cache_misses;
-                    globalTAD.numAllocationInstrs_large += metadata->after.instructions;
-                }
-            } else {
-                if(metadata->size < large_object_threshold) {
-                    globalTAD.cycles_allocFFL += metadata->cycles;
-                    globalTAD.numAllocsFFL++;
-                    globalTAD.numAllocationFaultsFFL += metadata->after.faults;
-                    globalTAD.numAllocationTlbReadMissesFFL += metadata->after.tlb_read_misses;
-                    globalTAD.numAllocationTlbWriteMissesFFL += metadata->after.tlb_write_misses;
-                    globalTAD.numAllocationCacheMissesFFL += metadata->after.cache_misses;
-                    globalTAD.numAllocationInstrsFFL += metadata->after.instructions;
-                } else {
-                    globalTAD.cycles_alloc_large += metadata->cycles;
-                    globalTAD.numAllocs_large++;
-                    globalTAD.numAllocationFaults_large += metadata->after.faults;
-                    globalTAD.numAllocationTlbReadMisses_large += metadata->after.tlb_read_misses;
-                    globalTAD.numAllocationTlbWriteMisses_large += metadata->after.tlb_write_misses;
-                    globalTAD.numAllocationCacheMisses_large += metadata->after.cache_misses;
-                    globalTAD.numAllocationInstrs_large += metadata->after.instructions;
-                }
-            }
-            globalize_lck.unlock();
-        }
 }
 
 void updateGlobalFriendlinessData() {

@@ -15,15 +15,6 @@ typedef enum {
 } LockType;
 
 #define MEM_SYS_START LOCK_TYPE_TOTAL
-typedef enum {
-  MEM_SYSCALL_MMAP = MEM_SYS_START,
-  MEM_SYSCALL_SBRK, 
-  MEM_SYSCALL_MADVISE,
-  MEM_SYSCALL_MUNMAP,
-  MEM_SYSCALL_MREMAP,
-  MEM_SYSCALL_MPROTECT,
-  MEM_SYSCALL_TOTAL
-} MemSyscallType; 
 
 typedef struct {
   ulong calls[4] = {0, 0, 0, 0};
@@ -117,14 +108,6 @@ typedef struct {
 } __attribute__((__aligned__(CACHELINE_SIZE))) ThreadContention;
 
 typedef struct {
-  long realMemoryUsage = 0;
-	long realAllocatedMemoryUsage = 0;
-	long freedTotalBytes = 0;
-	long totalMemoryUsage = 0;
-	long maxTotalMemoryUsage = 0;
-} MemoryUsage;
-
-typedef struct {
 	unsigned szUsed;
 } ObjectTuple;
 
@@ -150,8 +133,6 @@ typedef struct {
 inline bool isAllocatorInCallStack();
 size_t getClassSizeFor(size_t size);
 int num_used_pages(uintptr_t vstart, uintptr_t vend);
-void incrementMemoryUsage(size_t size, size_t classSize, size_t new_touched_bytes, void * object);
-void decrementMemoryUsage(size_t size, size_t classSize, void * addr);
 void getAddressUsage(size_t size, uint64_t address, uint64_t cycles);
 
 void getMappingsUsage(size_t size, uint64_t address, size_t classSize);
