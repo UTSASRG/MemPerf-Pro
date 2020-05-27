@@ -71,6 +71,74 @@ private:
     static thread_local PerfReadInfo countingDataAfterRealFunction;
     static thread_local PerfReadInfo countingDataInRealFunction;
 
+    struct OverviewLockDataInAllocatingStatus {
+        unsigned int numOfLocks;
+        unsigned int numOfCalls;
+        unsigned int numOfCallsWithContentions;
+        uint64_t cycles;
+
+        void addANewLock() {
+            numOfLocks++;
+        }
+
+        void addAContention() {
+            numOfCallsWithContentions++;
+        }
+
+        void addCallAndCycles(unsigned int numOfCalls, uint64_t cycles) {
+            this->numOfCalls += numOfCalls;
+            this->cycles += cycles;
+        }
+    };
+
+    struct QueueOfDetailLockDataInAllocatingStatus {
+        struct DetailLockDataInAllocatingStatus {
+            void * addressOfHashLockData;
+            unsigned int numOfCalls;
+            unsigned int numOfCallsWithContentions;
+            uint64_t cycles;
+        } queue[1000];
+        int queueTail = -1;
+
+        void writingNewDataInTheQueue(void * addressOfHashLockData) {
+            queue[++queueTail].addressOfHashLockData = addressOfHashLockData;
+        }
+
+        void addAContention() {
+            queue[queueTail].numOfCallsWithContentions++;
+        }
+
+        void addCallAndCycles(unsigned int numOfCalls, uint64_t cycles) {
+            queue[queueTail].numOfCalls += numOfCalls;
+            queue[queueTail].cycles += cycles;
+        }
+    };
+
+    struct CriticalSectionStatus {
+        unsigned int numOfOwningLocks;
+        uint64_t cyclesBeforeCriticalSection;
+        uint64_t cyclesAfterCriticalSection;
+        unsigned int numOfCriticalSections;
+        uint64_t totalCyclesOfCriticalSections;
+
+        void checkAndStartRecordingACriticalSection() {
+            if(++numOfOwningLocks == 1) {
+                cyclesBeforeRealFunction = rdtscp();
+            }
+        }
+
+        void checkAndStopRecordingACriticalSection() {
+            if(--numOfOwningLocks == 0) {
+                cyclesAfterRealFunction = rdtscp();
+                numOfCriticalSections++;
+                totalCyclesOfCriticalSections += cyclesAfterCriticalSection - cyclesBeforeRealFunction;
+            }
+        }
+    };
+    static thread_local LockTypes nowRunningLockType;
+    static thread_local QueueOfDetailLockDataInAllocatingStatus queueOfDetailLockData;
+    static thread_local OverviewLockDataInAllocatingStatus overviewLockData[NUM_OF_LOCKTYPES];
+    static thread_local CriticalSectionStatus criticalSectionStatus;
     static thread_local SystemCallData systemCallData[NUM_OF_SYSTEMCALLTYPES];
 
     static void updateAllocatingTypeBeforeRealFunction(AllocationFunction allocationFunction, size_t objectSize);
@@ -82,7 +150,9 @@ private:
 
     static void updateMemoryStatusAfterAllocation();
     static void updateMemoryStatusBeforeFree();
-    static void addUpSystemCallsInfoToThreadLocalData();
+    static void addUpLockFunctionsInfoToThreadLocalData();
+    static void addUpSyscallsInfoToThreadLocalData();
+    static void addUpOtherFunctionsInfoToThreadLocalData();
     static void addUpCountingEventsToThreadLocalData();
 
     static void calculateCountingDataInRealFunction();
@@ -102,6 +172,13 @@ public:
     static void updateAllocatingInfoToThreadLocalData();
     static bool outsideTrackedAllocation();
     static void addToSystemCallData(SystemCallTypes systemCallTypes, SystemCallData newSystemCallData);
+
+    static void recordANewLock(LockTypes lockType);
+    static void initForWritingOneLockData(LockTypes lockType, void * addressOfHashLockData);
+    static void recordALockContention();
+    static void recordLockCallAndCycles(unsigned int numOfCalls, uint64_t cycles);
+    static void checkAndStartRecordingACriticalSection();
+    static void checkAndStopRecordingACriticalSection();
 
 };
 

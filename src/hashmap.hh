@@ -448,35 +448,6 @@ public:
 
   iterator end() { return iterator(NULL, 0, this); }
 
-  void printUtilization() {
-    size_t pos = 0;
-    struct HashBucket* head = NULL;
-    size_t numEntries = 0;
-    size_t bucketsUsed = 0;
-    size_t emptyBuckets = 0;
-    size_t firstBucket = 0;
-
-    while(pos < _bucketsTotal) {
-      head = getHashBucket(pos);
-      if(head->count == 0) {
-        emptyBuckets++;
-      } else {
-        if(firstBucket == 0) {
-          firstBucket = pos;
-        }
-        bucketsUsed++;
-        numEntries += head->count;
-      }
-      //fprintf(stderr, "map %p -> bucket %04zu -> count = %zu\n", this, pos, head->count);
-      //entry = (struct Entry*)head->getFirstEntry();
-      //return iterator(entry, pos, this);
-      pos++;
-    }
-
-    fprintf(stderr, "map %p -> bucketsUsed = %zu , firstBucket = %zu, emptyBuckets = %zu, total entries = %zu\n",
-          this, bucketsUsed, firstBucket, emptyBuckets, numEntries);
-  }
-
 };
 
 #endif

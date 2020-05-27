@@ -7,10 +7,9 @@
 #include "real.hh"
 #include "memwaste.h"
 #include "mymalloc.h"
-
+#include "threadlocalstatus.h"
 extern thread_local thread_data thrData;
 
-extern "C" void setThreadContention();
 extern "C" void printHashMap();
 
 thread_local extern uint64_t thread_stack_start;
@@ -48,29 +47,11 @@ class xthreadx {
 
 		myThreadID = pthread_self();
 
-    // set thread local storeage
-    setThreadContention();
-
+        ThreadLocalStatus::getRunningThreadIndex();
 
 		void * result = NULL;
 		size_t stackSize;
 		thread_t * current = (thread_t *) arg;
-
-		#ifdef THREAD_OUTPUT
-		pid_t pid = getpid();
-		char outputFile[MAX_FILENAME_LEN];
-
-		snprintf(outputFile, MAX_FILENAME_LEN, "%s_libmallocprof_%d_tid_%d.txt",
-						program_invocation_name, pid, tid);
-
-		// Presently set to overwrite file; change fopen flag to "a" for append.
-		ProgramStatus::outputFile = fopen(outputFile, "w");
-		if(ProgramStatus::outputFile == NULL) {
-				fprintf(stderr, "error: unable to open output file for writing hash map: %s\n", strerror(errno));
-				current->output = false;
-		}
-		#else
-		#endif
 
 		pthread_attr_t attrs;
 		if(pthread_getattr_np(pthread_self(), &attrs) != 0) {

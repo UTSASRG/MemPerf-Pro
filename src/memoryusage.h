@@ -45,6 +45,11 @@ public:
         __atomic_sub_fetch(&globalMemoryUsage.realMemoryUsage, size, __ATOMIC_RELAXED);
     }
 
+    static void subTotalSizeFromMemoryUsage(size_t size) {
+        threadLocalMemoryUsage.totalMemoryUsage -= size;
+        __atomic_sub_fetch(&globalMemoryUsage.totalMemoryUsage, size, __ATOMIC_RELAXED);
+    }
 
 };
+
 #endif //SRC_MEMORYUSAGE_H

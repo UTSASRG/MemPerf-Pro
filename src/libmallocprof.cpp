@@ -27,10 +27,8 @@
 #include "programstatus.h"
 #include "mymalloc.h"
 #include "allocatingstatus.h"
+#include "threadlocalstatus.h"
 
-//spinlock improve_lock;
-//Globals
-uint64_t total_cycles;
 bool bibop = false;
 bool bumpPointer = false;
 bool isLibc = false;
@@ -46,13 +44,6 @@ char smaps_fileName[30];
 extern char * program_invocation_name;
 pid_t pid;
 
-
-
-
-
-//Array of class sizes
-int num_class_sizes;
-size_t* class_sizes;
 
 /// REQUIRED!
 thread_local thread_data thrData;
@@ -78,7 +69,7 @@ spinlock globalize_lck;
 
 friendly_data globalFriendlyData;
 
-HashMap <uint64_t, PerLockData, spinlock, PrivateHeap> lockUsage;
+HashMap <void *, DetailLockData, spinlock, PrivateHeap> lockUsage;
 
 // pre-init private allocator memory
 typedef int (*main_fn_t)(int, char **, char **);
@@ -113,26 +104,15 @@ extern "C" {
 // Constructor
 __attribute__((constructor)) void initializer() {
     ProgramStatus::checkSystemIs64Bits();
-
     RealX::initializer();
     ShadowMemory::initialize();
     ProgramStatus::initIO();
-	setMainThreadContention();
+    ThreadLocalStatus::getRunningThreadIndex();
 
 	ProgramStatus::setProfilerInitializedTrue();
 }
 
 __attribute__((destructor)) void finalizer_mallocprof () {}
-
-void dumpHashmaps() {
-
-
-	fprintf(stderr, "lockUsage.printUtilization():\n");
-  lockUsage.printUtilization();
-
-	fprintf(stderr, "\n");
-}
-
 
 //extern void improve_cycles_stage_count();
 
@@ -428,9 +408,6 @@ uint64_t total_lock_calls;
 
 void writeThreadMaps () {
 ///Here
-    total_cycles = globalTAD.numOutsideCycles + globalTAD.cycles_alloc + globalTAD.cycles_allocFFL + globalTAD.cycles_free +
-            globalTAD.cycles_alloc_large + globalTAD.cycles_free_large;
-    fprintf (ProgramStatus::outputFile, "total cycles\t\t\t\t%20lu\n", total_cycles);
 
 	double numAllocs = safeDivisor(globalTAD.numAllocs);
 	double numAllocsFFL = safeDivisor(globalTAD.numAllocsFFL);
@@ -680,7 +657,7 @@ void writeContention () {
 
 		fprintf(ProgramStatus::outputFile, "\n>>>>>>>>>>>>>>>>>>>>>>>>> DETAILED LOCK USAGE <<<<<<<<<<<<<<<<<<<<<<<<<\n");
 		for(auto lock : lockUsage) {
-				PerLockData * data = lock.getValue();
+            DetailLockData * data = lock.getValue();
 				if(data->contendCalls*100/data->calls >= 2 || data->cycles/data->calls >= (double)total_lock_cycles / safeDivisor(total_lock_calls)) {
                     fprintf(ProgramStatus::outputFile, "lockAddr = %#lx\t\ttype = %s\t\tmax contention thread = %5d\t\t",
                             lock.getKey(), LockTypeToString(data->type), data->maxContendThreads);

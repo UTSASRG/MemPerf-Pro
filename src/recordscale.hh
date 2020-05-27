@@ -27,181 +27,54 @@ ThreadContention all_threadcontention_array[MAX_THREAD_NUMBER];
 extern thread_local thread_alloc_data localTAD;
 thread_local ThreadContention* threadContention;
 
+typedef enum {
+    MUTEX,
+    SPIN,
+    MUTEXTRY,
+    SPINTRY,
+    NUM_OF_LOCKTYPES
+} LockTypes;
 
+struct DetailLockData {
+    LockTypes     lockType;  // What is the lock type
+    unsigned int numOfCalls[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];        // How many invocations
+    unsigned int numOfCallsWithContentions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA]; // How many of them have the contention
+    unsigned int numOfContentingThreads;    // How many are waiting
+    unsigned int maxNumOfContentingThreads; // How many threads are contending on this lock
+    uint64_t cycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA]; // Total cycles
 
-typedef struct {
-  LockType     type;  // What is the lock type 
-  unsigned int calls;        // How many invocations
-  unsigned int contendCalls; // How many of them have the contention
-  int contendThreads;    // How many are waiting
-  int maxContendThreads; // How many threads are contending on this lock
-  unsigned long cycles; // Total cycles
-    unsigned long percalls[4] = {0, 0, 0, 0};
-    unsigned long percycles[4] = {0, 0, 0, 0};
-} PerLockData;
+    DetailLockData newDetailLockData(LockTypes lockType) {
+        return DetailLockData{lockType, {0}, {0}, 0, 0, 0};
+    }
 
-extern HashMap <uint64_t, PerLockData, spinlock, PrivateHeap> lockUsage;
-typedef int (*myLockType) (void *);
-typedef int (*myUnlockType) (void *);
+    bool aContentionHappening() {
+        return (++numOfContentingThreads >= 2);
+    }
 
-typedef struct {
-  int (*realLock)(void *); 
-} LockFuncs; 
+    void checkAndUpdateMaxNumOfContentingThreads() {
+        maxNumOfContentingThreads = MAX(numOfContentingThreads, maxNumOfContentingThreads);
+    }
 
-LockFuncs lockfuncs[LOCK_TYPE_TOTAL] = 
-  { (myLockType)RealX::pthread_mutex_lock,
-    (myLockType)RealX::pthread_spin_lock,
-    (myLockType)RealX::pthread_mutex_trylock,
-    (myLockType)RealX::pthread_spin_trylock };
+    void quitFromContenting() {
+        numOfContentingThreads--;
+    }
+};
 
-typedef struct {
-  int (*realUnlock)(void *); 
-} UnlockFuncs; 
+extern HashMap <uint64_t, LockData, spinlock, PrivateHeap> lockUsage;
 
-UnlockFuncs unlockfuncs [LOCK_TYPE_TOTAL] =
-  { (myUnlockType)RealX::pthread_mutex_unlock,
-    (myUnlockType)RealX::pthread_spin_unlock,
-    (myUnlockType)RealX::pthread_mutex_unlock,
-    (myUnlockType)RealX::pthread_spin_unlock };
+auto lockFunctions[NUM_OF_LOCKTYPES] = {
+        RealX::pthread_mutex_lock,
+        RealX::pthread_spin_lock,
+        RealX::pthread_mutex_trylock,
+        RealX::pthread_spin_trylock
+};
 
-
-extern "C" {
-
-void setThreadContention() {
-  int current_index = __atomic_add_fetch(&threadcontention_index, 1, __ATOMIC_RELAXED);
-  if(current_index >= MAX_THREAD_NUMBER) {
-    fprintf(stderr, "Please increase thread number: MAX_THREAD_NUMBER, %d\n", MAX_THREAD_NUMBER);
-    abort();
-  }
-  threadContention = &all_threadcontention_array[current_index];
-    threadContention->tid = current_index;
-    thrData.tid = current_index;
-
-//    cpu_set_t mask;
-//    CPU_ZERO(&mask);
-//    CPU_SET(thrData.tid%40, &mask);
-//    if(sched_setaffinity(0, sizeof(mask), &mask) < 0 ) {
-//        fprintf(stderr, "sched_setaffinity %d\n", thrData.tid);
-//    }
-}
-
-
-/* ************************Synchronization******************************** */
-// In the PTHREAD_LOCK_HANDLE, we will pretend the initialization
-#define PTHREAD_LOCK_HANDLE(LOCK_TYPE, LOCK) \
-  if(!mapsInitialized) { \
-    return 0; \
-  } \
-  if (!realing || !inRealMain) { \
-    return lockfuncs[LOCK_TYPE].realLock((void *)LOCK); \
-  } \
-  PerPrimitiveData *pmdata = &threadContention->pmdata[LOCK_TYPE]; \
-  PerLockData * thisLock = lockUsage.find((uint64_t)LOCK, sizeof(uint64_t)); \
-  if(thisLock == NULL)  { \
-    PerLockData  newLock; \
-    memset(&newLock, 0, sizeof(PerLockData)); \
-    newLock.type = LOCK_TYPE;  \
-    thisLock = lockUsage.insert((uint64_t)LOCK, sizeof(uint64_t), newLock); \
-    localTAD.lock_nums[LOCK_TYPE]++; \
-  } \
-  int contendThreads = ++(thisLock->contendThreads); \
-  if(contendThreads > 1) { \
-    thisLock->contendCalls ++; \
-  } \
-  if(contendThreads > thisLock->maxContendThreads){ \
-    thisLock->maxContendThreads = contendThreads; \
-  }\
-  uint64_t timeStart = rdtscp();\
-  int result = lockfuncs[LOCK_TYPE].realLock((void *)LOCK); \
-  uint64_t timeStop = rdtscp(); \
-  uint64_t timediff = 0; \
-  if(timeStop > timeStart) { \
-    timediff = timeStop - timeStart; \
-} \
-    if(!inFree) {\
-if(now_size < large_object_threshold) {\
-pmdata->calls[0]++; \
-pmdata->cycles[0] += (timeStop - timeStart); \
-  thisLock->percalls[0]++;  \
-  thisLock->percycles[0] += (timeStop - timeStart); \
-} else { \
-pmdata->calls[1]++; \
-pmdata->cycles[1] += (timeStop - timeStart); \
-  thisLock->percalls[1]++;  \
-  thisLock->percycles[1] += (timeStop - timeStart); \
-} \
-} else { \
-if(now_size < large_object_threshold) { \
-pmdata->calls[2]++; \
-pmdata->cycles[2] += (timeStop - timeStart); \
-  thisLock->percalls[2]++;  \
-  thisLock->percycles[2] += (timeStop - timeStart); \
-} else { \
-pmdata->calls[3]++; \
-pmdata->cycles[3] += (timeStop - timeStart); \
-  thisLock->percalls[3]++;  \
-  thisLock->percycles[3] += (timeStop - timeStart); \
-} \
-} \
-  thisLock->calls++;  \
-  thisLock->cycles += (timeStop - timeStart); \
-  if(threadContention->lock_counter == 0) { \
-    threadContention->critical_section_start = timeStop; \
-  } \
-  threadContention->lock_counter++; \
-  return result;
-
-int pthread_mutex_lock(pthread_mutex_t *mutex) {
-    PTHREAD_LOCK_HANDLE(LOCK_TYPE_MUTEX, mutex);
-}
-// PTHREAD_SPIN_LOCK
-int pthread_spin_lock(pthread_spinlock_t *lock) {
-    PTHREAD_LOCK_HANDLE(LOCK_TYPE_SPINLOCK, lock);
-}
-
-// PTHREAD_SPIN_TRYLOCK
-int pthread_spin_trylock(pthread_spinlock_t *lock) {
-    PTHREAD_LOCK_HANDLE(LOCK_TYPE_SPIN_TRYLOCK, lock);
-}
-
-// PTHREAD_MUTEX_TRYLOCK
-int pthread_mutex_trylock(pthread_mutex_t *mutex) {
-    PTHREAD_LOCK_HANDLE(LOCK_TYPE_TRYLOCK, mutex);
-}
-
-#define PTHREAD_UNLOCK_HANDLE(LOCK_TYPE, lock) \
-  if(!mapsInitialized) { \
-    return 0; \
-  } \
-  if (realing && inRealMain) { \
-    PerLockData * thisLock = lockUsage.find((uint64_t)lock, sizeof(uint64_t)); \
-    thisLock->contendThreads--; \
-    threadContention->lock_counter--; \
-    if(threadContention->lock_counter == 0) { \
-      uint64_t duration = rdtscp() - threadContention->critical_section_start; \
-      threadContention->critical_section_duration += duration; \
-      threadContention->critical_section_counter++; \
-    } \
-    int result = unlockfuncs[LOCK_TYPE].realUnlock((void *)lock); \
-    return result; \
-  } \
-  int result = unlockfuncs[LOCK_TYPE].realUnlock((void *)lock); \
-  return result;
-
-// PTHREAD_MUTEX_UNLOCK
-int pthread_mutex_unlock(pthread_mutex_t *mutex) {
-
-  PTHREAD_UNLOCK_HANDLE(LOCK_TYPE_MUTEX, mutex);
-}
-
-int pthread_spin_unlock(pthread_spinlock_t *lock) {
-  PTHREAD_UNLOCK_HANDLE(LOCK_TYPE_SPINLOCK, lock);
-}
-
-/* ************************Synchronization End******************************** */
-
-/* ************************Systemn Calls******************************** */
-
+auto unlockFunctions [NUM_OF_LOCKTYPES] = {
+        RealX::pthread_mutex_unlock,
+        RealX::pthread_spin_unlock,
+        RealX::pthread_mutex_unlock,
+        RealX::pthread_spin_unlock
+};
 
 typedef enum {
     MMAP,
@@ -222,6 +95,77 @@ struct SystemCallData {
         this->cycles += newSystemCallData.cycles;
     }
 };
+
+
+extern "C" {
+
+/* ************************Synchronization******************************** */
+#define PTHREAD_LOCK_HANDLE(LOCKTYPE, LOCK) \
+  if (AllocatingStatus::outsideTrackedAllocation()) { \
+    return lockfuncs[LOCK_TYPE].realLock((void *)LOCK); \
+  } \
+  \
+  DetailLockData * detailLockData = lockUsage.find((void *)LOCK, sizeof(void *)); \
+  if(detailLockData == nullptr)  { \
+    detailLockData = lockUsage.insert((uint64_t)LOCK, sizeof(uint64_t), DetailLockData.newDetailLockData(LOCKTYPE)); \
+    AllocatingStatus::recordANewLock(LOCKTYPE); \
+  } \
+  \
+  AllocatingStatus::initForWritingOneLockData(LOCKTYPE, detailLockData); \
+  if(detailLockData.aContentionHappening()) { \
+    detailLockData.checkAndUpdateMaxNumOfContentingThreads(); \
+    AllocatingStatus::recordALockContention(); \
+  } \
+  \
+  uint64_t timeStart = rdtscp();\
+  int result = lockfuncs[LOCK_TYPE].realLock((void *)LOCK); \
+  uint64_t timeStop = rdtscp(); \
+  \
+  AllocatingStatus::recordLockCallAndCycles(1, timeStop-timeStart); \
+  AllocatingStatus::checkAndStartRecordingACriticalSection(); \
+  return result;
+
+
+int pthread_mutex_lock(pthread_mutex_t *mutex) {
+    PTHREAD_LOCK_HANDLE(LOCK_TYPE_MUTEX, mutex);
+}
+
+int pthread_spin_lock(pthread_spinlock_t *lock) {
+    PTHREAD_LOCK_HANDLE(LOCK_TYPE_SPINLOCK, lock);
+}
+
+int pthread_spin_trylock(pthread_spinlock_t *lock) {
+    PTHREAD_LOCK_HANDLE(LOCK_TYPE_SPIN_TRYLOCK, lock);
+}
+
+int pthread_mutex_trylock(pthread_mutex_t *mutex) {
+    PTHREAD_LOCK_HANDLE(LOCK_TYPE_TRYLOCK, mutex);
+}
+
+
+#define PTHREAD_UNLOCK_HANDLE(LOCK_TYPE, lock) \
+    if(AllocatingStatus::outsideTrackedAllocation()) { \
+        return unlockfuncs[LOCK_TYPE].realUnlock((void *)lock);
+    } \
+    DetailLockData * detailLockData = lockUsage.find((void *)lock, sizeof(void *)); \
+    detailLockData.quitFromContenting(); \
+    AllocatingStatus::checkAndStopRecordingACriticalSection(); \
+    int result = unlockfuncs[LOCK_TYPE].realUnlock((void *)lock); \
+    return result;
+
+// PTHREAD_MUTEX_UNLOCK
+int pthread_mutex_unlock(pthread_mutex_t *mutex) {
+  PTHREAD_UNLOCK_HANDLE(LOCK_TYPE_MUTEX, mutex);
+}
+
+int pthread_spin_unlock(pthread_spinlock_t *lock) {
+  PTHREAD_UNLOCK_HANDLE(LOCK_TYPE_SPINLOCK, lock);
+}
+
+/* ************************Synchronization End******************************** */
+
+/* ************************Systemn Calls******************************** */
+
 
 // MMAP
 void * yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset) {
@@ -247,11 +191,8 @@ int madvise(void *addr, size_t length, int advice){
     }
 
     if (advice == MADV_DONTNEED) {
-        uint returned = PAGESIZE * ShadowMemory::cleanupPages((uintptr_t)addr, length);
-        if(threadContention->totalMemoryUsage > returned) {
-            threadContention->totalMemoryUsage -= returned;
-        }
-        __atomic_sub_fetch(&mu.totalMemoryUsage, returned, __ATOMIC_RELAXED);
+        uint cleanedPageSize = ShadowMemory::cleanupPages((uintptr_t)addr, length);
+        MemoryUsage::subTotalSizeFromMemoryUsage(cleanedPageSize);
     }
 
     uint64_t timeStart = rdtscp();
@@ -305,15 +246,8 @@ int munmap(void *addr, size_t length) {
       return RealX::munmap(addr, length);
   }
 
-  // It is extremely important that the call to cleanupPages() occurs BEFORE the call
-  // to RealX::unmap(). If the orders were switched, it would then be possible for
-  // another thread to reallocate the unmapped region *while* the current thread is
-  // still performing the cleanupPages() call, thus clearing the other thread's pages.
-  ulong returned = PAGESIZE * ShadowMemory::cleanupPages((intptr_t)addr, length);
-  if(threadContention->totalMemoryUsage > returned) {
-      threadContention->totalMemoryUsage -= returned;
-  }
-    __atomic_sub_fetch(&mu.totalMemoryUsage, returned, __ATOMIC_RELAXED);
+  size_t cleanedPageSize = ShadowMemory::cleanupPages((intptr_t)addr, length);
+    MemoryUsage::subTotalSizeFromMemoryUsage(cleanedPageSize);
 
   uint64_t timeStart = rdtscp();
   int ret =  RealX::munmap(addr, length);
@@ -326,8 +260,8 @@ int munmap(void *addr, size_t length) {
 }
 
 
-void *mremap(void *old_address, size_t old_size, size_t new_size,
-    int flags, ... /*  void *new_address */) {
+void *mremap(void *old_address, size_t old_size, size_t new_size, int flags, ... /*  void *new_address */) {
+
   if (!realInitialized) RealX::initializer();
 
     va_list ap;
@@ -349,8 +283,6 @@ void *mremap(void *old_address, size_t old_size, size_t new_size,
 }
 
 
-extern uint64_t total_cycles;
-long totalMem;
 
 /* ************************Systemn Calls End******************************** */
 };

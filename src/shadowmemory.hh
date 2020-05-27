@@ -136,7 +136,7 @@ class ShadowMemory {
 				static void doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType);
 				static bool initialize();
 				static inline PageMapEntry ** getMegaMapEntry(unsigned long mega_index);
-				static unsigned cleanupPages(uintptr_t uintaddr, size_t length);
+				static size_t cleanupPages(uintptr_t uintaddr, size_t length);
 				static CacheMapEntry * doCacheMapBumpPointer();
 				static PageMapEntry * doPageMapBumpPointer();
 				static PageMapEntry * getPageMapEntry(unsigned long mega_idx, unsigned page_idx);

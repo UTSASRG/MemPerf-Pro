@@ -140,9 +140,24 @@ void AllocatingStatus::setAllocationTypeForOutputData() {
     }
 }
 
+
+
+
+void AllocatingStatus::addUpSyscallsInfoToThreadLocalData() {
+    for(int syscallType = 0; syscallType < NUM_OF_SYSTEMCALLTYPES; ++syscallType) {
+        ThreadLocalStatus::systemCallData[syscallType][allocationTypeForOutputData].add(systemCallData[syscallType]);
+    }
+}
+
+void AllocatingStatus::addUpOtherFunctionsInfoToThreadLocalData() {
+    addUpLockFunctionsInfoToThreadLocalData();
+    addUpSyscallsInfoToThreadLocalData;
+}
+
+
 void AllocatingStatus::updateAllocatingInfoToThreadLocalData() {
     setAllocationTypeForOutputData();
-    addUpSystemCallsInfoToThreadLocalData();
+    addUpOtherFunctionsInfoToThreadLocalData();
     addUpCountingEventsToThreadLocalData();
 }
 
@@ -162,4 +177,31 @@ bool AllocatingStatus::outsideTrackedAllocation() {
 
 void AllocatingStatus::addToSystemCallData(SystemCallTypes systemCallTypes, SystemCallData newSystemCallData) {
     systemCallData[systemCallTypes].add(newSystemCallData);
+}
+
+void AllocatingStatus::recordANewLock(LockTypes lockType) {
+    overviewLockData[lockType].addANewLock();
+}
+
+void AllocatingStatus::initForWritingOneLockData(LockTypes lockType, void * addressOfHashLockData) {
+    nowRunningLockType = lockType;
+    queueOfDetailLockData.writingNewDataInTheQueue(addressOfHashLockData);
+}
+
+void AllocatingStatus::recordALockContention() {
+    overviewLockData[nowRunningLockType].numOfCallsWithContentions++;
+    queueOfDetailLockData.addAContention();
+}
+
+void AllocatingStatus::recordLockCallAndCycles(unsigned int numOfCalls, uint64_t cycles) {
+    overviewLockData[nowRunningLockType].addCallAndCycles(numOfCalls, cycles);
+    queueOfDetailLockData.addCallAndCycles(numOfCalls, cycles);
+}
+
+void AllocatingStatus::checkAndStartRecordingACriticalSection() {
+    criticalSectionStatus.checkAndStartRecordingACriticalSection();
+}
+
+void AllocatingStatus::checkAndStopRecordingACriticalSection() {
+    criticalSectionStatus.checkAndStopRecordingACriticalSection();
 }

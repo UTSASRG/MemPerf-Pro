@@ -157,7 +157,7 @@ unsigned ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_index,
 		return numNewPagesTouched;
 }
 
-unsigned ShadowMemory::cleanupPages(uintptr_t uintaddr, size_t length) {
+size_t ShadowMemory::cleanupPages(uintptr_t uintaddr, size_t length) {
 		unsigned numTouchedPages = 0;
 
 		// First compute the megabyte number of the given address.
@@ -185,7 +185,7 @@ unsigned ShadowMemory::cleanupPages(uintptr_t uintaddr, size_t length) {
 				current->clear();
 		}
 
-		return numTouchedPages;
+		return PAGESIZE * numTouchedPages;
 }
 
 void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType) {
@@ -361,13 +361,12 @@ PageMapEntry ** ShadowMemory::getMegaMapEntry(unsigned long mega_index) {
 		PageMapEntry ** mega_entry = mega_map_begin + mega_index;
 
 		if(__builtin_expect(__atomic_load_n(mega_entry, __ATOMIC_RELAXED) == NULL, 0)) {
-				// Create a new page entries
-//				RealX::pthread_spin_lock(&mega_map_lock);
+
             mega_map_lock.lock();
 				if(__builtin_expect(__atomic_load_n(mega_entry, __ATOMIC_RELAXED) == NULL, 1)) {
 						__atomic_store_n(mega_entry, doPageMapBumpPointer(), __ATOMIC_RELAXED);
 				}
-//				RealX::pthread_spin_unlock(&mega_map_lock);
+
             mega_map_lock.unlock();
 		}
 

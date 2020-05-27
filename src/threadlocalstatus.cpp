@@ -3,3 +3,9 @@
 //
 
 #include "threadlocalstatus.h"
+
+void ThreadLocalStatus::getRunningThreadIndex() {
+    lock.lock();
+    runningThreadIndex = totalNumOfRunningThread++;
+    lock.unlock();
+}
