@@ -42,6 +42,9 @@ private:
 
     static void setSelfMapInitializedTrue();
 
+    static void printStackAddr();
+    static void printLargeObjectThreshold();
+
 public:
 
     static FILE * outputFile;
@@ -55,7 +58,7 @@ public:
     static void checkSystemIs64Bits();
 
     static void initIO();
-    static void printStackAddr();
+    static void printOutput();
 
     static bool selfMapInitializedIsTrue();
 

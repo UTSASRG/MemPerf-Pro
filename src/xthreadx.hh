@@ -8,12 +8,7 @@
 #include "memwaste.h"
 #include "mymalloc.h"
 #include "threadlocalstatus.h"
-extern thread_local thread_data thrData;
 
-extern "C" void printHashMap();
-
-thread_local extern uint64_t thread_stack_start;
-thread_local extern uint64_t myThreadID;
 thread_local extern perf_info perfInfo;
 
 
@@ -34,7 +29,6 @@ class xthreadx {
 		children->startArg = arg;
 		children->startRoutine = fn;
 
-		//total_cycles_start = rdtscp();
 		int result = RealX::pthread_create(tid, attr, xthreadx::startThread, (void *)children);
 		if(result) {
 			fprintf(stderr, "error: pthread_create failed: %s\n", strerror(errno));
@@ -45,9 +39,7 @@ class xthreadx {
 
 	static void * startThread(void * arg) {
 
-		myThreadID = pthread_self();
-
-        ThreadLocalStatus::getRunningThreadIndex();
+        ThreadLocalStatus::getARunningThreadIndex();
 
 		void * result = NULL;
 		size_t stackSize;
@@ -58,10 +50,6 @@ class xthreadx {
 			fprintf(stderr, "error: unable to get thread attributes: %s\n", strerror(errno));
 			abort();
 		}
-//		if(pthread_attr_getstack(&attrs, (void **)&thrData.stackEnd, &stackSize) != 0) {
-//			fprintf(stderr, "error: unable to get stack values: %s\n", strerror(errno));
-//			abort();
-//		}
 
 		#ifndef NO_PMU
 		initPMU();
@@ -74,18 +62,14 @@ class xthreadx {
 	}
 
 
-  static void threadExit() {
-      //countEventsOutside(true);
-      //improve_cycles_stage_count(-1);
+  static void threadExit()
     #ifndef NO_PMU
     stopSampling();
-    //doPerfCounterRead();
     stopCounting();
     #endif
 
-    // Replicate this thread's application friendliness data before it exits.
     updateGlobalFriendlinessData();
 
-    globalizeTAD();
+    GlobalStatus::globalize();
 	}
 };

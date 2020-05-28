@@ -8,6 +8,7 @@
 #include "test/alloc.cpp"
 #include "memwaste.h"
 #include "spinlock.hh"
+#include "threadlocalstatus.h"
 
 PageMapEntry ** ShadowMemory::mega_map_begin = nullptr;
 PageMapEntry * ShadowMemory::page_map_begin = nullptr;
@@ -16,29 +17,20 @@ PageMapEntry * ShadowMemory::page_map_bump_ptr = nullptr;
 CacheMapEntry * ShadowMemory::cache_map_begin = nullptr;
 CacheMapEntry * ShadowMemory::cache_map_end = nullptr;
 CacheMapEntry * ShadowMemory::cache_map_bump_ptr = nullptr;
-//pthread_spinlock_t ShadowMemory::cache_map_lock;
-//pthread_spinlock_t ShadowMemory::mega_map_lock;
 spinlock ShadowMemory::cache_map_lock;
 spinlock ShadowMemory::mega_map_lock;
 
-eMapInitStatus ShadowMemory::isInitialized = E_MAP_INIT_NOT;
-
 bool ShadowMemory::initialize() {
-	if(isInitialized != E_MAP_INIT_NOT) {
+	if(isInitialized) {
 			return false;
 	}
-	isInitialized = E_MAP_INIT_WORKING; 
-
-//	pthread_spin_init(&cache_map_lock, PTHREAD_PROCESS_PRIVATE);
-//	pthread_spin_init(&mega_map_lock, PTHREAD_PROCESS_PRIVATE);
-cache_map_lock.init();
-mega_map_lock.init();
+    cache_map_lock.init();
+    mega_map_lock.init();
 
 	// Allocate 1MB-to-4KB mapping region
 	if((void *)(mega_map_begin = (PageMapEntry **)mmap((void *)MEGABYTE_MAP_START, MEGABYTE_MAP_SIZE,
 									PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0)) == MAP_FAILED) {
 			fprintf(stderr, "mmap of global megabyte map failed. Adddress %lx error %s\n", MEGABYTE_MAP_START, strerror(errno));
-//			abort();			// temporary, remove and replace with return false after testing
 	}
 
 	// Allocate 4KB-to-cacheline region
@@ -56,15 +48,11 @@ mega_map_lock.init();
 	if((void *)(cache_map_begin = (CacheMapEntry *)mmap((void *)CACHE_MAP_START, CACHE_MAP_SIZE,
 									PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0)) == MAP_FAILED) {
 			perror("mmap of cache map region failed");
-//			abort();			// temporary, remove and replace with return false after testing
 	}
 	cache_map_end = cache_map_begin + MAX_CACHE_MAP_ENTRIES;
 	cache_map_bump_ptr = cache_map_begin;
 
-	isInitialized = E_MAP_INIT_DONE; 
-
-	//fprintf(stderr, "mega_map_begin = %p, page_map_begin = %p, cache_map_begin = %p\n",
-	//		mega_map_begin, page_map_begin, cache_map_begin);
+	isInitialized = true;
 
 	return true;
 }
@@ -190,97 +178,39 @@ size_t ShadowMemory::cleanupPages(uintptr_t uintaddr, size_t length) {
 
 void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType) {
 
-		// Only used for debug output (see end of function below)
-		const char * strAccessType;
-		switch(accessType) {
-				case E_MEM_NONE:
-						strAccessType = "none";
-						break;
-				case E_MEM_LOAD:
-						strAccessType = "load";
-						break;
-				case E_MEM_STORE:
-						strAccessType = "store";
-						break;
-				case E_MEM_PFETCH:
-						strAccessType = "prefetch";
-						break;
-				case E_MEM_EXEC:
-						strAccessType = "exec";
-						break;
-				case E_MEM_UNKNOWN:
-						strAccessType = "unknown";
-						break;
-				default:
-						strAccessType = "no_match";
-		}
-
 		PageMapEntry * pme;
 		CacheMapEntry * cme;
-		// We bypass checking and incrementing the MegaMap's bump pointer by not
-		// calling the usual fetch functions (e.g., getMegaMapEntry, getPageMapEntry, etc.).
-		// Thus, whenever the mega map entry is null/empty, we will simply give up
-		// here (instead of creating one).
+
 		map_tuple tuple = ShadowMemory::getMapTupleByAddress(uintaddr);
 		PageMapEntry ** mega_entry = mega_map_begin + tuple.mega_index;
 		if(__atomic_load_n(mega_entry, __ATOMIC_RELAXED) == NULL) {
 				return;
 		}
-		// Calculate the PageMap entry based on the page index.
 		pme = (*mega_entry + tuple.page_index);
-		// If the page has not been touched before then we will leave.
+
 		if(!pme->isTouched()) {
 				return;
 		}
-		// Fetch the PageMapEntry's cache map entry pointer; if it is non-null, we will
-		// add the appropriate cache index offset to it next.
-		// The "false" boolean constant in the call to getCacheMapEntry(false) controls
-		// whether the value of the CacheMap bump pointer is updated and returned
-		// (rather than NULL) if there is no CacheMap entry for this address; we do not
-		// wish to affect the bump pointer in this case, so this parameter should always
-		// be set to false.
+
     if((cme = pme->getCacheMapEntry(false)) == NULL) {
             return;
         }
     cme += tuple.cache_index;
 
-    unsigned int curPageUsage = pme->getUsedBytes();
-    unsigned int curCacheUsage = cme->getUsedBytes();
-
-    friendly_data * usageData = &thrData.friendlyData;
-
-		usageData->numAccesses++;
-		usageData->numCacheBytes += curCacheUsage;
-		usageData->numPageBytes += curPageUsage;
-
-//		bool isCacheOwnerConflict = false;
+    ThreadLocalStatus::friendlinessStatus.recordANewSampling(pme->getUsedBytes(), cme->getUsedBytes());
 		if(accessType == E_MEM_STORE) {
 				usageData->numCacheWrites++;
-				if(cme->last_write != thrData.tid && cme->last_write != -1) {
-				    if(cme->status == 0) {
-                        usageData->numObjectFS++;
-                        if(cme->objfs == false) {
-                            usageData->numObjectFSCacheLine++;
-                            cme->objfs = true;
-                        }
-				    } else if(cme->status == 1) {
-                        usageData->numActiveFS++;
-                        if(cme->actfs == false) {
-                            usageData->numActiveFSCacheLine++;
-                            cme->actfs = true;
-                        }
-				    } else {
-                        usageData->numPassiveFS++;
-                        if(cme->pasfs == false) {
-                            usageData->numPassiveFSCacheLine++;
-                            cme->pasfs = true;
-                        }
+				if(cme->last_write != ThreadLocalStatus::runningThreadIndex && cme->last_write != -1) {
+				    ThreadLocalStatus::friendlinessStatus.numOfSampledFalseSharingInstructions[cme->falseSharingStatus]++;
+				    if(cme->falseSharingLineRecorded[cme->falseSharingStatus] == false) {
+				        ThreadLocalStatus::friendlinessStatus.numOfSampledCacheLines[cme->falseSharingStatus]++;
+                        cme->falseSharingLineRecorded[cme->falseSharingStatus] = true;
 				    }
 				}
-            cme->last_write = thrData.tid;
+            cme->lastWriterThreadIndex = ThreadLocalStatus::runningThreadIndex;
         }
 		if(cme->sampled == false) {
-            usageData->cachelines++;
+            ThreadLocalStatus::friendlinessStatus.numOfSampledCacheLines++;
             cme->sampled = true;
         }
 
@@ -436,102 +366,85 @@ bool PageMapEntry::updateCacheLines(uintptr_t uintaddr, unsigned long mega_index
 						curCacheLineBytes = size_remain;
 				}
 				if(isFree) {
-						current->subUsedBytes(curCacheLineBytes);
+                    current->subUsedBytes(curCacheLineBytes);
+                    if(current->falseSharingStatus != PASSIVE) {
+                        if(current->getUsedBytes() <= 0) {
+                            current->lastAllocatingThreadIndex = -1;
+                            current->lastWriterThreadIndex = -1;
+                            current->justFreedButRemainedSomeData = false;
+                            current->falseSharingStatus = OBJECT;
+                        } else {
+                            current->lastAllocatingThreadIndex = ThreadLocalStatus::runningThreadIndex;
+                        }
+                    }
 				} else {
-						current->addUsedBytes(curCacheLineBytes);
-				}
-				size_remain -= curCacheLineBytes;
-				//current->setOwner(thrData.tid);
-				curCacheLineIdx++;
-
-				if(current->status != 2) {
-				    if(!isFree) {
-                        if(current->last_allocate != thrData.tid && current->last_allocate != -1) {
-//                            if(current->status == 0) {
-//                                current->status = 1;
-//                            } else if(current->freed) {
-//                                current->status = 2;
-//                            }
-                            if(current->freed) {
-                                current->status = 2;
+                    current->addUsedBytes(curCacheLineBytes);
+                    if(current->falseSharingStatus != PASSIVE) {
+                        if(current->lastAllocatingThreadIndex != ThreadLocalStatus::runningThreadIndex && current->lastAllocatingThreadIndex != -1) {
+                            if(current->justFreedButRemainedSomeData) {
+                                current->falseSharingStatus = PASSIVE;
                             } else {
-                                current->status = 1;
+                                current->falseSharingStatus = ACTIVE;
                             }
                         }
-                        current->last_allocate = thrData.tid;
-                        current->remain_size += curCacheLineBytes;
-                        current->freed = false;
-                    } else {
-				        current->remain_size -= curCacheLineBytes;
-				        if(current->remain_size <= 0) {
-				            current->last_allocate = -1;
-				            current->remain_size = 0;
-				        } else {
-				            current->freed = true;
-				        }
+                        current->lastAllocatingThreadIndex = ThreadLocalStatus::runningThreadIndex;
+                        current->justFreedButRemainedSomeData = false;
 				    }
 				}
 
-				if(current->getUsedBytes() == 0) {
-                    current->status = 0;
-                    current->last_write = -1;
-				}
-
-		}
-		while(size_remain > 0) {
-				current = getCacheMapEntry(mega_index, page_index, curCacheLineIdx);
-
-				if(size_remain >= CACHELINE_SIZE) {
-						curCacheLineBytes = CACHELINE_SIZE;
-				} else {
-						curCacheLineBytes = size_remain;
-				}
-
-				if(isFree) {
-						current->subUsedBytes(curCacheLineBytes);
-				} else {
-						current->addUsedBytes(curCacheLineBytes);
-				}
-
 				size_remain -= curCacheLineBytes;
 				curCacheLineIdx++;
 
-				if(size_remain < 0) {
-                    if(current->status != 2) {
-                        if(!isFree) {
-                            if(current->last_allocate != thrData.tid && current->last_allocate != -1) {
-//                                if(current->status == 0) {
-//                                    current->status = 1;
-//                                } else if(current->freed) {
-//                                    current->status = 2;
-//                                }
-                                if(current->freed) {
-                                    current->status = 2;
-                                } else {
-                                    current->status = 1;
-                                }
-                            }
-                            current->last_allocate = thrData.tid;
-                            current->remain_size += curCacheLineBytes;
-                            current->freed = false;
-                        } else {
-                            current->remain_size -= curCacheLineBytes;
-                            if(current->remain_size <= 0) {
-                                current->last_allocate = -1;
-                                current->remain_size = 0;
+		}
+		while(size_remain > 0) {
+            current = getCacheMapEntry(mega_index, page_index, curCacheLineIdx);
+
+            if (size_remain >= CACHELINE_SIZE) {
+                curCacheLineBytes = CACHELINE_SIZE;
+            } else {
+                curCacheLineBytes = size_remain;
+            }
+
+            if (isFree) {
+                current->subUsedBytes(curCacheLineBytes);
+            } else {
+                current->addUsedBytes(curCacheLineBytes);
+            }
+
+            size_remain -= curCacheLineBytes;
+            curCacheLineIdx++;
+
+            if (size_remain <= 0) {
+                if (current->status != 2) {
+                    if (current->falseSharingStatus != PASSIVE) {
+                        if (isFree) {
+                            if (current->getUsedBytes() <= 0) {
+                                current->lastAllocatingThreadIndex = -1;
+                                current->lastWriterThreadIndex = -1;
+                                current->justFreedButRemainedSomeData = false;
+                                current->falseSharingStatus = OBJECT;
                             } else {
-                                current->freed = true;
+                                current->lastAllocatingThreadIndex = ThreadLocalStatus::runningThreadIndex;
+                            }
+                        } else {
+                            if (current->falseSharingStatus != PASSIVE) {
+                                if (current->lastAllocatingThreadIndex != ThreadLocalStatus::runningThreadIndex &&
+                                    current->lastAllocatingThreadIndex != -1) {
+                                    if (current->justFreedButRemainedSomeData) {
+                                        current->falseSharingStatus = PASSIVE;
+                                    } else {
+                                        current->falseSharingStatus = ACTIVE;
+                                    }
+                                }
+                                current->lastAllocatingThreadIndex = ThreadLocalStatus::runningThreadIndex;
+                                current->justFreedButRemainedSomeData = false;
                             }
                         }
                     }
-				}
 
-            if(current->getUsedBytes() == 0) {
-                current->status = 0;
-                current->last_write = -1;
+                }
             }
-		}
-
+        }
 		return true;
 }
 

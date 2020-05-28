@@ -21,7 +21,6 @@ long perf_event_open(struct perf_event_attr *hw_event, pid_t pid, int cpu, int g
 
 //pthread_spinlock_t _perf_spin_lock;
 spinlock _perf_spin_lock;
-extern thread_local thread_data thrData;
 thread_local perf_info perfInfo;
 thread_local bool isCountingInit = false;
 thread_local bool isSamplingInit = false;
@@ -29,8 +28,6 @@ int sample_type = PERF_SAMPLE_IP | PERF_SAMPLE_TIME | PERF_SAMPLE_TID |
 									PERF_SAMPLE_ADDR | PERF_SAMPLE_DATA_SRC;
 
 int read_format = PERF_FORMAT_GROUP;
-
-extern thread_local bool realing, inAllocation;
 
 struct read_format {
 	uint64_t nr;
@@ -85,26 +82,6 @@ void getPerfCounts (PerfReadInfo * i) {
     memcpy(i, &(buffer.values), sizeof(buffer.values));
 
 }
-
-//void getCacheMissesOutside (CacheMissesOutsideInfo * i) {
-//#ifdef NO_PMU
-//    #warning NO_PMU flag set -> sampling will be disabled
-//    return;
-//#endif
-//
-//    if (!isCountingInit) {
-//        return;
-//    }
-//
-//    struct read_cache_misses_outside_format buffer;
-//
-//    if (read(perfInfo.perf_fd_cache_miss_outside, &buffer, sizeof(struct read_cache_misses_outside_format)) == -1) {
-//        perror("perf read failed");
-//    }
-//
-//    memcpy(i, &(buffer.values), sizeof(buffer.values));
-//
-//}
 
 void setupCounting(void) {
 	#ifdef NO_PMU
@@ -192,22 +169,11 @@ void setupCounting(void) {
     pe_instr.type = PERF_TYPE_HARDWARE;
 	pe_instr.config = PERF_COUNT_HW_INSTRUCTIONS;
 
-//    struct perf_event_attr pe_cache_miss_outside;
-//    memcpy(&pe_cache_miss_outside, &pe_cache_miss, sizeof(struct perf_event_attr));
-
-	// *** WARNING ***
-	// DO NOT change the order of the following create_perf_event system calls!
-	// Doing so will change the order of their values when read from the group
-	// leader's FD, which occurs elsewhere, and will thus be incorrect unless
-	// similarly reordered.
-	// *** *** *** ***
 	perfInfo.perf_fd_fault = create_perf_event(&pe_fault, -1);
 	perfInfo.perf_fd_tlb_reads = create_perf_event(&pe_tlb_reads, perfInfo.perf_fd_fault);
 	perfInfo.perf_fd_tlb_writes = create_perf_event(&pe_tlb_writes, perfInfo.perf_fd_fault);
 	perfInfo.perf_fd_cache_miss = create_perf_event(&pe_cache_miss, perfInfo.perf_fd_fault);
 	perfInfo.perf_fd_instr = create_perf_event(&pe_instr, perfInfo.perf_fd_fault);
-
-    //perfInfo.perf_fd_cache_miss_outside = create_perf_event(&pe_cache_miss_outside, -1);
 
 }
 
@@ -520,19 +486,10 @@ long long perf_mmap_read() {
 		// Sample data
 		if(event->type == PERF_RECORD_SAMPLE) {
 			if(sample_type & PERF_SAMPLE_IP) {
-				//memcpy(&ip, &use_data_buf[offset], sizeof(uint64_t));
-				//ip = *(uint64_t *)(use_data_buf + offset);
 				offset += sizeof(uint64_t);
 			}
 
 			if(sample_type & PERF_SAMPLE_TID) {
-				/*
-				uint32_t pid, tid;
-				pid = *(uint32_t *)(use_data_buf + offset);
-				tid = *(uint32_t *)(use_data_buf + offset + sizeof(uint32_t));
-				//memcpy(&pid, &use_data_buf[offset], sizeof(uint32_t));
-				//memcpy(&tid, &use_data_buf[(offset + sizeof(uint32_t))], sizeof(uint32_t));
-				*/
 				offset += 2 * sizeof(uint32_t);
 			}
 
@@ -546,8 +503,6 @@ long long perf_mmap_read() {
 			}
 
 			if(sample_type & PERF_SAMPLE_DATA_SRC) {
-        //uint64_t src;
-        //memcpy(&src, &use_data_buf[offset], sizeof(uint64_t));
 				uint64_t src = *(uint64_t *)(use_data_buf + offset);
         offset += sizeof(uint64_t);
 

@@ -30,11 +30,8 @@
 //#include "wrappers/stlallocator.h"
 
 using namespace std;
-
-extern bool isLibc;
 extern char *allocator_name;
-//extern thread_local thread_data thrData;
-extern bool opening_maps_file;
+bool opening_maps_file = false;
 
 struct regioninfo {
   void* start;
@@ -192,7 +189,7 @@ class selfmap {
 					if((libTextStart <= mallocSymbol) && (mallocSymbol <= libTextEnd)) {
 						_allocTextStart = (void *)libTextStart;
 						_allocTextEnd = (void *)libTextEnd;
-						isLibc = (strcasestr(_allocLibrary.c_str(), LIBC_LIBRARY_NAME) != NULL);
+						bool isLibc = (strcasestr(_allocLibrary.c_str(), LIBC_LIBRARY_NAME) != NULL);
 						strcpy (allocator_name, _allocLibrary.c_str());
 					}
 				}

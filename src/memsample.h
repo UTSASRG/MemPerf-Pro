@@ -43,32 +43,20 @@ typedef struct {
     long numAccesses;
 } Tuple;
 
-typedef struct {
-    unsigned long numAccesses;
-    unsigned long numCacheWrites;
-    //unsigned long numCacheOwnerConflicts;
-    unsigned long numCacheBytes;
-    unsigned long numPageBytes;
-    unsigned long numObjectFS;
-    unsigned long numActiveFS;
-    unsigned long numPassiveFS;
-    long numObjectFSCacheLine;
-    long numActiveFSCacheLine;
-    long numPassiveFSCacheLine;
-    unsigned long cachelines;
-} friendly_data;
-
-typedef struct {
-	pid_t tid = 0;
-	friendly_data friendlyData;
-} thread_data;
-
 struct PerfReadInfo{
   uint64_t faults = 0;
   uint64_t tlb_read_misses = 0;
   uint64_t tlb_write_misses = 0;
   uint64_t cache_misses = 0;
   uint64_t instructions = 0;
+
+  void add(struct PerfReadInfo newPerfReadInfo) {
+      faults += newPerfReadInfo.faults;
+      tlb_read_misses += newPerfReadInfo.tlb_read_misses;
+      tlb_write_misses += newPerfReadInfo.tlb_write_misses;
+      cache_misses += newPerfReadInfo.cache_misses;
+      instructions += newPerfReadInfo.instructions;
+  }
 };
 
 //typedef struct {
@@ -105,85 +93,11 @@ typedef struct {
 	pid_t tid;
 } perf_info;
 
-typedef struct {            //struct for holding data about allocations
-
-		ulong numAllocs;
-		ulong numAllocsFFL;
-		ulong numFrees;
-
-    uint64_t numAllocationFaults;
-    uint64_t numDeallocationFaults;
-
-    uint64_t numAllocationTlbReadMisses;
-    uint64_t numAllocationTlbWriteMisses;
-
-    uint64_t numDeallocationTlbReadMisses;
-    uint64_t numDeallocationTlbWriteMisses;
-
-    uint64_t numAllocationCacheMisses;
-    uint64_t numDeallocationCacheMisses;
-
-    uint64_t numAllocationInstrs;
-    uint64_t numDeallocationInstrs;
-
-    uint64_t numAllocationFaultsFFL;
-
-    uint64_t numAllocationTlbReadMissesFFL;
-    uint64_t numAllocationTlbWriteMissesFFL;
-
-    uint64_t numAllocationCacheMissesFFL;
-    uint64_t numAllocationInstrsFFL;
-
-		uint threads;
-		//size_t blowup_bytes;
-
-//		uint num_sbrk;
-//		uint num_madvise;
-//		uint malloc_mmaps;
-
-		//uint size_sbrk;
-		//uint blowup_allocations;
-
-		uint64_t cycles_alloc;
-		uint64_t cycles_allocFFL;
-		uint64_t cycles_free;
-
-		uint64_t numOutsideCacheMisses;
-    uint64_t numOutsideFaults;
-    uint64_t numOutsideTlbReadMisses;
-    uint64_t numOutsideTlbWriteMisses;
-    uint64_t numOutsideCycles;
-
-    ulong numAllocs_large;
-    ulong numFrees_large;
-
-    uint64_t numAllocationFaults_large;
-    uint64_t numDeallocationFaults_large;
-
-    uint64_t numAllocationTlbReadMisses_large;
-    uint64_t numAllocationTlbWriteMisses_large;
-
-    uint64_t numDeallocationTlbReadMisses_large;
-    uint64_t numDeallocationTlbWriteMisses_large;
-
-    uint64_t numAllocationCacheMisses_large;
-    uint64_t numDeallocationCacheMisses_large;
-
-    uint64_t numAllocationInstrs_large;
-    uint64_t numDeallocationInstrs_large;
-
-    uint64_t cycles_alloc_large;
-    uint64_t cycles_free_large;
-
-		uint lock_nums[4];
-
-} __attribute__((__aligned__(CACHELINE_SIZE))) thread_alloc_data;
-
 int initPMU(void);
 void setupCounting(void);
 void setupSampling(void);
 void stopSampling(void);
 void stopCounting(void);
-//void doPerfCounterRead(void);
 void doSampleRead();
+void getPerfCounts(PerfReadInfo*);
 #endif

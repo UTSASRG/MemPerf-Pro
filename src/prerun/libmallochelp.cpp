@@ -34,7 +34,6 @@ bool bibop = false;
 bool bump_point = false;
 bool inGetClassSizes = false;
 bool libInitialized;
-bool mapsInitialized = false;
 bool realInitialized = false;
 pid_t pid;
 short nextFreeClassIndex = 0;
@@ -47,10 +46,8 @@ unsigned total_mmaps = 0;
 char* allocator_name;
 FILE* outputFile;
 
-//Unused
-//__thread thread_data thrData;
+
 bool opening_maps_file;
-//bool isLibc;
 
 //Debugging flags DEBUG
 const bool d_mmap = false;

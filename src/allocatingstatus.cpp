@@ -140,8 +140,49 @@ void AllocatingStatus::setAllocationTypeForOutputData() {
     }
 }
 
+void AllocatingStatus::addUpOverviewLockDataToThreadLocalData() {
+    for(int lockType = 0; lockType < NUM_OF_LOCKTYPES; ++lockType) {
+        ThreadLocalStatus::overviewLockData[lockType].numOfLocks += overviewLockData[lockType].numOfLocks;
+        ThreadLocalStatus::overviewLockData[lockType].numOfCalls[AllocationTypeForOutputData] += overviewLockData[lockType].numOfCalls;
+        ThreadLocalStatus::overviewLockData[lockType].numOfCallsWithContentions[AllocationTypeForOutputData] += overviewLockData[lockType].numOfCallsWithContentions;
+        ThreadLocalStatus::overviewLockData[lockType].totalCycles[AllocationTypeForOutputData] += overviewLockData[lockType].cycles;
+    }
+}
 
+void AllocatingStatus::addUpDetailLockDataToHashTable() {
+    queueOfDetailLockData.writingIntoHashTable();
+}
 
+void AllocatingStatus::addUpCriticalSectionDataToThreadLocalData() {
+    ThreadLocalStatus::criticalSectionStatus[AllocationTypeForOutputData].numOfCriticalSections += criticalSectionStatus.numOfCriticalSections;
+    ThreadLocalStatus::criticalSectionStatus[AllocationTypeForOutputData].totalCyclesOfCriticalSections += criticalSectionStatus.totalCyclesOfCriticalSections;
+}
+
+void AllocatingStatus::addUpLockFunctionsInfoToThreadLocalData() {
+    addUpOverviewLockDataToThreadLocalData();
+    addUpDetailLockDataToHashTable();
+    addUpCriticalSectionDataToThreadLocalData();
+}
+
+void AllocatingStatus::cleanOverviewLockDataInAllocatingStatus() {
+    for(int lockType = 0; lockType < NUM_OF_LOCKTYPES; ++lockType) {
+        overviewLockData[lockType].cleanUp();
+    }
+}
+
+void AllocatingStatus::cleanDetailLockDataInAllocatingStatus() {
+    queueOfDetailLockData.cleanUpQueue();
+}
+
+void AllocatingStatus::cleanCriticalSectionDataInAllocatingStatus() {
+    criticalSectionStatus.cleanUp();
+}
+
+void AllocatingStatus::cleanLockFunctionsInfoInAllocatingStatus() {
+    cleanOverviewLockDataInAllocatingStatus();
+    cleanDetailLockDataInAllocatingStatus();
+    cleanCriticalSectionDataInAllocatingStatus();
+}
 
 void AllocatingStatus::addUpSyscallsInfoToThreadLocalData() {
     for(int syscallType = 0; syscallType < NUM_OF_SYSTEMCALLTYPES; ++syscallType) {
@@ -151,6 +192,7 @@ void AllocatingStatus::addUpSyscallsInfoToThreadLocalData() {
 
 void AllocatingStatus::addUpOtherFunctionsInfoToThreadLocalData() {
     addUpLockFunctionsInfoToThreadLocalData();
+    cleanLockFunctionsInfoInAllocatingStatus();
     addUpSyscallsInfoToThreadLocalData;
 }
 
@@ -164,11 +206,7 @@ void AllocatingStatus::updateAllocatingInfoToThreadLocalData() {
 void AllocatingStatus::addUpCountingEventsToThreadLocalData() {
     ThreadLocalStatus::numOfFunctions[allocationTypeForOutputData]++;
     ThreadLocalStatus::cycles[allocationTypeForOutputData] += cyclesInRealFunction;
-    ThreadLocalStatus::countingEvents[allocationTypeForOutputData].faults += countingDataInRealFunction.faults;
-    ThreadLocalStatus::countingEvents[allocationTypeForOutputData].instructions += countingDataInRealFunction.instructions;
-    ThreadLocalStatus::countingEvents[allocationTypeForOutputData].cache_misses += countingDataInRealFunction.cache_misses;
-    ThreadLocalStatus::countingEvents[allocationTypeForOutputData].tlb_read_misses += countingDataInRealFunction.tlb_read_misses;
-    ThreadLocalStatus::countingEvents[allocationTypeForOutputData].tlb_write_misses += countingDataInRealFunction.tlb_write_misses;
+    ThreadLocalStatus::countingEvents[allocationTypeForOutputData].add(countingDataInRealFunction);
 }
 
 bool AllocatingStatus::outsideTrackedAllocation() {

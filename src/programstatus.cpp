@@ -127,6 +127,7 @@ void ProgramStatus::openInputInfoFile() {
 }
 
 void ProgramStatus::openOutputFile() {
+    extern char * program_invocation_name;
 //	snprintf(ProgramStatus::outputInfoFileName, MAX_FILENAME_LEN, "%s_libmallocprof_%d_main_thread.txt",
 //			program_invocation_name, getpid());
     snprintf(ProgramStatus::outputFileName, MAX_FILENAME_LEN, "/home/jinzhou/parsec/records_t/%s_libmallocprof_%d_main_thread.txt",
@@ -149,6 +150,15 @@ void ProgramStatus::printStackAddr() {
     extern void * __libc_stack_end;
     fprintf(outputFile, ">>> stack start @ %p, stack end @ %p\n", (char *)__builtin_frame_address(0), (char *)__libc_stack_end);
     fprintf(outputFile, ">>> program break @ %p\n", RealX::sbrk(0));
+}
+
+void ProgramStatus::printLargeObjectThreshold() {
+    fprintf(outputFile, ">>> large_object_threshold\t%20zu\n", largeObjectThreshold);
+}
+
+void ProgramStatus::printOutput() {
+    printStackAddr();
+    printLargeObjectThreshold();
 }
 
 bool ProgramStatus::isALargeObject(size_t size) {

@@ -50,6 +50,14 @@ public:
         __atomic_sub_fetch(&globalMemoryUsage.totalMemoryUsage, size, __ATOMIC_RELAXED);
     }
 
+    static void printOutput() {
+        GlobalStatus::printTitle("MEMORY USAGE")
+        fprintf(ProgramStatus::outputFile, "thread local max real memory usage %20lu\n", maxThreadLocalMemoryUsage.realMemoryUsage);
+        fprintf(ProgramStatus::outputFile, "thread local max total memory usage %20lu\n", maxThreadLocalMemoryUsage.totalMemoryUsage);
+        fprintf(ProgramStatus::outputFile, "global max real memory usage %20lu\n", maxGlobalMemoryUsage.realMemoryUsage);
+        fprintf(ProgramStatus::outputFile, "global local max real memory usage %20lu\n", maxGlobalMemoryUsage.realMemoryUsage);
+    }
+
 };
 
 #endif //SRC_MEMORYUSAGE_H

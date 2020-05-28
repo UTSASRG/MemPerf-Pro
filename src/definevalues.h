@@ -8,8 +8,7 @@
 #define CACHELINE_SIZE 64
 #define PAGESIZE 4096
 #define SAMPLING_PERIOD 10000
-///#define MMAP_PAGES 33	// must be in the form of 2^N + 1
-#define MMAP_PAGES 129
+#define MMAP_PAGES 129 // must be in the form of 2^N + 1
 #define DATA_MMAP_PAGES (MMAP_PAGES - 1)
 #define MAPSIZE (MMAP_PAGES * getpagesize())
 #define DATA_MAPSIZE (DATA_MMAP_PAGES * getpagesize())
@@ -17,8 +16,6 @@
 #define SHADOW_MEM_SIZE (16 * ONE_GB)
 #define WORD_SIZE (sizeof(void *))
 
-//#define LOAD_ACCESS 0x1cd
-//#define STORE_ACCESS 0x2cd
 #define LOAD_ACCESS 0x81d0
 #define STORE_ACCESS 0x82d0
 #define LAST_USER_ADDR 0x7fffffffffff
@@ -53,5 +50,6 @@
 #define MY_METADATA_SIZE 4
 
 #define ABNORMAL_VALUE_FOR_COUNTING_EVENTS 100000000l
+#define MAX_OBJ_NUM 4096*16*64
 
 #endif //MMPROF_DEFINEVALUES_H

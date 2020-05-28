@@ -89,14 +89,27 @@ private:
             this->numOfCalls += numOfCalls;
             this->cycles += cycles;
         }
+
+        void cleanUp() {
+            numOfLocks = 0;
+            numOfCalls = 0;
+            numOfCallsWithContentions = 0;
+            cycles = 0;
+        }
     };
 
     struct QueueOfDetailLockDataInAllocatingStatus {
         struct DetailLockDataInAllocatingStatus {
-            void * addressOfHashLockData;
+            DetailLockData * addressOfHashLockData;
             unsigned int numOfCalls;
             unsigned int numOfCallsWithContentions;
             uint64_t cycles;
+
+            void writingIntoAddress() {
+                addressOfHashLockData->numOfCalls[allocationTypeForOutputData] += numOfCalls;
+                addressOfHashLockData->numOfCallsWithContentions[allocationTypeForOutputData] += numOfCallsWithContentions;
+                addressOfHashLockData->cycles[allocationTypeForOutputData] += cycles;
+            }
         } queue[1000];
         int queueTail = -1;
 
@@ -112,9 +125,19 @@ private:
             queue[queueTail].numOfCalls += numOfCalls;
             queue[queueTail].cycles += cycles;
         }
+
+        void cleanUpQueue() {
+            queueTail = -1;
+        }
+
+        void writingIntoHashTable() {
+            for(int index = 0; index <= queueTail; ++index) {
+                queue[index].writingIntoAddress();
+            }
+        }
     };
 
-    struct CriticalSectionStatus {
+    struct CriticalSectionStatusInAllocatingStatus {
         unsigned int numOfOwningLocks;
         uint64_t cyclesBeforeCriticalSection;
         uint64_t cyclesAfterCriticalSection;
@@ -134,11 +157,16 @@ private:
                 totalCyclesOfCriticalSections += cyclesAfterCriticalSection - cyclesBeforeRealFunction;
             }
         }
+
+        void cleanUp() {
+            numOfCriticalSections = 0;
+            totalCyclesOfCriticalSections = 0;
+        }
     };
     static thread_local LockTypes nowRunningLockType;
     static thread_local QueueOfDetailLockDataInAllocatingStatus queueOfDetailLockData;
     static thread_local OverviewLockDataInAllocatingStatus overviewLockData[NUM_OF_LOCKTYPES];
-    static thread_local CriticalSectionStatus criticalSectionStatus;
+    static thread_local CriticalSectionStatusInAllocatingStatus criticalSectionStatus;
     static thread_local SystemCallData systemCallData[NUM_OF_SYSTEMCALLTYPES];
 
     static void updateAllocatingTypeBeforeRealFunction(AllocationFunction allocationFunction, size_t objectSize);
@@ -150,6 +178,9 @@ private:
 
     static void updateMemoryStatusAfterAllocation();
     static void updateMemoryStatusBeforeFree();
+    static void addUpOverviewLockDataToThreadLocalData();
+    static void addUpDetailLockDataToHashTable();
+    static void addUpCriticalSectionDataToThreadLocalData();
     static void addUpLockFunctionsInfoToThreadLocalData();
     static void addUpSyscallsInfoToThreadLocalData();
     static void addUpOtherFunctionsInfoToThreadLocalData();
@@ -161,6 +192,10 @@ private:
 
     static void setAllocationTypeForOutputData();
 
+    static void cleanOverviewLockDataInAllocatingStatus();
+    static void cleanDetailLockDataInAllocatingStatus();
+    static void cleanCriticalSectionDataInAllocatingStatus();
+    static void cleanLockFunctionsInfoInAllocatingStatus();
 
 public:
     static void updateAllocatingStatusBeforeRealFunction(AllocationFunction allocationFunction, size_t objectSize);

@@ -5,7 +5,7 @@
 #define DEFINE_WRAPPER(name) decltype(::name) * name;
 #define INIT_WRAPPER(name, handle) name = (decltype(::name)*)dlsym(handle, #name);
 
-extern bool realInitialized;
+bool realInitialized = false;
 
 namespace RealX {
     DEFINE_WRAPPER(sbrk);

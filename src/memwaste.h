@@ -14,7 +14,6 @@
 #include "programstatus.h"
 #include "memoryusage.h"
 
-#define MAX_OBJ_NUM 4096*16*64
 
 class MemoryWaste{
 private:
@@ -107,7 +106,7 @@ private:
         }
 
         void globalize() {
-            for (int threadIndex = 0; threadIndex <= threadcontention_index; ++threadIndex) {
+            for (int threadIndex = 0; threadIndex < ThreadLocalStatus::totalNumOfRunningThread; ++threadIndex) {
                 for (int classSizeIndex = 0; classSizeIndex < ProgramStatus::numberOfClassSizes; ++classSizeIndex) {
                     internalFragment[classSizeIndex] += recordStatus.internalFragment[MemoryWasteStatus::arrayIndex(threadIndex, classSizeIndex)];
 

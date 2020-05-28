@@ -22,10 +22,6 @@
 #include "allocatingstatus.h"
 
 #define MAX_THREAD_NUMBER 1024
-int threadcontention_index;
-ThreadContention all_threadcontention_array[MAX_THREAD_NUMBER];
-extern thread_local thread_alloc_data localTAD;
-thread_local ThreadContention* threadContention;
 
 typedef enum {
     MUTEX,
@@ -39,8 +35,8 @@ struct DetailLockData {
     LockTypes     lockType;  // What is the lock type
     unsigned int numOfCalls[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];        // How many invocations
     unsigned int numOfCallsWithContentions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA]; // How many of them have the contention
-    unsigned int numOfContentingThreads;    // How many are waiting
-    unsigned int maxNumOfContentingThreads; // How many threads are contending on this lock
+    unsigned int numOfContendingThreads;    // How many are waiting
+    unsigned int maxNumOfContendingThreads; // How many threads are contending on this lock
     uint64_t cycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA]; // Total cycles
 
     DetailLockData newDetailLockData(LockTypes lockType) {
@@ -48,15 +44,19 @@ struct DetailLockData {
     }
 
     bool aContentionHappening() {
-        return (++numOfContentingThreads >= 2);
+        return (++numOfContendingThreads >= 2);
     }
 
-    void checkAndUpdateMaxNumOfContentingThreads() {
-        maxNumOfContentingThreads = MAX(numOfContentingThreads, maxNumOfContentingThreads);
+    void checkAndUpdateMaxNumOfContendingThreads() {
+        maxNumOfContendingThreads = MAX(numOfContendingThreads, maxNumOfContendingThreads);
     }
 
-    void quitFromContenting() {
-        numOfContentingThreads--;
+    void quitFromContending() {
+        numOfContendingThreads--;
+    }
+
+    bool isAnImportantLock() {
+        return maxNumOfContendingThreads >= 10;
     }
 };
 
@@ -113,7 +113,7 @@ extern "C" {
   \
   AllocatingStatus::initForWritingOneLockData(LOCKTYPE, detailLockData); \
   if(detailLockData.aContentionHappening()) { \
-    detailLockData.checkAndUpdateMaxNumOfContentingThreads(); \
+    detailLockData.checkAndUpdateMaxNumOfContendingThreads(); \
     AllocatingStatus::recordALockContention(); \
   } \
   \
@@ -148,7 +148,7 @@ int pthread_mutex_trylock(pthread_mutex_t *mutex) {
         return unlockfuncs[LOCK_TYPE].realUnlock((void *)lock);
     } \
     DetailLockData * detailLockData = lockUsage.find((void *)lock, sizeof(void *)); \
-    detailLockData.quitFromContenting(); \
+    detailLockData.quitFromContending(); \
     AllocatingStatus::checkAndStopRecordingACriticalSection(); \
     int result = unlockfuncs[LOCK_TYPE].realUnlock((void *)lock); \
     return result;
@@ -262,256 +262,22 @@ int munmap(void *addr, size_t length) {
 
 void *mremap(void *old_address, size_t old_size, size_t new_size, int flags, ... /*  void *new_address */) {
 
-  if (!realInitialized) RealX::initializer();
+    if (!realInitialized) RealX::initializer();
 
     va_list ap;
     va_start(ap, flags);
-    void* new_address = va_arg(ap, void*);
+    void *new_address = va_arg(ap, void * );
     va_end(ap);
 
-    if(AllocatingStatus::outsideTrackedAllocation()) {
-    return RealX::mremap(old_address, old_size, new_size, flags, new_address);
-  }
+    if (AllocatingStatus::outsideTrackedAllocation()) {
+        return RealX::mremap(old_address, old_size, new_size, flags, new_address);
+    }
 
-  uint64_t timeStart = rdtscp();
-  void* ret =  RealX::mremap(old_address, old_size, new_size, flags, new_address);
-  uint64_t timeStop = rdtscp();
+    uint64_t timeStart = rdtscp();
+    void *ret = RealX::mremap(old_address, old_size, new_size, flags, new_address);
+    uint64_t timeStop = rdtscp();
 
     AllocatingStatus::addToSystemCallData(MREMAP, SystemCallData{1, timeStop - timeStart});
 
-  return ret;
+    return ret;
 }
-
-
-
-/* ************************Systemn Calls End******************************** */
-};
-void writeThreadContention() {
-    fprintf(stderr, "writing\n");
-    fprintf (ProgramStatus::outputFile, "\n>>>>>>>>>>>>>>>>>>>>>>>>>> THREAD CONTENTIONS <<<<<<<<<<<<<<<<<<<<<<<<<<\n");
-
-    long maxRealMemoryUsage = 0;
-    long maxRealAllocatedMemoryUsage = 0;
-    long maxTotalMemoryUsage = 0;
-
-    ThreadContention globalizedThreadContention;
-
-    for(int i = 0; i <= threadcontention_index; i++) {
-        ThreadContention* data = &all_threadcontention_array[i];
-
-//        globalizedThreadContention.tid += data->tid;
-
-        globalizedThreadContention.mmap_waits_alloc += data->mmap_waits_alloc;
-        globalizedThreadContention.mmap_waits_alloc_large += data->mmap_waits_alloc_large;
-        globalizedThreadContention.mmap_waits_free += data->mmap_waits_free;
-        globalizedThreadContention.mmap_waits_free_large += data->mmap_waits_free_large;
-
-        globalizedThreadContention.mmap_wait_cycles_alloc += data->mmap_wait_cycles_alloc;
-        globalizedThreadContention.mmap_wait_cycles_alloc_large += data->mmap_wait_cycles_alloc_large;
-        globalizedThreadContention.mmap_wait_cycles_free += data->mmap_wait_cycles_free;
-        globalizedThreadContention.mmap_wait_cycles_free_large += data->mmap_wait_cycles_free_large;
-
-        globalizedThreadContention.sbrk_waits_alloc += data->sbrk_waits_alloc;
-        globalizedThreadContention.sbrk_waits_alloc_large += data->sbrk_waits_alloc_large;
-        globalizedThreadContention.sbrk_waits_free += data->sbrk_waits_free;
-        globalizedThreadContention.sbrk_waits_free_large += data->sbrk_waits_free_large;
-
-        globalizedThreadContention.sbrk_wait_cycles_alloc += data->sbrk_wait_cycles_alloc;
-        globalizedThreadContention.sbrk_wait_cycles_alloc_large += data->sbrk_wait_cycles_alloc_large;
-        globalizedThreadContention.sbrk_wait_cycles_free += data->sbrk_wait_cycles_free;
-        globalizedThreadContention.sbrk_wait_cycles_free_large += data->sbrk_wait_cycles_free_large;
-
-        globalizedThreadContention.madvise_waits_alloc += data->madvise_waits_alloc;
-        globalizedThreadContention.madvise_waits_alloc_large += data->madvise_waits_alloc_large;
-        globalizedThreadContention.madvise_waits_free += data->madvise_waits_free;
-        globalizedThreadContention.madvise_waits_free_large += data->madvise_waits_free_large;
-
-        globalizedThreadContention.madvise_wait_cycles_alloc += data->madvise_wait_cycles_alloc;
-        globalizedThreadContention.madvise_wait_cycles_alloc_large += data->madvise_wait_cycles_alloc_large;
-        globalizedThreadContention.madvise_wait_cycles_free += data->madvise_wait_cycles_free;
-        globalizedThreadContention.madvise_wait_cycles_free_large += data->madvise_wait_cycles_free_large;
-
-        globalizedThreadContention.munmap_waits_alloc += data->munmap_waits_alloc;
-        globalizedThreadContention.munmap_waits_alloc_large += data->munmap_waits_alloc_large;
-        globalizedThreadContention.munmap_waits_free += data->munmap_waits_free;
-        globalizedThreadContention.munmap_waits_free_large += data->munmap_waits_free_large;
-
-        globalizedThreadContention.munmap_wait_cycles_alloc += data->munmap_wait_cycles_alloc;
-        globalizedThreadContention.munmap_wait_cycles_alloc_large += data->munmap_wait_cycles_alloc_large;
-        globalizedThreadContention.munmap_wait_cycles_free += data->munmap_wait_cycles_free;
-        globalizedThreadContention.munmap_wait_cycles_free_large += data->munmap_wait_cycles_free_large;
-
-        globalizedThreadContention.mremap_waits_alloc += data->mremap_waits_alloc;
-        globalizedThreadContention.mremap_waits_alloc_large += data->mremap_waits_alloc_large;
-        globalizedThreadContention.mremap_waits_free += data->mremap_waits_free;
-        globalizedThreadContention.mremap_waits_free_large += data->mremap_waits_free_large;
-
-        globalizedThreadContention.mremap_wait_cycles_alloc += data->mremap_wait_cycles_alloc;
-        globalizedThreadContention.mremap_wait_cycles_alloc_large += data->mremap_wait_cycles_alloc_large;
-        globalizedThreadContention.mremap_wait_cycles_free += data->mremap_wait_cycles_free;
-        globalizedThreadContention.mremap_wait_cycles_free_large += data->mremap_wait_cycles_free_large;
-
-        globalizedThreadContention.mprotect_waits_alloc += data->mprotect_waits_alloc;
-        globalizedThreadContention.mprotect_waits_alloc_large += data->mprotect_waits_alloc_large;
-        globalizedThreadContention.mprotect_waits_free += data->mprotect_waits_free;
-        globalizedThreadContention.mprotect_waits_free_large += data->mprotect_waits_free_large;
-
-        globalizedThreadContention.mprotect_wait_cycles_alloc += data->mprotect_wait_cycles_alloc;
-        globalizedThreadContention.mprotect_wait_cycles_alloc_large += data->mprotect_wait_cycles_alloc_large;
-        globalizedThreadContention.mprotect_wait_cycles_free += data->mprotect_wait_cycles_free;
-        globalizedThreadContention.mprotect_wait_cycles_free_large += data->mprotect_wait_cycles_free_large;
-
-        globalizedThreadContention.maxRealMemoryUsage = MAX(data->maxRealMemoryUsage, globalizedThreadContention.maxRealMemoryUsage);
-        globalizedThreadContention.maxRealAllocatedMemoryUsage = MAX(data->maxRealAllocatedMemoryUsage, globalizedThreadContention.maxRealAllocatedMemoryUsage);
-        globalizedThreadContention.maxTotalMemoryUsage = MAX(data->maxTotalMemoryUsage, globalizedThreadContention.maxTotalMemoryUsage);
-    }
-
-		maxRealMemoryUsage = globalizedThreadContention.maxRealMemoryUsage;
-		maxRealAllocatedMemoryUsage = globalizedThreadContention.maxRealAllocatedMemoryUsage;
-		maxTotalMemoryUsage = globalizedThreadContention.maxTotalMemoryUsage;
-
-    fprintf (ProgramStatus::outputFile, ">>> small_alloc_mmap\t\t\t\t%20lu\n", globalizedThreadContention.mmap_waits_alloc);
-    fprintf (ProgramStatus::outputFile, ">>> small_alloc_mmap_wait_cycles%16lu(%3d%%)\tavg = %.1f\n",
-             globalizedThreadContention.mmap_wait_cycles_alloc,
-             globalizedThreadContention.mmap_wait_cycles_alloc / (total_cycles/100),
-						((double)globalizedThreadContention.mmap_wait_cycles_alloc / safeDivisor(globalizedThreadContention.mmap_waits_alloc)));
-    fprintf (ProgramStatus::outputFile, ">>> large_alloc_mmap\t\t\t\t%20lu\n", globalizedThreadContention.mmap_waits_alloc_large);
-    fprintf (ProgramStatus::outputFile, ">>> large_alloc_mmap_wait_cycles%16lu(%3d%%)\tavg = %.1f\n",
-             globalizedThreadContention.mmap_wait_cycles_alloc_large,
-             globalizedThreadContention.mmap_wait_cycles_alloc_large / (total_cycles/100),
-             ((double)globalizedThreadContention.mmap_wait_cycles_alloc_large / safeDivisor(globalizedThreadContention.mmap_waits_alloc_large)));
-    fprintf (ProgramStatus::outputFile, ">>> small_dealloc_mmap\t\t\t%20lu\n", globalizedThreadContention.mmap_waits_free);
-    fprintf (ProgramStatus::outputFile, ">>> small_dealloc_mmap_wait_cycles%14lu(%3d%%)\tavg = %.1f\n",
-             globalizedThreadContention.mmap_wait_cycles_free,
-             globalizedThreadContention.mmap_wait_cycles_free / (total_cycles/100),
-            ((double)globalizedThreadContention.mmap_wait_cycles_free / safeDivisor(globalizedThreadContention.mmap_waits_free)));
-    fprintf (ProgramStatus::outputFile, ">>> large_dealloc_mmap\t\t\t%20lu\n", globalizedThreadContention.mmap_waits_free_large);
-    fprintf (ProgramStatus::outputFile, ">>> large_dealloc_mmap_wait_cycles%14lu(%3d%%)\tavg = %.1f\n\n",
-             globalizedThreadContention.mmap_wait_cycles_free_large,
-             globalizedThreadContention.mmap_wait_cycles_free_large / (total_cycles/100),
-            ((double)globalizedThreadContention.mmap_wait_cycles_free_large / safeDivisor(globalizedThreadContention.mmap_waits_free_large)));
-
-
-    fprintf (ProgramStatus::outputFile, ">>> small_alloc_sbrk\t\t\t\t%20lu\n", globalizedThreadContention.sbrk_waits_alloc);
-    fprintf (ProgramStatus::outputFile, ">>> small_alloc_sbrk_wait_cycles%16lu(%3d%%)\tavg = %.1f\n",
-             globalizedThreadContention.sbrk_wait_cycles_alloc,
-             globalizedThreadContention.sbrk_wait_cycles_alloc / (total_cycles/100),
-             ((double)globalizedThreadContention.sbrk_wait_cycles_alloc / safeDivisor(globalizedThreadContention.sbrk_waits_alloc)));
-    fprintf (ProgramStatus::outputFile, ">>> large_alloc_sbrk\t\t\t\t%20lu\n", globalizedThreadContention.sbrk_waits_alloc_large);
-    fprintf (ProgramStatus::outputFile, ">>> large_alloc_sbrk_wait_cycles%16lu(%3d%%)\tavg = %.1f\n",
-             globalizedThreadContention.sbrk_wait_cycles_alloc_large,
-             globalizedThreadContention.sbrk_wait_cycles_alloc_large / (total_cycles/100),
-            ((double)globalizedThreadContention.sbrk_wait_cycles_alloc_large / safeDivisor(globalizedThreadContention.sbrk_waits_alloc_large)));
-    fprintf (ProgramStatus::outputFile, ">>> small_dealloc_sbrk\t\t\t%20lu\n", globalizedThreadContention.sbrk_waits_free);
-    fprintf (ProgramStatus::outputFile, ">>> small_dealloc_sbrk_wait_cycles%14lu(%3d%%)\tavg = %.1f\n",
-             globalizedThreadContention.sbrk_wait_cycles_free,
-             globalizedThreadContention.sbrk_wait_cycles_free / (total_cycles/100),
-            ((double)globalizedThreadContention.sbrk_wait_cycles_free / safeDivisor(globalizedThreadContention.sbrk_waits_free)));
-    fprintf (ProgramStatus::outputFile, ">>> large_dealloc_sbrk\t\t\t%20lu\n", globalizedThreadContention.sbrk_waits_free_large);
-    fprintf (ProgramStatus::outputFile, ">>> large_dealloc_sbrk_wait_cycles%14lu(%3d%%)\tavg = %.1f\n\n",
-             globalizedThreadContention.sbrk_wait_cycles_free_large,
-             globalizedThreadContention.sbrk_wait_cycles_free_large / (total_cycles/100),
-            ((double)globalizedThreadContention.sbrk_wait_cycles_free_large / safeDivisor(globalizedThreadContention.sbrk_waits_free_large)));
-
-    fprintf (ProgramStatus::outputFile, ">>> small_alloc_madvise\t\t\t%20lu\n", globalizedThreadContention.madvise_waits_alloc);
-    fprintf (ProgramStatus::outputFile, ">>> small_alloc_madvise_wait_cycles%13lu(%3d%%)\tavg = %.1f\n",
-             globalizedThreadContention.madvise_wait_cycles_alloc,
-             globalizedThreadContention.madvise_wait_cycles_alloc / (total_cycles/100),
-            ((double)globalizedThreadContention.madvise_wait_cycles_alloc / safeDivisor(globalizedThreadContention.madvise_waits_alloc)));
-    fprintf (ProgramStatus::outputFile, ">>> large_alloc_madvise\t\t\t%20lu\n", globalizedThreadContention.madvise_waits_alloc_large);
-    fprintf (ProgramStatus::outputFile, ">>> large_alloc_madvise_wait_cycles%13lu(%3d%%)\tavg = %.1f\n",
-             globalizedThreadContention.madvise_wait_cycles_alloc_large,
-             globalizedThreadContention.madvise_wait_cycles_alloc_large / (total_cycles/100),
-            ((double)globalizedThreadContention.madvise_wait_cycles_alloc_large / safeDivisor(globalizedThreadContention.madvise_waits_alloc_large)));
-    fprintf (ProgramStatus::outputFile, ">>> small_dealloc_madvise\t\t%20lu\n", globalizedThreadContention.madvise_waits_free);
-    fprintf (ProgramStatus::outputFile, ">>> small_dealloc_madvise_wait_cycles%11lu(%3d%%)\tavg = %.1f\n",
-             globalizedThreadContention.madvise_wait_cycles_free,
-             globalizedThreadContention.madvise_wait_cycles_free / (total_cycles/100),
-            ((double)globalizedThreadContention.madvise_wait_cycles_free / safeDivisor(globalizedThreadContention.madvise_waits_free)));
-    fprintf (ProgramStatus::outputFile, ">>> large_dealloc_madvise\t\t%20lu\n", globalizedThreadContention.madvise_waits_free_large);
-    fprintf (ProgramStatus::outputFile, ">>> large_dealloc_madvise_wait_cycles%11lu(%3d%%)\tavg = %.1f\n\n",
-             globalizedThreadContention.madvise_wait_cycles_free_large,
-             globalizedThreadContention.madvise_wait_cycles_free_large / (total_cycles/100),
-            ((double)globalizedThreadContention.madvise_wait_cycles_free_large / safeDivisor(globalizedThreadContention.madvise_waits_free_large)));
-
-    fprintf (ProgramStatus::outputFile, ">>> small_alloc_munmap\t\t\t%20lu\n", globalizedThreadContention.munmap_waits_alloc);
-    fprintf (ProgramStatus::outputFile, ">>> small_alloc_munmap_wait_cycles%14lu(%3d%%)\tavg = %.1f\n",
-             globalizedThreadContention.munmap_wait_cycles_alloc,
-             globalizedThreadContention.munmap_wait_cycles_alloc / (total_cycles/100),
-            ((double)globalizedThreadContention.munmap_wait_cycles_alloc / safeDivisor(globalizedThreadContention.munmap_waits_alloc)));
-    fprintf (ProgramStatus::outputFile, ">>> large_alloc_munmap\t\t\t%20lu\n", globalizedThreadContention.munmap_waits_alloc_large);
-    fprintf (ProgramStatus::outputFile, ">>> large_alloc_munmap_wait_cycles%14lu(%3d%%)\tavg = %.1f\n",
-             globalizedThreadContention.munmap_wait_cycles_alloc_large,
-             globalizedThreadContention.munmap_wait_cycles_alloc_large / (total_cycles/100),
-            ((double)globalizedThreadContention.munmap_wait_cycles_alloc_large / safeDivisor(globalizedThreadContention.munmap_waits_alloc_large)));
-    fprintf (ProgramStatus::outputFile, ">>> small_dealloc_munmap\t\t%20lu\n", globalizedThreadContention.munmap_waits_free);
-    fprintf (ProgramStatus::outputFile, ">>> small_dealloc_munmap_wait_cycles%12lu(%3d%%)\tavg = %.1f\n",
-             globalizedThreadContention.munmap_wait_cycles_free,
-             globalizedThreadContention.munmap_wait_cycles_free / (total_cycles/100),
-            ((double)globalizedThreadContention.munmap_wait_cycles_free / safeDivisor(globalizedThreadContention.munmap_waits_free)));
-    fprintf (ProgramStatus::outputFile, ">>> large_dealloc_munmap\t\t%20lu\n", globalizedThreadContention.munmap_waits_free_large);
-    fprintf (ProgramStatus::outputFile, ">>> large_dealloc_munmap_wait_cycles%12lu(%3d%%)\tavg = %.1f\n\n",
-             globalizedThreadContention.munmap_wait_cycles_free_large,
-             globalizedThreadContention.munmap_wait_cycles_free_large / (total_cycles/100),
-            ((double)globalizedThreadContention.munmap_wait_cycles_free_large / safeDivisor(globalizedThreadContention.munmap_waits_free_large)));
-
-    fprintf (ProgramStatus::outputFile, ">>> small_alloc_mremap\t\t\t%20lu\n", globalizedThreadContention.mremap_waits_alloc);
-    fprintf (ProgramStatus::outputFile, ">>> small_alloc_mremap_wait_cycles%14lu(%3d%%)\tavg = %.1f\n",
-             globalizedThreadContention.mremap_wait_cycles_alloc,
-             globalizedThreadContention.mremap_wait_cycles_alloc / (total_cycles/100),
-            ((double)globalizedThreadContention.mremap_wait_cycles_alloc / safeDivisor(globalizedThreadContention.mremap_waits_alloc)));
-    fprintf (ProgramStatus::outputFile, ">>> large_alloc_mremap\t\t\t%20lu\n", globalizedThreadContention.mremap_waits_alloc_large);
-    fprintf (ProgramStatus::outputFile, ">>> large_alloc_mremap_wait_cycles%14lu(%3d%%)\tavg = %.1f\n",
-             globalizedThreadContention.mremap_wait_cycles_alloc_large,
-             globalizedThreadContention.mremap_wait_cycles_alloc_large / (total_cycles/100),
-            ((double)globalizedThreadContention.mremap_wait_cycles_alloc_large / safeDivisor(globalizedThreadContention.mremap_waits_alloc_large)));
-    fprintf (ProgramStatus::outputFile, ">>> small_dealloc_mremap\t\t%20lu\n", globalizedThreadContention.mremap_waits_free);
-    fprintf (ProgramStatus::outputFile, ">>> small_dealloc_mremap_wait_cycles%12lu(%3d%%)\tavg = %.1f\n",
-             globalizedThreadContention.mremap_wait_cycles_free,
-             globalizedThreadContention.mremap_wait_cycles_free / (total_cycles/100),
-            ((double)globalizedThreadContention.mremap_wait_cycles_free / safeDivisor(globalizedThreadContention.mremap_waits_free)));
-    fprintf (ProgramStatus::outputFile, ">>> large_dealloc_mremap\t\t%20lu\n", globalizedThreadContention.mremap_waits_free_large);
-    fprintf (ProgramStatus::outputFile, ">>> large_dealloc_mremap_wait_cycles%12lu(%3d%%)\tavg = %.1f\n\n",
-             globalizedThreadContention.mremap_wait_cycles_free_large,
-             globalizedThreadContention.mremap_wait_cycles_free_large / (total_cycles/100),
-            ((double)globalizedThreadContention.mremap_wait_cycles_free_large / safeDivisor(globalizedThreadContention.mremap_waits_free_large)));
-
-
-    fprintf (ProgramStatus::outputFile, ">>> small_alloc_mprotect\t\t%20lu\n", globalizedThreadContention.mprotect_waits_alloc);
-    fprintf (ProgramStatus::outputFile, ">>> small_alloc_mprotect_wait_cycles%12lu(%3d%%)\tavg = %.1f\n",
-             globalizedThreadContention.mprotect_wait_cycles_alloc,
-             globalizedThreadContention.mprotect_wait_cycles_alloc / (total_cycles/100),
-            ((double)globalizedThreadContention.mprotect_wait_cycles_alloc / safeDivisor(globalizedThreadContention.mprotect_waits_alloc)));
-    fprintf (ProgramStatus::outputFile, ">>> large_alloc_mprotect\t\t%20lu\n", globalizedThreadContention.mprotect_waits_alloc_large);
-    fprintf (ProgramStatus::outputFile, ">>> large_alloc_mprotect_wait_cycles%12lu(%3d%%)\tavg = %.1f\n",
-             globalizedThreadContention.mprotect_wait_cycles_alloc_large,
-             globalizedThreadContention.mprotect_wait_cycles_alloc_large / (total_cycles/100),
-            ((double)globalizedThreadContention.mprotect_wait_cycles_alloc_large / safeDivisor(globalizedThreadContention.mprotect_waits_alloc_large)));
-    fprintf (ProgramStatus::outputFile, ">>> small_dealloc_mprotect\t%20lu\n", globalizedThreadContention.mprotect_waits_free);
-    fprintf (ProgramStatus::outputFile, ">>> small_dealloc_mprotect_wait_cycles%10lu(%3d%%)\tavg = %.1f\n",
-             globalizedThreadContention.mprotect_wait_cycles_free,
-             globalizedThreadContention.mprotect_wait_cycles_free / (total_cycles/100),
-            ((double)globalizedThreadContention.mprotect_wait_cycles_free / safeDivisor(globalizedThreadContention.mprotect_waits_free)));
-    fprintf (ProgramStatus::outputFile, ">>> large_dealloc_mprotect\t%20lu\n", globalizedThreadContention.mprotect_waits_free_large);
-    fprintf (ProgramStatus::outputFile, ">>> large_dealloc_mprotect_wait_cycles%10lu(%3d%%)\tavg = %.1f\n\n",
-             globalizedThreadContention.mprotect_wait_cycles_free_large,
-             globalizedThreadContention.mprotect_wait_cycles_free_large / (total_cycles/100),
-            ((double)globalizedThreadContention.mprotect_wait_cycles_free_large / safeDivisor(globalizedThreadContention.mprotect_waits_free_large)));
-
-
-		long realMem = MAX(max_mu.realMemoryUsage, maxRealMemoryUsage);
-    long realAllocMem = realMem + MemoryWaste::recordSumup();
-		totalMem = MAX(max_mu.totalMemoryUsage, MAX(maxTotalMemoryUsage, realAllocMem));
-		fprintf (ProgramStatus::outputFile, "\n>>>>>>>>>>>>>>>>>>>>>>>>>> Total Memory Usage <<<<<<<<<<<<<<<<<<<<<<<<<\n");
-    fprintf (ProgramStatus::outputFile, ">>> Max Memory Usage in Threads:\n");
-    fprintf (ProgramStatus::outputFile, ">>> maxRealMemoryUsage\t\t%20zuK\n", maxRealMemoryUsage/1024);
-    fprintf (ProgramStatus::outputFile, ">>> maxRealAllocMemoryUsage%19zuK\n", maxRealAllocatedMemoryUsage/1024);
-    fprintf (ProgramStatus::outputFile, ">>> maxTotalMemoryUsage\t\t%20zuK\n\n", maxTotalMemoryUsage/1024);
-    fprintf (ProgramStatus::outputFile, ">>> Global Memory Usage:\n");
-    fprintf (ProgramStatus::outputFile, ">>> realMemoryUsage\t\t\t\t%20zuK\n", realMem/1024);
-    fprintf (ProgramStatus::outputFile, ">>> realAllocatedMemoryUsage%18zuK\n", realAllocMem/1024);
-    fprintf (ProgramStatus::outputFile, ">>> totalMemoryUsage\t\t\t%20zuK\n", totalMem/1024);
-    MemoryWaste::reportMaxMemory(ProgramStatus::outputFile);
-}
-
-#endif
