@@ -1,4 +1,4 @@
-#if !defined(_HASHLIST_H)
+#ifndef _HASHLIST_H
 #define _HASHLIST_H
 
 #include <stdlib.h>

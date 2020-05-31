@@ -5,18 +5,12 @@
 #ifndef MMPROF_PROGRAMSTATUS_H
 #define MMPROF_PROGRAMSTATUS_H
 
-#include "definevalues.h"
-
-struct SizeClassSizeAndIndex {
-    size_t size;
-    size_t classSize;
-    unsigned int classSizeIndex;
-    void updateValues(size_t size, size_t classSize, unsigned int classSizeIndex) {
-        this->size = size;
-        this->classSize = classSize;
-        this->classSizeIndex = classSizeIndex;
-    }
-};
+#include <stdio.h>
+#include <stdlib.h>
+#include "recordscale.hh"
+#include "mymalloc.h"
+#include "string.h"
+#include "structs.h"
 
 class ProgramStatus {
 private:

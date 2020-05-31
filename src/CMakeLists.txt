@@ -38,8 +38,6 @@ add_executable(mmprof
         real.cpp
         real.hh
         recordfunctions.hh
-        selfmap.cpp
-        selfmap.hh
         shadowmemory.cpp
         shadowmemory.hh
         spinlock.hh

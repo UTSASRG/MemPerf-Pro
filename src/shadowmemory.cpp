@@ -5,7 +5,6 @@
 #include <stdint.h>
 #include "shadowmemory.hh"
 #include "real.hh"
-#include "test/alloc.cpp"
 #include "memwaste.h"
 #include "spinlock.hh"
 #include "threadlocalstatus.h"
@@ -199,8 +198,8 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType)
 
     ThreadLocalStatus::friendlinessStatus.recordANewSampling(pme->getUsedBytes(), cme->getUsedBytes());
 		if(accessType == E_MEM_STORE) {
-				usageData->numCacheWrites++;
-				if(cme->last_write != ThreadLocalStatus::runningThreadIndex && cme->last_write != -1) {
+				ThreadLocalStatus::friendlinessStatus.numOfSampledStoringInstructions++;
+				if(cme->lastWriterThreadIndex != (unsigned int)ThreadLocalStatus::runningThreadIndex && cme->lastWriterThreadIndex != -1) {
 				    ThreadLocalStatus::friendlinessStatus.numOfSampledFalseSharingInstructions[cme->falseSharingStatus]++;
 				    if(cme->falseSharingLineRecorded[cme->falseSharingStatus] == false) {
 				        ThreadLocalStatus::friendlinessStatus.numOfSampledCacheLines[cme->falseSharingStatus]++;
@@ -380,7 +379,7 @@ bool PageMapEntry::updateCacheLines(uintptr_t uintaddr, unsigned long mega_index
 				} else {
                     current->addUsedBytes(curCacheLineBytes);
                     if(current->falseSharingStatus != PASSIVE) {
-                        if(current->lastAllocatingThreadIndex != ThreadLocalStatus::runningThreadIndex && current->lastAllocatingThreadIndex != -1) {
+                        if(current->lastAllocatingThreadIndex != (unsigned int)ThreadLocalStatus::runningThreadIndex && current->lastAllocatingThreadIndex != -1) {
                             if(current->justFreedButRemainedSomeData) {
                                 current->falseSharingStatus = PASSIVE;
                             } else {
@@ -428,7 +427,7 @@ bool PageMapEntry::updateCacheLines(uintptr_t uintaddr, unsigned long mega_index
                             }
                         } else {
                             if (current->falseSharingStatus != PASSIVE) {
-                                if (current->lastAllocatingThreadIndex != ThreadLocalStatus::runningThreadIndex &&
+                                if (current->lastAllocatingThreadIndex != (unsigned int)ThreadLocalStatus::runningThreadIndex &&
                                     current->lastAllocatingThreadIndex != -1) {
                                     if (current->justFreedButRemainedSomeData) {
                                         current->falseSharingStatus = PASSIVE;

@@ -3,13 +3,7 @@
 //
 
 #include "allocatingstatus.h"
-#include "shadowmemory.hh"
-#include "memwaste.h"
-#include "programstatus.h"
-#include "memoryusage.h"
-#include "threadlocalstatus.h"
 
-thread_local AllocatingType AllocatingStatus::allocatingType;
 
 void AllocatingStatus::updateAllocatingTypeBeforeRealFunction(AllocationFunction allocationFunction, size_t objectSize) {
     allocatingType.allocatingFunction = allocationFunction;
@@ -104,13 +98,13 @@ void AllocatingStatus::updateFreeingStatusAfterRealFunction() {
 
 void AllocatingStatus::updateMemoryStatusAfterAllocation() {
     allocatingType.allocatingTypeGotFromMemoryWaste = MemoryWaste::allocUpdate(allocatingType.objectSize, allocatingType.objectAddress);
-    allocatingType.allocatingTypeGotFromShadowMemory = ShadowMemory::updateObject(allocatingType.objectAddress, allocatingType.objectSize, false);
+    allocatingType.allocatingTypeGotFromShadowMemory.objectNewTouchedPageSize = ShadowMemory::updateObject(allocatingType.objectAddress, allocatingType.objectSize, false);
     MemoryUsage::addToMemoryUsage(allocatingType.objectSize, allocatingType.allocatingTypeGotFromShadowMemory.objectNewTouchedPageSize);
 }
 
 void AllocatingStatus::updateMemoryStatusBeforeFree() {
     allocatingType.switchFreeingTypeGotFromMemoryWaste(MemoryWaste::freeUpdate(allocatingType.objectAddress));
-    allocatingType.allocatingTypeGotFromShadowMemory = ShadowMemory::updateObject(allocatingType.objectAddress, allocatingType.objectSize, true);
+    allocatingType.allocatingTypeGotFromShadowMemory.objectNewTouchedPageSize = ShadowMemory::updateObject(allocatingType.objectAddress, allocatingType.objectSize, true);
     MemoryUsage::subRealSizeFromMemoryUsage(allocatingType.objectSize);
 }
 
@@ -193,7 +187,7 @@ void AllocatingStatus::addUpSyscallsInfoToThreadLocalData() {
 void AllocatingStatus::addUpOtherFunctionsInfoToThreadLocalData() {
     addUpLockFunctionsInfoToThreadLocalData();
     cleanLockFunctionsInfoInAllocatingStatus();
-    addUpSyscallsInfoToThreadLocalData;
+    addUpSyscallsInfoToThreadLocalData();
 }
 
 
@@ -221,7 +215,7 @@ void AllocatingStatus::recordANewLock(LockTypes lockType) {
     overviewLockData[lockType].addANewLock();
 }
 
-void AllocatingStatus::initForWritingOneLockData(LockTypes lockType, void * addressOfHashLockData) {
+void AllocatingStatus::initForWritingOneLockData(LockTypes lockType, DetailLockData * addressOfHashLockData) {
     nowRunningLockType = lockType;
     queueOfDetailLockData.writingNewDataInTheQueue(addressOfHashLockData);
 }

@@ -9,6 +9,8 @@
 
 #define DECLARE_WRAPPER(name) extern decltype(::name) * name;
 
+bool realInitialized = false;
+
 namespace RealX {
 	void initializer();
 	DECLARE_WRAPPER(sbrk);

@@ -7,6 +7,7 @@
 
 #include "memwaste.h"
 #include "definevalues.h"
+#include "globalstatus.h"
 
 struct TotalMemoryUsage {
     uint64_t realMemoryUsage;
@@ -20,11 +21,9 @@ struct TotalMemoryUsage {
 };
 
 class MemoryUsage {
-private:
+public:
     static thread_local TotalMemoryUsage threadLocalMemoryUsage, maxThreadLocalMemoryUsage;
     static TotalMemoryUsage globalMemoryUsage, maxGlobalMemoryUsage;
-
-public:
     static void addToMemoryUsage(size_t size, size_t newTouchePageBytes) {
         threadLocalMemoryUsage.realMemoryUsage += size;
         threadLocalMemoryUsage.totalMemoryUsage += newTouchePageBytes;
@@ -51,7 +50,7 @@ public:
     }
 
     static void printOutput() {
-        GlobalStatus::printTitle("MEMORY USAGE")
+        GlobalStatus::printTitle((char*)"MEMORY USAGE");
         fprintf(ProgramStatus::outputFile, "thread local max real memory usage %20lu\n", maxThreadLocalMemoryUsage.realMemoryUsage);
         fprintf(ProgramStatus::outputFile, "thread local max total memory usage %20lu\n", maxThreadLocalMemoryUsage.totalMemoryUsage);
         fprintf(ProgramStatus::outputFile, "global max real memory usage %20lu\n", maxGlobalMemoryUsage.realMemoryUsage);

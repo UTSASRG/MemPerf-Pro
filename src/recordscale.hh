@@ -1,4 +1,4 @@
-#if !defined(__RECORD_SCALE_HH__)
+#ifndef __RECORD_SCALE_HH__
 #define __RECORD_SCALE_HH__
 
 /*
@@ -14,86 +14,38 @@
 #include <stdarg.h>
 #include <sched.h>
 #include <string.h>
-#include "programstatus.h"
-#include "definevalues.h"
 #include "libmallocprof.h"
 #include "hashmap.hh"
 #include "memwaste.h"
 #include "allocatingstatus.h"
+#include "real.hh"
+#include "shadowmemory.hh"
+#include "memoryusage.h"
+#include "structs.h"
 
-#define MAX_THREAD_NUMBER 1024
 
-typedef enum {
-    MUTEX,
-    SPIN,
-    MUTEXTRY,
-    SPINTRY,
-    NUM_OF_LOCKTYPES
-} LockTypes;
+extern HashMap <void*, DetailLockData, spinlock, PrivateHeap> lockUsage;
 
-struct DetailLockData {
-    LockTypes     lockType;  // What is the lock type
-    unsigned int numOfCalls[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];        // How many invocations
-    unsigned int numOfCallsWithContentions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA]; // How many of them have the contention
-    unsigned int numOfContendingThreads;    // How many are waiting
-    unsigned int maxNumOfContendingThreads; // How many threads are contending on this lock
-    uint64_t cycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA]; // Total cycles
-
-    DetailLockData newDetailLockData(LockTypes lockType) {
-        return DetailLockData{lockType, {0}, {0}, 0, 0, 0};
-    }
-
-    bool aContentionHappening() {
-        return (++numOfContendingThreads >= 2);
-    }
-
-    void checkAndUpdateMaxNumOfContendingThreads() {
-        maxNumOfContendingThreads = MAX(numOfContendingThreads, maxNumOfContendingThreads);
-    }
-
-    void quitFromContending() {
-        numOfContendingThreads--;
-    }
-
-    bool isAnImportantLock() {
-        return maxNumOfContendingThreads >= 10;
-    }
+typedef int (*LockFunction) (void *);
+typedef struct {
+    int (*LockFunction)(void *);
+} LockFunctionType;
+LockFunctionType lockFunctions[NUM_OF_LOCKTYPES] = {
+        (LockFunction)RealX::pthread_mutex_lock,
+        (LockFunction)RealX::pthread_spin_lock,
+        (LockFunction)RealX::pthread_mutex_trylock,
+        (LockFunction)RealX::pthread_spin_trylock
 };
 
-extern HashMap <uint64_t, LockData, spinlock, PrivateHeap> lockUsage;
-
-auto lockFunctions[NUM_OF_LOCKTYPES] = {
-        RealX::pthread_mutex_lock,
-        RealX::pthread_spin_lock,
-        RealX::pthread_mutex_trylock,
-        RealX::pthread_spin_trylock
-};
-
-auto unlockFunctions [NUM_OF_LOCKTYPES] = {
-        RealX::pthread_mutex_unlock,
-        RealX::pthread_spin_unlock,
-        RealX::pthread_mutex_unlock,
-        RealX::pthread_spin_unlock
-};
-
-typedef enum {
-    MMAP,
-    MADVISE,
-    SBRK,
-    MPROTECT,
-    MUNMAP,
-    MREMAP,
-    NUM_OF_SYSTEMCALLTYPES
-} SystemCallTypes;
-
-struct SystemCallData {
-    uint64_t num;
-    uint64_t cycles;
-
-    void add(SystemCallData newSystemCallData) {
-        this->num += newSystemCallData->num;
-        this->cycles += newSystemCallData.cycles;
-    }
+typedef int (*UnlockFunction) (void *);
+typedef struct {
+    int (*UnlockFunction)(void *);
+} UnlockFunctionType;
+UnlockFunctionType unlockFunctions [NUM_OF_LOCKTYPES] = {
+        (UnlockFunction)RealX::pthread_mutex_unlock,
+        (UnlockFunction)RealX::pthread_spin_unlock,
+        (UnlockFunction)RealX::pthread_mutex_unlock,
+        (UnlockFunction)RealX::pthread_spin_unlock
 };
 
 
@@ -102,23 +54,23 @@ extern "C" {
 /* ************************Synchronization******************************** */
 #define PTHREAD_LOCK_HANDLE(LOCKTYPE, LOCK) \
   if (AllocatingStatus::outsideTrackedAllocation()) { \
-    return lockfuncs[LOCK_TYPE].realLock((void *)LOCK); \
+    return lockFunctions[LOCKTYPE].LockFunction((void *)LOCK); \
   } \
   \
   DetailLockData * detailLockData = lockUsage.find((void *)LOCK, sizeof(void *)); \
   if(detailLockData == nullptr)  { \
-    detailLockData = lockUsage.insert((uint64_t)LOCK, sizeof(uint64_t), DetailLockData.newDetailLockData(LOCKTYPE)); \
+    detailLockData = lockUsage.insert((void*)LOCK, sizeof(void*), DetailLockData::newDetailLockData(LOCKTYPE)); \
     AllocatingStatus::recordANewLock(LOCKTYPE); \
   } \
   \
   AllocatingStatus::initForWritingOneLockData(LOCKTYPE, detailLockData); \
-  if(detailLockData.aContentionHappening()) { \
-    detailLockData.checkAndUpdateMaxNumOfContendingThreads(); \
+  if(detailLockData->aContentionHappening()) { \
+    detailLockData->checkAndUpdateMaxNumOfContendingThreads(); \
     AllocatingStatus::recordALockContention(); \
   } \
   \
   uint64_t timeStart = rdtscp();\
-  int result = lockfuncs[LOCK_TYPE].realLock((void *)LOCK); \
+  int result = lockFunctions[LOCKTYPE].LockFunction((void *)LOCK); \
   uint64_t timeStop = rdtscp(); \
   \
   AllocatingStatus::recordLockCallAndCycles(1, timeStop-timeStart); \
@@ -127,39 +79,39 @@ extern "C" {
 
 
 int pthread_mutex_lock(pthread_mutex_t *mutex) {
-    PTHREAD_LOCK_HANDLE(LOCK_TYPE_MUTEX, mutex);
+    PTHREAD_LOCK_HANDLE(MUTEX, mutex);
 }
 
 int pthread_spin_lock(pthread_spinlock_t *lock) {
-    PTHREAD_LOCK_HANDLE(LOCK_TYPE_SPINLOCK, lock);
+    PTHREAD_LOCK_HANDLE(SPIN, lock);
 }
 
 int pthread_spin_trylock(pthread_spinlock_t *lock) {
-    PTHREAD_LOCK_HANDLE(LOCK_TYPE_SPIN_TRYLOCK, lock);
+    PTHREAD_LOCK_HANDLE(SPINTRY, lock);
 }
 
 int pthread_mutex_trylock(pthread_mutex_t *mutex) {
-    PTHREAD_LOCK_HANDLE(LOCK_TYPE_TRYLOCK, mutex);
+    PTHREAD_LOCK_HANDLE(MUTEXTRY, mutex);
 }
 
 
-#define PTHREAD_UNLOCK_HANDLE(LOCK_TYPE, lock) \
+#define PTHREAD_UNLOCK_HANDLE(LOCKTYPE, lock) \
     if(AllocatingStatus::outsideTrackedAllocation()) { \
-        return unlockfuncs[LOCK_TYPE].realUnlock((void *)lock);
+        return unlockFunctions[LOCKTYPE].UnlockFunction((void *)lock); \
     } \
     DetailLockData * detailLockData = lockUsage.find((void *)lock, sizeof(void *)); \
-    detailLockData.quitFromContending(); \
+    detailLockData->quitFromContending(); \
     AllocatingStatus::checkAndStopRecordingACriticalSection(); \
-    int result = unlockfuncs[LOCK_TYPE].realUnlock((void *)lock); \
+    int result = unlockFunctions[LOCKTYPE].UnlockFunction((void *)lock); \
     return result;
 
 // PTHREAD_MUTEX_UNLOCK
 int pthread_mutex_unlock(pthread_mutex_t *mutex) {
-  PTHREAD_UNLOCK_HANDLE(LOCK_TYPE_MUTEX, mutex);
+  PTHREAD_UNLOCK_HANDLE(MUTEX, mutex);
 }
 
 int pthread_spin_unlock(pthread_spinlock_t *lock) {
-  PTHREAD_UNLOCK_HANDLE(LOCK_TYPE_SPINLOCK, lock);
+  PTHREAD_UNLOCK_HANDLE(SPIN, lock);
 }
 
 /* ************************Synchronization End******************************** */
@@ -281,3 +233,5 @@ void *mremap(void *old_address, size_t old_size, size_t new_size, int flags, ...
 
     return ret;
 }
+
+#endif

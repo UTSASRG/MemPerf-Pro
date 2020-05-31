@@ -8,6 +8,7 @@
 #include "memwaste.h"
 #include "mymalloc.h"
 #include "threadlocalstatus.h"
+#include "globalstatus.h"
 
 thread_local extern perf_info perfInfo;
 
@@ -21,8 +22,7 @@ class xthreadx {
 		void * startArg;
 		void * result;
 	} thread_t;
-
-	public:
+public:
 	static int thread_create(pthread_t * tid, const pthread_attr_t * attr, threadFunction * fn, void * arg) {
 		thread_t * children = (thread_t *) MyMalloc::malloc(sizeof(thread_t));
 		children->thread = tid;
@@ -42,7 +42,6 @@ class xthreadx {
         ThreadLocalStatus::getARunningThreadIndex();
 
 		void * result = NULL;
-		size_t stackSize;
 		thread_t * current = (thread_t *) arg;
 
 		pthread_attr_t attrs;
@@ -62,13 +61,11 @@ class xthreadx {
 	}
 
 
-  static void threadExit()
+  static void threadExit() {
     #ifndef NO_PMU
     stopSampling();
     stopCounting();
     #endif
-
-    updateGlobalFriendlinessData();
 
     GlobalStatus::globalize();
 	}

@@ -2,15 +2,7 @@
 #define _GNU_SOURCE
 #endif
 
-#include <asm/unistd.h>
-#include <fcntl.h>
-#include <linux/hw_breakpoint.h>
-#include <linux/perf_event.h>
-#include <signal.h>
-#include <stdint.h>
-#include <sys/ioctl.h>
-#include "libmallocprof.h"
-#include "spinlock.hh"
+#include "memsample.h"
 
 #define PERF_GROUP_SIZE 5
 

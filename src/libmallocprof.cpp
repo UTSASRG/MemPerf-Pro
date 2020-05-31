@@ -6,28 +6,9 @@
  * @author Stefen Ramirez <stfnrmz0@gmail.com>
  */
 
-//#include <atomic>  //atomic vars
-#include <dlfcn.h> //dlsym
-#include <fcntl.h> //fopen flags
-#include <stdio.h> //print, getline
-#include <signal.h>
-#include <time.h>
-#include <new>
-#include "hashmap.hh"
-#include "hashfuncs.hh"
+
 #include "libmallocprof.h"
-#include "real.hh"
-#include "selfmap.hh"
-#include "spinlock.hh"
-#include "xthreadx.hh"
-#include "recordscale.hh"
-#include "memwaste.h"
-#include <sched.h>
-#include <stdlib.h>
-#include "programstatus.h"
-#include "mymalloc.h"
-#include "allocatingstatus.h"
-#include "threadlocalstatus.h"
+
 
 thread_local bool PMUinit = false;
 
@@ -84,8 +65,6 @@ void exitHandler() {
 	stopSampling();
 	#endif
 
-	#warning Disabled smaps functionality (timer, file handle cleanup)
-
     GlobalStatus::globalize();
     GlobalStatus::printOutput();
 
@@ -98,7 +77,7 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
 	atexit(exitHandler);
 
 	PMU_init_check();
-	lockUsage.initialize(HashFuncs::hashCallsiteId, HashFuncs::compareCallsiteId, 128*32);
+	lockUsage.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, 128*32);
   MemoryWaste::initialize();
 
 	int result = real_main_mallocprof (argc, argv, envp);
@@ -128,14 +107,14 @@ extern "C" {
             return NULL;
         }
 
-        if(AllocatingStatus::profilerNotInitialized()) {
+        if(ProgramStatus::profilerNotInitialized()) {
             return MyMalloc::malloc(sz);
         }
 
 
         AllocatingStatus::updateAllocatingStatusBeforeRealFunction(MALLOC, sz);
 		void * object = RealX::malloc(sz);
-        AllocatingStatus::updateAllocatingStatusAfterRealFunction();
+        AllocatingStatus::updateAllocatingStatusAfterRealFunction(object);
         AllocatingStatus::updateAllocatingInfoToThreadLocalData();
         return object;
 
@@ -148,13 +127,13 @@ extern "C" {
 				return NULL;
 		}
 
-		if (AllocatingStatus::profilerNotInitialized()) {
-            return MyMalloc::malloc(sz);
+		if (ProgramStatus::profilerNotInitialized()) {
+            return MyMalloc::malloc(nelem*elsize);
 		}
 
-        AllocatingStatus::updateAllocatingStatusBeforeRealFunction(CALLOC, sz);
-        void * object = RealX::calloc(nelem, elsize));
-        AllocatingStatus::updateAllocatingStatusAfterRealFunction();
+        AllocatingStatus::updateAllocatingStatusBeforeRealFunction(CALLOC, nelem*elsize);
+        void * object = RealX::calloc(nelem, elsize);
+        AllocatingStatus::updateAllocatingStatusAfterRealFunction(object);
         AllocatingStatus::updateAllocatingInfoToThreadLocalData();
 		return object;
 	}
@@ -193,11 +172,11 @@ extern "C" {
 
 	int yyposix_memalign(void **memptr, size_t alignment, size_t size) {
         if(size == 0) {
-            return NULL;
+            return 0;
         }
 
-        if(AllocatingStatus::profilerNotInitialized()) {
-            return MyMalloc::malloc(sz);
+        if(ProgramStatus::profilerNotInitialized()) {
+            return RealX::posix_memalign(memptr, alignment, size);
         }
 
 
@@ -215,12 +194,12 @@ extern "C" {
          return NULL;
      }
 
-     if(AllocatingStatus::profilerNotInitialized()) {
+     if(ProgramStatus::profilerNotInitialized()) {
          return MyMalloc::malloc(size);
      }
 
 
-     AllocatingStatus::updateAllocatingStatusBeforeRealFunction(MEMALIGN, sz);
+     AllocatingStatus::updateAllocatingStatusBeforeRealFunction(MEMALIGN, size);
      void * object = RealX::memalign(alignment, size);
      AllocatingStatus::updateAllocatingStatusAfterRealFunction(object);
      AllocatingStatus::updateAllocatingInfoToThreadLocalData();

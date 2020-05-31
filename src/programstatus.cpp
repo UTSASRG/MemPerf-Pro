@@ -1,27 +1,7 @@
 //
 // Created by 86152 on 2020/5/20.
 //
-#include <stdio.h>
-#include <stdlib.h>
 #include "programstatus.h"
-#include "definevalues.h"
-#include "selfmap.hh"
-//#include "recordscale.hh"
-#include "mymalloc.h"
-#include "string.h"
-
-bool ProgramStatus::profilerInitialized = false;
-bool ProgramStatus::selfMapInitialized = false;
-
-FILE * ProgramStatus::inputInfoFile;
-FILE * ProgramStatus::outputFile;
-char ProgramStatus::inputInfoFileName[MAX_FILENAME_LEN];
-char ProgramStatus::outputFileName[MAX_FILENAME_LEN];
-
-bool ProgramStatus::allocatorStyleIsBibop;
-size_t ProgramStatus::largeObjectThreshold;
-size_t ProgramStatus::classSizes[10000];
-unsigned int ProgramStatus::numberOfClassSizes;
 
 void ProgramStatus::setProfilerInitializedTrue() {
     profilerInitialized = true;
@@ -46,18 +26,7 @@ void ProgramStatus::checkSystemIs64Bits() {
 }
 
 void ProgramStatus::getInputInfoFileName() {
-    char allocator_name[100];
-    selfmap::getInstance().getTextRegions(allocator_name);
-    setSelfMapInitializedTrue();
-    char* end_path = strrchr(allocator_name, '/');
-    char* end_name = strchr(end_path, '.') - 1;
-    char* start_name = end_path + 1;
-    uint64_t name_bytes = (uint64_t)end_name - (uint64_t)end_path;
-    uint64_t path_bytes = (uint64_t)start_name - (uint64_t)allocator_name;
-    short ext_bytes = 6;
-    memcpy(inputInfoFileName, allocator_name, path_bytes);
-    memcpy((inputInfoFileName+path_bytes), start_name, name_bytes);
-    snprintf ((inputInfoFileName+path_bytes+name_bytes), ext_bytes, ".info");
+    inputInfoFileName = "/home/jinzhou/Memoryallocators/libc-2.28/libmalloc.info";
 }
 
 void ProgramStatus::fopenInputInfoFile() {
@@ -88,12 +57,12 @@ void ProgramStatus::readAllocatorClassSizesFromInfo(char * token) {
         numberOfClassSizes = atoi(token);
 
         if(allocatorStyleIsBibop) {
-            for (int i = 0; i < numberOfClassSizes; i++) {
+            for (unsigned int i = 0; i < numberOfClassSizes; i++) {
                 token = strtok(NULL, " ");
                 classSizes[i] = (size_t) atoi(token);
             }
         } else {
-            for (int i = 0; i < numberOfClassSizes; i++) {
+            for (unsigned int i = 0; i < numberOfClassSizes; i++) {
                 classSizes[i] = (size_t) 24 + 16 * i;
             }
         }
@@ -181,7 +150,7 @@ SizeClassSizeAndIndex ProgramStatus::getClassSizeAndIndex(size_t size) {
     }
 
     if(allocatorStyleIsBibop) {
-        for (int index = 0; index < numberOfClassSizes; index++) {
+        for (unsigned int index = 0; index < numberOfClassSizes; index++) {
             if (size <= classSizes[index]) {
                 classSize = classSizes[index];
                 classSizeIndex = index;
@@ -190,12 +159,12 @@ SizeClassSizeAndIndex ProgramStatus::getClassSizeAndIndex(size_t size) {
         }
     }
     else {
-        if(allocData->size <= 24) {
+        if(size <= 24) {
             classSize = 24;
             classSizeIndex = 0;
         } else {
             classSizeIndex = (size - 24) / 16 + 1;
-            classSize = classSizes[allocData->classSizeIndex];
+            classSize = classSizes[classSizeIndex];
         }
     }
     cacheForGetClassSizeAndIndex.updateValues(size, classSize, classSizeIndex);

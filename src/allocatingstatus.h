@@ -6,57 +6,11 @@
 #define MMPROF_ALLOCATIONSTATUS_H
 
 #include "recordscale.hh"
-
-typedef enum {
-    MALLOC,
-    FREE,
-    CALLOC,
-    REALLOC,
-    POSIX_MEMALIGN,
-    MEMALIGN
-    NUM_OF_ALLOCATIONFUNCTION
-} AllocationFunction;
-
-typedef enum {
-    SMALL_NEW_MALLOC,
-    SMALL_REUSED_MALLOC,
-    LARGE_MALLOC,
-    SMALL_FREE,
-    LARGE_FREE,
-    NORMAL_CALLOC,
-    NORMAL_REALLOC,
-    NORMAL_POSIX_MEMALIGN,
-    NORMAL_MEMALIGN,
-    NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA
-} AllocationTypeForOutputData;
-
-struct AllocatingTypeGotFromMemoryWaste {
-    bool isReusedObject;
-    size_t objectClassSize;
-}
-struct AllocatingTypeWithSizeGotFromMemoryWaste {
-    size_t objectSize;
-    AllocatingTypeGotFromMemoryWaste allocatingTypeGotByMemoryWaste;
-}
-struct AllocatingTypeGotFromShadowMemory {
-    size_t objectNewTouchedPageSize;
-}
-struct AllocatingType {
-    AllocationFunction allocatingFunction;
-    size_t objectSize;
-    bool isALargeObject;
-    bool doingAllocation = false;
-    void * objectAddress;
-    AllocatingTypeGotFromMemoryWaste allocatingTypeGotFromMemoryWaste;
-    AllocatingTypeGotFromShadowMemory allocatingTypeGotFromShadowMemory;
-
-    void switchFreeingTypeGotFromMemoryWaste(AllocatingTypeWithSizeGotFromMemoryWaste allocatingTypeWithSizeGotFromMemoryWaste) {
-        objectSize = allocatingTypeWithSizeGotFromMemoryWaste.objectSize;
-        isALargeObject = ProgramStatus::isALargeObject(objectSize);
-        allocatingTypeGotFromMemoryWaste = allocatingTypeWithSizeGotFromMemoryWaste.allocatingTypeGotByMemoryWaste;
-    };
-};
-
+#include "shadowmemory.hh"
+#include "memwaste.h"
+#include "memoryusage.h"
+#include "threadlocalstatus.h"
+#include "structs.h"
 
 
 class AllocatingStatus {
@@ -113,7 +67,7 @@ private:
         } queue[1000];
         int queueTail = -1;
 
-        void writingNewDataInTheQueue(void * addressOfHashLockData) {
+        void writingNewDataInTheQueue(DetailLockData * addressOfHashLockData) {
             queue[++queueTail].addressOfHashLockData = addressOfHashLockData;
         }
 
@@ -170,11 +124,11 @@ private:
     static thread_local SystemCallData systemCallData[NUM_OF_SYSTEMCALLTYPES];
 
     static void updateAllocatingTypeBeforeRealFunction(AllocationFunction allocationFunction, size_t objectSize);
+    static void updateAllocatingTypeAfterRealFunction(void * objectAddress);
     static void updateFreeingTypeBeforeRealFunction(AllocationFunction allocationFunction, void * objectAddress);
 
+    static void updateFreeingTypeAfterRealFunction();
     static void startCountCountingEvents();
-    static void updateAllocatingTypeAfterRealFunction(void * objectAddress);
-    static void updateFreeingStatusAfterRealFunction();
 
     static void updateMemoryStatusAfterAllocation();
     static void updateMemoryStatusBeforeFree();
@@ -202,7 +156,7 @@ public:
     static void updateFreeingStatusBeforeRealFunction(AllocationFunction allocationFunction, void * objectAddress);
 
     static void updateAllocatingStatusAfterRealFunction(void * objectAddress);
-    static void updateFreeingTypeAfterRealFunction();
+    static void updateFreeingStatusAfterRealFunction();
 
     static void updateAllocatingInfoToThreadLocalData();
     static bool outsideTrackedAllocation();

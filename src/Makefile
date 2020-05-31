@@ -1,29 +1,36 @@
 SRCS =	libmallocprof.cpp	\
-            memwaste.cpp \
-				real.cpp					\
-				selfmap.cpp				\
-				shadowmemory.cpp	\
-				memsample.c \
-				programstatus.cpp \
-				mymalloc.cpp
+        allocatingstatus.cpp \
+        globalstatus.cpp \
+        memsample.c \
+        memwaste.cpp \
+        mymalloc.cpp \
+        programstatus.cpp \
+        real.cpp \
+        shadowmemory.cpp \
+        threadlocalstatus.cpp \
 
-
-INCS =	xthreadx.hh			\
-				real.hh					\
-				hashmap.hh			\
-				list.hh					\
-				hashfuncs.hh		\
-				interval.hh			\
-				selfmap.hh			\
-				recordscale.hh \
-				spinlock.hh			\
-				shadowmemory.hh	\
-				memwaste.h          \
-				libmallocprof.h \
-				memsample.h \
-				mymalloc.h \
-				programstatus.h \
-				definevalues.h
+INCS =	libmallocprof.h \
+        allocatingstatus.h  \
+        definevalues.h \
+        globalstatus.h \
+        hashfuncs.hh \
+        hashlist.hh \
+        hashmap.hh \
+        interval.hh \
+        list.hh \
+        memoryusage.h \
+        memsample.h \
+        memwaste.h \
+        mymalloc.h \
+        privateheap.hh \
+        programstatus.h \
+        real.hh \
+        recordscale.hh \
+        shadowmemory.hh \
+        spinlock.hh \
+        structs.h \
+        threadlocalstatus.h \
+        xthreadx.hh
 
 DEPS = $(SRCS) $(INCS)
 

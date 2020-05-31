@@ -9,6 +9,8 @@
 #include "libmallocprof.h"
 #include "spinlock.hh"
 #include "threadlocalstatus.h"
+#include "memsample.h"
+
 
 #define PAGESIZE 4096
 #define NUM_CACHELINES_PER_PAGE 64
@@ -74,8 +76,8 @@ class CacheMapEntry {
 		public:
     FalseSharingType falseSharingStatus = OBJECT;
     bool falseSharingLineRecorded[NUM_OF_FALSESHARINGTYPE] = {false};
-    unsigned int lastWriterThreadIndex = -1;
-    unsigned int lastAllocatingThreadIndex = -1;
+    int lastWriterThreadIndex = -1;
+    int lastAllocatingThreadIndex = -1;
     bool justFreedButRemainedSomeData = false;
     bool sampled = false;
 				unsigned int getUsedBytes();
