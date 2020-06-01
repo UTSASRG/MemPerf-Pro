@@ -7,6 +7,7 @@
 #include <stdio.h> //print, getline
 #include <signal.h>
 #include <time.h>
+#include <stdarg.h>
 #include <new>
 #include <sched.h>
 #include <stdlib.h>
@@ -19,7 +20,6 @@
 #include "real.hh"
 #include "spinlock.hh"
 #include "xthreadx.hh"
-#include "recordscale.hh"
 #include "memwaste.h"
 #include "globalstatus.h"
 #include "memsample.h"

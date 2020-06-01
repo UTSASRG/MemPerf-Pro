@@ -8,54 +8,21 @@
 #include "memwaste.h"
 #include "definevalues.h"
 #include "globalstatus.h"
+#include "structs.h"
 
-struct TotalMemoryUsage {
-    uint64_t realMemoryUsage;
-    uint64_t totalMemoryUsage;
-    bool isLowerThan(TotalMemoryUsage newTotalMemoryUsage, size_t interval) {
-        return this->totalMemoryUsage + interval < newTotalMemoryUsage.totalMemoryUsage;
-    }
-    bool isLowerThan(TotalMemoryUsage newTotalMemoryUsage) {
-        return this->totalMemoryUsage < newTotalMemoryUsage.totalMemoryUsage;
-    }
-};
+class GlobalStatus;
+class MemoryWaste;
+class ProgramStatus;
 
 class MemoryUsage {
 public:
     static thread_local TotalMemoryUsage threadLocalMemoryUsage, maxThreadLocalMemoryUsage;
     static TotalMemoryUsage globalMemoryUsage, maxGlobalMemoryUsage;
-    static void addToMemoryUsage(size_t size, size_t newTouchePageBytes) {
-        threadLocalMemoryUsage.realMemoryUsage += size;
-        threadLocalMemoryUsage.totalMemoryUsage += newTouchePageBytes;
-        if(maxThreadLocalMemoryUsage.isLowerThan(threadLocalMemoryUsage, ONE_MB)) {
-            maxThreadLocalMemoryUsage = threadLocalMemoryUsage;
-        }
 
-        __atomic_add_fetch(&globalMemoryUsage.realMemoryUsage, size, __ATOMIC_RELAXED);
-        __atomic_add_fetch(&globalMemoryUsage.totalMemoryUsage, newTouchePageBytes, __ATOMIC_RELAXED);
-        if(maxGlobalMemoryUsage.isLowerThan(globalMemoryUsage, ONE_MB)) {
-            maxGlobalMemoryUsage = globalMemoryUsage;
-            MemoryWaste::compareMemoryUsageAndRecordStatus(maxGlobalMemoryUsage);
-        }
-    }
-
-    static void subRealSizeFromMemoryUsage(size_t size) {
-        threadLocalMemoryUsage.realMemoryUsage -= size;
-        __atomic_sub_fetch(&globalMemoryUsage.realMemoryUsage, size, __ATOMIC_RELAXED);
-    }
-
-    static void subTotalSizeFromMemoryUsage(size_t size) {
-        threadLocalMemoryUsage.totalMemoryUsage -= size;
-        __atomic_sub_fetch(&globalMemoryUsage.totalMemoryUsage, size, __ATOMIC_RELAXED);
-    }
-
-    static void printOutput() {
-        GlobalStatus::printTitle((char*)"MEMORY USAGE");
-        fprintf(ProgramStatus::outputFile, "thread local max real memory usage %20lu\n", maxThreadLocalMemoryUsage.realMemoryUsage);
-        fprintf(ProgramStatus::outputFile, "thread local max total memory usage %20lu\n", maxThreadLocalMemoryUsage.totalMemoryUsage);
-        fprintf(ProgramStatus::outputFile, "global max real memory usage %20lu\n", maxGlobalMemoryUsage.realMemoryUsage);
-        fprintf(ProgramStatus::outputFile, "global local max real memory usage %20lu\n", maxGlobalMemoryUsage.realMemoryUsage);
-    }
+    static void addToMemoryUsage(size_t size, size_t newTouchePageBytes);
+    static void subRealSizeFromMemoryUsage(size_t size);
+    static void subTotalSizeFromMemoryUsage(size_t size);
+    static void printOutput();
 
 };
 

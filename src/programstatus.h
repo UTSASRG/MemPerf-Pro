@@ -7,7 +7,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "recordscale.hh"
+#include <string.h>
 #include "mymalloc.h"
 #include "string.h"
 #include "structs.h"
@@ -23,7 +23,7 @@ private:
 
     static bool selfMapInitialized;
 
-    static thread_local SizeClassSizeAndIndex cacheForGetClassSizeAndIndex;
+    static thread_local struct SizeClassSizeAndIndex cacheForGetClassSizeAndIndex;
 
     static void getInputInfoFileName();
     static void fopenInputInfoFile();
@@ -58,7 +58,7 @@ public:
 
     static bool isALargeObject(size_t size);
 
-    SizeClassSizeAndIndex getClassSizeAndIndex(size_t size);
+    static struct SizeClassSizeAndIndex getClassSizeAndIndex(size_t size);
 };
 
 #endif //MMPROF_PROGRAMSTATUS_H

@@ -5,7 +5,6 @@
 #ifndef MMPROF_THREADLOCALSTATUS_H
 #define MMPROF_THREADLOCALSTATUS_H
 
-#include "recordscale.hh"
 #include "memsample.h"
 #include "allocatingstatus.h"
 #include "definevalues.h"
@@ -14,7 +13,7 @@
 class ThreadLocalStatus {
 public:
     static unsigned int totalNumOfRunningThread;
-    static thread_local unsigned int runningThreadIndex;
+    static thread_local int runningThreadIndex;
     static spinlock lock;
 
     static thread_local uint64_t numOfFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];

@@ -199,10 +199,10 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType)
     ThreadLocalStatus::friendlinessStatus.recordANewSampling(pme->getUsedBytes(), cme->getUsedBytes());
 		if(accessType == E_MEM_STORE) {
 				ThreadLocalStatus::friendlinessStatus.numOfSampledStoringInstructions++;
-				if(cme->lastWriterThreadIndex != (unsigned int)ThreadLocalStatus::runningThreadIndex && cme->lastWriterThreadIndex != -1) {
+				if(cme->lastWriterThreadIndex != ThreadLocalStatus::runningThreadIndex && cme->lastWriterThreadIndex != -1) {
 				    ThreadLocalStatus::friendlinessStatus.numOfSampledFalseSharingInstructions[cme->falseSharingStatus]++;
 				    if(cme->falseSharingLineRecorded[cme->falseSharingStatus] == false) {
-				        ThreadLocalStatus::friendlinessStatus.numOfSampledCacheLines[cme->falseSharingStatus]++;
+				        ThreadLocalStatus::friendlinessStatus.numOfSampledFalseSharingCacheLines[cme->falseSharingStatus]++;
                         cme->falseSharingLineRecorded[cme->falseSharingStatus] = true;
 				    }
 				}
@@ -379,7 +379,7 @@ bool PageMapEntry::updateCacheLines(uintptr_t uintaddr, unsigned long mega_index
 				} else {
                     current->addUsedBytes(curCacheLineBytes);
                     if(current->falseSharingStatus != PASSIVE) {
-                        if(current->lastAllocatingThreadIndex != (unsigned int)ThreadLocalStatus::runningThreadIndex && current->lastAllocatingThreadIndex != -1) {
+                        if(current->lastAllocatingThreadIndex != ThreadLocalStatus::runningThreadIndex && current->lastAllocatingThreadIndex != -1) {
                             if(current->justFreedButRemainedSomeData) {
                                 current->falseSharingStatus = PASSIVE;
                             } else {
@@ -414,7 +414,6 @@ bool PageMapEntry::updateCacheLines(uintptr_t uintaddr, unsigned long mega_index
             curCacheLineIdx++;
 
             if (size_remain <= 0) {
-                if (current->status != 2) {
                     if (current->falseSharingStatus != PASSIVE) {
                         if (isFree) {
                             if (current->getUsedBytes() <= 0) {
@@ -427,7 +426,7 @@ bool PageMapEntry::updateCacheLines(uintptr_t uintaddr, unsigned long mega_index
                             }
                         } else {
                             if (current->falseSharingStatus != PASSIVE) {
-                                if (current->lastAllocatingThreadIndex != (unsigned int)ThreadLocalStatus::runningThreadIndex &&
+                                if (current->lastAllocatingThreadIndex != ThreadLocalStatus::runningThreadIndex &&
                                     current->lastAllocatingThreadIndex != -1) {
                                     if (current->justFreedButRemainedSomeData) {
                                         current->falseSharingStatus = PASSIVE;
@@ -440,8 +439,6 @@ bool PageMapEntry::updateCacheLines(uintptr_t uintaddr, unsigned long mega_index
                             }
                         }
                     }
-
-                }
             }
         }
 		return true;

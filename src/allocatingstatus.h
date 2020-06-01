@@ -5,7 +5,6 @@
 #ifndef MMPROF_ALLOCATIONSTATUS_H
 #define MMPROF_ALLOCATIONSTATUS_H
 
-#include "recordscale.hh"
 #include "shadowmemory.hh"
 #include "memwaste.h"
 #include "memoryusage.h"
@@ -163,7 +162,7 @@ public:
     static void addToSystemCallData(SystemCallTypes systemCallTypes, SystemCallData newSystemCallData);
 
     static void recordANewLock(LockTypes lockType);
-    static void initForWritingOneLockData(LockTypes lockType, void * addressOfHashLockData);
+    static void initForWritingOneLockData(LockTypes lockType, DetailLockData* addressOfHashLockData);
     static void recordALockContention();
     static void recordLockCallAndCycles(unsigned int numOfCalls, uint64_t cycles);
     static void checkAndStartRecordingACriticalSection();

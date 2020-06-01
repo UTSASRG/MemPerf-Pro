@@ -26,7 +26,7 @@ void ProgramStatus::checkSystemIs64Bits() {
 }
 
 void ProgramStatus::getInputInfoFileName() {
-    inputInfoFileName = "/home/jinzhou/Memoryallocators/libc-2.28/libmalloc.info";
+    strcpy(inputInfoFileName, "/home/jinzhou/Memoryallocators/libc-2.28/libmalloc.info");
 }
 
 void ProgramStatus::fopenInputInfoFile() {
@@ -140,8 +140,8 @@ SizeClassSizeAndIndex ProgramStatus::getClassSizeAndIndex(size_t size) {
         return cacheForGetClassSizeAndIndex;
     }
 
-    size_t classSize;
-    unsigned int classSizeIndex;
+    size_t classSize = 0;
+    unsigned int classSizeIndex = 0;
 
     if(size > largeObjectThreshold) {
         classSize = size;

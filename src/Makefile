@@ -1,13 +1,16 @@
 SRCS =	libmallocprof.cpp	\
         allocatingstatus.cpp \
         globalstatus.cpp \
+        memoryusage.cpp \
         memsample.c \
         memwaste.cpp \
         mymalloc.cpp \
         programstatus.cpp \
         real.cpp \
         shadowmemory.cpp \
+        structs.cpp \
         threadlocalstatus.cpp \
+        xthreadx.cpp
 
 INCS =	libmallocprof.h \
         allocatingstatus.h  \
@@ -25,7 +28,6 @@ INCS =	libmallocprof.h \
         privateheap.hh \
         programstatus.h \
         real.hh \
-        recordscale.hh \
         shadowmemory.hh \
         spinlock.hh \
         structs.h \

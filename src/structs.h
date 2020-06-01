@@ -5,29 +5,28 @@
 #include "definevalues.h"
 #include "programstatus.h"
 
-
 struct SizeClassSizeAndIndex {
     size_t size;
     size_t classSize;
     unsigned int classSizeIndex;
-    void updateValues(size_t size, size_t classSize, unsigned int classSizeIndex) {
-        this->size = size;
-        this->classSize = classSize;
-        this->classSizeIndex = classSizeIndex;
-    }
+
+    void updateValues(size_t size, size_t classSize, unsigned int classSizeIndex);
 };
 
 struct AllocatingTypeGotFromMemoryWaste {
     bool isReusedObject;
     size_t objectClassSize;
 };
+
 struct AllocatingTypeWithSizeGotFromMemoryWaste {
     size_t objectSize;
     AllocatingTypeGotFromMemoryWaste allocatingTypeGotByMemoryWaste;
 };
+
 struct AllocatingTypeGotFromShadowMemory {
     size_t objectNewTouchedPageSize;
 };
+
 struct AllocatingType {
     AllocationFunction allocatingFunction;
     size_t objectSize;
@@ -37,22 +36,27 @@ struct AllocatingType {
     AllocatingTypeGotFromMemoryWaste allocatingTypeGotFromMemoryWaste;
     AllocatingTypeGotFromShadowMemory allocatingTypeGotFromShadowMemory;
 
-    void switchFreeingTypeGotFromMemoryWaste(AllocatingTypeWithSizeGotFromMemoryWaste allocatingTypeWithSizeGotFromMemoryWaste) {
-        objectSize = allocatingTypeWithSizeGotFromMemoryWaste.objectSize;
-        isALargeObject = ProgramStatus::isALargeObject(objectSize);
-        allocatingTypeGotFromMemoryWaste = allocatingTypeWithSizeGotFromMemoryWaste.allocatingTypeGotByMemoryWaste;
-    };
+    void switchFreeingTypeGotFromMemoryWaste(AllocatingTypeWithSizeGotFromMemoryWaste allocatingTypeWithSizeGotFromMemoryWaste);
 };
 
 struct SystemCallData {
     uint64_t num;
     uint64_t cycles;
 
-    void add(SystemCallData newSystemCallData) {
-        this->num += newSystemCallData.num;
-        this->cycles += newSystemCallData.cycles;
-    }
+    void add(SystemCallData newSystemCallData);
 };
+
+typedef int (*LockFunction) (void *);
+typedef struct {
+    int (*LockFunction)(void *);
+} LockFunctionType;
+extern LockFunctionType lockFunctions[NUM_OF_LOCKTYPES];
+
+typedef int (*UnlockFunction) (void *);
+typedef struct {
+    int (*UnlockFunction)(void *);
+} UnlockFunctionType;
+extern UnlockFunctionType unlockFunctions[NUM_OF_LOCKTYPES];
 
 struct OverviewLockData {
     unsigned int numOfLocks;
@@ -60,14 +64,7 @@ struct OverviewLockData {
     unsigned int numOfCallsWithContentions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
     uint64_t totalCycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
 
-    void add(OverviewLockData newOverviewLockData) {
-        numOfLocks += newOverviewLockData.numOfLocks;
-        for(int allocationType; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
-            numOfCalls[allocationType] += newOverviewLockData.numOfCalls[allocationType];
-            numOfCallsWithContentions[allocationType] += newOverviewLockData.numOfCallsWithContentions[allocationType];
-            totalCycles[allocationType] += newOverviewLockData.totalCycles[allocationType];
-        }
-    }
+    void add(OverviewLockData newOverviewLockData);
 };
 
 struct DetailLockData {
@@ -78,35 +75,18 @@ struct DetailLockData {
     unsigned int maxNumOfContendingThreads; // How many threads are contending on this lock
     uint64_t cycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA]; // Total cycles
 
-    static DetailLockData newDetailLockData(LockTypes lockType) {
-        return DetailLockData{lockType, {0}, {0}, 0, 0, 0};
-    }
-
-    bool aContentionHappening() {
-        return (++numOfContendingThreads >= 2);
-    }
-
-    void checkAndUpdateMaxNumOfContendingThreads() {
-        maxNumOfContendingThreads = MAX(numOfContendingThreads, maxNumOfContendingThreads);
-    }
-
-    void quitFromContending() {
-        numOfContendingThreads--;
-    }
-
-    bool isAnImportantLock() {
-        return maxNumOfContendingThreads >= 10;
-    }
+    static DetailLockData newDetailLockData(LockTypes lockType);
+    bool aContentionHappening();
+    void checkAndUpdateMaxNumOfContendingThreads();
+    void quitFromContending();
+    bool isAnImportantLock();
 };
 
 struct CriticalSectionStatus {
     unsigned int numOfCriticalSections;
     uint64_t totalCyclesOfCriticalSections;
 
-    void add(CriticalSectionStatus newCriticalSectionStatus) {
-        numOfCriticalSections += newCriticalSectionStatus.numOfCriticalSections;
-        totalCyclesOfCriticalSections += newCriticalSectionStatus.totalCyclesOfCriticalSections;
-    }
+    void add(CriticalSectionStatus newCriticalSectionStatus);
 };
 
 struct FriendlinessStatus {
@@ -118,23 +98,15 @@ struct FriendlinessStatus {
     unsigned int numOfSampledFalseSharingInstructions[NUM_OF_FALSESHARINGTYPE];
     unsigned int numOfSampledFalseSharingCacheLines[NUM_OF_FALSESHARINGTYPE];
 
-    void recordANewSampling(uint64_t memoryUsageOfCacheLine, uint64_t memoryUsageOfPage) {
-        numOfSampling++;
-        totalMemoryUsageOfSampledCacheLines += memoryUsageOfCacheLine;
-        totalMemoryUsageOfSampledPages += memoryUsageOfPage;
-    }
+    void recordANewSampling(uint64_t memoryUsageOfCacheLine, uint64_t memoryUsageOfPage);
+    void add(FriendlinessStatus newFriendlinessStatus);
+};
 
-    void add(FriendlinessStatus newFriendlinessStatus) {
-        numOfSampling += newFriendlinessStatus.numOfSampling;
-        totalMemoryUsageOfSampledPages += newFriendlinessStatus.totalMemoryUsageOfSampledPages;
-        totalMemoryUsageOfSampledCacheLines += newFriendlinessStatus.totalMemoryUsageOfSampledPages;
-        numOfSampledStoringInstructions += newFriendlinessStatus.numOfSampledStoringInstructions;
-        numOfSampledCacheLines += newFriendlinessStatus.numOfSampledCacheLines;
-        for(int falseSharingType = 0; falseSharingType < NUM_OF_FALSESHARINGTYPE; ++falseSharingType) {
-            numOfSampledFalseSharingInstructions[falseSharingType] += newFriendlinessStatus.numOfSampledFalseSharingInstructions[falseSharingType];
-            numOfSampledFalseSharingCacheLines[falseSharingType] += newFriendlinessStatus.numOfSampledFalseSharingCacheLines[falseSharingType];
-        }
-    }
+struct TotalMemoryUsage {
+    uint64_t realMemoryUsage;
+    uint64_t totalMemoryUsage;
+    bool isLowerThan(TotalMemoryUsage newTotalMemoryUsage, size_t interval);
+    bool isLowerThan(TotalMemoryUsage newTotalMemoryUsage);
 };
 
 struct PerfReadInfo {
@@ -144,13 +116,7 @@ struct PerfReadInfo {
     uint64_t cache_misses = 0;
     uint64_t instructions = 0;
 
-    void add(struct PerfReadInfo newPerfReadInfo) {
-        faults += newPerfReadInfo.faults;
-        tlb_read_misses += newPerfReadInfo.tlb_read_misses;
-        tlb_write_misses += newPerfReadInfo.tlb_write_misses;
-        cache_misses += newPerfReadInfo.cache_misses;
-        instructions += newPerfReadInfo.instructions;
-    }
+    void add(struct PerfReadInfo newPerfReadInfo);
 };
 
 #endif //SRC_STRUCTS_H

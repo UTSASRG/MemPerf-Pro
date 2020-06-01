@@ -1,9 +1,10 @@
 #include "globalstatus.h"
 
+extern HashMap <void *, DetailLockData, spinlock, PrivateHeap> lockUsage;
 
 void GlobalStatus::globalize() {
     lock.lock();
-    for(int allocationType; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
+    for(int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
         numOfFunctions[allocationType] += ThreadLocalStatus::numOfFunctions[allocationType];
         countingEvents[allocationType].add(ThreadLocalStatus::countingEvents[allocationType]);
         criticalSectionStatus[allocationType].add(ThreadLocalStatus::criticalSectionStatus[allocationType]);
@@ -11,7 +12,7 @@ void GlobalStatus::globalize() {
             systemCallData[syscallType][allocationType].add(ThreadLocalStatus::systemCallData[syscallType][allocationType]);
         }
     }
-    for(int lockType; lockType < NUM_OF_LOCKTYPES; ++lockType) {
+    for(int lockType = 0; lockType < NUM_OF_LOCKTYPES; ++lockType) {
         overviewLockData[lockType].add(ThreadLocalStatus::overviewLockData[lockType]);
     }
     friendlinessStatus.add(ThreadLocalStatus::friendlinessStatus);
@@ -19,7 +20,7 @@ void GlobalStatus::globalize() {
 }
 
 void GlobalStatus::countPotentialMemoryLeakFunctions() {
-    for(int allocationType; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
+    for(int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
         if(allocationType == SMALL_FREE || allocationType == LARGE_FREE) {
             potentialMemoryLeakFunctions -= numOfFunctions[allocationType];
         } else {
@@ -46,7 +47,7 @@ void GlobalStatus::printTitle(char *content, uint64_t commentNumber) {
 
 void GlobalStatus::printNumOfAllocations() {
     printTitle((char*)"ALLOCATION NUM");
-    for(int allocationType; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
+    for(int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
         fprintf(ProgramStatus::outputFile, "%s %20lu\n", allocationTypeOutputString[allocationType], numOfFunctions[allocationType]);
     }
     countPotentialMemoryLeakFunctions();
@@ -54,7 +55,7 @@ void GlobalStatus::printNumOfAllocations() {
 }
 
 void GlobalStatus::printCountingEvents() {
-    for(int allocationType; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
+    for(int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
         printTitle(allocationTypeOutputTitleString[allocationType], numOfFunctions[allocationType]);
         if(numOfFunctions[allocationType]) {
             fprintf(ProgramStatus::outputFile, "cycles %20lu avg %20lu\n", cycles[allocationType], cycles[allocationType]/numOfFunctions[allocationType]);
@@ -70,14 +71,14 @@ void GlobalStatus::printCountingEvents() {
 
 void GlobalStatus::printOverviewLocks() {
     printTitle((char*)"LOCK TOTALS");
-    for(int lockType; lockType < NUM_OF_LOCKTYPES; ++lockType) {
-        fprintf(ProgramStatus::outputFile, "%s num %20lu\n", lockTypeOutputString[lockType], overviewLockData[lockType].numOfLocks);
+    for(int lockType = 0; lockType < NUM_OF_LOCKTYPES; ++lockType) {
+        fprintf(ProgramStatus::outputFile, "%s num %20u\n", lockTypeOutputString[lockType], overviewLockData[lockType].numOfLocks);
         if(overviewLockData[lockType].numOfLocks > 0) {
             for(int allocationType; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
                 if(overviewLockData[lockType].numOfCalls[allocationType] > 0) {
-                    fprintf(ProgramStatus::outputFile, "calls in %s %20lu\n", allocationTypeOutputString[allocationType], overviewLockData[lockType].numOfCalls[allocationType]);
+                    fprintf(ProgramStatus::outputFile, "calls in %s %20u\n", allocationTypeOutputString[allocationType], overviewLockData[lockType].numOfCalls[allocationType]);
                     fprintf(ProgramStatus::outputFile, "calls per %s %20lu\n", allocationTypeOutputString[allocationType], overviewLockData[lockType].numOfCalls[allocationType]/numOfFunctions[allocationType]);
-                    fprintf(ProgramStatus::outputFile, "contention calls in %s %20lu\n", allocationTypeOutputString[allocationType], overviewLockData[lockType].numOfCallsWithContentions[allocationType]);
+                    fprintf(ProgramStatus::outputFile, "contention calls in %s %20u\n", allocationTypeOutputString[allocationType], overviewLockData[lockType].numOfCallsWithContentions[allocationType]);
                     fprintf(ProgramStatus::outputFile, "contention calls per %s %20lu\n", allocationTypeOutputString[allocationType], overviewLockData[lockType].numOfCallsWithContentions[allocationType]/numOfFunctions[allocationType]);
                     fprintf(ProgramStatus::outputFile, "lock cycles in %s %20lu\n", allocationTypeOutputString[allocationType], overviewLockData[lockType].totalCycles[allocationType]);
                     fprintf(ProgramStatus::outputFile, "cycles per lock in %s %20lu\n", allocationTypeOutputString[allocationType], overviewLockData[lockType].totalCycles[allocationType]/overviewLockData[lockType].numOfCalls[allocationType]);
@@ -99,9 +100,9 @@ void GlobalStatus::printDetailLocks() {
             for(int allocationType; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
                 if(detailLockData->numOfCalls[allocationType] > 0) {
                     fprintf(ProgramStatus::outputFile, "calls in %s %20u\n", allocationTypeOutputString[allocationType], detailLockData->numOfCalls[allocationType]);
-                    fprintf(ProgramStatus::outputFile, "calls per %s %20u\n", allocationTypeOutputString[allocationType], detailLockData->numOfCalls[allocationType]/numOfFunctions[allocationType]);
+                    fprintf(ProgramStatus::outputFile, "calls per %s %20lu\n", allocationTypeOutputString[allocationType], detailLockData->numOfCalls[allocationType]/numOfFunctions[allocationType]);
                     fprintf(ProgramStatus::outputFile, "calls with contention in %s %20u\n", allocationTypeOutputString[allocationType], detailLockData->numOfCallsWithContentions[allocationType]);
-                    fprintf(ProgramStatus::outputFile, "calls with contention per %s %20u\n", allocationTypeOutputString[allocationType], detailLockData->numOfCallsWithContentions[allocationType]/numOfFunctions[allocationType]);
+                    fprintf(ProgramStatus::outputFile, "calls with contention per %s %20lu\n", allocationTypeOutputString[allocationType], detailLockData->numOfCallsWithContentions[allocationType]/numOfFunctions[allocationType]);
                 }
             }
             fprintf(ProgramStatus::outputFile, "\n");
@@ -112,7 +113,7 @@ void GlobalStatus::printDetailLocks() {
 void GlobalStatus::printCriticalSections() {
     printTitle((char*)"CRITICAL SECTION");
     if(criticalSectionStatus->numOfCriticalSections > 0) {
-        fprintf(ProgramStatus::outputFile, "critical section %20lu\n", criticalSectionStatus->numOfCriticalSections);
+        fprintf(ProgramStatus::outputFile, "critical section %20u\n", criticalSectionStatus->numOfCriticalSections);
         fprintf(ProgramStatus::outputFile, "critical section cycles %20lu avg %20lu\n", criticalSectionStatus->totalCyclesOfCriticalSections, criticalSectionStatus->totalCyclesOfCriticalSections/criticalSectionStatus->numOfCriticalSections);
     }
 }

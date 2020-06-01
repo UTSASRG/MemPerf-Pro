@@ -29,7 +29,7 @@
 #define ONE_MB 1048576l
 #define ONE_GB 1073741824l
 #define TEN_GB 10737418240l
-#define MAX_FILENAME_LEN 56
+#define MAX_FILENAME_LEN 128
 #define TEMP_BUF_SIZE EIGHT_MB
 
 
@@ -101,4 +101,23 @@ enum FalseSharingType {
     PASSIVE,
     NUM_OF_FALSESHARINGTYPE
 };
+
+enum eMemAccessType{
+    E_MEM_NONE = 0,
+    E_MEM_LOAD,
+    E_MEM_STORE,
+    E_MEM_PFETCH,
+    E_MEM_EXEC,
+    E_MEM_UNKNOWN,
+};
+inline unsigned long long rdtscp() {
+    unsigned int lo, hi;
+    asm volatile (
+    "rdtscp"
+    : "=a"(lo), "=d"(hi) /* outputs */
+    : "a"(0)             /* inputs */
+    : "%ebx", "%ecx");     /* clobbers*/
+    unsigned long long retval = ((unsigned long long)lo) | (((unsigned long long)hi) << 32);
+    return retval;
+}
 #endif //MMPROF_DEFINEVALUES_H

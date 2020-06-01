@@ -19,26 +19,7 @@
 #include <sys/ioctl.h>
 #include "structs.h"
 #include "spinlock.hh"
-
-enum eMemAccessType{
-  E_MEM_NONE = 0,
-  E_MEM_LOAD,
-  E_MEM_STORE,
-  E_MEM_PFETCH,
-  E_MEM_EXEC,
-  E_MEM_UNKNOWN,
-};
-
-inline unsigned long long rdtscp() {
-		unsigned int lo, hi;
-		asm volatile (
-						"rdtscp"
-						: "=a"(lo), "=d"(hi) /* outputs */
-						: "a"(0)             /* inputs */
-						: "%ebx", "%ecx");     /* clobbers*/
-		unsigned long long retval = ((unsigned long long)lo) | (((unsigned long long)hi) << 32);
-		return retval;
-}
+#include "shadowmemory.hh"
 
 
 typedef struct {

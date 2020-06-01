@@ -4,6 +4,8 @@
 
 #include "allocatingstatus.h"
 
+class MemoryUsage;
+
 
 void AllocatingStatus::updateAllocatingTypeBeforeRealFunction(AllocationFunction allocationFunction, size_t objectSize) {
     allocatingType.allocatingFunction = allocationFunction;
@@ -137,9 +139,9 @@ void AllocatingStatus::setAllocationTypeForOutputData() {
 void AllocatingStatus::addUpOverviewLockDataToThreadLocalData() {
     for(int lockType = 0; lockType < NUM_OF_LOCKTYPES; ++lockType) {
         ThreadLocalStatus::overviewLockData[lockType].numOfLocks += overviewLockData[lockType].numOfLocks;
-        ThreadLocalStatus::overviewLockData[lockType].numOfCalls[AllocationTypeForOutputData] += overviewLockData[lockType].numOfCalls;
-        ThreadLocalStatus::overviewLockData[lockType].numOfCallsWithContentions[AllocationTypeForOutputData] += overviewLockData[lockType].numOfCallsWithContentions;
-        ThreadLocalStatus::overviewLockData[lockType].totalCycles[AllocationTypeForOutputData] += overviewLockData[lockType].cycles;
+        ThreadLocalStatus::overviewLockData[lockType].numOfCalls[allocationTypeForOutputData] += overviewLockData[lockType].numOfCalls;
+        ThreadLocalStatus::overviewLockData[lockType].numOfCallsWithContentions[allocationTypeForOutputData] += overviewLockData[lockType].numOfCallsWithContentions;
+        ThreadLocalStatus::overviewLockData[lockType].totalCycles[allocationTypeForOutputData] += overviewLockData[lockType].cycles;
     }
 }
 
@@ -148,8 +150,8 @@ void AllocatingStatus::addUpDetailLockDataToHashTable() {
 }
 
 void AllocatingStatus::addUpCriticalSectionDataToThreadLocalData() {
-    ThreadLocalStatus::criticalSectionStatus[AllocationTypeForOutputData].numOfCriticalSections += criticalSectionStatus.numOfCriticalSections;
-    ThreadLocalStatus::criticalSectionStatus[AllocationTypeForOutputData].totalCyclesOfCriticalSections += criticalSectionStatus.totalCyclesOfCriticalSections;
+    ThreadLocalStatus::criticalSectionStatus[allocationTypeForOutputData].numOfCriticalSections += criticalSectionStatus.numOfCriticalSections;
+    ThreadLocalStatus::criticalSectionStatus[allocationTypeForOutputData].totalCyclesOfCriticalSections += criticalSectionStatus.totalCyclesOfCriticalSections;
 }
 
 void AllocatingStatus::addUpLockFunctionsInfoToThreadLocalData() {
