@@ -14,57 +14,6 @@
 
 
 class GlobalStatus {
-private:
-    static constexpr char * outoutTitleNotificationString[2] = {
-            (char*)"\n>>>>>>>>>>>>>>>",
-            (char*)"<<<<<<<<<<<<<<<\n"
-    };
-
-    static constexpr char * allocationTypeOutputString[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA] = {
-            (char*)"small new malloc",
-            (char*)"small reused malloc",
-            (char*)"large malloc",
-            (char*)"small free",
-            (char*)"large free",
-            (char*)"calloc",
-            (char*)"realloc",
-            (char*)"posix_memalign",
-            (char*)"memalign"
-    };
-
-    static constexpr char * allocationTypeOutputTitleString[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA] = {
-            (char*)"SMALL NEW MALLOC",
-            (char*)"SMALL REUSED MALLOC",
-            (char*)"LARGE MALLOC",
-            (char*)"SMALL FREE",
-            (char*)"LARGE FREE",
-            (char*)"CALLOC",
-            (char*)"REALLOC",
-            (char*)"POSIX_MEMALIGN",
-            (char*)"MEMALIGN"
-    };
-
-    static constexpr char * lockTypeOutputString[NUM_OF_LOCKTYPES] = {
-            (char*)"mutex lock",
-            (char*)"spin lock",
-            (char*)"mutex try lock",
-            (char*)"spin try lock"
-    };
-
-    static constexpr char * syscallTypeOutputString[NUM_OF_SYSTEMCALLTYPES] = {
-            (char*)"mmap",
-            (char*)"madvise",
-            (char*)"sbrk",
-            (char*)"mprotect",
-            (char*)"munmap",
-            (char*)"mremap"
-    };
-
-    static constexpr char * falseSharingTypeOutputString[NUM_OF_FALSESHARINGTYPE] = {
-            (char*)"object false sharing",
-            (char*)"active false sharing",
-            (char*)"passive false sharing"
-    };
 
 public:
     static spinlock lock;

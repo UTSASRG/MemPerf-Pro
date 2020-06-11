@@ -13,28 +13,24 @@ void AllocatingType::switchFreeingTypeGotFromMemoryWaste(AllocatingTypeWithSizeG
     allocatingTypeGotFromMemoryWaste = allocatingTypeWithSizeGotFromMemoryWaste.allocatingTypeGotByMemoryWaste;
 };
 
+void SystemCallData::addOneSystemCall(uint64_t cycles) {
+    this->num++;
+    this->cycles += cycles;
+}
 
 void SystemCallData::add(SystemCallData newSystemCallData) {
     this->num += newSystemCallData.num;
     this->cycles += newSystemCallData.cycles;
 }
 
+void SystemCallData::cleanup() {
+    this->num = 0;
+    this->cycles = 0;
+}
 
-LockFunctionType lockFunctions[NUM_OF_LOCKTYPES] = {
-        (LockFunction)RealX::pthread_mutex_lock,
-        (LockFunction)RealX::pthread_spin_lock,
-        (LockFunction)RealX::pthread_mutex_trylock,
-        (LockFunction)RealX::pthread_spin_trylock
-};
-
-
-UnlockFunctionType unlockFunctions[NUM_OF_LOCKTYPES] = {
-        (UnlockFunction)RealX::pthread_mutex_unlock,
-        (UnlockFunction)RealX::pthread_spin_unlock,
-        (UnlockFunction)RealX::pthread_mutex_unlock,
-        (UnlockFunction)RealX::pthread_spin_unlock
-};
-
+void SystemCallData::debugPrint() {
+    fprintf(stderr, "num = %lu, cycles = %lu\n", num, cycles);
+}
 
 void OverviewLockData::add(OverviewLockData newOverviewLockData) {
     numOfLocks += newOverviewLockData.numOfLocks;
@@ -91,6 +87,14 @@ void FriendlinessStatus::add(FriendlinessStatus newFriendlinessStatus) {
     }
 }
 
+void FriendlinessStatus::debugPrint() {
+    fprintf(stderr, "numOfSampling = %u\n", numOfSampling);
+    fprintf(stderr, "totalMemoryUsageOfSampledPages = %lu\n", totalMemoryUsageOfSampledPages);
+    fprintf(stderr, "totalMemoryUsageOfSampledCacheLines = %lu\n", totalMemoryUsageOfSampledCacheLines);
+    fprintf(stderr, "numOfSampledStoringInstructions = %u\n", numOfSampledStoringInstructions);
+    fprintf(stderr, "numOfSampledCacheLines = %u\n", numOfSampledCacheLines);
+    fprintf(stderr, "\n");
+}
 
 bool TotalMemoryUsage::isLowerThan(TotalMemoryUsage newTotalMemoryUsage, size_t interval) {
     return this->totalMemoryUsage + interval < newTotalMemoryUsage.totalMemoryUsage;
@@ -107,4 +111,11 @@ void PerfReadInfo::add(struct PerfReadInfo newPerfReadInfo) {
     tlb_write_misses += newPerfReadInfo.tlb_write_misses;
     cache_misses += newPerfReadInfo.cache_misses;
     instructions += newPerfReadInfo.instructions;
+}
+
+
+void PerfReadInfo::debugPrint() {
+    fprintf(stderr, "faults = %ld, tlb_read_misses = %ld, tlb_write_misses = %ld, "
+                    "cache_misses = %ld, instructions = %ld\n",
+                    faults, tlb_read_misses, tlb_write_misses, cache_misses, instructions);
 }

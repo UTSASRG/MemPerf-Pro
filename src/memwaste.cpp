@@ -1,6 +1,12 @@
 
 #include "memwaste.h"
 
+HashMap<void*, ObjectStatus, spinlock, PrivateHeap> MemoryWaste::objStatusMap;
+thread_local SizeClassSizeAndIndex MemoryWaste::currentSizeClassSizeAndIndex;
+MemoryWasteStatus MemoryWaste::currentStatus, MemoryWaste::recordStatus;
+MemoryWasteGlobalStatus MemoryWaste::globalStatus;
+MemoryWasteTotalValue MemoryWaste::totalValue;
+
 
 size_t ObjectStatus::internalFragment() {
     size_t unUsedPage = (sizeClassSizeAndIndex.classSize - maxTouchedBytes) / PAGESIZE * PAGESIZE;
@@ -36,6 +42,17 @@ void MemoryWasteStatus::initialize() {
     lock.init();
 }
 
+void MemoryWasteStatus::debugPrint() {
+    for(unsigned int threadIndex = 0; threadIndex < ThreadLocalStatus::totalNumOfRunningThread; ++threadIndex) {
+        fprintf(stderr, "thread %d: ", threadIndex);
+        for(unsigned int classSizeIndex = 0; classSizeIndex < ProgramStatus::numberOfClassSizes; ++classSizeIndex) {
+            fprintf(stderr, "%lu ", numOfActiveObjects.numOfFreelistObjects[arrayIndex(threadIndex, classSizeIndex)]);
+        }
+        fprintf(stderr, "\n");
+    }
+    fprintf(stderr, "\n");
+}
+
 void MemoryWasteStatus::updateStatus(MemoryWasteStatus newStatus) {
     lock.lock();
     memcpy(this->internalFragment, newStatus.internalFragment, sizeOfArrays);
@@ -47,7 +64,6 @@ void MemoryWasteStatus::updateStatus(MemoryWasteStatus newStatus) {
     memcpy(this->blowupFlag, newStatus.blowupFlag, ProgramStatus::numberOfClassSizes * sizeof(uint64_t));
     lock.unlock();
 }
-
 
 size_t MemoryWasteGlobalStatus::sizeOfArrays = ProgramStatus::numberOfClassSizes * sizeof(uint64_t);
 
@@ -115,7 +131,7 @@ void MemoryWasteTotalValue::getTotalValues(MemoryWasteGlobalStatus globalStatus)
 }
 
 void MemoryWasteTotalValue::getExternalFragment() {
-    externalFragment = MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage - MemoryUsage::globalMemoryUsage.realMemoryUsage - internalFragment - memoryBlowup;
+    externalFragment = MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage - MemoryUsage::maxGlobalMemoryUsage.realMemoryUsage - internalFragment - memoryBlowup;
     externalFragment = MAX(externalFragment, 0);
 }
 
@@ -170,7 +186,9 @@ AllocatingTypeWithSizeGotFromMemoryWaste MemoryWaste::freeUpdate(void* address) 
 
     /* Get old status */
     ObjectStatus* status = objStatusMap.find(address, sizeof(void *));
-
+    if(status == nullptr) {
+        return AllocatingTypeWithSizeGotFromMemoryWaste{0, AllocatingTypeGotFromMemoryWaste{false, 0}};
+    }
     currentSizeClassSizeAndIndex = status->sizeClassSizeAndIndex;
 
     currentStatus.numOfAccumulatedOperations.numOfFree[arrayIndex()]++;
@@ -191,6 +209,7 @@ void MemoryWaste::compareMemoryUsageAndRecordStatus(TotalMemoryUsage newTotalMem
 }
 
 void MemoryWaste::globalizeRecordAndGetTotalValues() {
+
     globalStatus.globalize(recordStatus);
     globalStatus.calculateBlowup(recordStatus);
     globalStatus.cleanAbnormalValues();
@@ -200,6 +219,7 @@ void MemoryWaste::globalizeRecordAndGetTotalValues() {
 }
 
 void MemoryWaste::printOutput() {
+    globalizeRecordAndGetTotalValues();
     GlobalStatus::printTitle((char*)"MEMORY WASTE");
     for (unsigned int classSizeIndex = 0; classSizeIndex < ProgramStatus::numberOfClassSizes; ++classSizeIndex) {
 
@@ -219,29 +239,30 @@ void MemoryWaste::printOutput() {
                 globalStatus.numOfAccumulatedOperations.numOfReusedAllocations[classSizeIndex],
                 globalStatus.numOfAccumulatedOperations.numOfFree[classSizeIndex]);
     }
-
-    fprintf(ProgramStatus::outputFile, "\ntotal:\t\t\t\t\t\t\t\t\t\t"
-                    "total internal fragmentation:%10luK(%3lu%%)\n\t\t\t\t\t\t\t\t\t\t\t\t\t",
-            totalValue.internalFragment/ONE_KB, totalValue.internalFragment*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage);
+    if(MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage) {
+        fprintf(ProgramStatus::outputFile, "\ntotal:\t\t\t\t\t\t\t\t\t\t"
+                                           "total internal fragmentation:%10luK(%3lu%%)\n\t\t\t\t\t\t\t\t\t\t\t\t\t",
+                totalValue.internalFragment/ONE_KB, totalValue.internalFragment*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage);
         fprintf(ProgramStatus::outputFile, "total memory blowup:\t\t\t\t\t\t%10ldK(%3ld%%)\n\t\t\t\t\t\t\t\t\t\t\t\t\t"
-                        "total external fragmentation:\t\t\t\t%10ldK(%3ld%%)\n\t\t\t\t\t\t\t\t\t\t\t\t\t",
+                                           "total external fragmentation:\t\t\t\t%10ldK(%3ld%%)\n\t\t\t\t\t\t\t\t\t\t\t\t\t",
                 totalValue.memoryBlowup/ONE_KB, totalValue.memoryBlowup*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage,
                 totalValue.externalFragment/ONE_KB, totalValue.externalFragment*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage);
-    fprintf(ProgramStatus::outputFile,
-            "total real using memory:\t\t\t\t%10ldK(%3ld%%)\n\t\t\t\t\t\t\t\t\t\t\t\t\t"
-                    "total using memory:\t\t\t\t%10ldK\n"
-                    "\ncurrent status:\t\t\t\t\t\t\t\t\t\t"
-                    "active objects: %10lu\t\t\tfreelist objects: %10lu"
-                    "\naccumulative results:\t\t\t\t\t\t\t\t\t\t"
-                    "new allocated: %10lu\t\t\treused allocated: %10lu\t\t\tfreed: %10lu\n",
-            MemoryUsage::maxGlobalMemoryUsage.realMemoryUsage/ONE_KB,
-            100 - totalValue.internalFragment*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage
-            - totalValue.memoryBlowup*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage
-            - totalValue.externalFragment*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage,
-            MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage/ONE_KB,
-            totalValue.numOfActiveObjects.numOfAllocatedObjects, totalValue.numOfActiveObjects.numOfFreelistObjects,
-            totalValue.numOfAccumulatedOperations.numOfNewAllocations, totalValue.numOfAccumulatedOperations.numOfReusedAllocations,
-            totalValue.numOfAccumulatedOperations.numOfFree);
+        fprintf(ProgramStatus::outputFile,
+                "total real using memory:\t\t\t\t%10ldK(%3ld%%)\n\t\t\t\t\t\t\t\t\t\t\t\t\t"
+                "total using memory:\t\t\t\t%10ldK\n"
+                "\ncurrent status:\t\t\t\t\t\t\t\t\t\t"
+                "active objects: %10lu\t\t\tfreelist objects: %10lu"
+                "\naccumulative results:\t\t\t\t\t\t\t\t\t\t"
+                "new allocated: %10lu\t\t\treused allocated: %10lu\t\t\tfreed: %10lu\n",
+                MemoryUsage::maxGlobalMemoryUsage.realMemoryUsage/ONE_KB,
+                100 - totalValue.internalFragment*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage
+                - totalValue.memoryBlowup*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage
+                - totalValue.externalFragment*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage,
+                MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage/ONE_KB,
+                totalValue.numOfActiveObjects.numOfAllocatedObjects, totalValue.numOfActiveObjects.numOfFreelistObjects,
+                totalValue.numOfAccumulatedOperations.numOfNewAllocations, totalValue.numOfAccumulatedOperations.numOfReusedAllocations,
+                totalValue.numOfAccumulatedOperations.numOfFree);
+    }
 
 }
 

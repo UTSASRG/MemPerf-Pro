@@ -10,6 +10,8 @@
 #include "real.hh"
 #include "hashlist.hh"
 #include "definevalues.h"
+#include "mymalloc.h"
+#include "threadlocalstatus.h"
 
 #define LOCK_PROTECTION 1
 
@@ -90,6 +92,10 @@ class HashMap {
 
 public:
   HashMap() : _initialized(false) {
+  }
+
+  bool initialized() {
+      return _initialized;
   }
 
   size_t alignup(size_t size, size_t alignto) {
@@ -220,9 +226,8 @@ public:
     ValueType* ret = NULL;
     struct Entry * entry; 
     if(_initialized != true) {
-      fprintf(stderr, "process %d: initialized at  %p hashmap is not true\n", getpid(), &_initialized);
-      exit(0);
-      //  while(1) { ; }
+      fprintf(stderr, "process %d: initialized at  %p hashmap is not true\n", getpid(), this);
+      abort();
     }
 
     assert(_initialized == true);
@@ -310,7 +315,8 @@ private:
 
   // Create a new Entry with specified key and value.
   struct Entry* createNewEntry(const KeyType& key, size_t keylen, ValueType value) {
-    struct Entry* entry = (struct Entry*)RealX::malloc(sizeof(struct Entry));
+      struct Entry* entry = (struct Entry*)MyMalloc::hashMalloc(sizeof(struct Entry));
+
     if(entry == NULL) {
       fprintf(stderr, "fail to create entry\n");
       exit(0);

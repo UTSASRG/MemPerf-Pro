@@ -183,7 +183,7 @@ void sampleHandler(int signum, siginfo_t *info, void *p) {
 }
 
 void doSampleRead() {
-  if(!perfInfo.initialized) {
+  if(!perfInfo.initialized || !isSamplingInit) {
     return;
   }
 

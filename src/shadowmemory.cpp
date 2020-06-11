@@ -18,6 +18,7 @@ CacheMapEntry * ShadowMemory::cache_map_end = nullptr;
 CacheMapEntry * ShadowMemory::cache_map_bump_ptr = nullptr;
 spinlock ShadowMemory::cache_map_lock;
 spinlock ShadowMemory::mega_map_lock;
+bool ShadowMemory::isInitialized;
 
 bool ShadowMemory::initialize() {
 	if(isInitialized) {
@@ -57,10 +58,8 @@ bool ShadowMemory::initialize() {
 }
 
 size_t ShadowMemory::updateObject(void * address, size_t size, bool isFree) {
-    if(address == NULL) {
-				fprintf(stderr, "ERROR: null pointer passed into %s at %s:%d\n",
-                __FUNCTION__, __FILE__, __LINE__);
-        abort();
+    if(address == nullptr || size == 0) {
+        return 0;
     }
 
     //unsigned classSize;

@@ -40,23 +40,14 @@ struct AllocatingType {
 };
 
 struct SystemCallData {
-    uint64_t num;
-    uint64_t cycles;
+    uint64_t num = 0;
+    uint64_t cycles = 0;
 
+    void addOneSystemCall(uint64_t cycles);
     void add(SystemCallData newSystemCallData);
+    void cleanup();
+    void debugPrint();
 };
-
-typedef int (*LockFunction) (void *);
-typedef struct {
-    int (*LockFunction)(void *);
-} LockFunctionType;
-extern LockFunctionType lockFunctions[NUM_OF_LOCKTYPES];
-
-typedef int (*UnlockFunction) (void *);
-typedef struct {
-    int (*UnlockFunction)(void *);
-} UnlockFunctionType;
-extern UnlockFunctionType unlockFunctions[NUM_OF_LOCKTYPES];
 
 struct OverviewLockData {
     unsigned int numOfLocks;
@@ -100,6 +91,7 @@ struct FriendlinessStatus {
 
     void recordANewSampling(uint64_t memoryUsageOfCacheLine, uint64_t memoryUsageOfPage);
     void add(FriendlinessStatus newFriendlinessStatus);
+    void debugPrint();
 };
 
 struct TotalMemoryUsage {
@@ -117,6 +109,65 @@ struct PerfReadInfo {
     uint64_t instructions = 0;
 
     void add(struct PerfReadInfo newPerfReadInfo);
+    void debugPrint();
+};
+
+//extern constexpr char * outputTitleNotificationString[2];
+//extern constexpr char * allocationTypeOutputString[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
+//extern constexpr char * allocationTypeOutputTitleString[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
+//extern constexpr char * lockTypeOutputString[NUM_OF_LOCKTYPES];
+//extern constexpr char * syscallTypeOutputString[NUM_OF_SYSTEMCALLTYPES];
+//extern constexpr char * falseSharingTypeOutputString[NUM_OF_FALSESHARINGTYPE];
+
+constexpr char * outputTitleNotificationString[2] = {
+        (char*)"\n>>>>>>>>>>>>>>>",
+        (char*)"<<<<<<<<<<<<<<<\n"
+};
+
+constexpr char * allocationTypeOutputString[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA] = {
+        (char*)"small new malloc",
+        (char*)"small reused malloc",
+        (char*)"large malloc",
+        (char*)"small free",
+        (char*)"large free",
+        (char*)"calloc",
+        (char*)"realloc",
+        (char*)"posix_memalign",
+        (char*)"memalign"
+};
+
+constexpr char * allocationTypeOutputTitleString[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA] = {
+        (char*)"SMALL NEW MALLOC",
+        (char*)"SMALL REUSED MALLOC",
+        (char*)"LARGE MALLOC",
+        (char*)"SMALL FREE",
+        (char*)"LARGE FREE",
+        (char*)"CALLOC",
+        (char*)"REALLOC",
+        (char*)"POSIX_MEMALIGN",
+        (char*)"MEMALIGN"
+};
+
+constexpr char * lockTypeOutputString[NUM_OF_LOCKTYPES] = {
+        (char*)"mutex lock",
+        (char*)"spin lock",
+        (char*)"mutex try lock",
+        (char*)"spin try lock"
+};
+
+constexpr char * syscallTypeOutputString[NUM_OF_SYSTEMCALLTYPES] = {
+        (char*)"mmap",
+        (char*)"madvise",
+        (char*)"sbrk",
+        (char*)"mprotect",
+        (char*)"munmap",
+        (char*)"mremap"
+};
+
+constexpr char * falseSharingTypeOutputString[NUM_OF_FALSESHARINGTYPE] = {
+        (char*)"object false sharing",
+        (char*)"active false sharing",
+        (char*)"passive false sharing"
 };
 
 #endif //SRC_STRUCTS_H

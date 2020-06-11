@@ -68,6 +68,9 @@ private:
 
         void writingNewDataInTheQueue(DetailLockData * addressOfHashLockData) {
             queue[++queueTail].addressOfHashLockData = addressOfHashLockData;
+            queue[queueTail].numOfCalls = 0;
+            queue[queueTail].numOfCallsWithContentions = 0;
+            queue[queueTail].cycles = 0;
         }
 
         void addAContention() {
@@ -99,15 +102,15 @@ private:
 
         void checkAndStartRecordingACriticalSection() {
             if(++numOfOwningLocks == 1) {
-                cyclesBeforeRealFunction = rdtscp();
+                cyclesBeforeCriticalSection = rdtscp();
             }
         }
 
         void checkAndStopRecordingACriticalSection() {
             if(--numOfOwningLocks == 0) {
-                cyclesAfterRealFunction = rdtscp();
+                cyclesAfterCriticalSection = rdtscp();
                 numOfCriticalSections++;
-                totalCyclesOfCriticalSections += cyclesAfterCriticalSection - cyclesBeforeRealFunction;
+                totalCyclesOfCriticalSections += cyclesAfterCriticalSection - cyclesBeforeCriticalSection;
             }
         }
 
@@ -116,6 +119,7 @@ private:
             totalCyclesOfCriticalSections = 0;
         }
     };
+
     static thread_local LockTypes nowRunningLockType;
     static thread_local QueueOfDetailLockDataInAllocatingStatus queueOfDetailLockData;
     static thread_local OverviewLockDataInAllocatingStatus overviewLockData[NUM_OF_LOCKTYPES];
@@ -149,6 +153,7 @@ private:
     static void cleanDetailLockDataInAllocatingStatus();
     static void cleanCriticalSectionDataInAllocatingStatus();
     static void cleanLockFunctionsInfoInAllocatingStatus();
+    static void cleanSyscallsInfoInAllocatingStatus();
 
 public:
     static void updateAllocatingStatusBeforeRealFunction(AllocationFunction allocationFunction, size_t objectSize);
@@ -159,7 +164,7 @@ public:
 
     static void updateAllocatingInfoToThreadLocalData();
     static bool outsideTrackedAllocation();
-    static void addToSystemCallData(SystemCallTypes systemCallTypes, SystemCallData newSystemCallData);
+    static void addOneSyscallToSyscallData(SystemCallTypes systemCallTypes, uint64_t cycles);
 
     static void recordANewLock(LockTypes lockType);
     static void initForWritingOneLockData(LockTypes lockType, DetailLockData* addressOfHashLockData);

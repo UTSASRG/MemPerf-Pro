@@ -15,13 +15,13 @@
 class ProgramStatus {
 private:
     static bool profilerInitialized;
+    static bool beginConclusion;
+
     static char inputInfoFileName[MAX_FILENAME_LEN];
     static FILE * inputInfoFile;
     static char outputFileName[MAX_FILENAME_LEN];
 
     static size_t largeObjectThreshold;
-
-    static bool selfMapInitialized;
 
     static thread_local struct SizeClassSizeAndIndex cacheForGetClassSizeAndIndex;
 
@@ -34,27 +34,26 @@ private:
     static void openInputInfoFile();
     static void openOutputFile();
 
-    static void setSelfMapInitializedTrue();
-
     static void printStackAddr();
     static void printLargeObjectThreshold();
 
 public:
 
     static FILE * outputFile;
-    static void setProfilerInitializedTrue();
-
     static bool allocatorStyleIsBibop;
+
     static unsigned int numberOfClassSizes;
     static size_t classSizes[10000];
 
+    static void setProfilerInitializedTrue();
+    static void setBeginConclusionTrue();
+
     static bool profilerNotInitialized();
+    static bool conclusionHasStarted();
     static void checkSystemIs64Bits();
 
     static void initIO();
     static void printOutput();
-
-    static bool selfMapInitializedIsTrue();
 
     static bool isALargeObject(size_t size);
 

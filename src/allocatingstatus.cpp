@@ -1,11 +1,20 @@
-//
-// Created by 86152 on 2020/5/23.
-//
-
 #include "allocatingstatus.h"
 
-class MemoryUsage;
+extern thread_local bool PMUinit;
 
+thread_local AllocatingType AllocatingStatus::allocatingType;
+thread_local AllocationTypeForOutputData AllocatingStatus::allocationTypeForOutputData;
+thread_local uint64_t AllocatingStatus::cyclesBeforeRealFunction;
+thread_local uint64_t AllocatingStatus::cyclesAfterRealFunction;
+thread_local uint64_t AllocatingStatus::cyclesInRealFunction;
+thread_local PerfReadInfo AllocatingStatus::countingDataBeforeRealFunction;
+thread_local PerfReadInfo AllocatingStatus::countingDataAfterRealFunction;
+thread_local PerfReadInfo AllocatingStatus::countingDataInRealFunction;
+thread_local LockTypes AllocatingStatus::nowRunningLockType;
+thread_local AllocatingStatus::QueueOfDetailLockDataInAllocatingStatus AllocatingStatus::queueOfDetailLockData;
+thread_local AllocatingStatus::OverviewLockDataInAllocatingStatus AllocatingStatus::overviewLockData[NUM_OF_LOCKTYPES];
+thread_local AllocatingStatus::CriticalSectionStatusInAllocatingStatus AllocatingStatus::criticalSectionStatus;
+thread_local SystemCallData AllocatingStatus::systemCallData[NUM_OF_SYSTEMCALLTYPES];
 
 void AllocatingStatus::updateAllocatingTypeBeforeRealFunction(AllocationFunction allocationFunction, size_t objectSize) {
     allocatingType.allocatingFunction = allocationFunction;
@@ -186,10 +195,17 @@ void AllocatingStatus::addUpSyscallsInfoToThreadLocalData() {
     }
 }
 
+void AllocatingStatus::cleanSyscallsInfoInAllocatingStatus() {
+    for(int syscallType = 0; syscallType < NUM_OF_SYSTEMCALLTYPES; ++syscallType) {
+        systemCallData[syscallType].cleanup();
+    }
+}
+
 void AllocatingStatus::addUpOtherFunctionsInfoToThreadLocalData() {
     addUpLockFunctionsInfoToThreadLocalData();
     cleanLockFunctionsInfoInAllocatingStatus();
     addUpSyscallsInfoToThreadLocalData();
+    cleanSyscallsInfoInAllocatingStatus();
 }
 
 
@@ -209,8 +225,8 @@ bool AllocatingStatus::outsideTrackedAllocation() {
     return ! allocatingType.doingAllocation;
 }
 
-void AllocatingStatus::addToSystemCallData(SystemCallTypes systemCallTypes, SystemCallData newSystemCallData) {
-    systemCallData[systemCallTypes].add(newSystemCallData);
+void AllocatingStatus::addOneSyscallToSyscallData(SystemCallTypes systemCallTypes, uint64_t cycles) {
+    systemCallData[systemCallTypes].addOneSystemCall(cycles);
 }
 
 void AllocatingStatus::recordANewLock(LockTypes lockType) {

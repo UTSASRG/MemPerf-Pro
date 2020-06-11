@@ -1,22 +1,31 @@
-//
-// Created by 86152 on 2020/5/20.
-//
 #include "programstatus.h"
+
+bool ProgramStatus::profilerInitialized;
+bool ProgramStatus::beginConclusion;
+char ProgramStatus::inputInfoFileName[MAX_FILENAME_LEN];
+FILE * ProgramStatus::inputInfoFile;
+char ProgramStatus::outputFileName[MAX_FILENAME_LEN];
+size_t ProgramStatus::largeObjectThreshold;
+thread_local struct SizeClassSizeAndIndex ProgramStatus::cacheForGetClassSizeAndIndex;
+
+FILE * ProgramStatus::outputFile;
+bool ProgramStatus::allocatorStyleIsBibop;
+unsigned int ProgramStatus::numberOfClassSizes;
+size_t ProgramStatus::classSizes[10000];
+
 
 void ProgramStatus::setProfilerInitializedTrue() {
     profilerInitialized = true;
 }
+void ProgramStatus::setBeginConclusionTrue() {
+    beginConclusion = true;
+}
 bool ProgramStatus::profilerNotInitialized() {
     return !profilerInitialized;
 }
-
-void ProgramStatus::setSelfMapInitializedTrue() {
-    selfMapInitialized = true;
+bool ProgramStatus::conclusionHasStarted() {
+    return beginConclusion;
 }
-bool ProgramStatus::selfMapInitializedIsTrue() {
-    return selfMapInitialized;
-}
-
 // Ensure we are operating on a system using 64-bit pointers.
 void ProgramStatus::checkSystemIs64Bits() {
     if(sizeof(void *) != EIGHT_BYTES) {
@@ -78,14 +87,16 @@ void ProgramStatus::readLargeObjectThresholdFromInfo(char * token) {
 
 void ProgramStatus::readInputInfoFile() {
 
-    size_t bufferSize = 1024;
+    size_t bufferSize = 65535;
     char * buffer = (char*)MyMalloc::malloc(bufferSize);
 
     while (getline(&buffer, &bufferSize, ProgramStatus::inputInfoFile) > 0) {
         char *token = strtok(buffer, " ");
-        readAllocatorStyleFromInfo(token);
-        readAllocatorClassSizesFromInfo(token);
-        readLargeObjectThresholdFromInfo(token);
+        if(token) {
+            readAllocatorStyleFromInfo(token);
+            readAllocatorClassSizesFromInfo(token);
+            readLargeObjectThresholdFromInfo(token);
+        }
     }
 }
 
@@ -97,10 +108,8 @@ void ProgramStatus::openInputInfoFile() {
 
 void ProgramStatus::openOutputFile() {
     extern char * program_invocation_name;
-//	snprintf(ProgramStatus::outputInfoFileName, MAX_FILENAME_LEN, "%s_libmallocprof_%d_main_thread.txt",
-//			program_invocation_name, getpid());
-    snprintf(ProgramStatus::outputFileName, MAX_FILENAME_LEN, "/home/jinzhou/parsec/records_t/%s_libmallocprof_%d_main_thread.txt",
-             program_invocation_name, getpid());
+	snprintf(ProgramStatus::outputFileName, MAX_FILENAME_LEN, "%s_libmallocprof_%d_main_thread.txt", program_invocation_name, getpid());
+//    snprintf(ProgramStatus::outputFileName, MAX_FILENAME_LEN, "/home/jinzhou/parsec/records_t/%s_libmallocprof_%d_main_thread.txt", program_invocation_name, getpid());
     fprintf(stderr, "%s\n", ProgramStatus::outputFileName);
 
     ProgramStatus::outputFile = fopen(ProgramStatus::outputFileName, "w");

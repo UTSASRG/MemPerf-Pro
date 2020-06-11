@@ -46,6 +46,7 @@ struct MemoryWasteStatus {
     spinlock lock;
 
     void initialize();
+    void debugPrint();
     void updateStatus(MemoryWasteStatus newStatus);
 };
 

@@ -2,13 +2,25 @@
 
 extern HashMap <void *, DetailLockData, spinlock, PrivateHeap> lockUsage;
 
+spinlock GlobalStatus::lock;
+uint64_t GlobalStatus::numOfFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
+PerfReadInfo GlobalStatus::countingEvents[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
+uint64_t GlobalStatus::cycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
+OverviewLockData GlobalStatus::overviewLockData[NUM_OF_LOCKTYPES];
+CriticalSectionStatus GlobalStatus::criticalSectionStatus[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
+SystemCallData GlobalStatus::systemCallData[NUM_OF_SYSTEMCALLTYPES][NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
+FriendlinessStatus GlobalStatus::friendlinessStatus;
+int64_t GlobalStatus::potentialMemoryLeakFunctions;
+
+
 void GlobalStatus::globalize() {
     lock.lock();
     for(int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
+        cycles[allocationType] += ThreadLocalStatus::cycles[allocationType];
         numOfFunctions[allocationType] += ThreadLocalStatus::numOfFunctions[allocationType];
         countingEvents[allocationType].add(ThreadLocalStatus::countingEvents[allocationType]);
         criticalSectionStatus[allocationType].add(ThreadLocalStatus::criticalSectionStatus[allocationType]);
-        for(int syscallType; syscallType < NUM_OF_SYSTEMCALLTYPES; ++syscallType) {
+        for(int syscallType = 0; syscallType < NUM_OF_SYSTEMCALLTYPES; ++syscallType) {
             systemCallData[syscallType][allocationType].add(ThreadLocalStatus::systemCallData[syscallType][allocationType]);
         }
     }
@@ -33,16 +45,16 @@ void GlobalStatus::countPotentialMemoryLeakFunctions() {
 }
 
 void GlobalStatus::printTitle(char *content) {
-    fprintf(ProgramStatus::outputFile, "%s", outoutTitleNotificationString[0]);
+    fprintf(ProgramStatus::outputFile, "%s", outputTitleNotificationString[0]);
     fprintf(ProgramStatus::outputFile, "%s", content);
-    fprintf(ProgramStatus::outputFile, "%s", outoutTitleNotificationString[1]);
+    fprintf(ProgramStatus::outputFile, "%s", outputTitleNotificationString[1]);
 }
 
 void GlobalStatus::printTitle(char *content, uint64_t commentNumber) {
-    fprintf(ProgramStatus::outputFile, "%s", outoutTitleNotificationString[0]);
+    fprintf(ProgramStatus::outputFile, "%s", outputTitleNotificationString[0]);
     fprintf(ProgramStatus::outputFile, "%s", content);
     fprintf(ProgramStatus::outputFile, "(%20lu)", commentNumber);
-    fprintf(ProgramStatus::outputFile, "%s", outoutTitleNotificationString[1]);
+    fprintf(ProgramStatus::outputFile, "%s", outputTitleNotificationString[1]);
 }
 
 void GlobalStatus::printNumOfAllocations() {
@@ -74,7 +86,7 @@ void GlobalStatus::printOverviewLocks() {
     for(int lockType = 0; lockType < NUM_OF_LOCKTYPES; ++lockType) {
         fprintf(ProgramStatus::outputFile, "%s num %20u\n", lockTypeOutputString[lockType], overviewLockData[lockType].numOfLocks);
         if(overviewLockData[lockType].numOfLocks > 0) {
-            for(int allocationType; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
+            for(int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
                 if(overviewLockData[lockType].numOfCalls[allocationType] > 0) {
                     fprintf(ProgramStatus::outputFile, "calls in %s %20u\n", allocationTypeOutputString[allocationType], overviewLockData[lockType].numOfCalls[allocationType]);
                     fprintf(ProgramStatus::outputFile, "calls per %s %20lu\n", allocationTypeOutputString[allocationType], overviewLockData[lockType].numOfCalls[allocationType]/numOfFunctions[allocationType]);
@@ -97,12 +109,14 @@ void GlobalStatus::printDetailLocks() {
             fprintf(ProgramStatus::outputFile, "lock address %p\n", entryInHashTable.getKey());
             fprintf(ProgramStatus::outputFile, "lock type %s\n", lockTypeOutputString[detailLockData->lockType]);
             fprintf(ProgramStatus::outputFile, "max contending threads %20u\n", detailLockData->maxNumOfContendingThreads);
-            for(int allocationType; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
+            for(int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
                 if(detailLockData->numOfCalls[allocationType] > 0) {
                     fprintf(ProgramStatus::outputFile, "calls in %s %20u\n", allocationTypeOutputString[allocationType], detailLockData->numOfCalls[allocationType]);
                     fprintf(ProgramStatus::outputFile, "calls per %s %20lu\n", allocationTypeOutputString[allocationType], detailLockData->numOfCalls[allocationType]/numOfFunctions[allocationType]);
                     fprintf(ProgramStatus::outputFile, "calls with contention in %s %20u\n", allocationTypeOutputString[allocationType], detailLockData->numOfCallsWithContentions[allocationType]);
                     fprintf(ProgramStatus::outputFile, "calls with contention per %s %20lu\n", allocationTypeOutputString[allocationType], detailLockData->numOfCallsWithContentions[allocationType]/numOfFunctions[allocationType]);
+                    fprintf(ProgramStatus::outputFile, "cycles in %s %20lu\n", allocationTypeOutputString[allocationType], detailLockData->cycles[allocationType]);
+                    fprintf(ProgramStatus::outputFile, "cycles per %s %20lu\n", allocationTypeOutputString[allocationType], detailLockData->cycles[allocationType]/numOfFunctions[allocationType]);
                 }
             }
             fprintf(ProgramStatus::outputFile, "\n");
@@ -144,8 +158,8 @@ void GlobalStatus::printFriendliness() {
         fprintf(ProgramStatus::outputFile, "\n");
         if(friendlinessStatus.numOfSampledStoringInstructions > 0) {
             for(int falseSharingType = 0; falseSharingType < NUM_OF_FALSESHARINGTYPE; ++falseSharingType) {
-                fprintf(ProgramStatus::outputFile, "accessed %s instructions %20u %3u%%", falseSharingTypeOutputString[falseSharingType], friendlinessStatus.numOfSampledFalseSharingInstructions[falseSharingType], friendlinessStatus.numOfSampledFalseSharingInstructions[falseSharingType]*100/friendlinessStatus.numOfSampledStoringInstructions);
-                fprintf(ProgramStatus::outputFile, "accessed %s cache lines %20u %3u%%", falseSharingTypeOutputString[falseSharingType], friendlinessStatus.numOfSampledFalseSharingCacheLines[falseSharingType], friendlinessStatus.numOfSampledFalseSharingCacheLines[falseSharingType]*100/friendlinessStatus.numOfSampledCacheLines);
+                fprintf(ProgramStatus::outputFile, "accessed %s instructions %20u %3u%%\n", falseSharingTypeOutputString[falseSharingType], friendlinessStatus.numOfSampledFalseSharingInstructions[falseSharingType], friendlinessStatus.numOfSampledFalseSharingInstructions[falseSharingType]*100/friendlinessStatus.numOfSampledStoringInstructions);
+                fprintf(ProgramStatus::outputFile, "accessed %s cache lines %20u %3u%%\n", falseSharingTypeOutputString[falseSharingType], friendlinessStatus.numOfSampledFalseSharingCacheLines[falseSharingType], friendlinessStatus.numOfSampledFalseSharingCacheLines[falseSharingType]*100/friendlinessStatus.numOfSampledCacheLines);
                 fprintf(ProgramStatus::outputFile, "\n");
             }
         }

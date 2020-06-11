@@ -24,6 +24,8 @@ public:
     static thread_local SystemCallData systemCallData[NUM_OF_SYSTEMCALLTYPES][NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
     static thread_local FriendlinessStatus friendlinessStatus;
 
+    static thread_local bool threadIsStopping;
+
     static void getARunningThreadIndex();
 
 };

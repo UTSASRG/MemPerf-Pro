@@ -19,7 +19,6 @@ add_executable(mmprof
         test/alloc.cpp
         test/alloc2.cpp
         test/blackscholes-pthread.cpp
-        test/fighting_with_the_heap.cpp
         test/madvise.cpp
         test/malloc-and-free.cpp
         test/malloc-then-free.cpp
