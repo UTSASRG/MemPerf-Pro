@@ -24,9 +24,6 @@
 #ifndef __ASSEMBLER__
 # include <time.h>
 # include <sys/param.h>
-# include "mypthreadtypes.h"
-//# include <kernel-features.h>
-//# include <tcb-offsets.h>
 
 # ifndef LOCK_INSTR
 #  ifdef UP
