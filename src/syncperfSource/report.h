@@ -5,7 +5,6 @@
 #include<fstream>
 #include<sstream>
 #include<string>
-#include "xdefines.h"
 #include "recordentries.hh"
 #include "mutex_manager.h"
 #include<map>

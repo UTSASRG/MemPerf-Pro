@@ -16,8 +16,6 @@
 #include<mutex_manager.h>
 #include "pthreadP.h"
 
-#include "xdefines.h"
-
 #ifndef LLL_MUTEX_LOCK
 # define LLL_MUTEX_LOCK(mutex) \
       lll_lock ((mutex)->__data.__lock, PTHREAD_MUTEX_PSHARED (mutex))
@@ -30,9 +28,6 @@
 
 int _my_pthread_mutex_lock (pthread_mutex_t *mutex)
 {
-    fprintf(stderr, "hi\n");
-
-	struct timeinfo wait_start;
 
   assert (sizeof (mutex->__size) >= sizeof (mutex->__data));
 

@@ -25,7 +25,6 @@
 
 //#include "log.hh"
 #include "mm.hh"
-#include "xdefines.h"
 //Each thread will have a class liked this. Thus, we can avoid 
 //memory allocation when we are trying to record a synchronization event.
 //The total number of entries for each thread is xdefines::MAX_SYNCEVENT_ENTRIES.

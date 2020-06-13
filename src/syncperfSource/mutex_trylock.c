@@ -9,8 +9,6 @@
 #include <stdlib.h>
 #include "pthreadP.h"
 #include <lowlevellock.h>
-#include "xdefines.h"
-
 
 
 #ifndef lll_trylock_elision
