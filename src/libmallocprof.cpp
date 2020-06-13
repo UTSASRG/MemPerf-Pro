@@ -206,7 +206,7 @@ extern "C" {
         if(ProgramStatus::conclusionHasStarted()) {
             return RealX::posix_memalign(memptr, alignment, size);
         }
-
+        fprintf(stderr, "POSIX_MEMALIGN\n");
         AllocatingStatus::updateAllocatingStatusBeforeRealFunction(POSIX_MEMALIGN, size);
         int retval = RealX::posix_memalign(memptr, alignment, size);
         AllocatingStatus::updateAllocatingStatusAfterRealFunction(*memptr);
@@ -406,9 +406,9 @@ void *mremap(void *old_address, size_t old_size, size_t new_size, int flags, ...
 
 int pthread_mutex_lock(pthread_mutex_t *mutex) {
     if (AllocatingStatus::outsideTrackedAllocation()) {
+        if (!realInitialized) RealX::initializer();
         return RealX::pthread_mutex_lock(mutex);
     }
-
     DetailLockData * detailLockData = lockUsage.find((void *)mutex, sizeof(void *));
     if(detailLockData == nullptr)  {
         detailLockData = lockUsage.insert((void*)mutex, sizeof(void*), DetailLockData::newDetailLockData(MUTEX));
@@ -416,13 +416,12 @@ int pthread_mutex_lock(pthread_mutex_t *mutex) {
     }
 
     AllocatingStatus::initForWritingOneLockData(MUTEX, detailLockData);
-    if(detailLockData->aContentionHappening()) {
-        detailLockData->checkAndUpdateMaxNumOfContendingThreads();
-        AllocatingStatus::recordALockContention();
-    }
+//    if(detailLockData->aContentionHappening()) {
+//        detailLockData->checkAndUpdateMaxNumOfContendingThreads();
+//        AllocatingStatus::recordALockContention();
+//    }
 
     uint64_t timeStart = rdtscp();
-//    int result = RealX::pthread_mutex_lock(mutex);
     int result = _my_pthread_mutex_lock(mutex);
     uint64_t timeStop = rdtscp();
 
@@ -434,6 +433,7 @@ int pthread_mutex_lock(pthread_mutex_t *mutex) {
 
 int pthread_spin_lock(pthread_spinlock_t *lock) {
     if (AllocatingStatus::outsideTrackedAllocation()) {
+        if (!realInitialized) RealX::initializer();
         return RealX::pthread_spin_lock(lock);
     }
 
@@ -461,6 +461,7 @@ int pthread_spin_lock(pthread_spinlock_t *lock) {
 
 int pthread_spin_trylock(pthread_spinlock_t *lock) {
     if (AllocatingStatus::outsideTrackedAllocation()) {
+        if (!realInitialized) RealX::initializer();
         return RealX::pthread_spin_trylock(lock);
     }
 
@@ -488,6 +489,7 @@ int pthread_spin_trylock(pthread_spinlock_t *lock) {
 
 int pthread_mutex_trylock(pthread_mutex_t *mutex) {
     if (AllocatingStatus::outsideTrackedAllocation()) {
+        if (!realInitialized) RealX::initializer();
         return RealX::pthread_mutex_trylock(mutex);
     }
 
@@ -504,7 +506,6 @@ int pthread_mutex_trylock(pthread_mutex_t *mutex) {
     }
 
     uint64_t timeStart = rdtscp();
-//    int result = RealX::pthread_mutex_trylock(mutex);
     int result = my_pthread_mutex_trylock(mutex);
     uint64_t timeStop = rdtscp();
 
@@ -517,17 +518,18 @@ int pthread_mutex_trylock(pthread_mutex_t *mutex) {
 // PTHREAD_MUTEX_UNLOCK
 int pthread_mutex_unlock(pthread_mutex_t *mutex) {
     if(AllocatingStatus::outsideTrackedAllocation()) {
+        if (!realInitialized) RealX::initializer();
         return RealX::pthread_mutex_unlock(mutex);
     }
     DetailLockData * detailLockData = lockUsage.find((void *)mutex, sizeof(void *));
-    detailLockData->quitFromContending();
+//    detailLockData->quitFromContending();
     AllocatingStatus::checkAndStopRecordingACriticalSection();
-//    return RealX::pthread_mutex_unlock(mutex);
     return my_pthread_mutex_unlock(mutex);
 }
 
 int pthread_spin_unlock(pthread_spinlock_t *lock) {
     if(AllocatingStatus::outsideTrackedAllocation()) {
+        if (!realInitialized) RealX::initializer();
         return RealX::pthread_spin_unlock(lock);
     }
     DetailLockData * detailLockData = lockUsage.find((void *)lock, sizeof(void *));

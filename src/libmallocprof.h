@@ -25,5 +25,5 @@
 #include "memsample.h"
 #include "shadowmemory.hh"
 #include "definevalues.h"
-#include "syncperfSource/mutex.h"
+#include "mutexwrapper.h"
 #endif /* end of include guard: __LIBMALLOCPROF_H__ */

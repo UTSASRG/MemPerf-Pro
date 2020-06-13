@@ -14,6 +14,8 @@
 #include <sysdep.h>
 #include "pthreadP.h"
 
+#include "../mutexwrapper.h"
+
 #ifndef LLL_MUTEX_LOCK
 # define LLL_MUTEX_LOCK(mutex) \
       lll_lock ((mutex)->__data.__lock, PTHREAD_MUTEX_PSHARED (mutex))
@@ -71,7 +73,12 @@ int _my_pthread_mutex_lock (pthread_mutex_t *mutex)
 		/* FALLTHROUGH */
 
 	case PTHREAD_MUTEX_TIMED_NP:
-simple:
+//simple:
+	    ///Jin
+	    if(mutex->__data.__lock == 2) {
+            allocatingStatusRecordALockContention();
+        }
+
 		LLL_MUTEX_LOCK (mutex);
 		assert (mutex->__data.__owner == 0);
 		break;
@@ -79,6 +86,7 @@ simple:
 	case PTHREAD_MUTEX_ADAPTIVE_NP:
 		if (LLL_MUTEX_TRYLOCK (mutex) != 0)
 		{
+            allocatingStatusRecordALockContention();
 			int cnt = 0;
 			int max_cnt = MIN (MAX_ADAPTIVE_COUNT,
 				mutex->__data.__spins * 2 + 10);
@@ -109,99 +117,6 @@ simple:
 	case PTHREAD_MUTEX_ROBUST_ADAPTIVE_NP:
     	printf("PTHREAD_MUTEX_ROBUST_*_NP\n");
 		assert(PTHREAD_MUTEX_ROBUST_ADAPTIVE_NP != mutex->__data.__kind);
-#if 0
-		THREAD_SETMEM (THREAD_SELF, robust_head.list_op_pending,
-			&mutex->__data.__list.__next);
-
-		oldval = mutex->__data.__lock;
-		do
-		{
-again:
-			if ((oldval & FUTEX_OWNER_DIED) != 0)
-			{
-				/* The previous owner died.  Try locking the mutex.  */
-				int newval = id;
-#ifdef NO_INCR
-				newval |= FUTEX_WAITERS;
-#endif
-
-				newval
-					= atomic_compare_and_exchange_val_acq (&mutex->__data.__lock,
-					newval, oldval);
-
-				if (newval != oldval)
-				{
-					oldval = newval;
-					goto again;
-				}
-
-				/* We got the mutex.  */
-				mutex->__data.__count = 1;
-				/* But it is inconsistent unless marked otherwise.  */
-				mutex->__data.__owner = PTHREAD_MUTEX_INCONSISTENT;
-
-				ENQUEUE_MUTEX (mutex);
-				THREAD_SETMEM (THREAD_SELF, robust_head.list_op_pending, NULL);
-
-				/* Note that we deliberately exit here.  If we fall
-				through to the end of the function __nusers would be
-				incremented which is not correct because the old
-				owner has to be discounted.  If we are not supposed
-				to increment __nusers we actually have to decrement
-				it here.  */
-#ifdef NO_INCR
-				--mutex->__data.__nusers;
-#endif
-
-				return EOWNERDEAD;
-			}
-			/* Check whether we already hold the mutex.  */
-			if (__builtin_expect ((oldval & FUTEX_TID_MASK) == id, 0))
-			{
-				if (mutex->__data.__kind
-					== PTHREAD_MUTEX_ROBUST_ERRORCHECK_NP)
-				{
-					THREAD_SETMEM (THREAD_SELF, robust_head.list_op_pending,
-						NULL);
-					return EDEADLK;
-				}
-
-				if (mutex->__data.__kind
-					== PTHREAD_MUTEX_ROBUST_RECURSIVE_NP)
-				{
-					THREAD_SETMEM (THREAD_SELF, robust_head.list_op_pending,
-						NULL);
-
-					/* Just bump the counter.  */
-					if (__builtin_expect (mutex->__data.__count + 1 == 0, 0))
-						/* Overflow of the counter.  */
-						return EAGAIN;
-
-					++mutex->__data.__count;
-
-					return 0;
-				}
-			}
-
-			oldval = LLL_ROBUST_MUTEX_LOCK (mutex, id);
-
-			if (__builtin_expect (mutex->__data.__owner
-				== PTHREAD_MUTEX_NOTRECOVERABLE, 0))
-			{
-				/* This mutex is now not recoverable.  */
-				mutex->__data.__count = 0;
-				lll_unlock (mutex->__data.__lock, PTHREAD_MUTEX_PSHARED (mutex));
-				THREAD_SETMEM (THREAD_SELF, robust_head.list_op_pending, NULL);
-				return ENOTRECOVERABLE;
-			}
-		}
-		while ((oldval & FUTEX_OWNER_DIED) != 0);
-
-		mutex->__data.__count = 1;
-		ENQUEUE_MUTEX (mutex);
-		THREAD_SETMEM (THREAD_SELF, robust_head.list_op_pending, NULL);
-#endif
-		
 		break;
 	case PTHREAD_MUTEX_PI_RECURSIVE_NP:
 	case PTHREAD_MUTEX_PI_ERRORCHECK_NP:

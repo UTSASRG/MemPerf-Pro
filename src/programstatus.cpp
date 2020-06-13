@@ -36,6 +36,7 @@ void ProgramStatus::checkSystemIs64Bits() {
 
 void ProgramStatus::getInputInfoFileName() {
     strcpy(inputInfoFileName, "/home/jinzhou/Memoryallocators/libc-2.28/libmalloc.info");
+//    strcpy(inputInfoFileName, "/home/jinzhou/Memoryallocators/Hoard/src/libhoard.info");
 }
 
 void ProgramStatus::fopenInputInfoFile() {

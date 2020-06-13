@@ -1,7 +1,7 @@
 SRCS = $(wildcard *.c) $(wildcard *.cpp)
 INCS = $(wildcard *.h) $(wildcard *.hh)
 OBJS = $(wildcard *.o) $(wildcard ./syncperfSource/*.o)
-DEPS = $(SRCS) $(INCS) $(OBJS)
+DEPS = $(SRCS) $(INCS)
 
 CC = gcc
 CXX = g++
@@ -22,13 +22,14 @@ LIBS     := dl pthread
 
 TARGETS = libmallocprof.so
 
-object: $(SRCS) $(INCS)
-	$(CXX) $(CFLAGS) $(PROFILER_FLAGS) $(INCLUDE_DIRS) -shared -fPIC -c $(SRCS) -ldl -lpthread
 
 
 # Libmallocprof
-libmallocprof.so: $(DEPS)
+libmallocprof.so: $(DEPS) object
 	$(CXX) $(CFLAGS) $(PROFILER_FLAGS) $(INCLUDE_DIRS) -shared -fPIC $(OBJS) -o libmallocprof.so -ldl -lpthread
+
+object: $(SRCS) $(INCS)
+	$(CXX) $(CFLAGS) $(PROFILER_FLAGS) $(INCLUDE_DIRS) -shared -fPIC -c $(SRCS) -ldl -lpthread
 
 test/test-tcmalloc-minimal: libmallocprof.so test/$(TEST_FILE)
 	$(CXX) $(CFLAGS) -o test/test-tcmalloc-minimal test/$(TEST_FILE) -rdynamic ./libmallocprof.so -ltcmalloc_minimal
@@ -70,10 +71,10 @@ test/test-libc221-thread: libmallocprof.so test/$(THREADTEST_FILE)
 
 # Hoard
 test/test-hoard: libmallocprof.so test/$(TEST_FILE)
-	$(CXX) $(CFLAGS) -rdynamic ./libmallocprof.so -rdynamic ../Memoryallocators/Hoard-spinlock/src/libhoard.so -o test/test-hoard test/$(TEST_FILE)
+	$(CXX) $(CFLAGS)  -rdynamic ./libmallocprof.so -rdynamic ../Memoryallocators/Hoard-spinlock-modified/src/libhoard.so -o test/test-hoard test/$(TEST_FILE)
 
 test/test-hoard-thread: libmallocprof.so test/$(THREADTEST_FILE)
-	$(CXX) $(CFLAGS) -rdynamic ./libmallocprof.so -rdynamic ../Memoryallocators/Hoard-spinlock/src/libhoard.so -o test/test-hoard-thread test/$(THREADTEST_FILE) -pthread
+	$(CXX) $(CFLAGS) -rdynamic ./libmallocprof.so -rdynamic ../Memoryallocators/Hoard-spinlock-modidied/src/libhoard.so -o test/test-hoard-thread test/$(THREADTEST_FILE) -pthread
 
 # JeMalloc
 test/test-jemalloc-thread: libmallocprof.so test/$(THREADTEST_FILE)
@@ -85,4 +86,4 @@ test/test-clean: test/$(TEST_FILE)
 
 clean:
 	rm -f $(TARGETS)
-	rm -f test/*.txt
+	rm -f test/test-*
