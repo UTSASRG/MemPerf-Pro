@@ -8,7 +8,6 @@
 #include <atomic.h>
 #include <unistd.h>
 #include <sysdep.h>
-#include<mutex_manager.h>
 
 static int
 __pthread_mutex_unlock_full (pthread_mutex_t *mutex, int decr)

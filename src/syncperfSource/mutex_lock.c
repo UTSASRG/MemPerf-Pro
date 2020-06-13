@@ -10,10 +10,8 @@
 #include <unistd.h>
 #include <lowlevellock.h>
 #include <pthread.h>
-//#include <kernel-features.h>
 #include <atomic.h>
 #include <sysdep.h>
-#include<mutex_manager.h>
 #include "pthreadP.h"
 
 #ifndef LLL_MUTEX_LOCK

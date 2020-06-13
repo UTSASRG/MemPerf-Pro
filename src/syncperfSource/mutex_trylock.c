@@ -1,9 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <dlfcn.h>
-
-#include "mutex_manager.h"
-
 #include <assert.h>
 #include <errno.h>
 #include <stdlib.h>
