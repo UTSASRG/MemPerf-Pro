@@ -29,7 +29,6 @@ void * xthreadx::startThread(void * arg) {
 
     ThreadLocalStatus::getARunningThreadIndex();
     MyMalloc::initializeForThreadLocalMemory();
-
     result = current->startRoutine(current->startArg);
     threadExit();
 

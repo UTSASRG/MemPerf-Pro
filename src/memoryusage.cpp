@@ -2,6 +2,7 @@
 
 thread_local TotalMemoryUsage MemoryUsage::threadLocalMemoryUsage, MemoryUsage::maxThreadLocalMemoryUsage;
 TotalMemoryUsage MemoryUsage::globalMemoryUsage, MemoryUsage::maxGlobalMemoryUsage;
+spinlock MemoryUsage::debugLock;
 
 void MemoryUsage::addToMemoryUsage(size_t size, size_t newTouchePageBytes) {
     threadLocalMemoryUsage.realMemoryUsage += size;
@@ -30,8 +31,8 @@ void MemoryUsage::subTotalSizeFromMemoryUsage(size_t size) {
 
 void MemoryUsage::printOutput() {
     GlobalStatus::printTitle((char*)"MEMORY USAGE");
-    fprintf(ProgramStatus::outputFile, "thread local max real memory usage %20luK\n", maxThreadLocalMemoryUsage.realMemoryUsage/ONE_KB);
-    fprintf(ProgramStatus::outputFile, "thread local max total memory usage %20luK\n", maxThreadLocalMemoryUsage.totalMemoryUsage/ONE_KB);
-    fprintf(ProgramStatus::outputFile, "global max real memory usage %20luK\n", maxGlobalMemoryUsage.realMemoryUsage/ONE_KB);
-    fprintf(ProgramStatus::outputFile, "global max total memory usage %20luK\n", maxGlobalMemoryUsage.totalMemoryUsage/ONE_KB);
+    fprintf(ProgramStatus::outputFile, "thread local max real memory usage %20ldK\n", maxThreadLocalMemoryUsage.realMemoryUsage/ONE_KB);
+    fprintf(ProgramStatus::outputFile, "thread local max total memory usage %20ldK\n", maxThreadLocalMemoryUsage.totalMemoryUsage/ONE_KB);
+    fprintf(ProgramStatus::outputFile, "global max real memory usage %20ldK\n", maxGlobalMemoryUsage.realMemoryUsage/ONE_KB);
+    fprintf(ProgramStatus::outputFile, "global max total memory usage %20ldK\n", maxGlobalMemoryUsage.totalMemoryUsage/ONE_KB);
 }

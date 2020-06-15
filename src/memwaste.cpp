@@ -21,7 +21,7 @@ ObjectStatus ObjectStatus::newObjectStatus(SizeClassSizeAndIndex sizeClassSizeAn
 }
 
 
-size_t MemoryWasteStatus::sizeOfArrays = MAX_THREAD_NUMBER * ProgramStatus::numberOfClassSizes * sizeof(uint64_t);
+size_t MemoryWasteStatus::sizeOfArrays;
 
 unsigned int MemoryWasteStatus::arrayIndex(unsigned int classSizeIndex) {
     return ThreadLocalStatus::runningThreadIndex * ProgramStatus::numberOfClassSizes + classSizeIndex;
@@ -32,21 +32,32 @@ unsigned int MemoryWasteStatus::arrayIndex(unsigned int threadIndex, unsigned in
 }
 
 void MemoryWasteStatus::initialize() {
-    internalFragment = (uint64_t*) MyMalloc::malloc(sizeOfArrays);
+    sizeOfArrays = MAX_THREAD_NUMBER * ProgramStatus::numberOfClassSizes * sizeof(uint64_t);
+
+    internalFragment = (int64_t*) MyMalloc::malloc(sizeOfArrays);
     numOfActiveObjects.numOfAllocatedObjects = (int64_t*) MyMalloc::malloc(sizeOfArrays);
     numOfActiveObjects.numOfFreelistObjects = (int64_t*) MyMalloc::malloc(sizeOfArrays);
     numOfAccumulatedOperations.numOfNewAllocations = (uint64_t*) MyMalloc::malloc(sizeOfArrays);
     numOfAccumulatedOperations.numOfReusedAllocations = (uint64_t*) MyMalloc::malloc(sizeOfArrays);
     numOfAccumulatedOperations.numOfFree = (uint64_t*) MyMalloc::malloc(sizeOfArrays);
     blowupFlag = (int64_t*) MyMalloc::malloc(ProgramStatus::numberOfClassSizes * sizeof(uint64_t));
+//
+//    memset(internalFragment, 0, sizeOfArrays);
+//    memset(numOfActiveObjects.numOfAllocatedObjects, 0, sizeOfArrays);
+//    memset(numOfActiveObjects.numOfFreelistObjects, 0, sizeOfArrays);
+//    memset(numOfAccumulatedOperations.numOfNewAllocations, 0, sizeOfArrays);
+//    memset(numOfAccumulatedOperations.numOfReusedAllocations, 0, sizeOfArrays);
+//    memset(numOfAccumulatedOperations.numOfFree, 0, sizeOfArrays);
+//    memset(blowupFlag, 0, ProgramStatus::numberOfClassSizes * sizeof(uint64_t));
+
     lock.init();
 }
 
 void MemoryWasteStatus::debugPrint() {
-    for(unsigned int threadIndex = 0; threadIndex < ThreadLocalStatus::totalNumOfRunningThread; ++threadIndex) {
+    for(unsigned int threadIndex = 0; threadIndex < 40; ++threadIndex) {
         fprintf(stderr, "thread %d: ", threadIndex);
         for(unsigned int classSizeIndex = 0; classSizeIndex < ProgramStatus::numberOfClassSizes; ++classSizeIndex) {
-            fprintf(stderr, "%lu ", numOfActiveObjects.numOfFreelistObjects[arrayIndex(threadIndex, classSizeIndex)]);
+            fprintf(stderr, "%ld ", internalFragment[arrayIndex(threadIndex, classSizeIndex)]);
         }
         fprintf(stderr, "\n");
     }
@@ -65,9 +76,11 @@ void MemoryWasteStatus::updateStatus(MemoryWasteStatus newStatus) {
     lock.unlock();
 }
 
-size_t MemoryWasteGlobalStatus::sizeOfArrays = ProgramStatus::numberOfClassSizes * sizeof(uint64_t);
+size_t MemoryWasteGlobalStatus::sizeOfArrays;
 
 void MemoryWasteGlobalStatus::initialize() {
+    sizeOfArrays = ProgramStatus::numberOfClassSizes * sizeof(uint64_t);
+
     internalFragment = (int64_t*) MyMalloc::malloc(sizeOfArrays);
     numOfActiveObjects.numOfAllocatedObjects = (int64_t*) MyMalloc::malloc(sizeOfArrays);
     numOfActiveObjects.numOfFreelistObjects = (int64_t*) MyMalloc::malloc(sizeOfArrays);
@@ -75,9 +88,24 @@ void MemoryWasteGlobalStatus::initialize() {
     numOfAccumulatedOperations.numOfReusedAllocations = (uint64_t*) MyMalloc::malloc(sizeOfArrays);
     numOfAccumulatedOperations.numOfFree = (uint64_t*) MyMalloc::malloc(sizeOfArrays);
     memoryBlowup = (int64_t *) MyMalloc::malloc(sizeOfArrays);
+
+    memset(internalFragment, 0, sizeOfArrays);
+    memset(numOfActiveObjects.numOfAllocatedObjects, 0, sizeOfArrays);
+    memset(numOfActiveObjects.numOfFreelistObjects, 0, sizeOfArrays);
+    memset(numOfAccumulatedOperations.numOfNewAllocations, 0, sizeOfArrays);
+    memset(numOfAccumulatedOperations.numOfReusedAllocations, 0, sizeOfArrays);
+    memset(numOfAccumulatedOperations.numOfFree, 0, sizeOfArrays);
+    memset(memoryBlowup, 0, sizeOfArrays);
+
 }
 
 void MemoryWasteGlobalStatus::globalize(MemoryWasteStatus recordStatus) {
+    ///Jin: bugs remaining
+//    recordStatus.debugPrint();
+//    for (unsigned int classSizeIndex = 0; classSizeIndex < ProgramStatus::numberOfClassSizes; ++classSizeIndex) {
+//        fprintf(stderr, "%ld ", internalFragment[classSizeIndex]);
+//    }
+//    fprintf(stderr, "\n");
     for (unsigned int threadIndex = 0; threadIndex < ThreadLocalStatus::totalNumOfRunningThread; ++threadIndex) {
         for (unsigned int classSizeIndex = 0; classSizeIndex < ProgramStatus::numberOfClassSizes; ++classSizeIndex) {
             internalFragment[classSizeIndex] += recordStatus.internalFragment[MemoryWaste::arrayIndex(threadIndex, classSizeIndex)];
@@ -96,6 +124,10 @@ void MemoryWasteGlobalStatus::globalize(MemoryWasteStatus recordStatus) {
 
         }
     }
+//    for (unsigned int classSizeIndex = 0; classSizeIndex < ProgramStatus::numberOfClassSizes; ++classSizeIndex) {
+//        fprintf(stderr, "%ld ", internalFragment[classSizeIndex]);
+//    }
+//    fprintf(stderr, "\n");
 }
 
 void MemoryWasteGlobalStatus::calculateBlowup(MemoryWasteStatus recordStatus) {
@@ -178,6 +210,9 @@ AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(size_t size, void * ad
         currentStatus.blowupFlag[currentSizeClassSizeAndIndex.classSizeIndex]--;
     }
 
+//        fprintf(stderr, "tid = %d, alloc up size = %lu %lu %p %p\n",
+//                ThreadLocalStatus::runningThreadIndex, currentSizeClassSizeAndIndex.size, status->sizeClassSizeAndIndex.size, status, &status->sizeClassSizeAndIndex.size);
+
     return AllocatingTypeGotFromMemoryWaste{reused, currentSizeClassSizeAndIndex.classSize};
 }
 
@@ -188,6 +223,11 @@ AllocatingTypeWithSizeGotFromMemoryWaste MemoryWaste::freeUpdate(void* address) 
     ObjectStatus* status = objStatusMap.find(address, sizeof(void *));
     if(status == nullptr) {
         return AllocatingTypeWithSizeGotFromMemoryWaste{0, AllocatingTypeGotFromMemoryWaste{false, 0}};
+    }
+    ///Jin: There are some bugs remaining
+    if(status->sizeClassSizeAndIndex.size > 0x10000) {
+        status->sizeClassSizeAndIndex.size %= 0x10000;
+//        fprintf(stderr, "cut size = %lu\n", status->sizeClassSizeAndIndex.size);
     }
     currentSizeClassSizeAndIndex = status->sizeClassSizeAndIndex;
 
@@ -223,13 +263,13 @@ void MemoryWaste::printOutput() {
     GlobalStatus::printTitle((char*)"MEMORY WASTE");
     for (unsigned int classSizeIndex = 0; classSizeIndex < ProgramStatus::numberOfClassSizes; ++classSizeIndex) {
 
-        if(globalStatus.internalFragment[classSizeIndex] == 0 && globalStatus.memoryBlowup[classSizeIndex] == 0) {
+        if(globalStatus.internalFragment[classSizeIndex]/ONE_KB == 0 && globalStatus.memoryBlowup[classSizeIndex]/ONE_KB == 0) {
             continue;
         }
 
         fprintf(ProgramStatus::outputFile, "size: %10lu\t\t\t", ProgramStatus::classSizes[classSizeIndex]);
 
-        fprintf(ProgramStatus::outputFile, "internal fragmentation: %10luK\t\t\tmemory blowup: %10luK\t\t\t"
+        fprintf(ProgramStatus::outputFile, "internal fragmentation: %10ldK\t\t\tmemory blowup: %10luK\t\t\t"
                         "active alloc: %10ld\t\t\tfreelist objects: %10ld\t\t\t"
                         "new allocated: %10lu\t\t\treused allocated: %10lu\t\t\tfreed: %10lu\n",
                         globalStatus.internalFragment[classSizeIndex]/ONE_KB, globalStatus.memoryBlowup[classSizeIndex]/ONE_KB,
@@ -241,7 +281,7 @@ void MemoryWaste::printOutput() {
     }
     if(MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage) {
         fprintf(ProgramStatus::outputFile, "\ntotal:\t\t\t\t\t\t\t\t\t\t"
-                                           "total internal fragmentation:%10luK(%3lu%%)\n\t\t\t\t\t\t\t\t\t\t\t\t\t",
+                                           "total internal fragmentation:%10ldK(%3lu%%)\n\t\t\t\t\t\t\t\t\t\t\t\t\t",
                 totalValue.internalFragment/ONE_KB, totalValue.internalFragment*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage);
         fprintf(ProgramStatus::outputFile, "total memory blowup:\t\t\t\t\t\t%10ldK(%3ld%%)\n\t\t\t\t\t\t\t\t\t\t\t\t\t"
                                            "total external fragmentation:\t\t\t\t%10ldK(%3ld%%)\n\t\t\t\t\t\t\t\t\t\t\t\t\t",

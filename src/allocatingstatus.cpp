@@ -15,6 +15,24 @@ thread_local AllocatingStatus::QueueOfDetailLockDataInAllocatingStatus Allocatin
 thread_local AllocatingStatus::OverviewLockDataInAllocatingStatus AllocatingStatus::overviewLockData[NUM_OF_LOCKTYPES];
 thread_local AllocatingStatus::CriticalSectionStatusInAllocatingStatus AllocatingStatus::criticalSectionStatus;
 thread_local SystemCallData AllocatingStatus::systemCallData[NUM_OF_SYSTEMCALLTYPES];
+spinlock AllocatingStatus::debugLock;
+
+void AllocatingStatus::QueueOfDetailLockDataInAllocatingStatus::writingNewDataInTheQueue(DetailLockData * addressOfHashLockData) {
+    queueTail++;
+    if(queueTail >= 100) {
+        fprintf(stderr, "Queue Of detail lock data used up\n");
+        abort();
+    }
+    queue[queueTail].addressOfHashLockData = addressOfHashLockData;
+    queue[queueTail].numOfCalls = 0;
+    queue[queueTail].numOfCallsWithContentions = 0;
+    queue[queueTail].cycles = 0;
+}
+
+void AllocatingStatus::QueueOfDetailLockDataInAllocatingStatus::cleanUpQueue() {
+    queueTail = -1;
+}
+
 
 void AllocatingStatus::updateAllocatingTypeBeforeRealFunction(AllocationFunction allocationFunction, size_t objectSize) {
     allocatingType.allocatingFunction = allocationFunction;
@@ -115,6 +133,10 @@ void AllocatingStatus::updateMemoryStatusAfterAllocation() {
 
 void AllocatingStatus::updateMemoryStatusBeforeFree() {
     allocatingType.switchFreeingTypeGotFromMemoryWaste(MemoryWaste::freeUpdate(allocatingType.objectAddress));
+    if(allocatingType.objectSize == 4294967316) {
+        fprintf(stderr, "free = %d\n", allocatingType.allocatingFunction == FREE);
+        abort();
+    }
     allocatingType.allocatingTypeGotFromShadowMemory.objectNewTouchedPageSize = ShadowMemory::updateObject(allocatingType.objectAddress, allocatingType.objectSize, true);
     MemoryUsage::subRealSizeFromMemoryUsage(allocatingType.objectSize);
 }
@@ -210,8 +232,8 @@ void AllocatingStatus::addUpOtherFunctionsInfoToThreadLocalData() {
 
 
 void AllocatingStatus::updateAllocatingInfoToThreadLocalData() {
-    setAllocationTypeForOutputData();
     addUpOtherFunctionsInfoToThreadLocalData();
+    setAllocationTypeForOutputData();
     addUpCountingEventsToThreadLocalData();
 }
 

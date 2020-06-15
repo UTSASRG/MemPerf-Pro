@@ -89,7 +89,6 @@ void GlobalStatus::printOverviewLocks() {
             for(int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
                 if(overviewLockData[lockType].numOfCalls[allocationType] > 0) {
                     fprintf(ProgramStatus::outputFile, "calls in %s %20u\n", allocationTypeOutputString[allocationType], overviewLockData[lockType].numOfCalls[allocationType]);
-                    fprintf(stderr, "%s %lu %lu\n", allocationTypeOutputString[allocationType], overviewLockData[lockType].numOfCalls[allocationType], numOfFunctions[allocationType]);
                     fprintf(ProgramStatus::outputFile, "calls per %s %20lu\n", allocationTypeOutputString[allocationType], overviewLockData[lockType].numOfCalls[allocationType]/numOfFunctions[allocationType]);
                     fprintf(ProgramStatus::outputFile, "contention calls in %s %20u\n", allocationTypeOutputString[allocationType], overviewLockData[lockType].numOfCallsWithContentions[allocationType]);
                     fprintf(ProgramStatus::outputFile, "contention calls per %s %20lu\n", allocationTypeOutputString[allocationType], overviewLockData[lockType].numOfCallsWithContentions[allocationType]/numOfFunctions[allocationType]);

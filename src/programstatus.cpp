@@ -26,6 +26,7 @@ bool ProgramStatus::profilerNotInitialized() {
 bool ProgramStatus::conclusionHasStarted() {
     return beginConclusion;
 }
+
 // Ensure we are operating on a system using 64-bit pointers.
 void ProgramStatus::checkSystemIs64Bits() {
     if(sizeof(void *) != EIGHT_BYTES) {
@@ -34,9 +35,16 @@ void ProgramStatus::checkSystemIs64Bits() {
     }
 }
 
-void ProgramStatus::getInputInfoFileName() {
-    strcpy(inputInfoFileName, "/home/jinzhou/Memoryallocators/libc-2.28/libmalloc.info");
-//    strcpy(inputInfoFileName, "/home/jinzhou/Memoryallocators/Hoard/src/libhoard.info");
+void ProgramStatus::getInputInfoFileName(char * runningApplicationName) {
+    char * runningAllocatorName = strrchr(runningApplicationName, '-')+1;
+    if(strcmp(runningAllocatorName, "libc228") == 0) {
+        strcpy(inputInfoFileName, "/home/jinzhou/Memoryallocators/libc-2.28/libmalloc.info");
+    } else if(strcmp(runningAllocatorName, "hoard") == 0) {
+        strcpy(inputInfoFileName, "/home/jinzhou/Memoryallocators/Hoard/src/libhoard.info");
+    } else {
+        fprintf(stderr, "Info File Location Unknown\n");
+        abort();
+    }
 }
 
 void ProgramStatus::fopenInputInfoFile() {
@@ -101,8 +109,8 @@ void ProgramStatus::readInputInfoFile() {
     }
 }
 
-void ProgramStatus::openInputInfoFile() {
-    ProgramStatus::getInputInfoFileName();
+void ProgramStatus::openInputInfoFile(char * runningApplicationName) {
+    ProgramStatus::getInputInfoFileName(runningApplicationName);
     ProgramStatus::fopenInputInfoFile();
     ProgramStatus::readInputInfoFile();
 }
@@ -120,8 +128,8 @@ void ProgramStatus::openOutputFile() {
     }
 }
 
-void ProgramStatus::initIO() {
-    ProgramStatus::openInputInfoFile();
+void ProgramStatus::initIO(char * runningApplicationName) {
+    ProgramStatus::openInputInfoFile(runningApplicationName);
     ProgramStatus::openOutputFile();
 }
 

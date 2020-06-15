@@ -27,7 +27,7 @@ struct ObjectStatus{
 };
 
 struct MemoryWasteStatus {
-    uint64_t * internalFragment;
+    int64_t * internalFragment;
     struct NumOfActiveObjects {
         int64_t * numOfAllocatedObjects;
         int64_t * numOfFreelistObjects;
@@ -72,7 +72,7 @@ struct MemoryWasteGlobalStatus {
 };
 
 struct MemoryWasteTotalValue {
-    uint64_t internalFragment = 0;
+    int64_t internalFragment = 0;
     struct NumOfActiveObjects {
         int64_t numOfAllocatedObjects = 0;
         int64_t numOfFreelistObjects = 0;

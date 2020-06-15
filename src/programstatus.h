@@ -1,7 +1,3 @@
-//
-// Created by 86152 on 2020/5/20.
-//
-
 #ifndef MMPROF_PROGRAMSTATUS_H
 #define MMPROF_PROGRAMSTATUS_H
 
@@ -25,13 +21,13 @@ private:
 
     static thread_local struct SizeClassSizeAndIndex cacheForGetClassSizeAndIndex;
 
-    static void getInputInfoFileName();
+    static void getInputInfoFileName(char * runningApplicationName);
     static void fopenInputInfoFile();
     static void readAllocatorStyleFromInfo(char*token);
     static void readAllocatorClassSizesFromInfo(char*token);
     static void readLargeObjectThresholdFromInfo(char*token);
     static void readInputInfoFile();
-    static void openInputInfoFile();
+    static void openInputInfoFile(char * runningApplicationName);
     static void openOutputFile();
 
     static void printStackAddr();
@@ -52,7 +48,7 @@ public:
     static bool conclusionHasStarted();
     static void checkSystemIs64Bits();
 
-    static void initIO();
+    static void initIO(char * runningApplicationName);
     static void printOutput();
 
     static bool isALargeObject(size_t size);

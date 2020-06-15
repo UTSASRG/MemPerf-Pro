@@ -56,6 +56,7 @@ struct OverviewLockData {
     uint64_t totalCycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
 
     void add(OverviewLockData newOverviewLockData);
+    void debugPrint();
 };
 
 struct DetailLockData {
@@ -95,10 +96,11 @@ struct FriendlinessStatus {
 };
 
 struct TotalMemoryUsage {
-    uint64_t realMemoryUsage;
-    uint64_t totalMemoryUsage;
+    int64_t realMemoryUsage;
+    int64_t totalMemoryUsage;
     bool isLowerThan(TotalMemoryUsage newTotalMemoryUsage, size_t interval);
     bool isLowerThan(TotalMemoryUsage newTotalMemoryUsage);
+    void debugPrint();
 };
 
 struct PerfReadInfo {

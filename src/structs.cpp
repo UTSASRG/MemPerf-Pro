@@ -41,6 +41,15 @@ void OverviewLockData::add(OverviewLockData newOverviewLockData) {
     }
 }
 
+void OverviewLockData::debugPrint() {
+    fprintf(stderr, "num of locks = %u\n", numOfLocks);
+    for(unsigned int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
+        fprintf(stderr, "num of calls = %u, num of calls with contentions = %u, total cycles = %lu\n",
+                numOfCalls[allocationType], numOfCallsWithContentions[allocationType], totalCycles[allocationType]);
+    }
+    fprintf(stderr, "\n");
+}
+
 
 DetailLockData DetailLockData::newDetailLockData(LockTypes lockType) {
     return DetailLockData{lockType, {0}, {0}, 0, 0, 0};
@@ -97,11 +106,15 @@ void FriendlinessStatus::debugPrint() {
 }
 
 bool TotalMemoryUsage::isLowerThan(TotalMemoryUsage newTotalMemoryUsage, size_t interval) {
-    return this->totalMemoryUsage + interval < newTotalMemoryUsage.totalMemoryUsage;
+    return this->totalMemoryUsage + (int64_t)interval < newTotalMemoryUsage.totalMemoryUsage;
 }
 
 bool TotalMemoryUsage::isLowerThan(TotalMemoryUsage newTotalMemoryUsage) {
     return this->totalMemoryUsage < newTotalMemoryUsage.totalMemoryUsage;
+}
+
+void TotalMemoryUsage::debugPrint() {
+    fprintf(stderr, "real memory usage = %ld, total memory usage = %ld\n", realMemoryUsage, totalMemoryUsage);
 }
 
 

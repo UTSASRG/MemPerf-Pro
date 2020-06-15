@@ -50,13 +50,12 @@ __attribute__((constructor)) void initializer() {
     ProgramStatus::checkSystemIs64Bits();
     PMU_init_check();
     RealX::initializer();
-    MyMalloc::initializeForThreadLocalMemory();
+
     ShadowMemory::initialize();
-    ProgramStatus::initIO();
     ThreadLocalStatus::getARunningThreadIndex();
 }
 
-__attribute__((destructor)) void finalizer_mallocprof () {};
+__attribute__((destructor)) void finalizer () {};
 
 void exitHandler() {
 
@@ -74,12 +73,14 @@ void exitHandler() {
 
 // MallocProf's main function
 int libmallocprof_main(int argc, char ** argv, char ** envp) {
-    // Register our cleanup routine as an on-exit handler.
-    atexit(exitHandler);
 
+    ProgramStatus::initIO(argv[0]);
     lockUsage.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, 128*32);
     MemoryWaste::initialize();
+    MyMalloc::initializeForThreadLocalMemory();
     ProgramStatus::setProfilerInitializedTrue();
+
+    atexit(exitHandler);
 
 	return real_main_mallocprof (argc, argv, envp);
 }
@@ -206,7 +207,6 @@ extern "C" {
         if(ProgramStatus::conclusionHasStarted()) {
             return RealX::posix_memalign(memptr, alignment, size);
         }
-        fprintf(stderr, "POSIX_MEMALIGN\n");
         AllocatingStatus::updateAllocatingStatusBeforeRealFunction(POSIX_MEMALIGN, size);
         int retval = RealX::posix_memalign(memptr, alignment, size);
         AllocatingStatus::updateAllocatingStatusAfterRealFunction(*memptr);
@@ -521,7 +521,7 @@ int pthread_mutex_unlock(pthread_mutex_t *mutex) {
         if (!realInitialized) RealX::initializer();
         return RealX::pthread_mutex_unlock(mutex);
     }
-    DetailLockData * detailLockData = lockUsage.find((void *)mutex, sizeof(void *));
+//    DetailLockData * detailLockData = lockUsage.find((void *)mutex, sizeof(void *));
 //    detailLockData->quitFromContending();
     AllocatingStatus::checkAndStopRecordingACriticalSection();
     return my_pthread_mutex_unlock(mutex);

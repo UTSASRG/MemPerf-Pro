@@ -23,6 +23,7 @@ private:
     static thread_local PerfReadInfo countingDataBeforeRealFunction;
     static thread_local PerfReadInfo countingDataAfterRealFunction;
     static thread_local PerfReadInfo countingDataInRealFunction;
+    static spinlock debugLock;
 
     struct OverviewLockDataInAllocatingStatus {
         unsigned int numOfLocks;
@@ -63,15 +64,10 @@ private:
                 addressOfHashLockData->numOfCallsWithContentions[allocationTypeForOutputData] += numOfCallsWithContentions;
                 addressOfHashLockData->cycles[allocationTypeForOutputData] += cycles;
             }
-        } queue[1000];
+        } queue[100];
         int queueTail = -1;
 
-        void writingNewDataInTheQueue(DetailLockData * addressOfHashLockData) {
-            queue[++queueTail].addressOfHashLockData = addressOfHashLockData;
-            queue[queueTail].numOfCalls = 0;
-            queue[queueTail].numOfCallsWithContentions = 0;
-            queue[queueTail].cycles = 0;
-        }
+        void writingNewDataInTheQueue(DetailLockData * addressOfHashLockData);
 
         void addAContention() {
             queue[queueTail].numOfCallsWithContentions++;
@@ -82,9 +78,7 @@ private:
             queue[queueTail].cycles += cycles;
         }
 
-        void cleanUpQueue() {
-            queueTail = -1;
-        }
+        void cleanUpQueue();
 
         void writingIntoHashTable() {
             for(int index = 0; index <= queueTail; ++index) {

@@ -10,47 +10,12 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="f07b8e7c-11f2-4582-b7c0-966bf3cde0cb" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/src/glibc227/atomic-machine.h" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/glibc227/atomic.h" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/glibc227/descr.h" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/glibc227/dl-dtv.h" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/glibc227/internaltypes.h" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/glibc227/list_t.h" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/glibc227/lowlevellock-futex.h" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/glibc227/lowlevellock.S" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/glibc227/lowlevellock.h" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/glibc227/mutex.h" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/glibc227/pthreadP.h" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/glibc227/pthread_mutex_lock.c" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/glibc227/sysdep.h" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/glibc227/tls.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/CMakeLists.txt" beforeDir="false" afterPath="$PROJECT_DIR$/src/CMakeLists.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/Makefile" beforeDir="false" afterPath="$PROJECT_DIR$/src/Makefile" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/allocatingstatus.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/src/allocatingstatus.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/allocatingstatus.h" beforeDir="false" afterPath="$PROJECT_DIR$/src/allocatingstatus.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/globalstatus.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/src/globalstatus.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/globalstatus.h" beforeDir="false" afterPath="$PROJECT_DIR$/src/globalstatus.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/hashmap.hh" beforeDir="false" afterPath="$PROJECT_DIR$/src/hashmap.hh" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/libmallocprof.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/src/libmallocprof.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/libmallocprof.h" beforeDir="false" afterPath="$PROJECT_DIR$/src/libmallocprof.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/memoryusage.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/src/memoryusage.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/memsample.c" beforeDir="false" afterPath="$PROJECT_DIR$/src/memsample.c" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/memwaste.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/src/memwaste.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/memwaste.h" beforeDir="false" afterPath="$PROJECT_DIR$/src/memwaste.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/mymalloc.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/src/mymalloc.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/mymalloc.h" beforeDir="false" afterPath="$PROJECT_DIR$/src/mymalloc.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/programstatus.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/src/programstatus.cpp" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/programstatus.h" beforeDir="false" afterPath="$PROJECT_DIR$/src/programstatus.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/shadowmemory.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/src/shadowmemory.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/structs.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/src/structs.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/structs.h" beforeDir="false" afterPath="$PROJECT_DIR$/src/structs.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/alloc.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/alloc.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/fighting_with_the_heap.cpp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/malloc-and-free.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/malloc-and-free.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/threadlocalstatus.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/src/threadlocalstatus.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/threadlocalstatus.h" beforeDir="false" afterPath="$PROJECT_DIR$/src/threadlocalstatus.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/xthreadx.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/src/xthreadx.cpp" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -97,18 +62,19 @@
       <workItem from="1591305180181" duration="314000" />
       <workItem from="1591576059688" duration="20000" />
       <workItem from="1591840603118" duration="35000" />
+      <workItem from="1592079577223" duration="422000" />
     </task>
     <servers />
   </component>
   <component name="WindowStateProjectService">
-    <state x="493" y="201" key="FileChooserDialogImpl" timestamp="1591840636578">
-      <screen x="0" y="0" width="1280" height="760" />
-    </state>
-    <state x="493" y="201" key="FileChooserDialogImpl/0.0.1280.760/335.-1080.1920.1040@0.0.1280.760" timestamp="1591840636578" />
-    <state x="1075" y="-805" key="FileChooserDialogImpl/0.0.1280.760/335.-1080.1920.1040@335.-1080.1920.1040" timestamp="1591576077754" />
-    <state x="1328" y="-807" width="647" height="534" key="find.popup" timestamp="1591305299788">
+    <state x="1075" y="-805" key="FileChooserDialogImpl" timestamp="1592079998186">
       <screen x="335" y="-1080" width="1920" height="1040" />
     </state>
-    <state x="1328" y="-807" width="647" height="534" key="find.popup/0.0.1280.760/335.-1080.1920.1040@335.-1080.1920.1040" timestamp="1591305299788" />
+    <state x="493" y="201" key="FileChooserDialogImpl/0.0.1280.760/335.-1080.1920.1040@0.0.1280.760" timestamp="1591840636578" />
+    <state x="1075" y="-805" key="FileChooserDialogImpl/0.0.1280.760/335.-1080.1920.1040@335.-1080.1920.1040" timestamp="1592079998186" />
+    <state x="1447" y="-810" width="647" height="534" key="find.popup" timestamp="1592079877722">
+      <screen x="335" y="-1080" width="1920" height="1040" />
+    </state>
+    <state x="1447" y="-810" width="647" height="534" key="find.popup/0.0.1280.760/335.-1080.1920.1040@335.-1080.1920.1040" timestamp="1592079877722" />
   </component>
 </project>
