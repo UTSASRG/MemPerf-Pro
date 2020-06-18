@@ -156,7 +156,6 @@ public:
     assert(_initialized == true);
     size_t hindex = hashIndex(key, keylen);
     struct HashBucket* first = getHashBucket(hindex);
-    //fprintf(stderr, "find entry key %p hindex %d\n", key, hindex);
     struct Entry* entry = getEntry(first, key, keylen);
     ValueType * ret = NULL;
 
@@ -232,11 +231,7 @@ public:
 
     assert(_initialized == true);
     size_t hindex = hashIndex(key, keylen);
-    // PRINF("Insert entry:  before inserting\n");
     struct HashBucket* first = getHashBucket(hindex);
-//    fprintf(stderr, "insert key %p index %lx\n", key, hindex);
-
-    // PRINF("Insert entry: key %p\n", key);
 #if LOCK_PROTECTION
     first->Lock();
 #endif
@@ -332,7 +327,7 @@ private:
     struct Entry* entry = createNewEntry(key, keylen, value);
     listInsertTail(&entry->list, &head->list);
     head->count++;
-
+//    fprintf(stderr, "w: head = %p count = %lu\n", head, head->count);
     // increment total number
     __atomic_add_fetch(&_totalEntry, 1, __ATOMIC_RELAXED);
     return entry;
@@ -342,7 +337,7 @@ private:
   struct Entry* getEntry(struct HashBucket* first, const KeyType& key, size_t keylen) {
     struct Entry* entry = (struct Entry*)first->getFirstEntry();
     struct Entry* result = NULL;
-
+//      fprintf(stderr, "r: head = %p count = %lu\n", first, first->count);
     // Check all _buckets with the same hindex.
     int count = first->count;
     while(count > 0) {

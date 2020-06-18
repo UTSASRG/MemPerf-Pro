@@ -1,15 +1,18 @@
 
 #include "memwaste.h"
 
-HashMap<void*, ObjectStatus, spinlock, PrivateHeap> MemoryWaste::objStatusMap;
+HashMap<void*, ObjectStatus, nolock, PrivateHeap> MemoryWaste::objStatusMap;
 thread_local SizeClassSizeAndIndex MemoryWaste::currentSizeClassSizeAndIndex;
 MemoryWasteStatus MemoryWaste::currentStatus, MemoryWaste::recordStatus;
 MemoryWasteGlobalStatus MemoryWaste::globalStatus;
 MemoryWasteTotalValue MemoryWaste::totalValue;
-
+HashLocksSet MemoryWaste::hashLocksSet;
 
 size_t ObjectStatus::internalFragment() {
     size_t unUsedPage = (sizeClassSizeAndIndex.classSize - maxTouchedBytes) / PAGESIZE * PAGESIZE;
+    if(sizeClassSizeAndIndex.classSize - unUsedPage - sizeClassSizeAndIndex.size > ABNORMAL_VALUE) {
+        return 0;
+    }
     return sizeClassSizeAndIndex.classSize - unUsedPage - sizeClassSizeAndIndex.size;
 }
 
@@ -41,8 +44,7 @@ void MemoryWasteStatus::initialize() {
     numOfAccumulatedOperations.numOfReusedAllocations = (uint64_t*) MyMalloc::malloc(sizeOfArrays);
     numOfAccumulatedOperations.numOfFree = (uint64_t*) MyMalloc::malloc(sizeOfArrays);
     blowupFlag = (int64_t*) MyMalloc::malloc(ProgramStatus::numberOfClassSizes * sizeof(uint64_t));
-//
-//    memset(internalFragment, 0, sizeOfArrays);
+    memset(internalFragment, 0, sizeOfArrays);
 //    memset(numOfActiveObjects.numOfAllocatedObjects, 0, sizeOfArrays);
 //    memset(numOfActiveObjects.numOfFreelistObjects, 0, sizeOfArrays);
 //    memset(numOfAccumulatedOperations.numOfNewAllocations, 0, sizeOfArrays);
@@ -57,7 +59,7 @@ void MemoryWasteStatus::debugPrint() {
     for(unsigned int threadIndex = 0; threadIndex < 40; ++threadIndex) {
         fprintf(stderr, "thread %d: ", threadIndex);
         for(unsigned int classSizeIndex = 0; classSizeIndex < ProgramStatus::numberOfClassSizes; ++classSizeIndex) {
-            fprintf(stderr, "%ld ", internalFragment[arrayIndex(threadIndex, classSizeIndex)]);
+            ;
         }
         fprintf(stderr, "\n");
     }
@@ -66,12 +68,13 @@ void MemoryWasteStatus::debugPrint() {
 
 void MemoryWasteStatus::updateStatus(MemoryWasteStatus newStatus) {
     lock.lock();
-    memcpy(this->internalFragment, newStatus.internalFragment, sizeOfArrays);
-    memcpy(this->numOfActiveObjects.numOfAllocatedObjects, newStatus.numOfActiveObjects.numOfAllocatedObjects, sizeOfArrays);
-    memcpy(this->numOfActiveObjects.numOfFreelistObjects, newStatus.numOfActiveObjects.numOfFreelistObjects, sizeOfArrays);
-    memcpy(this->numOfAccumulatedOperations.numOfNewAllocations, newStatus.numOfAccumulatedOperations.numOfNewAllocations, sizeOfArrays);
-    memcpy(this->numOfAccumulatedOperations.numOfReusedAllocations, newStatus.numOfAccumulatedOperations.numOfReusedAllocations, sizeOfArrays);
-    memcpy(this->numOfAccumulatedOperations.numOfFree, newStatus.numOfAccumulatedOperations.numOfFree, sizeOfArrays);
+    size_t sizeOfCopiedArrays = ThreadLocalStatus::totalNumOfRunningThread * ProgramStatus::numberOfClassSizes * sizeof(uint64_t);
+    memcpy(this->internalFragment, newStatus.internalFragment, sizeOfCopiedArrays);
+    memcpy(this->numOfActiveObjects.numOfAllocatedObjects, newStatus.numOfActiveObjects.numOfAllocatedObjects, sizeOfCopiedArrays);
+    memcpy(this->numOfActiveObjects.numOfFreelistObjects, newStatus.numOfActiveObjects.numOfFreelistObjects, sizeOfCopiedArrays);
+    memcpy(this->numOfAccumulatedOperations.numOfNewAllocations, newStatus.numOfAccumulatedOperations.numOfNewAllocations, sizeOfCopiedArrays);
+    memcpy(this->numOfAccumulatedOperations.numOfReusedAllocations, newStatus.numOfAccumulatedOperations.numOfReusedAllocations, sizeOfCopiedArrays);
+    memcpy(this->numOfAccumulatedOperations.numOfFree, newStatus.numOfAccumulatedOperations.numOfFree, sizeOfCopiedArrays);
     memcpy(this->blowupFlag, newStatus.blowupFlag, ProgramStatus::numberOfClassSizes * sizeof(uint64_t));
     lock.unlock();
 }
@@ -89,23 +92,19 @@ void MemoryWasteGlobalStatus::initialize() {
     numOfAccumulatedOperations.numOfFree = (uint64_t*) MyMalloc::malloc(sizeOfArrays);
     memoryBlowup = (int64_t *) MyMalloc::malloc(sizeOfArrays);
 
-    memset(internalFragment, 0, sizeOfArrays);
-    memset(numOfActiveObjects.numOfAllocatedObjects, 0, sizeOfArrays);
-    memset(numOfActiveObjects.numOfFreelistObjects, 0, sizeOfArrays);
-    memset(numOfAccumulatedOperations.numOfNewAllocations, 0, sizeOfArrays);
-    memset(numOfAccumulatedOperations.numOfReusedAllocations, 0, sizeOfArrays);
-    memset(numOfAccumulatedOperations.numOfFree, 0, sizeOfArrays);
-    memset(memoryBlowup, 0, sizeOfArrays);
+//    memset(internalFragment, 0, sizeOfArrays);
+//    memset(numOfActiveObjects.numOfAllocatedObjects, 0, sizeOfArrays);
+//    memset(numOfActiveObjects.numOfFreelistObjects, 0, sizeOfArrays);
+//    memset(numOfAccumulatedOperations.numOfNewAllocations, 0, sizeOfArrays);
+//    memset(numOfAccumulatedOperations.numOfReusedAllocations, 0, sizeOfArrays);
+//    memset(numOfAccumulatedOperations.numOfFree, 0, sizeOfArrays);
+//    memset(memoryBlowup, 0, sizeOfArrays);
 
 }
 
 void MemoryWasteGlobalStatus::globalize(MemoryWasteStatus recordStatus) {
-    ///Jin: bugs remaining
-//    recordStatus.debugPrint();
-//    for (unsigned int classSizeIndex = 0; classSizeIndex < ProgramStatus::numberOfClassSizes; ++classSizeIndex) {
-//        fprintf(stderr, "%ld ", internalFragment[classSizeIndex]);
-//    }
-//    fprintf(stderr, "\n");
+
+
     for (unsigned int threadIndex = 0; threadIndex < ThreadLocalStatus::totalNumOfRunningThread; ++threadIndex) {
         for (unsigned int classSizeIndex = 0; classSizeIndex < ProgramStatus::numberOfClassSizes; ++classSizeIndex) {
             internalFragment[classSizeIndex] += recordStatus.internalFragment[MemoryWaste::arrayIndex(threadIndex, classSizeIndex)];
@@ -124,10 +123,7 @@ void MemoryWasteGlobalStatus::globalize(MemoryWasteStatus recordStatus) {
 
         }
     }
-//    for (unsigned int classSizeIndex = 0; classSizeIndex < ProgramStatus::numberOfClassSizes; ++classSizeIndex) {
-//        fprintf(stderr, "%ld ", internalFragment[classSizeIndex]);
-//    }
-//    fprintf(stderr, "\n");
+
 }
 
 void MemoryWasteGlobalStatus::calculateBlowup(MemoryWasteStatus recordStatus) {
@@ -162,29 +158,55 @@ void MemoryWasteTotalValue::getTotalValues(MemoryWasteGlobalStatus globalStatus)
     }
 }
 
+void MemoryWasteTotalValue::clearAbnormalValues() {
+    internalFragment = MIN(MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage - MemoryUsage::maxGlobalMemoryUsage.realMemoryUsage, internalFragment);
+    memoryBlowup = MIN(MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage - MemoryUsage::maxGlobalMemoryUsage.realMemoryUsage - internalFragment, memoryBlowup);
+
+}
+
 void MemoryWasteTotalValue::getExternalFragment() {
     externalFragment = MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage - MemoryUsage::maxGlobalMemoryUsage.realMemoryUsage - internalFragment - memoryBlowup;
     externalFragment = MAX(externalFragment, 0);
 }
 
+void HashLocksSet::init() {
+    for(unsigned int hashKey = 0; hashKey < MAX_OBJ_NUM; ++hashKey) {
+        locks[hashKey].init();
+    }
+}
+
+void HashLocksSet::lock(void *address) {
+    size_t hashKey = HashFuncs::hashAddr(address, sizeof(void*)) & (MAX_OBJ_NUM-1);
+//    fprintf(stderr, "lock: tid = %lu, addr = %p, key = %lu\n", ThreadLocalStatus::runningThreadIndex, address, hashKey);
+    locks[hashKey].lock();
+}
+
+void HashLocksSet::unlock(void *address) {
+    size_t hashKey = HashFuncs::hashAddr(address, sizeof(void*)) & (MAX_OBJ_NUM-1);
+//    fprintf(stderr, "unlock: tid = %lu, addr = %p, key = %lu\n", ThreadLocalStatus::runningThreadIndex, address, hashKey);
+    locks[hashKey].unlock();
+}
 
 void MemoryWaste::initialize() {
-
     objStatusMap.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_OBJ_NUM);
     currentStatus.initialize();
     recordStatus.initialize();
     globalStatus.initialize();
+    hashLocksSet.init();
 }
 
 
 AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(size_t size, void * address) {
-
+    hashLocksSet.lock(address);
     bool reused;
     ObjectStatus * status = objStatusMap.find(address, sizeof(unsigned long));
     if(!status) {
         reused = false;
         currentSizeClassSizeAndIndex = ProgramStatus::getClassSizeAndIndex(size);
         status = objStatusMap.insert(address, sizeof(void *), ObjectStatus::newObjectStatus(currentSizeClassSizeAndIndex, size));
+
+        status->sizeClassSizeAndIndex = currentSizeClassSizeAndIndex;
+        status->maxTouchedBytes = size;
 
         currentStatus.numOfAccumulatedOperations.numOfNewAllocations[arrayIndex()]++;
     }
@@ -201,45 +223,42 @@ AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(size_t size, void * ad
         }
         currentStatus.numOfActiveObjects.numOfFreelistObjects[arrayIndex()]--;
         currentStatus.numOfAccumulatedOperations.numOfReusedAllocations[arrayIndex()]++;
-    }
 
+    }
     currentStatus.numOfActiveObjects.numOfAllocatedObjects[arrayIndex()]++;
 
-    currentStatus.internalFragment[arrayIndex()] += status->internalFragment();
+    if(currentStatus.internalFragment[arrayIndex()] >= 0x1000000000) {
+        currentStatus.internalFragment[arrayIndex()] = 0;
+    }
+
+    currentStatus.internalFragment[arrayIndex()] += (int64_t)status->internalFragment();
+
     if(currentStatus.blowupFlag[currentSizeClassSizeAndIndex.classSizeIndex] > 0 ) {
         currentStatus.blowupFlag[currentSizeClassSizeAndIndex.classSizeIndex]--;
     }
-
-//        fprintf(stderr, "tid = %d, alloc up size = %lu %lu %p %p\n",
-//                ThreadLocalStatus::runningThreadIndex, currentSizeClassSizeAndIndex.size, status->sizeClassSizeAndIndex.size, status, &status->sizeClassSizeAndIndex.size);
-
+    hashLocksSet.unlock(address);
     return AllocatingTypeGotFromMemoryWaste{reused, currentSizeClassSizeAndIndex.classSize};
 }
 
 
 AllocatingTypeWithSizeGotFromMemoryWaste MemoryWaste::freeUpdate(void* address) {
-
+    hashLocksSet.lock(address);
     /* Get old status */
     ObjectStatus* status = objStatusMap.find(address, sizeof(void *));
     if(status == nullptr) {
+        hashLocksSet.unlock(address);
         return AllocatingTypeWithSizeGotFromMemoryWaste{0, AllocatingTypeGotFromMemoryWaste{false, 0}};
     }
-    ///Jin: There are some bugs remaining
-    if(status->sizeClassSizeAndIndex.size > 0x10000) {
-        status->sizeClassSizeAndIndex.size %= 0x10000;
-//        fprintf(stderr, "cut size = %lu\n", status->sizeClassSizeAndIndex.size);
-    }
     currentSizeClassSizeAndIndex = status->sizeClassSizeAndIndex;
-
     currentStatus.numOfAccumulatedOperations.numOfFree[arrayIndex()]++;
 
     currentStatus.numOfActiveObjects.numOfAllocatedObjects[arrayIndex()]--;
     currentStatus.numOfActiveObjects.numOfFreelistObjects[arrayIndex()]++;
 
-    currentStatus.internalFragment[arrayIndex()] -= status->internalFragment();
+    currentStatus.internalFragment[arrayIndex()] -= (int64_t)status->internalFragment();
 
     currentStatus.blowupFlag[currentSizeClassSizeAndIndex.classSizeIndex]++;
-
+    hashLocksSet.unlock(address);
     return AllocatingTypeWithSizeGotFromMemoryWaste{currentSizeClassSizeAndIndex.size,
                                                     AllocatingTypeGotFromMemoryWaste{false, currentSizeClassSizeAndIndex.classSize}};
 }
@@ -255,6 +274,7 @@ void MemoryWaste::globalizeRecordAndGetTotalValues() {
     globalStatus.cleanAbnormalValues();
 
     totalValue.getTotalValues(globalStatus);
+    totalValue.clearAbnormalValues();
     totalValue.getExternalFragment();
 }
 

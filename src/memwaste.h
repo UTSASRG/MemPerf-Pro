@@ -19,6 +19,7 @@
 class ProgramStatus;
 
 struct ObjectStatus{
+    uint64_t proof;
     SizeClassSizeAndIndex sizeClassSizeAndIndex;
     size_t maxTouchedBytes = 0;
 
@@ -83,18 +84,27 @@ struct MemoryWasteTotalValue {
         uint64_t numOfFree = 0;
     } numOfAccumulatedOperations;
     int64_t externalFragment;
-    uint64_t memoryBlowup = 0;
+    int64_t memoryBlowup = 0;
     void getTotalValues(MemoryWasteGlobalStatus globalStatus);
+    void clearAbnormalValues();
     void getExternalFragment();
+};
+
+struct HashLocksSet {
+    spinlock locks[MAX_OBJ_NUM];
+    void init();
+    void lock(void * address);
+    void unlock(void * address);
 };
 
 class MemoryWaste{
 private:
-    static HashMap <void*, ObjectStatus, spinlock, PrivateHeap> objStatusMap;
+    static HashMap <void*, ObjectStatus, nolock, PrivateHeap> objStatusMap;
     static thread_local SizeClassSizeAndIndex currentSizeClassSizeAndIndex;
     static MemoryWasteStatus currentStatus, recordStatus;
     static MemoryWasteGlobalStatus globalStatus;
     static MemoryWasteTotalValue totalValue;
+    static HashLocksSet hashLocksSet;
 
 
 public:

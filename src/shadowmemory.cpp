@@ -102,10 +102,8 @@ unsigned ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_index,
 						curPageBytes = size_remain;
 				}
 				if(isFree) {
-				        //printf("sub %d\n", curPageBytes);
 						current->subUsedBytes(curPageBytes);
 				} else {
-                    //printf("add %d\n", curPageBytes);
 						current->addUsedBytes(curPageBytes);
 						if(!current->isTouched()) {
 								current->setTouched();

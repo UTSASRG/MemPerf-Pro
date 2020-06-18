@@ -86,22 +86,22 @@ void AllocatingStatus::calculateCountingDataInRealFunction() {
 }
 
 void AllocatingStatus::removeAbnormalCountingEventValues() {
-    if(cyclesInRealFunction > ABNORMAL_VALUE_FOR_COUNTING_EVENTS) {
+    if(cyclesInRealFunction > ABNORMAL_VALUE) {
         cyclesInRealFunction = 0;
     }
-    if(countingDataInRealFunction.faults > ABNORMAL_VALUE_FOR_COUNTING_EVENTS) {
+    if(countingDataInRealFunction.faults > ABNORMAL_VALUE) {
         countingDataInRealFunction.faults = 0;
     }
-    if(countingDataInRealFunction.cache_misses > ABNORMAL_VALUE_FOR_COUNTING_EVENTS) {
+    if(countingDataInRealFunction.cache_misses > ABNORMAL_VALUE) {
         countingDataInRealFunction.cache_misses = 0;
     }
-    if(countingDataInRealFunction.tlb_read_misses > ABNORMAL_VALUE_FOR_COUNTING_EVENTS) {
+    if(countingDataInRealFunction.tlb_read_misses > ABNORMAL_VALUE) {
         countingDataInRealFunction.tlb_read_misses = 0;
     }
-    if(countingDataInRealFunction.tlb_write_misses > ABNORMAL_VALUE_FOR_COUNTING_EVENTS) {
+    if(countingDataInRealFunction.tlb_write_misses > ABNORMAL_VALUE) {
         countingDataInRealFunction.tlb_write_misses = 0;
     }
-    if(countingDataInRealFunction.instructions > ABNORMAL_VALUE_FOR_COUNTING_EVENTS) {
+    if(countingDataInRealFunction.instructions > ABNORMAL_VALUE) {
         countingDataInRealFunction.instructions = 0;
     }
 }
@@ -133,10 +133,6 @@ void AllocatingStatus::updateMemoryStatusAfterAllocation() {
 
 void AllocatingStatus::updateMemoryStatusBeforeFree() {
     allocatingType.switchFreeingTypeGotFromMemoryWaste(MemoryWaste::freeUpdate(allocatingType.objectAddress));
-    if(allocatingType.objectSize == 4294967316) {
-        fprintf(stderr, "free = %d\n", allocatingType.allocatingFunction == FREE);
-        abort();
-    }
     allocatingType.allocatingTypeGotFromShadowMemory.objectNewTouchedPageSize = ShadowMemory::updateObject(allocatingType.objectAddress, allocatingType.objectSize, true);
     MemoryUsage::subRealSizeFromMemoryUsage(allocatingType.objectSize);
 }

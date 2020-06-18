@@ -24,6 +24,7 @@ public:
     static void subRealSizeFromMemoryUsage(size_t size);
     static void subTotalSizeFromMemoryUsage(size_t size);
     static void printOutput();
+    static void clearAbnormalValues();
 
 };
 
