@@ -72,6 +72,7 @@ struct DetailLockData {
     void checkAndUpdateMaxNumOfContendingThreads();
     void quitFromContending();
     bool isAnImportantLock();
+    void add(DetailLockData newDetailLockData);
 };
 
 struct CriticalSectionStatus {
@@ -114,28 +115,21 @@ struct PerfReadInfo {
     void debugPrint();
 };
 
-//extern constexpr char * outputTitleNotificationString[2];
-//extern constexpr char * allocationTypeOutputString[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
-//extern constexpr char * allocationTypeOutputTitleString[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
-//extern constexpr char * lockTypeOutputString[NUM_OF_LOCKTYPES];
-//extern constexpr char * syscallTypeOutputString[NUM_OF_SYSTEMCALLTYPES];
-//extern constexpr char * falseSharingTypeOutputString[NUM_OF_FALSESHARINGTYPE];
-
 constexpr char * outputTitleNotificationString[2] = {
         (char*)"\n>>>>>>>>>>>>>>>",
         (char*)"<<<<<<<<<<<<<<<\n"
 };
 
 constexpr char * allocationTypeOutputString[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA] = {
-        (char*)"small new malloc",
+        (char*)"small new malloc   ",
         (char*)"small reused malloc",
-        (char*)"large malloc",
-        (char*)"small free",
-        (char*)"large free",
-        (char*)"calloc",
-        (char*)"realloc",
-        (char*)"posix_memalign",
-        (char*)"memalign"
+        (char*)"large malloc       ",
+        (char*)"small free         ",
+        (char*)"large free         ",
+        (char*)"calloc             ",
+        (char*)"realloc            ",
+        (char*)"posix_memalign     ",
+        (char*)"memalign           "
 };
 
 constexpr char * allocationTypeOutputTitleString[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA] = {
@@ -151,24 +145,24 @@ constexpr char * allocationTypeOutputTitleString[NUM_OF_ALLOCATIONTYPEFOROUTPUTD
 };
 
 constexpr char * lockTypeOutputString[NUM_OF_LOCKTYPES] = {
-        (char*)"mutex lock",
-        (char*)"spin lock",
+        (char*)"mutex lock    ",
+        (char*)"spin lock     ",
         (char*)"mutex try lock",
-        (char*)"spin try lock"
+        (char*)"spin try lock "
 };
 
 constexpr char * syscallTypeOutputString[NUM_OF_SYSTEMCALLTYPES] = {
-        (char*)"mmap",
-        (char*)"madvise",
-        (char*)"sbrk",
+        (char*)"mmap    ",
+        (char*)"madvise ",
+        (char*)"sbrk    ",
         (char*)"mprotect",
-        (char*)"munmap",
-        (char*)"mremap"
+        (char*)"munmap  ",
+        (char*)"mremap  "
 };
 
 constexpr char * falseSharingTypeOutputString[NUM_OF_FALSESHARINGTYPE] = {
-        (char*)"object false sharing",
-        (char*)"active false sharing",
+        (char*)"object false sharing ",
+        (char*)"active false sharing ",
         (char*)"passive false sharing"
 };
 

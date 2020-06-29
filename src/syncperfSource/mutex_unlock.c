@@ -31,8 +31,8 @@ __pthread_mutex_unlock_usercnt (pthread_mutex_t *mutex, int decr)
 	/* One less user.  */
 	--mutex->__data.__nusers;
 
-      /* Unlock.  */
-      lll_unlock (mutex->__data.__lock, PTHREAD_MUTEX_PSHARED (mutex));
+        /* Unlock.  */
+        lll_unlock (mutex->__data.__lock, PTHREAD_MUTEX_PSHARED (mutex));
 
       //LIBC_PROBE (mutex_release, 1, mutex);
 

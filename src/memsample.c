@@ -36,7 +36,6 @@ struct read_cache_misses_outside_format {
 };
 
 inline void acquireGlobalPerfLock() {
-		//pthread_spin_lock(&_perf_spin_lock);
     _perf_spin_lock.lock();
 }
 

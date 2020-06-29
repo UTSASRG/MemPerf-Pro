@@ -68,7 +68,21 @@ void DetailLockData::quitFromContending() {
 }
 
 bool DetailLockData::isAnImportantLock() {
-    return maxNumOfContendingThreads >= 10;
+    for(unsigned int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
+        if(numOfCalls[allocationType] && numOfCallsWithContentions[allocationType] * 10 >= numOfCalls[allocationType]) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void DetailLockData::add(DetailLockData newDetailLockData) {
+    lockType = newDetailLockData.lockType;
+    for(unsigned int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
+        numOfCalls[allocationType] += newDetailLockData.numOfCalls[allocationType];
+        numOfCallsWithContentions[allocationType] += newDetailLockData.numOfCallsWithContentions[allocationType];
+        cycles[allocationType] += newDetailLockData.cycles[allocationType];
+    }
 }
 
 
@@ -82,12 +96,18 @@ void FriendlinessStatus::recordANewSampling(uint64_t memoryUsageOfCacheLine, uin
     numOfSampling++;
     totalMemoryUsageOfSampledCacheLines += memoryUsageOfCacheLine;
     totalMemoryUsageOfSampledPages += memoryUsageOfPage;
+//    if(numOfSampling) {
+//        fprintf(stderr, "tc = %lu, tp = %lu, c = %lu, p = %lu, avgc = %3lu%%, avgp = %3lu%%\n",
+//                totalMemoryUsageOfSampledCacheLines, totalMemoryUsageOfSampledPages, memoryUsageOfCacheLine, memoryUsageOfPage,
+//                totalMemoryUsageOfSampledPages*100/(numOfSampling*PAGESIZE),
+//                totalMemoryUsageOfSampledCacheLines*100/(numOfSampling*CACHELINE_SIZE));
+//    }
 }
 
 void FriendlinessStatus::add(FriendlinessStatus newFriendlinessStatus) {
     numOfSampling += newFriendlinessStatus.numOfSampling;
     totalMemoryUsageOfSampledPages += newFriendlinessStatus.totalMemoryUsageOfSampledPages;
-    totalMemoryUsageOfSampledCacheLines += newFriendlinessStatus.totalMemoryUsageOfSampledPages;
+    totalMemoryUsageOfSampledCacheLines += newFriendlinessStatus.totalMemoryUsageOfSampledCacheLines;
     numOfSampledStoringInstructions += newFriendlinessStatus.numOfSampledStoringInstructions;
     numOfSampledCacheLines += newFriendlinessStatus.numOfSampledCacheLines;
     for(int falseSharingType = 0; falseSharingType < NUM_OF_FALSESHARINGTYPE; ++falseSharingType) {
@@ -98,11 +118,17 @@ void FriendlinessStatus::add(FriendlinessStatus newFriendlinessStatus) {
 
 void FriendlinessStatus::debugPrint() {
     fprintf(stderr, "numOfSampling = %u\n", numOfSampling);
-    fprintf(stderr, "totalMemoryUsageOfSampledPages = %lu\n", totalMemoryUsageOfSampledPages);
-    fprintf(stderr, "totalMemoryUsageOfSampledCacheLines = %lu\n", totalMemoryUsageOfSampledCacheLines);
-    fprintf(stderr, "numOfSampledStoringInstructions = %u\n", numOfSampledStoringInstructions);
-    fprintf(stderr, "numOfSampledCacheLines = %u\n", numOfSampledCacheLines);
-    fprintf(stderr, "\n");
+    if(numOfSampling / 100) {
+        fprintf(stderr, "totalMemoryUsageOfSampledPages = %lu, avg = %3lu%%\n",
+                totalMemoryUsageOfSampledPages,
+                totalMemoryUsageOfSampledPages/(numOfSampling/100*PAGESIZE));
+        fprintf(stderr, "totalMemoryUsageOfSampledCacheLines = %lu, avg = %3lu%%\n",
+                totalMemoryUsageOfSampledCacheLines,
+                totalMemoryUsageOfSampledCacheLines/(numOfSampling/100*CACHELINE_SIZE));
+        fprintf(stderr, "numOfSampledStoringInstructions = %u\n", numOfSampledStoringInstructions);
+        fprintf(stderr, "numOfSampledCacheLines = %u\n", numOfSampledCacheLines);
+        fprintf(stderr, "\n");
+    }
 }
 
 bool TotalMemoryUsage::isLowerThan(TotalMemoryUsage newTotalMemoryUsage, size_t interval) {

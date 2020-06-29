@@ -73,19 +73,20 @@ int _my_pthread_mutex_lock (pthread_mutex_t *mutex)
 		/* FALLTHROUGH */
 
 	case PTHREAD_MUTEX_TIMED_NP:
-//simple:
+
 	    ///Jin
-	    if(mutex->__data.__lock == 2) {
+	    if(mutex->__data.__lock) {
             allocatingStatusRecordALockContention();
         }
-
 		LLL_MUTEX_LOCK (mutex);
 		assert (mutex->__data.__owner == 0);
+
 		break;
 
 	case PTHREAD_MUTEX_ADAPTIVE_NP:
 		if (LLL_MUTEX_TRYLOCK (mutex) != 0)
 		{
+            ///Jin
             allocatingStatusRecordALockContention();
 			int cnt = 0;
 			int max_cnt = MIN (MAX_ADAPTIVE_COUNT,

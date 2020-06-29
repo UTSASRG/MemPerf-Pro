@@ -1,5 +1,7 @@
 #include "xthreadx.hh"
 
+extern thread_local HashMap <void *, DetailLockData, nolock, PrivateHeap> lockUsage;
+
 int xthreadx::thread_create(pthread_t * tid, const pthread_attr_t * attr, threadFunction * fn, void * arg) {
     thread_t * children = (thread_t *) MyMalloc::malloc(sizeof(thread_t));
     children->thread = tid;
@@ -28,7 +30,10 @@ void * xthreadx::startThread(void * arg) {
 #endif
 
     ThreadLocalStatus::getARunningThreadIndex();
+    MyMalloc::initializeForMMAPHashMemory(ThreadLocalStatus::runningThreadIndex);
     MyMalloc::initializeForThreadLocalMemory();
+    lockUsage.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_OBJ_NUM);
+    ProgramStatus::setProfilerInitializedTrue();
     result = current->startRoutine(current->startArg);
     threadExit();
 

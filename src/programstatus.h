@@ -10,7 +10,7 @@
 
 class ProgramStatus {
 private:
-    static bool profilerInitialized;
+    static thread_local bool profilerInitialized;
     static bool beginConclusion;
 
     static char inputInfoFileName[MAX_FILENAME_LEN];
@@ -29,8 +29,6 @@ private:
     static void readInputInfoFile();
     static void openInputInfoFile(char * runningApplicationName);
     static void openOutputFile();
-
-    static void printStackAddr();
     static void printLargeObjectThreshold();
 
 public:
@@ -43,6 +41,7 @@ public:
 
     static void setProfilerInitializedTrue();
     static void setBeginConclusionTrue();
+    static void setThreadInitializedTrue();
 
     static bool profilerNotInitialized();
     static bool conclusionHasStarted();

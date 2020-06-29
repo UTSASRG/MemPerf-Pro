@@ -49,6 +49,7 @@ struct MemoryWasteStatus {
     void initialize();
     void debugPrint();
     void updateStatus(MemoryWasteStatus newStatus);
+    void cleanAbnormalValues();
 };
 
 struct MemoryWasteGlobalStatus {

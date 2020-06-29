@@ -74,8 +74,8 @@ size_t ShadowMemory::updateObject(void * address, size_t size, bool isFree) {
     }
 
     unsigned firstPageIdx = ((uintaddr & MEGABYTE_MASK) >> LOG2_PAGESIZE);
-
     unsigned numNewPagesTouched = updatePages(uintaddr, mega_index, firstPageIdx, size, isFree);
+//    fprintf(stderr, "tid = %u, firstPageIdx = %u, numNewPagesTouched = %u\n", ThreadLocalStatus::runningThreadIndex, firstPageIdx, numNewPagesTouched);
     PageMapEntry::updateCacheLines(uintaddr, mega_index, firstPageIdx, size, isFree);
 
     return numNewPagesTouched * PAGESIZE;
@@ -165,8 +165,8 @@ size_t ShadowMemory::cleanupPages(uintptr_t uintaddr, size_t length) {
 				current = getPageMapEntry(mega_index, curPageIdx);
 				if(current->isTouched()) {
 						numTouchedPages++;
-				}
-				current->clear();
+                        current->clear();
+                }
 		}
 
 		return PAGESIZE * numTouchedPages;
@@ -193,22 +193,22 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType)
         }
     cme += tuple.cache_index;
 
-    ThreadLocalStatus::friendlinessStatus.recordANewSampling(pme->getUsedBytes(), cme->getUsedBytes());
-		if(accessType == E_MEM_STORE) {
-				ThreadLocalStatus::friendlinessStatus.numOfSampledStoringInstructions++;
-				if(cme->lastWriterThreadIndex != ThreadLocalStatus::runningThreadIndex && cme->lastWriterThreadIndex != -1) {
-				    ThreadLocalStatus::friendlinessStatus.numOfSampledFalseSharingInstructions[cme->falseSharingStatus]++;
-				    if(cme->falseSharingLineRecorded[cme->falseSharingStatus] == false) {
-				        ThreadLocalStatus::friendlinessStatus.numOfSampledFalseSharingCacheLines[cme->falseSharingStatus]++;
-                        cme->falseSharingLineRecorded[cme->falseSharingStatus] = true;
-				    }
-				}
-            cme->lastWriterThreadIndex = ThreadLocalStatus::runningThreadIndex;
+    ThreadLocalStatus::friendlinessStatus.recordANewSampling(cme->getUsedBytes(), pme->getUsedBytes());
+    if(accessType == E_MEM_STORE) {
+        ThreadLocalStatus::friendlinessStatus.numOfSampledStoringInstructions++;
+        if(cme->lastWriterThreadIndex != ThreadLocalStatus::runningThreadIndex && cme->lastWriterThreadIndex != -1) {
+            ThreadLocalStatus::friendlinessStatus.numOfSampledFalseSharingInstructions[cme->falseSharingStatus]++;
+            if(cme->falseSharingLineRecorded[cme->falseSharingStatus] == false) {
+                ThreadLocalStatus::friendlinessStatus.numOfSampledFalseSharingCacheLines[cme->falseSharingStatus]++;
+                cme->falseSharingLineRecorded[cme->falseSharingStatus] = true;
+            }
         }
-		if(cme->sampled == false) {
-            ThreadLocalStatus::friendlinessStatus.numOfSampledCacheLines++;
-            cme->sampled = true;
-        }
+        cme->lastWriterThreadIndex = ThreadLocalStatus::runningThreadIndex;
+    }
+    if(cme->sampled == false) {
+        ThreadLocalStatus::friendlinessStatus.numOfSampledCacheLines++;
+        cme->sampled = true;
+    }
 
 }
 
@@ -448,7 +448,6 @@ CacheMapEntry * PageMapEntry::getCacheMapEntry(bool mvBumpPtr) {
 
     if(__builtin_expect(__atomic_load_n(&cache_map_entry, __ATOMIC_RELAXED) == NULL, 0)) {
         // Create a new page entries
-//				RealX::pthread_spin_lock(&mega_map_lock);
         ShadowMemory::cache_map_lock.lock();
         if(__builtin_expect(__atomic_load_n(&cache_map_entry, __ATOMIC_RELAXED) == NULL, 1)) {
             __atomic_store_n(&cache_map_entry, ShadowMemory::doCacheMapBumpPointer(), __ATOMIC_RELAXED);

@@ -1,175 +1,71 @@
-//
-// Created by 86152 on 2020/5/20.
-//
-
 #ifndef MMPROF_MYMALLOC_H
 #define MMPROF_MYMALLOC_H
 
-#define THREAD_LOCAL_PROFILER_MEMORY_SIZE ONE_GB
+#define PROFILER_MEMORY_SIZE ONE_GB
+#define MMAP_PROFILER_MEMORY_SIZE 8*ONE_GB
 
 #include "real.hh"
 #include "stdint.h"
 #include "definevalues.h"
+#include "spinlock.hh"
 
 struct ProfilerMemory {
 
-   char startPointer[THREAD_LOCAL_PROFILER_MEMORY_SIZE];
+   char startPointer[PROFILER_MEMORY_SIZE];
     void * endPointer;
     void * overheadPointer;
     uint64_t objectNum = 0;
+    spinlock lock;
     bool initialized = false;
 
-    void initialize() {
-        endPointer = (void *) ((uint64_t)startPointer + THREAD_LOCAL_PROFILER_MEMORY_SIZE);
-        overheadPointer = startPointer;
-        initialized = true;
-    }
-
-    void checkAndInitialize() {
-        if(!initialized) initialize();
-    }
-
-    void GetASpaceFromMemory(size_t size) {
-        overheadPointer = (void *) ((uint64_t) overheadPointer + size);
-        objectNum++;
-    }
-
-    void checkIfMemoryOutOfBound() {
-        if(overheadPointer >= endPointer) {
-            fprintf(stderr, "out of profiler memory\n");
-            abort();
-        }
-    }
-
-    void * newObjectAddr(size_t size) {
-        return (void *) ((uint64_t)overheadPointer - size);
-    }
-
-    void * malloc(size_t size) {
-        checkAndInitialize();
-        GetASpaceFromMemory(size);
-        checkIfMemoryOutOfBound();
-        return newObjectAddr(size);
-    }
-
-    void free(void * addr) {
-        if(addr == nullptr) {
-            return;
-        }
-        objectNum--;
-        if(objectNum == 0) {
-            overheadPointer = startPointer;
-        }
-    }
-
-    bool inMemory(void * addr) {
-        return(addr >= startPointer && addr <= endPointer);
-    }
-
-    bool ifInProfilerMemoryThenFree(void * addr) {
-        checkAndInitialize();
-        if(inMemory(addr)) {
-            free(addr);
-            return true;
-        }
-        return false;
-    }
+    void initialize();
+    void checkAndInitialize();
+    void GetASpaceFromMemory(size_t size);
+    void checkIfMemoryOutOfBound();
+    void * newObjectAddr(size_t size);
+    void * malloc(size_t size);
+    void free(void * addr);
+    bool inMemory(void * addr);
+    bool ifInProfilerMemoryThenFree(void * addr);
 };
 
-struct ThreadLocalProfilerMemory {
+struct MMAPProfilerMemory {
 
     void * startPointer;
     void * endPointer;
     void * overheadPointer;
     uint64_t objectNum = 0;
+    size_t currentSize;
     bool initialized = false;
 
-    void initialize() {
-        startPointer = RealX::mmap(NULL, THREAD_LOCAL_PROFILER_MEMORY_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-        endPointer = (void *) ((uint64_t)startPointer + THREAD_LOCAL_PROFILER_MEMORY_SIZE);
-        overheadPointer = startPointer;
-        initialized = true;
-    }
-
-    void GetASpaceFromMemory(size_t size) {
-        overheadPointer = (void *) ((uint64_t) overheadPointer + size);
-        objectNum++;
-    }
-
-    void checkIfMemoryOutOfBound() {
-        if(overheadPointer >= endPointer) {
-            fprintf(stderr, "out of profiler memory\n");
-            abort();
-        }
-    }
-
-    void * newObjectAddr(size_t size) {
-        return (void *) ((uint64_t)overheadPointer - size);
-    }
-
-    void * malloc(size_t size) {
-        GetASpaceFromMemory(size);
-        checkIfMemoryOutOfBound();
-        return newObjectAddr(size);
-    }
-
-    void free(void * addr) {
-        if(addr == nullptr) {
-            return;
-        }
-        objectNum--;
-        if(objectNum == 0) {
-            overheadPointer = startPointer;
-        }
-    }
-
-    bool inMemory(void * addr) {
-        return(addr >= startPointer && addr <= endPointer);
-    }
-
-    bool ifInProfilerMemoryThenFree(void * addr) {
-        if(inMemory(addr)) {
-            free(addr);
-            return true;
-        }
-        return false;
-    }
+    void initialize();
+    void GetASpaceFromMemory(size_t size);
+    void checkIfMemoryOutOfBound();
+    void * newObjectAddr(size_t size);
+    void * malloc(size_t size);
+    void free(void * addr);
+    bool inMemory(void * addr);
+    bool ifInProfilerMemoryThenFree(void * addr);
 };
 
 class MyMalloc{
 private:
     static ProfilerMemory profilerMemory;
     static ProfilerMemory profilerHashMemory;
-    static thread_local ThreadLocalProfilerMemory threadLocalProfilerMemory;
+    static thread_local MMAPProfilerMemory threadLocalProfilerMemory;
+    static MMAPProfilerMemory MMAPProfilerHashMemory[MAX_THREAD_NUMBER];
+//    static MMAPProfilerMemory MMAPProfilerHashMemory;
+    static spinlock debugLock;
 
 public:
 
-    static void initializeForThreadLocalMemory() {
-        threadLocalProfilerMemory.initialize();
-    }
+    static void initializeForThreadLocalMemory();
+    static bool threadLocalMemoryInitialized();
+    static void initializeForMMAPHashMemory(unsigned int threadIndex);
+    static bool MMAPHashMemoryInitialized(unsigned int threadIndex);
 
-    static bool threadLocalMemoryInitialized() {
-        return threadLocalProfilerMemory.initialized;
-    }
-
-    static void * malloc(size_t size) {
-        if(threadLocalMemoryInitialized()) {
-            return threadLocalProfilerMemory.malloc(size);
-        }
-        return profilerMemory.malloc(size);
-    }
-
-    static bool ifInProfilerMemoryThenFree(void * addr) {
-        bool freed = false;
-        if(threadLocalMemoryInitialized()) {
-            freed = threadLocalProfilerMemory.ifInProfilerMemoryThenFree(addr);
-        }
-        freed = ( profilerMemory.ifInProfilerMemoryThenFree(addr) || profilerHashMemory.ifInProfilerMemoryThenFree(addr) );
-        return freed;
-    }
-
-    static void * hashMalloc(size_t size) {
-        return profilerHashMemory.malloc(size);
-    }
+    static void * malloc(size_t size);
+    static bool ifInProfilerMemoryThenFree(void * addr);
+    static void * hashMalloc(size_t size);
 };
 #endif //MMPROF_MYMALLOC_H

@@ -1,6 +1,6 @@
 #include "programstatus.h"
 
-bool ProgramStatus::profilerInitialized;
+thread_local bool ProgramStatus::profilerInitialized;
 bool ProgramStatus::beginConclusion;
 char ProgramStatus::inputInfoFileName[MAX_FILENAME_LEN];
 FILE * ProgramStatus::inputInfoFile;
@@ -39,8 +39,18 @@ void ProgramStatus::getInputInfoFileName(char * runningApplicationName) {
     char * runningAllocatorName = strrchr(runningApplicationName, '-')+1;
     if(strcmp(runningAllocatorName, "libc228") == 0) {
         strcpy(inputInfoFileName, "/home/jinzhou/Memoryallocators/libc-2.28/libmalloc.info");
+    } else if(strcmp(runningAllocatorName, "libc221") == 0) {
+        strcpy(inputInfoFileName, "/home/jinzhou/Memoryallocators/libc-2.21/libmalloc.info");
     } else if(strcmp(runningAllocatorName, "hoard") == 0) {
         strcpy(inputInfoFileName, "/home/jinzhou/Memoryallocators/Hoard/src/libhoard.info");
+    } else if(strcmp(runningAllocatorName, "jemalloc") == 0) {
+        strcpy(inputInfoFileName, "/home/jinzhou/Memoryallocators/jemalloc/libjemalloc.info");
+    } else if(strcmp(runningAllocatorName, "tcmalloc") == 0) {
+        strcpy(inputInfoFileName, "/usr/local/lib/libtcmalloc.info");
+    } else if(strcmp(runningAllocatorName, "dieharder") == 0) {
+        strcpy(inputInfoFileName, "/home/jinzhou/Memoryallocators/DieHard/src/libdieharder.info");
+    } else if(strcmp(runningAllocatorName, "omalloc") == 0) {
+        strcpy(inputInfoFileName, "/home/jinzhou/Memoryallocators/OpenBSD-6.0-mus/libomalloc.info");
     } else {
         fprintf(stderr, "Info File Location Unknown\n");
         abort();
@@ -118,7 +128,7 @@ void ProgramStatus::openInputInfoFile(char * runningApplicationName) {
 void ProgramStatus::openOutputFile() {
     extern char * program_invocation_name;
 	snprintf(ProgramStatus::outputFileName, MAX_FILENAME_LEN, "%s_libmallocprof_%d_main_thread.txt", program_invocation_name, getpid());
-//    snprintf(ProgramStatus::outputFileName, MAX_FILENAME_LEN, "/home/jinzhou/parsec/records_t/%s_libmallocprof_%d_main_thread.txt", program_invocation_name, getpid());
+//    snprintf(ProgramStatus::outputFileName, MAX_FILENAME_LEN, "/home/jinzhou/parsec/records/%s_libmallocprof_%d_main_thread.txt", program_invocation_name, getpid());
     fprintf(stderr, "%s\n", ProgramStatus::outputFileName);
 
     ProgramStatus::outputFile = fopen(ProgramStatus::outputFileName, "w");
@@ -133,18 +143,11 @@ void ProgramStatus::initIO(char * runningApplicationName) {
     ProgramStatus::openOutputFile();
 }
 
-void ProgramStatus::printStackAddr() {
-    extern void * __libc_stack_end;
-    fprintf(outputFile, ">>> stack start @ %p, stack end @ %p\n", (char *)__builtin_frame_address(0), (char *)__libc_stack_end);
-    fprintf(outputFile, ">>> program break @ %p\n", RealX::sbrk(0));
-}
-
 void ProgramStatus::printLargeObjectThreshold() {
-    fprintf(outputFile, ">>> large_object_threshold\t%20zu\n", largeObjectThreshold);
+    fprintf(outputFile, ">>> large_object_threshold                  %20zu\n", largeObjectThreshold);
 }
 
 void ProgramStatus::printOutput() {
-    printStackAddr();
     printLargeObjectThreshold();
 }
 

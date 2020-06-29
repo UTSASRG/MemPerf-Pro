@@ -10,16 +10,14 @@ void MemoryUsage::addToMemoryUsage(size_t size, size_t newTouchePageBytes) {
     if(maxThreadLocalMemoryUsage.isLowerThan(threadLocalMemoryUsage, ONE_MB)) {
         maxThreadLocalMemoryUsage = threadLocalMemoryUsage;
     }
-
     __atomic_add_fetch(&globalMemoryUsage.realMemoryUsage, size, __ATOMIC_RELAXED);
     __atomic_add_fetch(&globalMemoryUsage.totalMemoryUsage, newTouchePageBytes, __ATOMIC_RELAXED);
-
-    clearAbnormalValues();
 
     if(maxGlobalMemoryUsage.isLowerThan(globalMemoryUsage, ONE_MB)) {
         maxGlobalMemoryUsage = globalMemoryUsage;
         MemoryWaste::compareMemoryUsageAndRecordStatus(maxGlobalMemoryUsage);
     }
+
 }
 
 void MemoryUsage::subRealSizeFromMemoryUsage(size_t size) {
@@ -34,10 +32,10 @@ void MemoryUsage::subTotalSizeFromMemoryUsage(size_t size) {
 
 void MemoryUsage::printOutput() {
     GlobalStatus::printTitle((char*)"MEMORY USAGE");
-    fprintf(ProgramStatus::outputFile, "thread local max real memory usage %20ldK\n", maxThreadLocalMemoryUsage.realMemoryUsage/ONE_KB);
-    fprintf(ProgramStatus::outputFile, "thread local max total memory usage %20ldK\n", maxThreadLocalMemoryUsage.totalMemoryUsage/ONE_KB);
-    fprintf(ProgramStatus::outputFile, "global max real memory usage %20ldK\n", maxGlobalMemoryUsage.realMemoryUsage/ONE_KB);
-    fprintf(ProgramStatus::outputFile, "global max total memory usage %20ldK\n", maxGlobalMemoryUsage.totalMemoryUsage/ONE_KB);
+    fprintf(ProgramStatus::outputFile, "thread local max real memory usage                %20ldK\n", maxThreadLocalMemoryUsage.realMemoryUsage/ONE_KB);
+    fprintf(ProgramStatus::outputFile, "thread local max total memory usage               %20ldK\n", maxThreadLocalMemoryUsage.totalMemoryUsage/ONE_KB);
+    fprintf(ProgramStatus::outputFile, "global max real memory usage                      %20ldK\n", maxGlobalMemoryUsage.realMemoryUsage/ONE_KB);
+    fprintf(ProgramStatus::outputFile, "global max total memory usage                     %20ldK\n", maxGlobalMemoryUsage.totalMemoryUsage/ONE_KB);
 }
 
 void MemoryUsage::clearAbnormalValues() {

@@ -60,15 +60,6 @@ do_mutex_trylock (pthread_mutex_t *mutex)
 		break;
 	case PTHREAD_MUTEX_TIMED_ELISION_NP:
 		assert(PTHREAD_MUTEX_TYPE_ELISION (mutex) != PTHREAD_MUTEX_TIMED_ELISION_NP);
-#if 1 //mejbah
-
-		elision: __attribute__((unused))
-			 if (lll_trylock_elision (mutex->__data.__lock,
-				 mutex->__data.__elision) != 0)
-				 break;
-		 /* Don't record the ownership.  */
-		 return 0;
-#endif
 
 	case PTHREAD_MUTEX_TIMED_NP:
 		FORCE_ELISION (mutex, goto elision);
@@ -88,107 +79,6 @@ do_mutex_trylock (pthread_mutex_t *mutex)
 	case PTHREAD_MUTEX_ROBUST_ERRORCHECK_NP:
 	case PTHREAD_MUTEX_ROBUST_NORMAL_NP:
 	case PTHREAD_MUTEX_ROBUST_ADAPTIVE_NP:
-#if 1 //mejbah
-		THREAD_SETMEM (THREAD_SELF, robust_head.list_op_pending,
-			&mutex->__data.__list.__next);
-
-		oldval = mutex->__data.__lock;
-		do
-		{
-again:
-			if ((oldval & FUTEX_OWNER_DIED) != 0)
-			{
-				/* The previous owner died.  Try locking the mutex.  */
-				int newval = id | (oldval & FUTEX_WAITERS);
-
-				newval
-					= atomic_compare_and_exchange_val_acq (&mutex->__data.__lock,
-					newval, oldval);
-
-				if (newval != oldval)
-				{
-					oldval = newval;
-					goto again;
-				}
-
-				/* We got the mutex.  */
-				mutex->__data.__count = 1;
-				/* But it is inconsistent unless marked otherwise.  */
-				mutex->__data.__owner = PTHREAD_MUTEX_INCONSISTENT;
-
-				ENQUEUE_MUTEX (mutex);
-				THREAD_SETMEM (THREAD_SELF, robust_head.list_op_pending, NULL);
-
-				/* Note that we deliberately exist here.  If we fall
-				through to the end of the function __nusers would be
-				incremented which is not correct because the old
-				owner has to be discounted.  */
-				return EOWNERDEAD;
-			}
-
-			/* Check whether we already hold the mutex.  */
-			if (__glibc_unlikely ((oldval & FUTEX_TID_MASK) == id))
-			{
-				int kind = PTHREAD_MUTEX_TYPE (mutex);
-				if (kind == PTHREAD_MUTEX_ROBUST_ERRORCHECK_NP)
-				{
-					THREAD_SETMEM (THREAD_SELF, robust_head.list_op_pending,
-						NULL);
-					return EDEADLK;
-				}
-
-				if (kind == PTHREAD_MUTEX_ROBUST_RECURSIVE_NP)
-				{
-					THREAD_SETMEM (THREAD_SELF, robust_head.list_op_pending,
-						NULL);
-
-					/* Just bump the counter.  */
-					if (__glibc_unlikely (mutex->__data.__count + 1 == 0))
-						/* Overflow of the counter.  */
-						return EAGAIN;
-
-					++mutex->__data.__count;
-
-					return 0;
-				}
-			}
-
-			oldval = atomic_compare_and_exchange_val_acq (&mutex->__data.__lock,
-				id, 0);
-			if (oldval != 0 && (oldval & FUTEX_OWNER_DIED) == 0)
-			{
-				THREAD_SETMEM (THREAD_SELF, robust_head.list_op_pending, NULL);
-
-				return EBUSY;
-			}
-
-			if (__builtin_expect (mutex->__data.__owner
-				== PTHREAD_MUTEX_NOTRECOVERABLE, 0))
-			{
-				/* This mutex is now not recoverable.  */
-				mutex->__data.__count = 0;
-				if (oldval == id)
-					lll_unlock (mutex->__data.__lock,
-					PTHREAD_ROBUST_MUTEX_PSHARED (mutex));
-				THREAD_SETMEM (THREAD_SELF, robust_head.list_op_pending, NULL);
-				return ENOTRECOVERABLE;
-			}
-		}
-		while ((oldval & FUTEX_OWNER_DIED) != 0);
-
-		ENQUEUE_MUTEX (mutex);
-		THREAD_SETMEM (THREAD_SELF, robust_head.list_op_pending, NULL);
-
-		mutex->__data.__owner = id;
-		++mutex->__data.__nusers;
-		mutex->__data.__count = 1;
-
-		return 0;
-
-		/* The PI support requires the Linux futex system call.  If that's not
-		available, pthread_mutex_init should never have allowed the type to
-		be set.  So it will get the default case for an invalid type.  */
-#endif //mejbah
 #ifdef __NR_futex
 	case PTHREAD_MUTEX_PI_RECURSIVE_NP:
 	case PTHREAD_MUTEX_PI_ERRORCHECK_NP:

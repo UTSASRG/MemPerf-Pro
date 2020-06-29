@@ -50,7 +50,14 @@ private:
             numOfCallsWithContentions = 0;
             cycles = 0;
         }
+
+        void debugPrint() {
+            fprintf(stderr, "numOfLocks = %u, numOfCalls = %u, numOfCallsWithContentions = %u, cycles = %lu\n",
+                    numOfLocks, numOfCalls, numOfCallsWithContentions, cycles);
+        }
     };
+
+#define LENGTH_OF_QUEUE 500
 
     struct QueueOfDetailLockDataInAllocatingStatus {
         struct DetailLockDataInAllocatingStatus {
@@ -59,12 +66,16 @@ private:
             unsigned int numOfCallsWithContentions;
             uint64_t cycles;
 
+            uint64_t lockTimeStamp;
+            uint64_t unlockTimeStamp;
+            pthread_mutex_t * debugMutexAddress;
+
             void writingIntoAddress() {
                 addressOfHashLockData->numOfCalls[allocationTypeForOutputData] += numOfCalls;
                 addressOfHashLockData->numOfCallsWithContentions[allocationTypeForOutputData] += numOfCallsWithContentions;
                 addressOfHashLockData->cycles[allocationTypeForOutputData] += cycles;
             }
-        } queue[100];
+        } queue[LENGTH_OF_QUEUE];
         int queueTail = -1;
 
         void writingNewDataInTheQueue(DetailLockData * addressOfHashLockData);
@@ -83,6 +94,48 @@ private:
         void writingIntoHashTable() {
             for(int index = 0; index <= queueTail; ++index) {
                 queue[index].writingIntoAddress();
+            }
+        }
+
+        void debugAddMutexAddress(uint64_t lockTimeStamp, pthread_mutex_t * mutex) {
+            queue[queueTail].lockTimeStamp = lockTimeStamp;
+            queue[queueTail].debugMutexAddress = mutex;
+        }
+
+        void debugAddUnlockTimeStamp(uint64_t unlockTimeStamp, pthread_mutex_t * mutex) {
+            for(int index = 0; index <= queueTail; ++index) {
+                if(queue[index].debugMutexAddress == mutex && queue[index].unlockTimeStamp == 0) {
+                    queue[index].unlockTimeStamp = unlockTimeStamp;
+                    return;
+                }
+            }
+            fprintf(stderr, "didn't find mutex in the queue: %p\n", mutex);
+            debugPrint();
+            abort();
+        }
+
+        bool debugMutexAddressInTheQueue(pthread_mutex_t * mutex) {
+            for(int index = 0; index <= queueTail; ++index) {
+                if(queue[index].debugMutexAddress == mutex) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        void debugPrint() {
+            for(int index = 0; index <= queueTail; ++index) {
+                fprintf(stderr, "mutex = %p, contention = %u, cycles = %lu\n",
+                        queue[index].debugMutexAddress, queue[index].numOfCallsWithContentions, queue[index].cycles);
+            }
+        }
+
+        void debugPrint(unsigned int threadIndex) {
+            for(int index = 0; index <= queueTail; ++index) {
+                fprintf(stderr, "%lu, %u, %p, %u, %lu\n",
+                        queue[index].lockTimeStamp, threadIndex, queue[index].debugMutexAddress, queue[index].numOfCallsWithContentions, queue[index].cycles);
+                fprintf(stderr, "%lu, %u, %p, %u, %lu\n",
+                        queue[index].unlockTimeStamp, threadIndex, queue[index].debugMutexAddress, queue[index].numOfCallsWithContentions, queue[index].cycles);
             }
         }
     };
@@ -164,8 +217,13 @@ public:
     static void initForWritingOneLockData(LockTypes lockType, DetailLockData* addressOfHashLockData);
     static void recordALockContention();
     static void recordLockCallAndCycles(unsigned int numOfCalls, uint64_t cycles);
+    static void debugRecordMutexAddress(uint64_t lockTimeStamp, pthread_mutex_t * mutex);
+    static void debugRecordUnlockTimeStamp(uint64_t unlockTimeStamp, pthread_mutex_t * mutex);
+    static bool debugMutexAddressInTheQueue(pthread_mutex_t * mutex);
     static void checkAndStartRecordingACriticalSection();
     static void checkAndStopRecordingACriticalSection();
+
+    static void debugPrint();
 
 };
 

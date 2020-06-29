@@ -18,15 +18,19 @@ thread_local SystemCallData AllocatingStatus::systemCallData[NUM_OF_SYSTEMCALLTY
 spinlock AllocatingStatus::debugLock;
 
 void AllocatingStatus::QueueOfDetailLockDataInAllocatingStatus::writingNewDataInTheQueue(DetailLockData * addressOfHashLockData) {
-    queueTail++;
-    if(queueTail >= 100) {
-        fprintf(stderr, "Queue Of detail lock data used up\n");
-        abort();
+    if(queueTail == LENGTH_OF_QUEUE-1) {
+        writingIntoHashTable();
+        cleanUpQueue();
     }
+    queueTail++;
     queue[queueTail].addressOfHashLockData = addressOfHashLockData;
     queue[queueTail].numOfCalls = 0;
     queue[queueTail].numOfCallsWithContentions = 0;
     queue[queueTail].cycles = 0;
+
+    queue[queueTail].lockTimeStamp = 0;
+    queue[queueTail].unlockTimeStamp = 0;
+    queue[queueTail].debugMutexAddress = nullptr;
 }
 
 void AllocatingStatus::QueueOfDetailLockDataInAllocatingStatus::cleanUpQueue() {
@@ -221,22 +225,40 @@ void AllocatingStatus::cleanSyscallsInfoInAllocatingStatus() {
 
 void AllocatingStatus::addUpOtherFunctionsInfoToThreadLocalData() {
     addUpLockFunctionsInfoToThreadLocalData();
-    cleanLockFunctionsInfoInAllocatingStatus();
     addUpSyscallsInfoToThreadLocalData();
-    cleanSyscallsInfoInAllocatingStatus();
 }
 
 
 void AllocatingStatus::updateAllocatingInfoToThreadLocalData() {
-    addUpOtherFunctionsInfoToThreadLocalData();
     setAllocationTypeForOutputData();
+    addUpOtherFunctionsInfoToThreadLocalData();
     addUpCountingEventsToThreadLocalData();
+    cleanLockFunctionsInfoInAllocatingStatus();
+    cleanSyscallsInfoInAllocatingStatus();
 }
 
 void AllocatingStatus::addUpCountingEventsToThreadLocalData() {
     ThreadLocalStatus::numOfFunctions[allocationTypeForOutputData]++;
     ThreadLocalStatus::cycles[allocationTypeForOutputData] += cyclesInRealFunction;
     ThreadLocalStatus::countingEvents[allocationTypeForOutputData].add(countingDataInRealFunction);
+
+//    if(ThreadLocalStatus::runningThreadIndex == 1 && allocationTypeForOutputData == SMALL_REUSED_MALLOC) {
+//
+//        if(cyclesInRealFunction > 100000) {
+//            fprintf(stderr, "tid = %u, cycles = %lu, alloc = %lu, add = %lu",
+//                    ThreadLocalStatus::runningThreadIndex, ThreadLocalStatus::cycles[SMALL_REUSED_MALLOC], ThreadLocalStatus::numOfFunctions[SMALL_REUSED_MALLOC],
+//                    cyclesInRealFunction);
+//            if(ThreadLocalStatus::numOfFunctions[SMALL_REUSED_MALLOC]) {
+//                fprintf(stderr, " avg = %lu\n", ThreadLocalStatus::cycles[SMALL_REUSED_MALLOC] / ThreadLocalStatus::numOfFunctions[SMALL_REUSED_MALLOC]);
+//            } else {
+//                fprintf(stderr, "\n");
+//            }
+//            debugPrint();
+//        }
+//    }
+//    debugLock.lock();
+//    queueOfDetailLockData.debugPrint(ThreadLocalStatus::runningThreadIndex);
+//    debugLock.unlock();
 }
 
 bool AllocatingStatus::outsideTrackedAllocation() {
@@ -266,10 +288,38 @@ void AllocatingStatus::recordLockCallAndCycles(unsigned int numOfCalls, uint64_t
     queueOfDetailLockData.addCallAndCycles(numOfCalls, cycles);
 }
 
+void AllocatingStatus::debugRecordMutexAddress(uint64_t lockTimeStamp, pthread_mutex_t * mutex) {
+    queueOfDetailLockData.debugAddMutexAddress(lockTimeStamp, mutex);
+}
+
+void AllocatingStatus::debugRecordUnlockTimeStamp(uint64_t unlockTimeStamp, pthread_mutex_t * mutex) {
+    queueOfDetailLockData.debugAddUnlockTimeStamp(unlockTimeStamp, mutex);
+}
+
+bool AllocatingStatus::debugMutexAddressInTheQueue(pthread_mutex_t * mutex) {
+    return queueOfDetailLockData.debugMutexAddressInTheQueue(mutex);
+}
+
 void AllocatingStatus::checkAndStartRecordingACriticalSection() {
     criticalSectionStatus.checkAndStartRecordingACriticalSection();
 }
 
 void AllocatingStatus::checkAndStopRecordingACriticalSection() {
     criticalSectionStatus.checkAndStopRecordingACriticalSection();
+}
+
+void AllocatingStatus::debugPrint() {
+    fprintf(stderr, "allocating output type = %u\n", allocationTypeForOutputData);
+    for(int lockType = 0; lockType < NUM_OF_LOCKTYPES; ++lockType) {
+        fprintf(stderr, "lockType = %d ", lockType);
+        overviewLockData[lockType].debugPrint();
+    }
+
+    queueOfDetailLockData.debugPrint();
+
+    for(int syscallType = 0; syscallType < NUM_OF_SYSTEMCALLTYPES; ++syscallType) {
+        fprintf(stderr, "syscallType = %d ", syscallType);
+        systemCallData[syscallType].debugPrint();
+    }
+
 }
