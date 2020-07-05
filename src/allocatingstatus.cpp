@@ -241,24 +241,6 @@ void AllocatingStatus::addUpCountingEventsToThreadLocalData() {
     ThreadLocalStatus::numOfFunctions[allocationTypeForOutputData]++;
     ThreadLocalStatus::cycles[allocationTypeForOutputData] += cyclesInRealFunction;
     ThreadLocalStatus::countingEvents[allocationTypeForOutputData].add(countingDataInRealFunction);
-
-//    if(ThreadLocalStatus::runningThreadIndex == 1 && allocationTypeForOutputData == SMALL_REUSED_MALLOC) {
-//
-//        if(cyclesInRealFunction > 100000) {
-//            fprintf(stderr, "tid = %u, cycles = %lu, alloc = %lu, add = %lu",
-//                    ThreadLocalStatus::runningThreadIndex, ThreadLocalStatus::cycles[SMALL_REUSED_MALLOC], ThreadLocalStatus::numOfFunctions[SMALL_REUSED_MALLOC],
-//                    cyclesInRealFunction);
-//            if(ThreadLocalStatus::numOfFunctions[SMALL_REUSED_MALLOC]) {
-//                fprintf(stderr, " avg = %lu\n", ThreadLocalStatus::cycles[SMALL_REUSED_MALLOC] / ThreadLocalStatus::numOfFunctions[SMALL_REUSED_MALLOC]);
-//            } else {
-//                fprintf(stderr, "\n");
-//            }
-//            debugPrint();
-//        }
-//    }
-//    debugLock.lock();
-//    queueOfDetailLockData.debugPrint(ThreadLocalStatus::runningThreadIndex);
-//    debugLock.unlock();
 }
 
 bool AllocatingStatus::outsideTrackedAllocation() {
@@ -322,4 +304,8 @@ void AllocatingStatus::debugPrint() {
         systemCallData[syscallType].debugPrint();
     }
 
+}
+
+void AllocatingStatus::debugPrintTypeAndSize() {
+    fprintf(stderr, "allocating type = %u, size = %lu\n", allocatingType.allocatingFunction, allocatingType.objectSize);
 }

@@ -89,6 +89,10 @@ void MemoryWasteStatus::cleanAbnormalValues() {
             if(internalFragment[arrayIndex(threadIndex, classSizeIndex)] > 0x1000000000) {
                 internalFragment[arrayIndex(threadIndex, classSizeIndex)] = 0;
             }
+            if(classSizeIndex >= 1) {
+                internalFragment[arrayIndex(threadIndex, classSizeIndex)] = MIN(internalFragment[arrayIndex(threadIndex, classSizeIndex)],
+                        (int64_t)(numOfActiveObjects.numOfAllocatedObjects[arrayIndex(threadIndex, classSizeIndex)] * (ProgramStatus::classSizes[classSizeIndex] - ProgramStatus::classSizes[classSizeIndex-1])));
+            }
         }
     }
 }

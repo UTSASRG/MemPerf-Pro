@@ -1,4 +1,5 @@
 #include "structs.h"
+#include "globalstatus.h"
 
 void SizeClassSizeAndIndex::updateValues(size_t size, size_t classSize, unsigned int classSizeIndex) {
     this->size = size;
@@ -69,7 +70,7 @@ void DetailLockData::quitFromContending() {
 
 bool DetailLockData::isAnImportantLock() {
     for(unsigned int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
-        if(numOfCalls[allocationType] && numOfCallsWithContentions[allocationType] * 10 >= numOfCalls[allocationType]) {
+        if(GlobalStatus::numOfFunctions[allocationType] && cycles[allocationType]/GlobalStatus::numOfFunctions[allocationType] > 500) {
             return true;
         }
     }
@@ -96,12 +97,6 @@ void FriendlinessStatus::recordANewSampling(uint64_t memoryUsageOfCacheLine, uin
     numOfSampling++;
     totalMemoryUsageOfSampledCacheLines += memoryUsageOfCacheLine;
     totalMemoryUsageOfSampledPages += memoryUsageOfPage;
-//    if(numOfSampling) {
-//        fprintf(stderr, "tc = %lu, tp = %lu, c = %lu, p = %lu, avgc = %3lu%%, avgp = %3lu%%\n",
-//                totalMemoryUsageOfSampledCacheLines, totalMemoryUsageOfSampledPages, memoryUsageOfCacheLine, memoryUsageOfPage,
-//                totalMemoryUsageOfSampledPages*100/(numOfSampling*PAGESIZE),
-//                totalMemoryUsageOfSampledCacheLines*100/(numOfSampling*CACHELINE_SIZE));
-//    }
 }
 
 void FriendlinessStatus::add(FriendlinessStatus newFriendlinessStatus) {

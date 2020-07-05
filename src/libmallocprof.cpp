@@ -410,7 +410,9 @@ int pthread_mutex_lock(pthread_mutex_t *mutex) {
         if (!realInitialized) RealX::initializer();
         return RealX::pthread_mutex_lock(mutex);
     }
-    
+//    if((uint64_t)mutex<<56>>56 == 0x98) {
+//        abort();
+//    }
     DetailLockData * detailLockData = lockUsage.find((void *)mutex, sizeof(void *));
     if(detailLockData == nullptr)  {
         detailLockData = lockUsage.insert((void*)mutex, sizeof(void*), DetailLockData::newDetailLockData(MUTEX));
@@ -419,8 +421,12 @@ int pthread_mutex_lock(pthread_mutex_t *mutex) {
 
     AllocatingStatus::initForWritingOneLockData(MUTEX, detailLockData);
 
+    if(mutex->__data.__lock) {
+        AllocatingStatus::recordALockContention();
+    }
+
     uint64_t timeStart = rdtscp();
-    int result = _my_pthread_mutex_lock(mutex);
+    int result = RealX::pthread_mutex_lock(mutex);
     uint64_t timeStop = rdtscp();
 
     AllocatingStatus::recordLockCallAndCycles(1, timeStop-timeStart);
@@ -503,7 +509,7 @@ int pthread_mutex_trylock(pthread_mutex_t *mutex) {
     AllocatingStatus::initForWritingOneLockData(MUTEXTRY, detailLockData);
 
     uint64_t timeStart = rdtscp();
-    int result = my_pthread_mutex_trylock(mutex);
+    int result = RealX::pthread_mutex_trylock(mutex);
     uint64_t timeStop = rdtscp();
 
     if(result != 0) {
@@ -525,8 +531,7 @@ int pthread_mutex_unlock(pthread_mutex_t *mutex) {
     }
 
     AllocatingStatus::checkAndStopRecordingACriticalSection();
-//    AllocatingStatus::debugRecordUnlockTimeStamp(rdtscp(), mutex);
-    return my_pthread_mutex_unlock(mutex);
+    return RealX::pthread_mutex_unlock(mutex);
 }
 
 int pthread_spin_unlock(pthread_spinlock_t *lock) {

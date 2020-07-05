@@ -1,6 +1,6 @@
 SRCS = $(wildcard *.c) $(wildcard *.cpp)
 INCS = $(wildcard *.h) $(wildcard *.hh)
-OBJS = $(wildcard *.o) $(wildcard ./syncperfSource/*.o)
+OBJS = $(wildcard *.o)
 DEPS = $(SRCS) $(INCS)
 
 CC = gcc
@@ -26,10 +26,10 @@ TARGETS = libmallocprof.so
 
 # Libmallocprof
 libmallocprof.so: $(DEPS) object
-	$(CXX) $(CFLAGS) $(PROFILER_FLAGS) $(INCLUDE_DIRS) -shared -fPIC $(OBJS) -o libmallocprof.so -ldl -lpthread
+	$(CXX) $(CFLAGS2) $(PROFILER_FLAGS) $(INCLUDE_DIRS) -shared -fPIC $(OBJS) -o libmallocprof.so -ldl -lpthread
 
 object: $(SRCS) $(INCS)
-	$(CXX) $(CFLAGS) $(PROFILER_FLAGS) $(INCLUDE_DIRS) -shared -fPIC -c $(SRCS) -ldl -lpthread
+	$(CXX) $(CFLAGS2) $(PROFILER_FLAGS) $(INCLUDE_DIRS) -shared -fPIC -c $(SRCS) -ldl -lpthread
 
 test/test-tcmalloc-minimal: libmallocprof.so test/$(TEST_FILE)
 	$(CXX) $(CFLAGS) -o test/test-tcmalloc-minimal test/$(TEST_FILE) -rdynamic ./libmallocprof.so -ltcmalloc_minimal

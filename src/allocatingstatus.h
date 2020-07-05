@@ -224,6 +224,7 @@ public:
     static void checkAndStopRecordingACriticalSection();
 
     static void debugPrint();
+    static void debugPrintTypeAndSize();
 
 };
 
