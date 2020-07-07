@@ -29,6 +29,8 @@ void * xthreadx::startThread(void * arg) {
     initPMU();
 #endif
 
+    ThreadLocalStatus::addARunningThread();
+
     ThreadLocalStatus::getARunningThreadIndex();
     MyMalloc::initializeForMMAPHashMemory(ThreadLocalStatus::runningThreadIndex);
     MyMalloc::initializeForThreadLocalMemory();
@@ -41,6 +43,9 @@ void * xthreadx::startThread(void * arg) {
 }
 
 void xthreadx::threadExit() {
+
+    ThreadLocalStatus::subARunningThread();
+
 #ifndef NO_PMU
     stopSampling();
     stopCounting();

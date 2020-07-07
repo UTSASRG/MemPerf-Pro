@@ -46,7 +46,8 @@ void GlobalStatus::globalize() {
 
 void GlobalStatus::countPotentialMemoryLeakFunctions() {
     for(int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
-        if(allocationType == SMALL_FREE || allocationType == LARGE_FREE) {
+        if(allocationType == SINGAL_THREAD_SMALL_FREE || allocationType == MULTI_THREAD_SMALL_FREE
+        || allocationType == SINGAL_THREAD_LARGE_FREE || allocationType == MULTI_THREAD_LARGE_FREE ) {
             potentialMemoryLeakFunctions -= numOfFunctions[allocationType];
         } else {
             potentialMemoryLeakFunctions += numOfFunctions[allocationType];
@@ -164,6 +165,7 @@ void GlobalStatus::printSyscalls() {
                 fprintf(ProgramStatus::outputFile, "%s per %s                   %20lu\n", syscallTypeOutputString[syscallType], allocationTypeOutputString[allocationType], systemCallData[syscallType][allocationType].num/numOfFunctions[allocationType]);
                 fprintf(ProgramStatus::outputFile, "%s total cycles in %s       %20lu\n", syscallTypeOutputString[syscallType], allocationTypeOutputString[allocationType], systemCallData[syscallType][allocationType].cycles);
                 fprintf(ProgramStatus::outputFile, "cycles per %s in %s         %20lu\n", syscallTypeOutputString[syscallType], allocationTypeOutputString[allocationType], systemCallData[syscallType][allocationType].cycles/systemCallData[syscallType][allocationType].num);
+                fprintf(ProgramStatus::outputFile, "%s cycles per %s            %20lu\n", syscallTypeOutputString[syscallType], allocationTypeOutputString[allocationType], systemCallData[syscallType][allocationType].cycles/numOfFunctions[allocationType]);
                 fprintf(ProgramStatus::outputFile, "\n");
             }
         }

@@ -121,27 +121,45 @@ constexpr char * outputTitleNotificationString[2] = {
 };
 
 constexpr char * allocationTypeOutputString[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA] = {
-        (char*)"small new malloc   ",
-        (char*)"small reused malloc",
-        (char*)"large malloc       ",
-        (char*)"small free         ",
-        (char*)"large free         ",
-        (char*)"calloc             ",
-        (char*)"realloc            ",
-        (char*)"posix_memalign     ",
-        (char*)"memalign           "
+        (char*)"single thread small new malloc   ",
+        (char*)"multi  thread small new malloc   ",
+        (char*)"single thread small reused malloc",
+        (char*)"multi  thread small reused malloc",
+        (char*)"single thread large malloc       ",
+        (char*)"multi  thread large malloc       ",
+        (char*)"single thread small free         ",
+        (char*)"multi  thread small free         ",
+        (char*)"single thread large free         ",
+        (char*)"multi  thread large free         ",
+        (char*)"single thread calloc             ",
+        (char*)"multi  thread calloc             ",
+        (char*)"single thread realloc            ",
+        (char*)"multi  thread realloc            ",
+        (char*)"single thread posix_memalign     ",
+        (char*)"multi  thread posix_memalign     ",
+        (char*)"single thread memalign           ",
+        (char*)"multi  thread memalign           "
 };
 
 constexpr char * allocationTypeOutputTitleString[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA] = {
-        (char*)"SMALL NEW MALLOC",
-        (char*)"SMALL REUSED MALLOC",
-        (char*)"LARGE MALLOC",
-        (char*)"SMALL FREE",
-        (char*)"LARGE FREE",
-        (char*)"CALLOC",
-        (char*)"REALLOC",
-        (char*)"POSIX_MEMALIGN",
-        (char*)"MEMALIGN"
+        (char*)"SINGLE THREAD SMALL NEW MALLOC",
+        (char*)"MULTI THREAD SMALL NEW MALLOC",
+        (char*)"SINGLE THREAD SMALL REUSED MALLOC",
+        (char*)"MULTI THREAD SMALL REUSED MALLOC",
+        (char*)"SINGLE THREAD LARGE MALLOC",
+        (char*)"MULTI THREAD LARGE MALLOC",
+        (char*)"SINGLE THREAD SMALL FREE",
+        (char*)"MULTI THREAD SMALL FREE",
+        (char*)"SINGLE THREAD LARGE FREE",
+        (char*)"MULTI THREAD LARGE FREE",
+        (char*)"SINGLE THREAD CALLOC",
+        (char*)"MULTI THREAD CALLOC",
+        (char*)"SINGLE THREAD REALLOC",
+        (char*)"MULTI THREAD REALLOC",
+        (char*)"SINGLE THREAD POSIX_MEMALIGN",
+        (char*)"MULTI THREAD POSIX_MEMALIGN",
+        (char*)"SINGLE THREAD MEMALIGN",
+        (char*)"MULTI THREAD MEMALIGN",
 };
 
 constexpr char * lockTypeOutputString[NUM_OF_LOCKTYPES] = {

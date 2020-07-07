@@ -1,5 +1,6 @@
 #include "threadlocalstatus.h"
 
+unsigned int ThreadLocalStatus::totalNumOfThread;
 unsigned int ThreadLocalStatus::totalNumOfRunningThread;
 thread_local int ThreadLocalStatus::runningThreadIndex;
 spinlock ThreadLocalStatus::lock;
@@ -16,6 +17,22 @@ thread_local bool ThreadLocalStatus::threadIsStopping = false;
 
 void ThreadLocalStatus::getARunningThreadIndex() {
     lock.lock();
-    runningThreadIndex = totalNumOfRunningThread++;
+    runningThreadIndex = totalNumOfThread++;
     lock.unlock();
+}
+
+void ThreadLocalStatus::addARunningThread() {
+    lock.lock();
+    totalNumOfRunningThread++;
+    lock.unlock();
+}
+
+void ThreadLocalStatus::subARunningThread() {
+    lock.lock();
+    totalNumOfRunningThread--;
+    lock.unlock();
+}
+
+bool ThreadLocalStatus::isCurrentlySingleThread() {
+    return totalNumOfRunningThread <= 1;
 }

@@ -12,6 +12,7 @@
 
 class ThreadLocalStatus {
 public:
+    static unsigned int totalNumOfThread;
     static unsigned int totalNumOfRunningThread;
     static thread_local int runningThreadIndex;
     static spinlock lock;
@@ -27,6 +28,9 @@ public:
     static thread_local bool threadIsStopping;
 
     static void getARunningThreadIndex();
+    static void addARunningThread();
+    static void subARunningThread();
+    static bool isCurrentlySingleThread();
 
 };
 

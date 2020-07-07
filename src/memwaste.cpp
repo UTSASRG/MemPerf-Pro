@@ -72,7 +72,7 @@ void MemoryWasteStatus::debugPrint() {
 void MemoryWasteStatus::updateStatus(MemoryWasteStatus newStatus) {
     lock.lock();
     newStatus.cleanAbnormalValues();
-    size_t sizeOfCopiedArrays = ThreadLocalStatus::totalNumOfRunningThread * ProgramStatus::numberOfClassSizes * sizeof(uint64_t);
+    size_t sizeOfCopiedArrays = ThreadLocalStatus::totalNumOfThread * ProgramStatus::numberOfClassSizes * sizeof(uint64_t);
     memcpy(this->internalFragment, newStatus.internalFragment, sizeOfCopiedArrays);
     memcpy(this->numOfActiveObjects.numOfAllocatedObjects, newStatus.numOfActiveObjects.numOfAllocatedObjects, sizeOfCopiedArrays);
     memcpy(this->numOfActiveObjects.numOfFreelistObjects, newStatus.numOfActiveObjects.numOfFreelistObjects, sizeOfCopiedArrays);
@@ -122,7 +122,7 @@ void MemoryWasteGlobalStatus::initialize() {
 
 void MemoryWasteGlobalStatus::globalize(MemoryWasteStatus recordStatus) {
 //    recordStatus.debugPrint();
-    for (unsigned int threadIndex = 0; threadIndex < ThreadLocalStatus::totalNumOfRunningThread; ++threadIndex) {
+    for (unsigned int threadIndex = 0; threadIndex < ThreadLocalStatus::totalNumOfThread; ++threadIndex) {
         for (unsigned int classSizeIndex = 0; classSizeIndex < ProgramStatus::numberOfClassSizes; ++classSizeIndex) {
             internalFragment[classSizeIndex] += recordStatus.internalFragment[MemoryWaste::arrayIndex(threadIndex, classSizeIndex)];
 
