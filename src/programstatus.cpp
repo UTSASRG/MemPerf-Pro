@@ -48,7 +48,8 @@ void ProgramStatus::getInputInfoFileName(char * runningApplicationName) {
     } else if(strcmp(runningAllocatorName, "tcmalloc") == 0) {
         strcpy(inputInfoFileName, "/usr/local/lib/libtcmalloc.info");
     } else if(strcmp(runningAllocatorName, "dieharder") == 0) {
-        strcpy(inputInfoFileName, "/home/jinzhou/Memoryallocators/DieHard/src/libdieharder.info");
+//        strcpy(inputInfoFileName, "/home/jinzhou/Memoryallocators/DieHard/src/libdieharder.info");
+        strcpy(inputInfoFileName, "/home/jinzhou/Memoryallocators/Hoard/src/libhoard.info");
     } else if(strcmp(runningAllocatorName, "omalloc") == 0) {
         strcpy(inputInfoFileName, "/home/jinzhou/Memoryallocators/OpenBSD-6.0-mus/libomalloc.info");
     } else {
@@ -127,8 +128,8 @@ void ProgramStatus::openInputInfoFile(char * runningApplicationName) {
 
 void ProgramStatus::openOutputFile() {
     extern char * program_invocation_name;
-	snprintf(ProgramStatus::outputFileName, MAX_FILENAME_LEN, "%s_libmallocprof_%d_main_thread.txt", program_invocation_name, getpid());
-//    snprintf(ProgramStatus::outputFileName, MAX_FILENAME_LEN, "/home/jinzhou/parsec/records/%s_libmallocprof_%d_main_thread.txt", program_invocation_name, getpid());
+//	snprintf(ProgramStatus::outputFileName, MAX_FILENAME_LEN, "%s_libmallocprof_%d_main_thread.txt", program_invocation_name, getpid());
+    snprintf(ProgramStatus::outputFileName, MAX_FILENAME_LEN, "/home/jinzhou/parsec/records/%s_libmallocprof_%d_main_thread.txt", program_invocation_name, getpid());
     fprintf(stderr, "%s\n", ProgramStatus::outputFileName);
 
     ProgramStatus::outputFile = fopen(ProgramStatus::outputFileName, "w");

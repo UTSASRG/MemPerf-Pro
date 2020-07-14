@@ -194,13 +194,11 @@ void HashLocksSet::init() {
 
 void HashLocksSet::lock(void *address) {
     size_t hashKey = HashFuncs::hashAddr(address, sizeof(void*)) & (MAX_OBJ_NUM-1);
-//    fprintf(stderr, "lock: tid = %lu, addr = %p, key = %lu\n", ThreadLocalStatus::runningThreadIndex, address, hashKey);
     locks[hashKey].lock();
 }
 
 void HashLocksSet::unlock(void *address) {
     size_t hashKey = HashFuncs::hashAddr(address, sizeof(void*)) & (MAX_OBJ_NUM-1);
-//    fprintf(stderr, "unlock: tid = %lu, addr = %p, key = %lu\n", ThreadLocalStatus::runningThreadIndex, address, hashKey);
     locks[hashKey].unlock();
 }
 
@@ -214,7 +212,7 @@ void MemoryWaste::initialize() {
 
 
 AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(size_t size, void * address) {
-    hashLocksSet.lock(address);
+//    hashLocksSet.lock(address);
     bool reused;
     ObjectStatus * status = objStatusMap.find(address, sizeof(unsigned long));
     if(!status) {
@@ -252,7 +250,7 @@ AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(size_t size, void * ad
     if(currentStatus.blowupFlag[currentSizeClassSizeAndIndex.classSizeIndex] > 0 ) {
         currentStatus.blowupFlag[currentSizeClassSizeAndIndex.classSizeIndex]--;
     }
-    hashLocksSet.unlock(address);
+//    hashLocksSet.unlock(address);
     return AllocatingTypeGotFromMemoryWaste{reused, currentSizeClassSizeAndIndex.classSize};
 }
 

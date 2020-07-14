@@ -25,16 +25,28 @@ void * xthreadx::startThread(void * arg) {
         abort();
     }
 
+
 #ifndef NO_PMU
     initPMU();
 #endif
 
     ThreadLocalStatus::addARunningThread();
-
     ThreadLocalStatus::getARunningThreadIndex();
+
+    ///CPU Binding
+//    cpu_set_t mask;
+//    CPU_ZERO(&mask);
+//    CPU_SET(ThreadLocalStatus::runningThreadIndex%40, &mask);
+//    if (sched_setaffinity(0, sizeof(mask), &mask) == -1)
+//    {
+//        fprintf(stderr, "warning: could not set CPU affinity\n");
+//        abort();
+//    }
+
+
     MyMalloc::initializeForMMAPHashMemory(ThreadLocalStatus::runningThreadIndex);
     MyMalloc::initializeForThreadLocalMemory();
-    lockUsage.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_OBJ_NUM);
+    lockUsage.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_LOCK_NUM);
     ProgramStatus::setProfilerInitializedTrue();
     result = current->startRoutine(current->startArg);
     threadExit();
@@ -44,11 +56,15 @@ void * xthreadx::startThread(void * arg) {
 
 void xthreadx::threadExit() {
 
-    ThreadLocalStatus::subARunningThread();
+    ThreadLocalStatus::threadIsStopping = true;
 
 #ifndef NO_PMU
     stopSampling();
     stopCounting();
 #endif
     GlobalStatus::globalize();
+
+    ThreadLocalStatus::subARunningThread();
+    MyMalloc::finalizeForMMAPHashMemory(ThreadLocalStatus::runningThreadIndex);
+    MyMalloc::finalizeForThreadLocalMemory();
 }

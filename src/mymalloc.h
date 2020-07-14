@@ -2,7 +2,8 @@
 #define MMPROF_MYMALLOC_H
 
 #define PROFILER_MEMORY_SIZE ONE_GB
-#define MMAP_PROFILER_MEMORY_SIZE 8*ONE_GB
+#define MMAP_PROFILER_MEMORY_SIZE 2*ONE_GB
+#define MMAP_PROFILER_HASH_MEMORY_SIZE 8*ONE_GB
 
 #include "real.hh"
 #include "stdint.h"
@@ -38,7 +39,8 @@ struct MMAPProfilerMemory {
     size_t currentSize;
     bool initialized = false;
 
-    void initialize();
+    void initialize(size_t setSize);
+    void finalize();
     void GetASpaceFromMemory(size_t size);
     void checkIfMemoryOutOfBound();
     void * newObjectAddr(size_t size);
@@ -54,14 +56,15 @@ private:
     static ProfilerMemory profilerHashMemory;
     static thread_local MMAPProfilerMemory threadLocalProfilerMemory;
     static MMAPProfilerMemory MMAPProfilerHashMemory[MAX_THREAD_NUMBER];
-//    static MMAPProfilerMemory MMAPProfilerHashMemory;
     static spinlock debugLock;
 
 public:
 
     static void initializeForThreadLocalMemory();
+    static void finalizeForThreadLocalMemory();
     static bool threadLocalMemoryInitialized();
     static void initializeForMMAPHashMemory(unsigned int threadIndex);
+    static void finalizeForMMAPHashMemory(unsigned int threadIndex);
     static bool MMAPHashMemoryInitialized(unsigned int threadIndex);
 
     static void * malloc(size_t size);

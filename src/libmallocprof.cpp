@@ -24,7 +24,7 @@ extern "C" {
 	// Function prototypes
 	void exitHandler();
 
-	// Function aliases
+//	 Function aliases
 	void free(void *) __attribute__ ((weak, alias("yyfree")));
 	void * calloc(size_t, size_t) __attribute__ ((weak, alias("yycalloc")));
 	void * malloc(size_t) __attribute__ ((weak, alias("yymalloc")));
@@ -54,6 +54,16 @@ __attribute__((constructor)) void initializer() {
 
     ShadowMemory::initialize();
     ThreadLocalStatus::getARunningThreadIndex();
+
+    ///CPU Binding
+//    cpu_set_t mask;
+//    CPU_ZERO(&mask);
+//    CPU_SET(ThreadLocalStatus::runningThreadIndex%40, &mask);
+//    if (sched_setaffinity(0, sizeof(mask), &mask) == -1)
+//    {
+//        fprintf(stderr, "warning: could not set CPU affinity\n");
+//        abort();
+//    }
 }
 
 __attribute__((destructor)) void finalizer () {};
@@ -61,9 +71,9 @@ __attribute__((destructor)) void finalizer () {};
 void exitHandler() {
 
     ProgramStatus::setBeginConclusionTrue();
-
 	#ifndef NO_PMU
 	stopSampling();
+    stopCounting();
     #endif
 
     GlobalStatus::globalize();
@@ -76,13 +86,12 @@ void exitHandler() {
 int libmallocprof_main(int argc, char ** argv, char ** envp) {
 
     ProgramStatus::initIO(argv[0]);
-    lockUsage.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_OBJ_NUM);
-    globalLockUsage.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_OBJ_NUM);
+    lockUsage.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_LOCK_NUM);
+    globalLockUsage.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_LOCK_NUM);
     MemoryWaste::initialize();
     MyMalloc::initializeForMMAPHashMemory(ThreadLocalStatus::runningThreadIndex);
     MyMalloc::initializeForThreadLocalMemory();
     ProgramStatus::setProfilerInitializedTrue();
-
     atexit(exitHandler);
 
 	return real_main_mallocprof (argc, argv, envp);
@@ -103,7 +112,7 @@ extern "C" int libmallocprof_libc_start_main(main_fn_t main_fn, int argc,
 }
 
 
-// Memory management functions
+//// Memory management functions
 extern "C" {
 	void * yymalloc(size_t sz) {
         if(sz == 0) {
@@ -236,39 +245,7 @@ extern "C" {
      AllocatingStatus::updateAllocatingInfoToThreadLocalData();
      return object;
 	}
-
-
-
-////	 PTHREAD_CREATE
-	int pthread_create(pthread_t * tid, const pthread_attr_t * attr,
-			void *(*start_routine)(void *), void * arg) {
-		if (!realInitialized) RealX::initializer();
-		int result = xthreadx::thread_create(tid, attr, start_routine, arg);
-		return result;
-	}
-
-	// PTHREAD_JOIN
-	int pthread_join(pthread_t thread, void **retval) {
-		if (!realInitialized) RealX::initializer();
-
-		int result = RealX::pthread_join (thread, retval);
-
-		return result;
-	}
-
-	// PTHREAD_EXIT
-	void pthread_exit(void *retval) {
-		if(!realInitialized) {
-				RealX::initializer();
-		}
-
-        ThreadLocalStatus::threadIsStopping = true;
-
-		xthreadx::threadExit();
-        RealX::pthread_exit(retval);
-        __builtin_unreachable();
-	}
-} // End of extern "C"
+}
 
 void * operator new (size_t sz) {
 	return yymalloc(sz);
@@ -410,9 +387,7 @@ int pthread_mutex_lock(pthread_mutex_t *mutex) {
         if (!realInitialized) RealX::initializer();
         return RealX::pthread_mutex_lock(mutex);
     }
-//    if((uint64_t)mutex<<56>>56 == 0x98) {
-//        abort();
-//    }
+
     DetailLockData * detailLockData = lockUsage.find((void *)mutex, sizeof(void *));
     if(detailLockData == nullptr)  {
         detailLockData = lockUsage.insert((void*)mutex, sizeof(void*), DetailLockData::newDetailLockData(MUTEX));
@@ -544,3 +519,32 @@ int pthread_spin_unlock(pthread_spinlock_t *lock) {
     return RealX::pthread_spin_unlock(lock);
 }
 }
+
+extern "C" {
+//////	 PTHREAD_CREATE
+int pthread_create(pthread_t * tid, const pthread_attr_t * attr,
+                   void *(*start_routine)(void *), void * arg) {
+    if (!realInitialized) RealX::initializer();
+    int result = xthreadx::thread_create(tid, attr, start_routine, arg);
+    return result;
+}
+
+// PTHREAD_JOIN
+int pthread_join(pthread_t thread, void **retval) {
+    if (!realInitialized) RealX::initializer();
+
+    int result = RealX::pthread_join (thread, retval);
+
+    return result;
+}
+
+// PTHREAD_EXIT
+void pthread_exit(void *retval) {
+    if(!realInitialized) {
+        RealX::initializer();
+    }
+
+    RealX::pthread_exit(retval);
+    __builtin_unreachable();
+}
+} // End of extern "C"

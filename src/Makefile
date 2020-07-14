@@ -6,7 +6,7 @@ DEPS = $(SRCS) $(INCS)
 CC = gcc
 CXX = g++
 
-CFLAGS += -pipe -g -g3 -ggdb3 -Wall -DNDEBUG --std=c++11 -fPIC -I$(ROOT)/include -Wno-unused-result -fno-omit-frame-pointer -Wl,--no-as-needed -lrt
+CFLAGS += -pipe -g -g3 -ggdb3 -Wall -DNDEBUG --std=c++11 -fPIC -I$(ROOcpu_set_t T)/include -Wno-unused-result -fno-omit-frame-pointer -Wl,--no-as-needed -lrt
 CFLAGS2 += -O2 -pipe -g -g3 -ggdb3 -Wall -DNDEBUG --std=c++11 -fPIC -I$(ROOT)/include -Wno-unused-result -fno-omit-frame-pointer -Wl,--no-as-needed -lrt
 
 

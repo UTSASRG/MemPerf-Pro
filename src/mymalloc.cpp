@@ -29,12 +29,10 @@ void * ProfilerMemory::newObjectAddr(size_t size) {
 }
 
 void * ProfilerMemory::malloc(size_t size) {
-//    lock.lock();
     checkAndInitialize();
     GetASpaceFromMemory(size);
     checkIfMemoryOutOfBound();
     void * object = newObjectAddr(size);
-//    lock.unlock();
     return object;
 }
 
@@ -42,12 +40,10 @@ void ProfilerMemory::free(void * addr) {
     if(addr == nullptr) {
         return;
     }
-//    lock.lock();
     objectNum--;
     if(objectNum == 0) {
         overheadPointer = startPointer;
     }
-//    lock.unlock();
 }
 
 bool ProfilerMemory::inMemory(void * addr) {
@@ -64,12 +60,16 @@ bool ProfilerMemory::ifInProfilerMemoryThenFree(void * addr) {
 }
 
 
-void MMAPProfilerMemory::initialize() {
-    currentSize = MMAP_PROFILER_MEMORY_SIZE;
+void MMAPProfilerMemory::initialize(size_t setSize) {
+    currentSize = setSize;
     startPointer = RealX::mmap(NULL, currentSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     endPointer = (void *) ((uint64_t)startPointer + currentSize);
     overheadPointer = startPointer;
     initialized = true;
+}
+
+void MMAPProfilerMemory::finalize() {
+    RealX::munmap(overheadPointer, (uint64_t)endPointer - (uint64_t)overheadPointer);
 }
 
 void MMAPProfilerMemory::GetASpaceFromMemory(size_t size) {
@@ -124,7 +124,11 @@ MMAPProfilerMemory MyMalloc::MMAPProfilerHashMemory[MAX_THREAD_NUMBER];
 spinlock MyMalloc::debugLock;
 
 void MyMalloc::initializeForThreadLocalMemory() {
-    threadLocalProfilerMemory.initialize();
+    threadLocalProfilerMemory.initialize(MMAP_PROFILER_MEMORY_SIZE);
+}
+
+void MyMalloc::finalizeForThreadLocalMemory() {
+    threadLocalProfilerMemory.finalize();
 }
 
 bool MyMalloc::threadLocalMemoryInitialized() {
@@ -132,7 +136,11 @@ bool MyMalloc::threadLocalMemoryInitialized() {
 }
 
 void MyMalloc::initializeForMMAPHashMemory(unsigned int threadIndex) {
-    MMAPProfilerHashMemory[threadIndex].initialize();
+    MMAPProfilerHashMemory[threadIndex].initialize(MMAP_PROFILER_HASH_MEMORY_SIZE);
+}
+
+void MyMalloc::finalizeForMMAPHashMemory(unsigned int threadIndex) {
+    MMAPProfilerHashMemory[threadIndex].finalize();
 }
 
 bool MyMalloc::MMAPHashMemoryInitialized(unsigned int threadIndex) {
