@@ -151,9 +151,15 @@ void ProgramStatus::printLargeObjectThreshold() {
 void ProgramStatus::printOutput() {
     printLargeObjectThreshold();
 }
-
-bool ProgramStatus::isALargeObject(size_t size) {
-    return size > largeObjectThreshold;
+#define MEDIUM_THRESHOLD 256
+ObjectSizeType ProgramStatus::getObjectSizeType(size_t size) {
+    if(size > largeObjectThreshold) {
+        return LARGE;
+    }
+    if(size <= MEDIUM_THRESHOLD) {
+        return SMALL;
+    }
+    return MEDIUM;
 }
 
 SizeClassSizeAndIndex ProgramStatus::getClassSizeAndIndex(size_t size) {

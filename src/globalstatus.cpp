@@ -47,6 +47,7 @@ void GlobalStatus::globalize() {
 void GlobalStatus::countPotentialMemoryLeakFunctions() {
     for(int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
         if(allocationType == SINGAL_THREAD_SMALL_FREE || allocationType == MULTI_THREAD_SMALL_FREE
+        || allocationType == SINGAL_THREAD_MEDIUM_FREE || allocationType == MULTI_THREAD_MEDIUM_FREE
         || allocationType == SINGAL_THREAD_LARGE_FREE || allocationType == MULTI_THREAD_LARGE_FREE ) {
             potentialMemoryLeakFunctions -= numOfFunctions[allocationType];
         } else {

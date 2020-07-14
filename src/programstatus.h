@@ -50,7 +50,7 @@ public:
     static void initIO(char * runningApplicationName);
     static void printOutput();
 
-    static bool isALargeObject(size_t size);
+    static ObjectSizeType getObjectSizeType(size_t size);
 
     static struct SizeClassSizeAndIndex getClassSizeAndIndex(size_t size);
 };

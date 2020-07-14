@@ -30,7 +30,7 @@ struct AllocatingTypeGotFromShadowMemory {
 struct AllocatingType {
     AllocationFunction allocatingFunction;
     size_t objectSize;
-    bool isALargeObject;
+    ObjectSizeType objectSizeType;
     bool doingAllocation = false;
     void * objectAddress;
     AllocatingTypeGotFromMemoryWaste allocatingTypeGotFromMemoryWaste;
@@ -121,24 +121,44 @@ constexpr char * outputTitleNotificationString[2] = {
 };
 
 constexpr char * allocationTypeOutputString[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA] = {
-        (char*)"single thread small new malloc   ",
-        (char*)"multi  thread small new malloc   ",
-        (char*)"single thread small reused malloc",
-        (char*)"multi  thread small reused malloc",
-        (char*)"single thread large malloc       ",
-        (char*)"multi  thread large malloc       ",
-        (char*)"single thread small free         ",
-        (char*)"multi  thread small free         ",
-        (char*)"single thread large free         ",
-        (char*)"multi  thread large free         ",
-        (char*)"single thread calloc             ",
-        (char*)"multi  thread calloc             ",
-        (char*)"single thread realloc            ",
-        (char*)"multi  thread realloc            ",
-        (char*)"single thread posix_memalign     ",
-        (char*)"multi  thread posix_memalign     ",
-        (char*)"single thread memalign           ",
-        (char*)"multi  thread memalign           "
+        (char*)"single thread small new malloc    ",
+        (char*)"multi  thread small new malloc    ",
+        (char*)"single thread small reused malloc ",
+        (char*)"multi  thread small reused malloc ",
+
+        (char*)"single thread medium new malloc   ",
+        (char*)"multi  thread medium new malloc   ",
+        (char*)"single thread medium reused malloc",
+        (char*)"multi  thread medium reused malloc",
+
+        (char*)"single thread large malloc        ",
+        (char*)"multi  thread large malloc        ",
+
+
+        (char*)"single thread small free          ",
+        (char*)"multi  thread small free          ",
+
+        (char*)"single thread medium free         ",
+        (char*)"multi  thread medium free         ",
+
+        (char*)"single thread large free          ",
+        (char*)"multi  thread large free          ",
+
+
+        (char*)"single thread calloc              ",
+        (char*)"multi  thread calloc              ",
+
+
+        (char*)"single thread realloc             ",
+        (char*)"multi  thread realloc             ",
+
+
+        (char*)"single thread posix_memalign      ",
+        (char*)"multi  thread posix_memalign      ",
+
+
+        (char*)"single thread memalign            ",
+        (char*)"multi  thread memalign            "
 };
 
 constexpr char * allocationTypeOutputTitleString[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA] = {
@@ -146,18 +166,38 @@ constexpr char * allocationTypeOutputTitleString[NUM_OF_ALLOCATIONTYPEFOROUTPUTD
         (char*)"MULTI THREAD SMALL NEW MALLOC",
         (char*)"SINGLE THREAD SMALL REUSED MALLOC",
         (char*)"MULTI THREAD SMALL REUSED MALLOC",
+
+        (char*)"SINGLE THREAD MEDIUM NEW MALLOC",
+        (char*)"MULTI THREAD MEDIUM NEW MALLOC",
+        (char*)"SINGLE THREAD MEDIUM REUSED MALLOC",
+        (char*)"MULTI THREAD MEDIUM REUSED MALLOC",
+
         (char*)"SINGLE THREAD LARGE MALLOC",
         (char*)"MULTI THREAD LARGE MALLOC",
+
+
         (char*)"SINGLE THREAD SMALL FREE",
         (char*)"MULTI THREAD SMALL FREE",
+
+        (char*)"SINGLE THREAD MEDIUM FREE",
+        (char*)"MULTI THREAD MEDIUM FREE",
+
         (char*)"SINGLE THREAD LARGE FREE",
         (char*)"MULTI THREAD LARGE FREE",
+
+
         (char*)"SINGLE THREAD CALLOC",
         (char*)"MULTI THREAD CALLOC",
+
+
         (char*)"SINGLE THREAD REALLOC",
         (char*)"MULTI THREAD REALLOC",
+
+
         (char*)"SINGLE THREAD POSIX_MEMALIGN",
         (char*)"MULTI THREAD POSIX_MEMALIGN",
+
+
         (char*)"SINGLE THREAD MEMALIGN",
         (char*)"MULTI THREAD MEMALIGN",
 };

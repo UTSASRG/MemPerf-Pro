@@ -10,7 +10,7 @@ void SizeClassSizeAndIndex::updateValues(size_t size, size_t classSize, unsigned
 
 void AllocatingType::switchFreeingTypeGotFromMemoryWaste(AllocatingTypeWithSizeGotFromMemoryWaste allocatingTypeWithSizeGotFromMemoryWaste) {
     objectSize = allocatingTypeWithSizeGotFromMemoryWaste.objectSize;
-    isALargeObject = ProgramStatus::isALargeObject(objectSize);
+    objectSizeType = ProgramStatus::getObjectSizeType(objectSize);
     allocatingTypeGotFromMemoryWaste = allocatingTypeWithSizeGotFromMemoryWaste.allocatingTypeGotByMemoryWaste;
 };
 
