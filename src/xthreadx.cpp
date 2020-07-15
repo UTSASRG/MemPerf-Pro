@@ -29,7 +29,7 @@ void * xthreadx::startThread(void * arg) {
 #ifndef NO_PMU
     initPMU();
 #endif
-
+//
     ThreadLocalStatus::addARunningThread();
     ThreadLocalStatus::getARunningThreadIndex();
 

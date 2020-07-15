@@ -122,6 +122,7 @@ public:
     mapsize = alignup(mapsize, 4096);
 
     _buckets = (struct HashBucket*)RealX::mmap(NULL, mapsize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+//      _buckets = (struct HashBucket*)MyMalloc::hashMalloc(mapsize);
     if(_buckets == NULL) { 
       fprintf(stderr, "Fail to initialize the hash map\n");
       exit(-1);

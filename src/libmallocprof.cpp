@@ -112,7 +112,7 @@ extern "C" int libmallocprof_libc_start_main(main_fn_t main_fn, int argc,
 }
 
 
-//// Memory management functions
+////// Memory management functions
 extern "C" {
 	void * yymalloc(size_t sz) {
         if(sz == 0) {
@@ -521,15 +521,15 @@ int pthread_spin_unlock(pthread_spinlock_t *lock) {
 }
 
 extern "C" {
-//////	 PTHREAD_CREATE
+////////	 PTHREAD_CREATE
 int pthread_create(pthread_t * tid, const pthread_attr_t * attr,
                    void *(*start_routine)(void *), void * arg) {
     if (!realInitialized) RealX::initializer();
     int result = xthreadx::thread_create(tid, attr, start_routine, arg);
     return result;
 }
-
-// PTHREAD_JOIN
+//
+//// PTHREAD_JOIN
 int pthread_join(pthread_t thread, void **retval) {
     if (!realInitialized) RealX::initializer();
 

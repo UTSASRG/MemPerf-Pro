@@ -48,10 +48,12 @@ void ProgramStatus::getInputInfoFileName(char * runningApplicationName) {
     } else if(strcmp(runningAllocatorName, "tcmalloc") == 0) {
         strcpy(inputInfoFileName, "/usr/local/lib/libtcmalloc.info");
     } else if(strcmp(runningAllocatorName, "dieharder") == 0) {
-//        strcpy(inputInfoFileName, "/home/jinzhou/Memoryallocators/DieHard/src/libdieharder.info");
-        strcpy(inputInfoFileName, "/home/jinzhou/Memoryallocators/Hoard/src/libhoard.info");
+        strcpy(inputInfoFileName, "/home/jinzhou/Memoryallocators/DieHard/src/libdieharder.info");
+//        strcpy(inputInfoFileName, "/home/jinzhou/Memoryallocators/Hoard/src/libhoard.info");
     } else if(strcmp(runningAllocatorName, "omalloc") == 0) {
         strcpy(inputInfoFileName, "/home/jinzhou/Memoryallocators/OpenBSD-6.0-mus/libomalloc.info");
+    } else if (strcmp(runningAllocatorName, "numalloc") == 0) {
+        strcpy(inputInfoFileName, "/home/jinzhou/numalloc/source/libnumalloc.info");
     } else {
         fprintf(stderr, "Info File Location Unknown\n");
         abort();
