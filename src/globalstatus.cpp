@@ -40,6 +40,7 @@ void GlobalStatus::globalize() {
     }
     friendlinessStatus.add(ThreadLocalStatus::friendlinessStatus);
 
+    MemoryUsage::globalize();
 
     lock.unlock();
 }
@@ -75,7 +76,9 @@ void GlobalStatus::printTitle(char *content, uint64_t commentNumber) {
 void GlobalStatus::printNumOfAllocations() {
     printTitle((char*)"ALLOCATION NUM");
     for(int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
-        fprintf(ProgramStatus::outputFile, "%s                         %20lu\n", allocationTypeOutputString[allocationType], numOfFunctions[allocationType]);
+        if(numOfFunctions[allocationType]) {
+            fprintf(ProgramStatus::outputFile, "%s                         %20lu\n", allocationTypeOutputString[allocationType], numOfFunctions[allocationType]);
+        }
     }
     countPotentialMemoryLeakFunctions();
     fprintf(ProgramStatus::outputFile, "potential memory leak allocations           %20lu\n", potentialMemoryLeakFunctions);
@@ -91,8 +94,8 @@ void GlobalStatus::printCountingEvents() {
             fprintf(ProgramStatus::outputFile, "tlb write misses %20lu   avg %20lu\n", countingEvents[allocationType].tlb_write_misses, countingEvents[allocationType].tlb_write_misses/numOfFunctions[allocationType]);
             fprintf(ProgramStatus::outputFile, "cache misses     %20lu   avg %20lu\n", countingEvents[allocationType].cache_misses, countingEvents[allocationType].cache_misses/numOfFunctions[allocationType]);
             fprintf(ProgramStatus::outputFile, "instructions     %20lu   avg %20lu\n", countingEvents[allocationType].instructions, countingEvents[allocationType].instructions/numOfFunctions[allocationType]);
+            fprintf(ProgramStatus::outputFile, "\n");
         }
-        fprintf(ProgramStatus::outputFile, "\n");
     }
 }
 

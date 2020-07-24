@@ -134,6 +134,11 @@ bool TotalMemoryUsage::isLowerThan(TotalMemoryUsage newTotalMemoryUsage) {
     return this->totalMemoryUsage < newTotalMemoryUsage.totalMemoryUsage;
 }
 
+void TotalMemoryUsage::ifLowerThanReplace(TotalMemoryUsage newTotalMemoryUsage) {
+    this->realMemoryUsage = MAX(this->realMemoryUsage, newTotalMemoryUsage.realMemoryUsage);
+    this->totalMemoryUsage = MAX(this->totalMemoryUsage, newTotalMemoryUsage.totalMemoryUsage);
+}
+
 void TotalMemoryUsage::debugPrint() {
     fprintf(stderr, "real memory usage = %ld, total memory usage = %ld\n", realMemoryUsage, totalMemoryUsage);
 }

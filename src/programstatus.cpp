@@ -40,21 +40,21 @@ void ProgramStatus::checkSystemIs64Bits() {
 void ProgramStatus::getInputInfoFileName(char * runningApplicationName) {
     char * runningAllocatorName = strrchr(runningApplicationName, '-')+1;
     if(strcmp(runningAllocatorName, "libc228") == 0) {
-        strcpy(inputInfoFileName, "/home/jinzhou/Memoryallocators/libc-2.28/libmalloc.info");
+        strcpy(inputInfoFileName, "/home/jinzhou/mmprof/info/libc228.info");
     } else if(strcmp(runningAllocatorName, "libc221") == 0) {
-        strcpy(inputInfoFileName, "/home/jinzhou/Memoryallocators/libc-2.21/libmalloc.info");
+        strcpy(inputInfoFileName, "/home/jinzhou/mmprof/info/libc221.info");
     } else if(strcmp(runningAllocatorName, "hoard") == 0) {
-        strcpy(inputInfoFileName, "/home/jinzhou/Memoryallocators/Hoard/src/libhoard.info");
+        strcpy(inputInfoFileName, "/home/jinzhou/mmprof/info/libhoard.info");
     } else if(strcmp(runningAllocatorName, "jemalloc") == 0) {
-        strcpy(inputInfoFileName, "/home/jinzhou/Memoryallocators/jemalloc/libjemalloc.info");
+        strcpy(inputInfoFileName, "/home/jinzhou/mmprof/info/libjemalloc.info");
     } else if(strcmp(runningAllocatorName, "tcmalloc") == 0) {
-        strcpy(inputInfoFileName, "/usr/local/lib/libtcmalloc.info");
+        strcpy(inputInfoFileName, "/home/jinzhou/mmprof/info/libtcmalloc.info");
     } else if(strcmp(runningAllocatorName, "dieharder") == 0) {
-        strcpy(inputInfoFileName, "/home/jinzhou/Memoryallocators/DieHard/src/libdieharder.info");
+        strcpy(inputInfoFileName, "/home/jinzhou/mmprof/info/libdieharder.info");
     } else if(strcmp(runningAllocatorName, "omalloc") == 0) {
-        strcpy(inputInfoFileName, "/home/jinzhou/Memoryallocators/OpenBSD-6.0-mus/libomalloc.info");
+        strcpy(inputInfoFileName, "/home/jinzhou/mmprof/info/libomalloc.info");
     } else if (strcmp(runningAllocatorName, "numalloc") == 0) {
-        strcpy(inputInfoFileName, "/home/jinzhou/numalloc/source/libnumalloc.info");
+        strcpy(inputInfoFileName, "/home/jinzhou/mmprof/info/libnumalloc.info");
     } else {
         fprintf(stderr, "Info File Location Unknown\n");
         abort();

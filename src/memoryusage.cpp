@@ -1,6 +1,7 @@
 #include "memoryusage.h"
 
 thread_local TotalMemoryUsage MemoryUsage::threadLocalMemoryUsage, MemoryUsage::maxThreadLocalMemoryUsage;
+TotalMemoryUsage MemoryUsage::globalThreadLocalMemoryUsage;
 TotalMemoryUsage MemoryUsage::globalMemoryUsage, MemoryUsage::maxGlobalMemoryUsage;
 spinlock MemoryUsage::debugLock;
 
@@ -30,10 +31,14 @@ void MemoryUsage::subTotalSizeFromMemoryUsage(size_t size) {
     __atomic_sub_fetch(&globalMemoryUsage.totalMemoryUsage, size, __ATOMIC_RELAXED);
 }
 
+void MemoryUsage::globalize() {
+    globalThreadLocalMemoryUsage.ifLowerThanReplace(maxThreadLocalMemoryUsage);
+}
+
 void MemoryUsage::printOutput() {
     GlobalStatus::printTitle((char*)"MEMORY USAGE");
-    fprintf(ProgramStatus::outputFile, "thread local max real memory usage                %20ldK\n", maxThreadLocalMemoryUsage.realMemoryUsage/ONE_KB);
-    fprintf(ProgramStatus::outputFile, "thread local max total memory usage               %20ldK\n", maxThreadLocalMemoryUsage.totalMemoryUsage/ONE_KB);
+    fprintf(ProgramStatus::outputFile, "thread local max real memory usage                %20ldK\n", globalThreadLocalMemoryUsage.realMemoryUsage/ONE_KB);
+    fprintf(ProgramStatus::outputFile, "thread local max total memory usage               %20ldK\n", globalThreadLocalMemoryUsage.totalMemoryUsage/ONE_KB);
     fprintf(ProgramStatus::outputFile, "global max real memory usage                      %20ldK\n", maxGlobalMemoryUsage.realMemoryUsage/ONE_KB);
     fprintf(ProgramStatus::outputFile, "global max total memory usage                     %20ldK\n", maxGlobalMemoryUsage.totalMemoryUsage/ONE_KB);
 }

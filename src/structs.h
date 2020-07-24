@@ -101,6 +101,7 @@ struct TotalMemoryUsage {
     int64_t totalMemoryUsage;
     bool isLowerThan(TotalMemoryUsage newTotalMemoryUsage, size_t interval);
     bool isLowerThan(TotalMemoryUsage newTotalMemoryUsage);
+    void ifLowerThanReplace(TotalMemoryUsage newTotalMemoryUsage);
     void debugPrint();
 };
 
