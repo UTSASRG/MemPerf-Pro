@@ -16,12 +16,12 @@ thread_local bool PMUinit = false;
 thread_local HashMap <void *, DetailLockData, nolock, PrivateHeap> lockUsage;
 HashMap <void *, DetailLockData, nolock, PrivateHeap> globalLockUsage;
 
-// pre-init private allocator memory
+//// pre-init private allocator memory
 typedef int (*main_fn_t)(int, char **, char **);
 main_fn_t real_main_mallocprof;
 
 extern "C" {
-	// Function prototypes
+//	 Function prototypes
 	void exitHandler();
 
 //	 Function aliases
@@ -46,28 +46,6 @@ extern "C" {
     #endif
  }
 
-// Constructor
-__attribute__((constructor)) void initializer() {
-    ProgramStatus::checkSystemIs64Bits();
-    PMU_init_check();
-    RealX::initializer();
-
-    ShadowMemory::initialize();
-    ThreadLocalStatus::getARunningThreadIndex();
-
-    ///CPU Binding
-//    cpu_set_t mask;
-//    CPU_ZERO(&mask);
-//    CPU_SET(ThreadLocalStatus::runningThreadIndex%40, &mask);
-//    if (sched_setaffinity(0, sizeof(mask), &mask) == -1)
-//    {
-//        fprintf(stderr, "warning: could not set CPU affinity\n");
-//        abort();
-//    }
-}
-
-__attribute__((destructor)) void finalizer () {};
-
 void exitHandler() {
 
     ProgramStatus::setBeginConclusionTrue();
@@ -84,6 +62,11 @@ void exitHandler() {
 
 // MallocProf's main function
 int libmallocprof_main(int argc, char ** argv, char ** envp) {
+    ProgramStatus::checkSystemIs64Bits();
+    PMU_init_check();
+    RealX::initializer();
+    ShadowMemory::initialize();
+    ThreadLocalStatus::getARunningThreadIndex();
 
     ProgramStatus::initIO(argv[0]);
     lockUsage.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_LOCK_NUM);
@@ -92,27 +75,22 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
     MyMalloc::initializeForMMAPHashMemory(ThreadLocalStatus::runningThreadIndex);
     MyMalloc::initializeForThreadLocalMemory();
     ProgramStatus::setProfilerInitializedTrue();
+
     atexit(exitHandler);
 
 	return real_main_mallocprof (argc, argv, envp);
 }
 
-extern "C" int __libc_start_main(main_fn_t, int, char **, void (*)(),
-		void (*)(), void (*)(), void *) __attribute__((weak,
-			alias("libmallocprof_libc_start_main")));
+extern "C" int __libc_start_main(main_fn_t, int, char **, void (*)(), void (*)(), void (*)(), void *) __attribute__((weak, alias("libmallocprof_libc_start_main")));
 
-extern "C" int libmallocprof_libc_start_main(main_fn_t main_fn, int argc,
-		char ** argv, void (*init)(), void (*fini)(), void (*rtld_fini)(),
-		void * stack_end) {
-	auto real_libc_start_main =
-		(decltype(__libc_start_main) *)dlsym(RTLD_NEXT, "__libc_start_main");
+extern "C" int libmallocprof_libc_start_main(main_fn_t main_fn, int argc, char ** argv, void (*init)(), void (*fini)(), void (*rtld_fini)(), void * stack_end) {
+	auto real_libc_start_main = (decltype(__libc_start_main) *)dlsym(RTLD_NEXT, "__libc_start_main");
 	real_main_mallocprof = main_fn;
-	return real_libc_start_main(libmallocprof_main, argc, argv, init, fini,
-			rtld_fini, stack_end);
+	return real_libc_start_main(libmallocprof_main, argc, argv, init, fini, rtld_fini, stack_end);
 }
 
 
-////// Memory management functions
+//// Memory management functions
 extern "C" {
 	void * yymalloc(size_t sz) {
         if(sz == 0) {
@@ -122,8 +100,7 @@ extern "C" {
         if(ProgramStatus::profilerNotInitialized()) {
             return MyMalloc::malloc(sz);
         }
-
-        if(ProgramStatus::conclusionHasStarted()) {
+        if(!AllocatingStatus::outsideTrackedAllocation() || ProgramStatus::conclusionHasStarted()) {
             return RealX::malloc(sz);
         }
 
@@ -131,7 +108,6 @@ extern "C" {
 		void * object = RealX::malloc(sz);
         AllocatingStatus::updateAllocatingStatusAfterRealFunction(object);
         AllocatingStatus::updateAllocatingInfoToThreadLocalData();
-
         return object;
 
 	}
@@ -146,8 +122,7 @@ extern "C" {
 		if (ProgramStatus::profilerNotInitialized()) {
             return MyMalloc::malloc(nelem*elsize);
         }
-
-        if(ProgramStatus::conclusionHasStarted()) {
+        if(!AllocatingStatus::outsideTrackedAllocation() || ProgramStatus::conclusionHasStarted()) {
             return RealX::calloc(nelem, elsize);
         }
 
@@ -163,12 +138,12 @@ extern "C" {
 	void yyfree(void * ptr) {
         if(ptr == nullptr) return;
 
-        if(MyMalloc::ifInProfilerMemoryThenFree(ptr)) {
+        if(MyMalloc::ifInProfilerMemoryThenFree(ptr) || ProgramStatus::profilerNotInitialized()) {
             return;
         }
 
-        if(ProgramStatus::conclusionHasStarted()) {
-        return RealX::free(ptr);
+        if(!AllocatingStatus::outsideTrackedAllocation() || ProgramStatus::conclusionHasStarted()) {
+            return RealX::free(ptr);
         }
 
 
@@ -186,13 +161,13 @@ extern "C" {
             return MyMalloc::malloc(sz);
         }
 
-        if(ProgramStatus::conclusionHasStarted()) {
-            return RealX::realloc(ptr, sz);
+        if(MyMalloc::ifInProfilerMemoryThenFree(ptr)) {
+            return RealX::malloc(sz);
         }
 
-		if(MyMalloc::ifInProfilerMemoryThenFree(ptr)) {
-            return MyMalloc::malloc(sz);
-		}
+        if(!AllocatingStatus::outsideTrackedAllocation() || ProgramStatus::conclusionHasStarted()) {
+            return RealX::realloc(ptr, sz);
+        }
 
 		if(ptr) {
             AllocatingStatus::updateFreeingStatusBeforeRealFunction(REALLOC, ptr);
@@ -210,11 +185,7 @@ extern "C" {
             return 0;
         }
 
-        if(ProgramStatus::profilerNotInitialized()) {
-            return RealX::posix_memalign(memptr, alignment, size);
-        }
-
-        if(ProgramStatus::conclusionHasStarted()) {
+        if(!AllocatingStatus::outsideTrackedAllocation() || ProgramStatus::profilerNotInitialized() || ProgramStatus::conclusionHasStarted()) {
             return RealX::posix_memalign(memptr, alignment, size);
         }
         AllocatingStatus::updateAllocatingStatusBeforeRealFunction(POSIX_MEMALIGN, size);
@@ -235,7 +206,7 @@ extern "C" {
          return MyMalloc::malloc(size);
      }
 
-     if(ProgramStatus::conclusionHasStarted()) {
+     if(!AllocatingStatus::outsideTrackedAllocation() || ProgramStatus::conclusionHasStarted()) {
          return RealX::memalign(alignment, size);
      }
 
@@ -405,7 +376,6 @@ int pthread_mutex_lock(pthread_mutex_t *mutex) {
     uint64_t timeStop = rdtscp();
 
     AllocatingStatus::recordLockCallAndCycles(1, timeStop-timeStart);
-//    AllocatingStatus::debugRecordMutexAddress(timeStart, mutex);
     AllocatingStatus::checkAndStartRecordingACriticalSection();
 
     return result;

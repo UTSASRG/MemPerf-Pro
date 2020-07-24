@@ -9,11 +9,8 @@ MemoryWasteTotalValue MemoryWaste::totalValue;
 HashLocksSet MemoryWaste::hashLocksSet;
 
 size_t ObjectStatus::internalFragment() {
-    size_t unUsedPage = (sizeClassSizeAndIndex.classSize - maxTouchedBytes) / PAGESIZE * PAGESIZE;
-    if(sizeClassSizeAndIndex.classSize - unUsedPage - sizeClassSizeAndIndex.size > ABNORMAL_VALUE) {
-        return 0;
-    }
-    return sizeClassSizeAndIndex.classSize - unUsedPage - sizeClassSizeAndIndex.size;
+    size_t unusedPageSize = (sizeClassSizeAndIndex.classSize - maxTouchedBytes) / PAGESIZE * PAGESIZE;
+    return sizeClassSizeAndIndex.classSize - unusedPageSize - sizeClassSizeAndIndex.size;
 }
 
 ObjectStatus ObjectStatus::newObjectStatus(SizeClassSizeAndIndex sizeClassSizeAndIndex, size_t maxTouchBytes) {
@@ -71,7 +68,7 @@ void MemoryWasteStatus::debugPrint() {
 
 void MemoryWasteStatus::updateStatus(MemoryWasteStatus newStatus) {
     lock.lock();
-    newStatus.cleanAbnormalValues();
+//    newStatus.cleanAbnormalValues();
     size_t sizeOfCopiedArrays = ThreadLocalStatus::totalNumOfThread * ProgramStatus::numberOfClassSizes * sizeof(uint64_t);
     memcpy(this->internalFragment, newStatus.internalFragment, sizeOfCopiedArrays);
     memcpy(this->numOfActiveObjects.numOfAllocatedObjects, newStatus.numOfActiveObjects.numOfAllocatedObjects, sizeOfCopiedArrays);
@@ -84,15 +81,15 @@ void MemoryWasteStatus::updateStatus(MemoryWasteStatus newStatus) {
 }
 
 void MemoryWasteStatus::cleanAbnormalValues() {
-    for(unsigned int threadIndex = 0; threadIndex < (unsigned int)ThreadLocalStatus::runningThreadIndex; ++threadIndex) {
+    for(unsigned int threadIndex = 0; threadIndex < (unsigned int)ThreadLocalStatus::totalNumOfThread; ++threadIndex) {
         for(unsigned int classSizeIndex = 0; classSizeIndex < ProgramStatus::numberOfClassSizes; ++classSizeIndex) {
             if(internalFragment[arrayIndex(threadIndex, classSizeIndex)] > 0x1000000000) {
                 internalFragment[arrayIndex(threadIndex, classSizeIndex)] = 0;
             }
-            if(classSizeIndex >= 1) {
-                internalFragment[arrayIndex(threadIndex, classSizeIndex)] = MIN(internalFragment[arrayIndex(threadIndex, classSizeIndex)],
-                        (int64_t)(numOfActiveObjects.numOfAllocatedObjects[arrayIndex(threadIndex, classSizeIndex)] * (ProgramStatus::classSizes[classSizeIndex] - ProgramStatus::classSizes[classSizeIndex-1])));
-            }
+//            if(classSizeIndex >= 1) {
+//                internalFragment[arrayIndex(threadIndex, classSizeIndex)] = MIN(internalFragment[arrayIndex(threadIndex, classSizeIndex)],
+//                        (int64_t)(numOfActiveObjects.numOfAllocatedObjects[arrayIndex(threadIndex, classSizeIndex)] * (ProgramStatus::classSizes[classSizeIndex] - ProgramStatus::classSizes[classSizeIndex-1])));
+//            }
         }
     }
 }
@@ -212,8 +209,9 @@ void MemoryWaste::initialize() {
 
 
 AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(size_t size, void * address) {
-//    hashLocksSet.lock(address);
     bool reused;
+
+    hashLocksSet.lock(address);
     ObjectStatus * status = objStatusMap.find(address, sizeof(unsigned long));
     if(!status) {
         reused = false;
@@ -232,6 +230,9 @@ AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(size_t size, void * ad
         } else {
             currentSizeClassSizeAndIndex = ProgramStatus::getClassSizeAndIndex(size);
             status->sizeClassSizeAndIndex = currentSizeClassSizeAndIndex;
+            if(currentSizeClassSizeAndIndex.classSize < status->maxTouchedBytes) {
+                status->maxTouchedBytes = currentSizeClassSizeAndIndex.classSize;
+            }
             if(size > status->maxTouchedBytes) {
                 status->maxTouchedBytes = size;
             }
@@ -240,22 +241,22 @@ AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(size_t size, void * ad
         currentStatus.numOfAccumulatedOperations.numOfReusedAllocations[arrayIndex()]++;
 
     }
-    currentStatus.numOfActiveObjects.numOfAllocatedObjects[arrayIndex()]++;
-
-    if(currentStatus.internalFragment[arrayIndex()] >= 0x1000000000) {
-        currentStatus.internalFragment[arrayIndex()] = 0;
-    }
+//    if(currentStatus.internalFragment[arrayIndex()] >= 0x1000000000) {
+//        currentStatus.internalFragment[arrayIndex()] = 0;
+//    }
     currentStatus.internalFragment[arrayIndex()] += (int64_t)status->internalFragment();
+    hashLocksSet.unlock(address);
 
+    currentStatus.numOfActiveObjects.numOfAllocatedObjects[arrayIndex()]++;
     if(currentStatus.blowupFlag[currentSizeClassSizeAndIndex.classSizeIndex] > 0 ) {
         currentStatus.blowupFlag[currentSizeClassSizeAndIndex.classSizeIndex]--;
     }
-//    hashLocksSet.unlock(address);
     return AllocatingTypeGotFromMemoryWaste{reused, currentSizeClassSizeAndIndex.classSize};
 }
 
 
 AllocatingTypeWithSizeGotFromMemoryWaste MemoryWaste::freeUpdate(void* address) {
+
     hashLocksSet.lock(address);
     /* Get old status */
     ObjectStatus* status = objStatusMap.find(address, sizeof(void *));
@@ -264,15 +265,16 @@ AllocatingTypeWithSizeGotFromMemoryWaste MemoryWaste::freeUpdate(void* address) 
         return AllocatingTypeWithSizeGotFromMemoryWaste{0, AllocatingTypeGotFromMemoryWaste{false, 0}};
     }
     currentSizeClassSizeAndIndex = status->sizeClassSizeAndIndex;
-    currentStatus.numOfAccumulatedOperations.numOfFree[arrayIndex()]++;
 
+    currentStatus.internalFragment[arrayIndex()] -= (int64_t)status->internalFragment();
+    hashLocksSet.unlock(address);
+
+    currentStatus.numOfAccumulatedOperations.numOfFree[arrayIndex()]++;
     currentStatus.numOfActiveObjects.numOfAllocatedObjects[arrayIndex()]--;
     currentStatus.numOfActiveObjects.numOfFreelistObjects[arrayIndex()]++;
 
-    currentStatus.internalFragment[arrayIndex()] -= (int64_t)status->internalFragment();
 
     currentStatus.blowupFlag[currentSizeClassSizeAndIndex.classSizeIndex]++;
-    hashLocksSet.unlock(address);
     return AllocatingTypeWithSizeGotFromMemoryWaste{currentSizeClassSizeAndIndex.size,
                                                     AllocatingTypeGotFromMemoryWaste{false, currentSizeClassSizeAndIndex.classSize}};
 }
@@ -302,8 +304,11 @@ void MemoryWaste::printOutput() {
         if(globalStatus.internalFragment[classSizeIndex]/ONE_KB == 0 && globalStatus.memoryBlowup[classSizeIndex]/ONE_KB == 0) {
             continue;
         }
-
-        fprintf(ProgramStatus::outputFile, "size: %10lu\t\t\t", ProgramStatus::classSizes[classSizeIndex]);
+        if(classSizeIndex != ProgramStatus::numberOfClassSizes - 1) {
+            fprintf(ProgramStatus::outputFile, "size: %10lu\t\t\t", ProgramStatus::classSizes[classSizeIndex]);
+        } else {
+            fprintf(ProgramStatus::outputFile, "large object:   \t\t\t");
+        }
 
         fprintf(ProgramStatus::outputFile, "internal fragmentation: %10ldK\t\t\tmemory blowup: %10luK\t\t\t"
                         "active alloc: %10ld\t\t\tfreelist objects: %10ld\t\t\t"

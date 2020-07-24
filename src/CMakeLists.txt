@@ -28,7 +28,6 @@ add_executable(mmprof
         test/threadTest.cpp
         hashfuncs.hh
         hashmap.hh
-        interval.hh
         libmallocprof.cpp
         libmallocprof.h
         list.hh

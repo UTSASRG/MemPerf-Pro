@@ -17,7 +17,9 @@ private:
     static FILE * inputInfoFile;
     static char outputFileName[MAX_FILENAME_LEN];
 
+    static size_t middleObjectThreshold;
     static size_t largeObjectThreshold;
+    static size_t largeObjectAlignment;
 
     static thread_local struct SizeClassSizeAndIndex cacheForGetClassSizeAndIndex;
 
@@ -25,7 +27,9 @@ private:
     static void fopenInputInfoFile();
     static void readAllocatorStyleFromInfo(char*token);
     static void readAllocatorClassSizesFromInfo(char*token);
+    static void readMiddleObjectThresholdFromInfo(char*token);
     static void readLargeObjectThresholdFromInfo(char*token);
+    static void readLargeObjectAlignmentFromInfo(char*token);
     static void readInputInfoFile();
     static void openInputInfoFile(char * runningApplicationName);
     static void openOutputFile();
@@ -50,6 +54,7 @@ public:
     static void initIO(char * runningApplicationName);
     static void printOutput();
 
+    static bool hasMiddleObjectThreshold();
     static ObjectSizeType getObjectSizeType(size_t size);
 
     static struct SizeClassSizeAndIndex getClassSizeAndIndex(size_t size);

@@ -5,7 +5,9 @@ bool ProgramStatus::beginConclusion;
 char ProgramStatus::inputInfoFileName[MAX_FILENAME_LEN];
 FILE * ProgramStatus::inputInfoFile;
 char ProgramStatus::outputFileName[MAX_FILENAME_LEN];
+size_t ProgramStatus::middleObjectThreshold;
 size_t ProgramStatus::largeObjectThreshold;
+size_t ProgramStatus::largeObjectAlignment;
 thread_local struct SizeClassSizeAndIndex ProgramStatus::cacheForGetClassSizeAndIndex;
 
 FILE * ProgramStatus::outputFile;
@@ -49,7 +51,6 @@ void ProgramStatus::getInputInfoFileName(char * runningApplicationName) {
         strcpy(inputInfoFileName, "/usr/local/lib/libtcmalloc.info");
     } else if(strcmp(runningAllocatorName, "dieharder") == 0) {
         strcpy(inputInfoFileName, "/home/jinzhou/Memoryallocators/DieHard/src/libdieharder.info");
-//        strcpy(inputInfoFileName, "/home/jinzhou/Memoryallocators/Hoard/src/libhoard.info");
     } else if(strcmp(runningAllocatorName, "omalloc") == 0) {
         strcpy(inputInfoFileName, "/home/jinzhou/Memoryallocators/OpenBSD-6.0-mus/libomalloc.info");
     } else if (strcmp(runningAllocatorName, "numalloc") == 0) {
@@ -98,12 +99,27 @@ void ProgramStatus::readAllocatorClassSizesFromInfo(char * token) {
             }
         }
     }
+    numberOfClassSizes++;
+}
+
+void ProgramStatus::readMiddleObjectThresholdFromInfo(char *token) {
+    if ((strcmp(token, "middle_object_threshold")) == 0) {
+        token = strtok(NULL, " ");
+        middleObjectThreshold = (size_t) atoi(token);
+    }
 }
 
 void ProgramStatus::readLargeObjectThresholdFromInfo(char * token) {
     if ((strcmp(token, "large_object_threshold")) == 0) {
         token = strtok(NULL, " ");
         largeObjectThreshold = (size_t) atoi(token);
+    }
+}
+
+void ProgramStatus::readLargeObjectAlignmentFromInfo(char *token) {
+    if ((strcmp(token, "large_object_alignment")) == 0) {
+        token = strtok(NULL, " ");
+        largeObjectAlignment = (size_t) atoi(token);
     }
 }
 
@@ -116,8 +132,10 @@ void ProgramStatus::readInputInfoFile() {
         char *token = strtok(buffer, " ");
         if(token) {
             readAllocatorStyleFromInfo(token);
+            readMiddleObjectThresholdFromInfo(token);
             readAllocatorClassSizesFromInfo(token);
             readLargeObjectThresholdFromInfo(token);
+            readLargeObjectAlignmentFromInfo(token);
         }
     }
 }
@@ -153,15 +171,21 @@ void ProgramStatus::printLargeObjectThreshold() {
 void ProgramStatus::printOutput() {
     printLargeObjectThreshold();
 }
-#define MEDIUM_THRESHOLD 256
+
+bool ProgramStatus::hasMiddleObjectThreshold() {
+    return (0<middleObjectThreshold) && (middleObjectThreshold<largeObjectThreshold);
+}
+
 ObjectSizeType ProgramStatus::getObjectSizeType(size_t size) {
     if(size > largeObjectThreshold) {
         return LARGE;
     }
-    if(size <= MEDIUM_THRESHOLD) {
-        return SMALL;
+    if(hasMiddleObjectThreshold()) {
+        if(size >=  middleObjectThreshold) {
+            return MEDIUM;
+        }
     }
-    return MEDIUM;
+    return SMALL;
 }
 
 SizeClassSizeAndIndex ProgramStatus::getClassSizeAndIndex(size_t size) {
@@ -174,13 +198,13 @@ SizeClassSizeAndIndex ProgramStatus::getClassSizeAndIndex(size_t size) {
     unsigned int classSizeIndex = 0;
 
     if(size > largeObjectThreshold) {
-        classSize = size;
-        classSizeIndex = numberOfClassSizes - 1;
+        classSize = (size/largeObjectAlignment)*largeObjectAlignment + ((bool)size%largeObjectAlignment)*largeObjectAlignment;
+        classSizeIndex = numberOfClassSizes-1;
         return SizeClassSizeAndIndex{size, classSize, classSizeIndex};
     }
 
     if(allocatorStyleIsBibop) {
-        for (unsigned int index = 0; index < numberOfClassSizes; index++) {
+        for (unsigned int index = 0; index < numberOfClassSizes-1; index++) {
             if (size <= classSizes[index]) {
                 classSize = classSizes[index];
                 classSizeIndex = index;

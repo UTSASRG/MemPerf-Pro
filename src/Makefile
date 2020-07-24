@@ -1,6 +1,39 @@
-SRCS = $(wildcard *.c) $(wildcard *.cpp)
-INCS = $(wildcard *.h) $(wildcard *.hh)
-OBJS = $(wildcard *.o)
+SRCS = 	\
+		libmallocprof.cpp \
+		allocatingstatus.cpp \
+		globalstatus.cpp \
+		memoryusage.cpp \
+		memsample.c \
+		memwaste.cpp \
+		mymalloc.cpp \
+		programstatus.cpp \
+		real.cpp \
+		shadowmemory.cpp \
+		structs.cpp \
+		threadlocalstatus.cpp \
+		xthreadx.cpp
+INCS = \
+		libmallocprof.h \
+		allocatingstatus.h \
+		definevalues.h \
+		globalstatus.h \
+		hashfuncs.hh \
+		hashlist.hh \
+		hashmap.hh \
+		list.hh \
+		memoryusage.h \
+		memsample.h \
+		memwaste.h \
+		mymalloc.h \
+		privateheap.hh \
+		programstatus.h \
+		real.hh \
+		shadowmemory.hh \
+		spinlock.hh \
+		structs.h \
+		threadlocalstatus.h \
+		xthreadx.hh
+
 DEPS = $(SRCS) $(INCS)
 
 CC = gcc
@@ -23,13 +56,9 @@ LIBS     := dl pthread
 TARGETS = libmallocprof.so
 
 
-
 # Libmallocprof
-libmallocprof.so: $(DEPS) object
-	$(CXX) $(CFLAGS2) $(PROFILER_FLAGS) $(INCLUDE_DIRS) -shared -fPIC $(OBJS) -o libmallocprof.so -ldl -lpthread
-
-object: $(SRCS) $(INCS)
-	$(CXX) $(CFLAGS2) $(PROFILER_FLAGS) $(INCLUDE_DIRS) -shared -fPIC -c $(SRCS) -ldl -lpthread
+libmallocprof.so: $(DEPS)
+	$(CXX) $(CFLAGS2) $(PROFILER_FLAGS) $(INCLUDE_DIRS) -shared -fPIC $(SRCS) -o libmallocprof.so -ldl -lpthread
 
 test/test-tcmalloc-minimal: libmallocprof.so test/$(TEST_FILE)
 	$(CXX) $(CFLAGS) -o test/test-tcmalloc-minimal test/$(TEST_FILE) -rdynamic ./libmallocprof.so -ltcmalloc_minimal

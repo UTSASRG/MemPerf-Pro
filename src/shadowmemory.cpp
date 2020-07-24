@@ -75,7 +75,6 @@ size_t ShadowMemory::updateObject(void * address, size_t size, bool isFree) {
 
     unsigned firstPageIdx = ((uintaddr & MEGABYTE_MASK) >> LOG2_PAGESIZE);
     unsigned numNewPagesTouched = updatePages(uintaddr, mega_index, firstPageIdx, size, isFree);
-//    fprintf(stderr, "tid = %u, firstPageIdx = %u, numNewPagesTouched = %u\n", ThreadLocalStatus::runningThreadIndex, firstPageIdx, numNewPagesTouched);
     PageMapEntry::updateCacheLines(uintaddr, mega_index, firstPageIdx, size, isFree);
 
     return numNewPagesTouched * PAGESIZE;
@@ -160,16 +159,14 @@ size_t ShadowMemory::cleanupPages(uintptr_t uintaddr, size_t length) {
 		unsigned curPageIdx;
 		unsigned numPages = length >> LOG2_PAGESIZE;
 		PageMapEntry * current;
-
 		for(curPageIdx = firstPageIdx; curPageIdx < firstPageIdx + numPages; curPageIdx++) {
-				current = getPageMapEntry(mega_index, curPageIdx);
-				if(current->isTouched()) {
-						numTouchedPages++;
-                        current->clear();
-                }
-		}
-
-		return PAGESIZE * numTouchedPages;
+            current = getPageMapEntry(mega_index, curPageIdx);
+            if(current->isTouched()) {
+                numTouchedPages++;
+                current->clear();
+            }
+        }
+    return PAGESIZE * numTouchedPages;
 }
 
 void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType) {
@@ -452,7 +449,6 @@ CacheMapEntry * PageMapEntry::getCacheMapEntry(bool mvBumpPtr) {
         if(__builtin_expect(__atomic_load_n(&cache_map_entry, __ATOMIC_RELAXED) == NULL, 1)) {
             __atomic_store_n(&cache_map_entry, ShadowMemory::doCacheMapBumpPointer(), __ATOMIC_RELAXED);
         }
-//				RealX::pthread_spin_unlock(&mega_map_lock);
         ShadowMemory::cache_map_lock.unlock();
     }
 

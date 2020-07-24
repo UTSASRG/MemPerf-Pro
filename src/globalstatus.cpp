@@ -83,8 +83,8 @@ void GlobalStatus::printNumOfAllocations() {
 
 void GlobalStatus::printCountingEvents() {
     for(int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
-        printTitle(allocationTypeOutputTitleString[allocationType], numOfFunctions[allocationType]);
         if(numOfFunctions[allocationType]) {
+            printTitle(allocationTypeOutputTitleString[allocationType], numOfFunctions[allocationType]);
             fprintf(ProgramStatus::outputFile, "cycles           %20lu   avg %20lu\n", cycles[allocationType], cycles[allocationType]/numOfFunctions[allocationType]);
             fprintf(ProgramStatus::outputFile, "faults           %20lu   avg %20lu\n", countingEvents[allocationType].faults, countingEvents[allocationType].faults/numOfFunctions[allocationType]);
             fprintf(ProgramStatus::outputFile, "tlb read misses  %20lu   avg %20lu\n", countingEvents[allocationType].tlb_read_misses, countingEvents[allocationType].tlb_read_misses/numOfFunctions[allocationType]);

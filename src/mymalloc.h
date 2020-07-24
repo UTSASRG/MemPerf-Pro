@@ -54,7 +54,7 @@ class MyMalloc{
 private:
     static ProfilerMemory profilerMemory;
     static ProfilerMemory profilerHashMemory;
-    static thread_local MMAPProfilerMemory threadLocalProfilerMemory;
+    static MMAPProfilerMemory threadLocalProfilerMemory[MAX_THREAD_NUMBER];
     static MMAPProfilerMemory MMAPProfilerHashMemory[MAX_THREAD_NUMBER];
     static spinlock debugLock;
 
@@ -63,6 +63,12 @@ public:
     static void initializeForThreadLocalMemory();
     static void finalizeForThreadLocalMemory();
     static bool threadLocalMemoryInitialized();
+    static void initializeForThreadLocalMemory(unsigned int threadIndex);
+    static void finalizeForThreadLocalMemory(unsigned int threadIndex);
+    static bool threadLocalMemoryInitialized(unsigned int threadIndex);
+    static void initializeForMMAPHashMemory();
+    static void finalizeForMMAPHashMemory();
+    static bool MMAPHashMemoryInitialized();
     static void initializeForMMAPHashMemory(unsigned int threadIndex);
     static void finalizeForMMAPHashMemory(unsigned int threadIndex);
     static bool MMAPHashMemoryInitialized(unsigned int threadIndex);

@@ -119,20 +119,45 @@ bool MMAPProfilerMemory::ifInProfilerMemoryThenFree(void * addr) {
 
 ProfilerMemory MyMalloc::profilerMemory;
 ProfilerMemory MyMalloc::profilerHashMemory;
-thread_local MMAPProfilerMemory MyMalloc::threadLocalProfilerMemory;
+//thread_local MMAPProfilerMemory MyMalloc::threadLocalProfilerMemory;
+MMAPProfilerMemory MyMalloc::threadLocalProfilerMemory[MAX_THREAD_NUMBER];
 MMAPProfilerMemory MyMalloc::MMAPProfilerHashMemory[MAX_THREAD_NUMBER];
 spinlock MyMalloc::debugLock;
 
 void MyMalloc::initializeForThreadLocalMemory() {
-    threadLocalProfilerMemory.initialize(MMAP_PROFILER_MEMORY_SIZE);
+    threadLocalProfilerMemory[ThreadLocalStatus::runningThreadIndex].initialize(MMAP_PROFILER_MEMORY_SIZE);
 }
 
 void MyMalloc::finalizeForThreadLocalMemory() {
-    threadLocalProfilerMemory.finalize();
+    threadLocalProfilerMemory[ThreadLocalStatus::runningThreadIndex].finalize();
 }
 
 bool MyMalloc::threadLocalMemoryInitialized() {
-    return threadLocalProfilerMemory.initialized;
+    return threadLocalProfilerMemory[ThreadLocalStatus::runningThreadIndex].initialized;
+}
+
+void MyMalloc::initializeForThreadLocalMemory(unsigned int threadIndex) {
+    threadLocalProfilerMemory[threadIndex].initialize(MMAP_PROFILER_MEMORY_SIZE);
+}
+
+void MyMalloc::finalizeForThreadLocalMemory(unsigned int threadIndex) {
+    threadLocalProfilerMemory[threadIndex].finalize();
+}
+
+bool MyMalloc::threadLocalMemoryInitialized(unsigned int threadIndex) {
+    return threadLocalProfilerMemory[threadIndex].initialized;
+}
+
+void MyMalloc::initializeForMMAPHashMemory() {
+    MMAPProfilerHashMemory[ThreadLocalStatus::runningThreadIndex].initialize(MMAP_PROFILER_HASH_MEMORY_SIZE);
+}
+
+void MyMalloc::finalizeForMMAPHashMemory() {
+    MMAPProfilerHashMemory[ThreadLocalStatus::runningThreadIndex].finalize();
+}
+
+bool MyMalloc::MMAPHashMemoryInitialized() {
+    return MMAPProfilerHashMemory[ThreadLocalStatus::runningThreadIndex].initialized;
 }
 
 void MyMalloc::initializeForMMAPHashMemory(unsigned int threadIndex) {
@@ -149,23 +174,30 @@ bool MyMalloc::MMAPHashMemoryInitialized(unsigned int threadIndex) {
 
 void * MyMalloc::malloc(size_t size) {
     if(threadLocalMemoryInitialized()) {
-        return threadLocalProfilerMemory.malloc(size);
+        return threadLocalProfilerMemory[ThreadLocalStatus::runningThreadIndex].malloc(size);
     }
     return profilerMemory.malloc(size);
 }
 
 bool MyMalloc::ifInProfilerMemoryThenFree(void * addr) {
-    bool freed = false;
     if(threadLocalMemoryInitialized()) {
-        freed = threadLocalProfilerMemory.ifInProfilerMemoryThenFree(addr);
+        if(threadLocalProfilerMemory[ThreadLocalStatus::runningThreadIndex].ifInProfilerMemoryThenFree(addr)) {
+            return true;
+        }
     }
-    freed = freed || profilerMemory.ifInProfilerMemoryThenFree(addr);
-    return freed;
+    for(unsigned int threadIndex = 0; threadIndex < ThreadLocalStatus::totalNumOfThread; ++threadIndex) {
+        if(threadIndex != (unsigned int)ThreadLocalStatus::runningThreadIndex && threadLocalMemoryInitialized(threadIndex)) {
+            if(threadLocalProfilerMemory[threadIndex].ifInProfilerMemoryThenFree(addr)) {
+                return true;
+            }
+        }
+    }
+    return profilerMemory.ifInProfilerMemoryThenFree(addr);
 }
 
 void * MyMalloc::hashMalloc(size_t size) {
     void * object;
-    if(MMAPHashMemoryInitialized(ThreadLocalStatus::runningThreadIndex)) {
+    if(MMAPHashMemoryInitialized()) {
         object = MMAPProfilerHashMemory[ThreadLocalStatus::runningThreadIndex].malloc(size);
     } else {
         object = profilerHashMemory.malloc(size);

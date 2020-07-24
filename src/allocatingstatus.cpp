@@ -127,7 +127,7 @@ void AllocatingStatus::updateFreeingStatusAfterRealFunction() {
     stopCountCountingEvents();
     updateFreeingTypeAfterRealFunction();
 }
-
+int tmp = 0;
 
 void AllocatingStatus::updateMemoryStatusAfterAllocation() {
     allocatingType.allocatingTypeGotFromMemoryWaste = MemoryWaste::allocUpdate(allocatingType.objectSize, allocatingType.objectAddress);
@@ -377,6 +377,6 @@ void AllocatingStatus::debugPrint() {
 
 }
 
-void AllocatingStatus::debugPrintTypeAndSize() {
-    fprintf(stderr, "allocating type = %u, size = %lu\n", allocatingType.allocatingFunction, allocatingType.objectSize);
+size_t AllocatingStatus::debugReturnSize() {
+    return(allocatingType.objectSize);
 }
