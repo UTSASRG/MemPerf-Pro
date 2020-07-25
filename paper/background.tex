@@ -149,4 +149,32 @@ Category & Important Metrics & Collection Techniques \\ \hline
 \end{table}
 
 
+\subsection{Allocator's Performance}
+
+\todo{Maybe integrate the previous description}
+
+ What factors of an allocator can affect the performance of the corresponding applications?	
+
+Based on our current understanding, the following factors may affect the performance of applications. 
+
+\paragraph{Allocator's Internal Implementation}
+
+\begin{itemize}
+
+\item The allocator's implementation complexity, or the number of instructions inside the memory management operations. Different allocators may have different complexity. Hoard's implementation is more than twice of TcMalloc for instance for allocating objects with . 
+
+\item The lock contention inside each memory management operation. This can be caused by three reasons. First, an allocator has a wrong threshold of per-thread heap. For instance, Hoard actually has a threshold of evaluating the emptiness of per-thread superblock. Therefore, one deallocation will make Hoard to move the current superblock to the global pool, which is to reduce memory blowup, while the next allocation will be forced to get one superblock from the global pool. Then the global lock will incur lots of lock contention, which slows down an application by $5\times$. Therefore, it is better to have the machine learning to predict the  the working set of each per-thread heap. Therefore, the allocator will not cause too much performance penalty caused by the lock contention, but will still has reasonable memory overhead. Second, an allocator will return some unnecessary memory back to the OS, in order to reduce the memory overhead. However, an allocator (such as the allocator of glibc-2.21) makes the wrong prediction on it, which actually slowdown the application by more than 20\% due to the kernel contention. Third, whether multiple threads are sharing the same heap? If yes, then this is a potential performance issue that can be caused by the lock contention. 
+
+\item Cache performance issue of memory management operation: First, a memory management operation may incur unnecessary cache misses. For instance, DieHard actually causes a significant performance issue caused by cache loading. For each deallocation, DieHard actually incurs a big number of cache misses in finding its corresponding miniheap, since all miniheaps will be checked one after the other. Second, a memory management operation will have some false sharing issues, if multiple threads are accessing the same metadata. Then they can cause some performance issue. 
+	Third, it may cause some remote accesses, if we are using the NUMA architecture.
+\item Memory allocators incur lot of unnecessary consumption, which may affect the performance due to a large number of page faults, TLB misses, or more cache misses. 
+\end{itemize}
+
+\paragraph{Application Friendliness}
+\begin{itemize}
+\item Cache Utilization Rate: multiple reasons can cause low cache utilization rate, which will incur the in-efficiency of cache utilization. First, if metadata is co-located with the actual object, it may cause low cache utilization rate. Second, if an allocator utilizes too-coarse grained size class, it may cause low cache utilization rate.   
+\item Low page utilization rate: similarly, this could affect the performance. 
+\item Active/passive false sharing issue: an allocator may introduce active/passive false sharing for applications running on it. 
+\end{itemize}
+
 
