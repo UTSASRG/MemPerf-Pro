@@ -5,83 +5,123 @@
 #ifndef MMPROF_MEMWASTE_H
 #define MMPROF_MEMWASTE_H
 
-
-//#include <atomic>
+#include <stdio.h>
 #include "hashmap.hh"
 #include "hashfuncs.hh"
 #include "libmallocprof.h"
 #include "memsample.h"
+#include "memoryusage.h"
+#include "mymalloc.h"
+#include "threadlocalstatus.h"
+#include "allocatingstatus.h"
+#include "structs.h"
 
-#define MAX_OBJ_NUM 4096*16*64
-//#define MAX_PAGE_NUM 4096
+class ProgramStatus;
 
+struct ObjectStatus{
+    uint64_t proof;
+    SizeClassSizeAndIndex sizeClassSizeAndIndex;
+    size_t maxTouchedBytes = 0;
 
-extern int num_class_sizes;
+    size_t internalFragment();
+    static ObjectStatus newObjectStatus(SizeClassSizeAndIndex SizeClassSizeAndIndex, size_t maxTouchBytes);
+};
 
-typedef struct {
-    //pid_t tid;
-    size_t size_using = 0;
-    size_t classSize = 0;
-    short classSizeIndex = 0;
-    size_t max_touched_bytes = 0;
-} objStatus;
+struct MemoryWasteStatus {
+    int64_t * internalFragment;
+    struct NumOfActiveObjects {
+        int64_t * numOfAllocatedObjects;
+        int64_t * numOfFreelistObjects;
+    } numOfActiveObjects;
+    struct NumOfAccumulatedOperations {
+        uint64_t * numOfNewAllocations;
+        uint64_t * numOfReusedAllocations;
+        uint64_t * numOfFree;
+    } numOfAccumulatedOperations;
+    static size_t sizeOfArrays;
+
+    static unsigned int arrayIndex(unsigned int classSizeIndex);
+    static unsigned int arrayIndex(unsigned int threadIndex, unsigned int classSizeIndex);
+
+    int64_t * blowupFlag;
+    spinlock lock;
+
+    void initialize();
+    void debugPrint();
+    void updateStatus(MemoryWasteStatus newStatus);
+    void cleanAbnormalValues();
+};
+
+struct MemoryWasteGlobalStatus {
+    int64_t * internalFragment;
+    struct NumOfActiveObjects {
+        int64_t * numOfAllocatedObjects;
+        int64_t * numOfFreelistObjects;
+    } numOfActiveObjects;
+    struct NumOfAccumulatedOperations {
+        uint64_t * numOfNewAllocations;
+        uint64_t * numOfReusedAllocations;
+        uint64_t * numOfFree;
+    } numOfAccumulatedOperations;
+    static size_t sizeOfArrays;
+
+    int64_t * memoryBlowup;
+
+    void initialize();
+    void globalize(MemoryWasteStatus recordStatus);
+    void calculateBlowup(MemoryWasteStatus recordStatus);
+    void cleanAbnormalValues();
+};
+
+struct MemoryWasteTotalValue {
+    int64_t internalFragment = 0;
+    struct NumOfActiveObjects {
+        int64_t numOfAllocatedObjects = 0;
+        int64_t numOfFreelistObjects = 0;
+    } numOfActiveObjects;
+    struct NumOfAccumulatedOperations {
+        uint64_t numOfNewAllocations = 0;
+        uint64_t numOfReusedAllocations = 0;
+        uint64_t numOfFree = 0;
+    } numOfAccumulatedOperations;
+    int64_t externalFragment;
+    int64_t memoryBlowup = 0;
+    void getTotalValues(MemoryWasteGlobalStatus globalStatus);
+    void clearAbnormalValues();
+    void getExternalFragment();
+};
+
+struct HashLocksSet {
+    spinlock locks[MAX_OBJ_NUM];
+    void init();
+    void lock(void * address);
+    void unlock(void * address);
+};
 
 class MemoryWaste{
 private:
-    static HashMap <void*, objStatus, spinlock, PrivateHeap> objStatusMap;
+    static HashMap <void*, ObjectStatus, nolock, PrivateHeap> objStatusMap;
+    static thread_local SizeClassSizeAndIndex currentSizeClassSizeAndIndex;
+    static MemoryWasteStatus currentStatus, recordStatus;
+    static MemoryWasteGlobalStatus globalStatus;
+    static MemoryWasteTotalValue totalValue;
+    static HashLocksSet hashLocksSet;
 
-    static uint64_t* mem_alloc_wasted;
-    static uint64_t * mem_alloc_wasted_record;
-    static uint64_t * mem_alloc_wasted_record_global;
-
-    static int64_t * num_alloc_active;
-    static int64_t * num_alloc_active_record;
-    static int64_t * num_alloc_active_record_global;
-
-    static int64_t * num_freelist;
-    static int64_t * num_freelist_record;
-    static int64_t * num_freelist_record_global;
-
-    static uint64_t * num_alloc;
-    static uint64_t * num_allocFFL;
-    static uint64_t * num_free;
-
-    static uint64_t * num_alloc_record;
-    static uint64_t * num_allocFFL_record;
-    static uint64_t * num_free_record;
-
-    static uint64_t * num_alloc_record_global;
-    static uint64_t * num_allocFFL_record_global;
-    static uint64_t * num_free_record_global;
-
-    static int64_t * blowupflag_record;
-    static int64_t * blowupflag;
-
-    static uint64_t mem_alloc_wasted_record_total;
-    static uint64_t mem_blowup_total;
-
-    static uint64_t num_alloc_active_total;
-    static uint64_t num_freelist_total;
-
-    static uint64_t num_alloc_total;
-    static uint64_t num_allocFFL_total;
-    static uint64_t num_free_total;
-
-    static long realMem;
-    static long totalMem;
-
-    static spinlock record_lock;
 
 public:
 
     static void initialize();
-///Here
-    static bool allocUpdate(allocation_metadata * allocData, void * address);
-    static void freeUpdate(allocation_metadata * allocData, void* address);
-    ///Here
-    static bool recordMemory(long realMemory, long totalMemory);
-    static uint64_t recordSumup();
-    static void reportMaxMemory(FILE * output);
+
+    static AllocatingTypeGotFromMemoryWaste allocUpdate(size_t size, void * address);
+    static AllocatingTypeWithSizeGotFromMemoryWaste freeUpdate(void* address);
+
+    static void compareMemoryUsageAndRecordStatus(TotalMemoryUsage newTotalMemoryUsage);
+    static void globalizeRecordAndGetTotalValues();
+    static void printOutput();
+
+    static unsigned int arrayIndex();
+    static unsigned int arrayIndex(unsigned int classSizeIndex);
+    static unsigned int arrayIndex(unsigned int threadIndex, unsigned int classSizeIndex);
 };
 
 #endif //MMPROF_MEMWASTE_H

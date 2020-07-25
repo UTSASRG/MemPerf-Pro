@@ -1,7 +1,6 @@
 #ifndef __SHADOWMAP_H__
 #define __SHADOWMAP_H__
 
-//#include <atomic>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,6 +8,9 @@
 #include <malloc.h>
 #include "libmallocprof.h"
 #include "spinlock.hh"
+#include "threadlocalstatus.h"
+#include "memsample.h"
+
 
 #define PAGESIZE 4096
 #define NUM_CACHELINES_PER_PAGE 64
@@ -49,12 +51,7 @@
 #define MAX_OBJECT_SIZE 524287								// 2^19 - 1
 
 // Located in libmallocprof.cpp globals
-extern bool bibop;
-extern bool isLibc;
 extern char * allocator_name;
-extern size_t large_object_threshold;
-extern thread_local thread_data thrData;
-extern thread_local PerfAppFriendly friendliness;
 
 typedef struct {
 		unsigned long mega_index;
@@ -62,11 +59,6 @@ typedef struct {
 		unsigned cache_index;
 } map_tuple;
 
-typedef enum {
-    E_MAP_INIT_NOT = 0,
-    E_MAP_INIT_WORKING,
-    E_MAP_INIT_DONE,
-} eMapInitStatus;
 
 inline const char * boolToStr(bool p);
 inline size_t alignup(size_t size, size_t alignto) {
@@ -82,15 +74,12 @@ class CacheMapEntry {
                 short num_used_bytes;
 
 		public:
-    short status = 0;
-    int last_allocate = -1;
-    int remain_size = -1;
-    bool freed = false;
-    int last_write = -1;
+    FalseSharingType falseSharingStatus = OBJECT;
+    bool falseSharingLineRecorded[NUM_OF_FALSESHARINGTYPE] = {false};
+    int lastWriterThreadIndex = -1;
+    int lastAllocatingThreadIndex = -1;
+    bool justFreedButRemainedSomeData = false;
     bool sampled = false;
-    bool objfs = false;
-    bool actfs = false;
-    bool pasfs = false;
 				unsigned int getUsedBytes();
 				bool addUsedBytes(unsigned int num_bytes);
 				bool subUsedBytes(unsigned int num_bytes);
@@ -128,7 +117,7 @@ class ShadowMemory {
 				static CacheMapEntry * cache_map_bump_ptr;
 				//static pthread_spinlock_t mega_map_lock;
                 static spinlock mega_map_lock;
-				static eMapInitStatus isInitialized;
+				static bool isInitialized;
 
 		public:
 				//static pthread_spinlock_t cache_map_lock;
@@ -136,11 +125,11 @@ class ShadowMemory {
 				static void doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType);
 				static bool initialize();
 				static inline PageMapEntry ** getMegaMapEntry(unsigned long mega_index);
-				static unsigned cleanupPages(uintptr_t uintaddr, size_t length);
+				static size_t cleanupPages(uintptr_t uintaddr, size_t length);
 				static CacheMapEntry * doCacheMapBumpPointer();
 				static PageMapEntry * doPageMapBumpPointer();
 				static PageMapEntry * getPageMapEntry(unsigned long mega_idx, unsigned page_idx);
-				static unsigned updateObject(void * address, size_t size, bool isFree);
+				static size_t updateObject(void * address, size_t size, bool isFree);
 				static map_tuple getMapTupleByAddress(uintptr_t uintaddr);
 };
 

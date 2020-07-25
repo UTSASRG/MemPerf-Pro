@@ -19,7 +19,6 @@ add_executable(mmprof
         test/alloc.cpp
         test/alloc2.cpp
         test/blackscholes-pthread.cpp
-        test/fighting_with_the_heap.cpp
         test/madvise.cpp
         test/malloc-and-free.cpp
         test/malloc-then-free.cpp
@@ -29,7 +28,6 @@ add_executable(mmprof
         test/threadTest.cpp
         hashfuncs.hh
         hashmap.hh
-        interval.hh
         libmallocprof.cpp
         libmallocprof.h
         list.hh
@@ -38,9 +36,7 @@ add_executable(mmprof
         real.cpp
         real.hh
         recordfunctions.hh
-        selfmap.cpp
-        selfmap.hh
         shadowmemory.cpp
         shadowmemory.hh
         spinlock.hh
-        xthreadx.hh programstatus.cpp programstatus.h definevalues.h cmake-build-debug/mymalloc.cpp cmake-build-debug/mymalloc.h mymalloc.cpp)
+        xthreadx.hh programstatus.cpp programstatus.h definevalues.h cmake-build-debug/mymalloc.cpp cmake-build-debug/mymalloc.h mymalloc.cpp allocatingstatus.cpp allocatingstatus.h threadlocalstatus.cpp threadlocalstatus.h)

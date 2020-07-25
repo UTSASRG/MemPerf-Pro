@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CMakeRunConfigurationManager" shouldGenerate="true" shouldDeleteObsolete="true">
+    <generated />
+  </component>
+  <component name="CMakeSettings">
+    <configurations>
+      <configuration PROFILE_NAME="Debug" CONFIG_NAME="Debug" />
+    </configurations>
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="f07b8e7c-11f2-4582-b7c0-966bf3cde0cb" name="Default Changelist" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/CMakeLists.txt" beforeDir="false" afterPath="$PROJECT_DIR$/src/CMakeLists.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/Makefile" beforeDir="false" afterPath="$PROJECT_DIR$/src/Makefile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/interval.hh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/libmallocprof.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/src/libmallocprof.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/memwaste.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/src/memwaste.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/mymalloc.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/src/mymalloc.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/mymalloc.h" beforeDir="false" afterPath="$PROJECT_DIR$/src/mymalloc.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/programstatus.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/src/programstatus.cpp" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="ClangdSettings">
+    <option name="formatViaClangd" value="false" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="IgnoredFileRootStore">
+    <option name="generatedRoots">
+      <set>
+        <option value="D:\GitHub\mmprof\.idea" />
+      </set>
+    </option>
+  </component>
+  <component name="ProjectId" id="1b8rQjVmGo6T3XRbjoy1OOCWdM5" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showExcludedFiles" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">
+    <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
+    <property name="WebServerToolWindowFactoryState" value="true" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/src" />
+  </component>
+  <component name="SvnConfiguration">
+    <configuration />
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="f07b8e7c-11f2-4582-b7c0-966bf3cde0cb" name="Default Changelist" comment="" />
+      <created>1588024547865</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1588024547865</updated>
+      <workItem from="1588024549168" duration="1395000" />
+      <workItem from="1588026295017" duration="1025000" />
+      <workItem from="1588200470955" duration="907000" />
+      <workItem from="1591305180181" duration="314000" />
+      <workItem from="1591576059688" duration="20000" />
+      <workItem from="1591840603118" duration="35000" />
+      <workItem from="1592079577223" duration="422000" />
+      <workItem from="1593540278482" duration="441000" />
+      <workItem from="1595346821013" duration="71000" />
+    </task>
+    <servers />
+  </component>
+  <component name="WindowStateProjectService">
+    <state x="1075" y="-805" key="FileChooserDialogImpl" timestamp="1595346890745">
+      <screen x="335" y="-1080" width="1920" height="1040" />
+    </state>
+    <state x="493" y="201" key="FileChooserDialogImpl/0.0.1280.760/335.-1080.1920.1040@0.0.1280.760" timestamp="1591840636578" />
+    <state x="1075" y="-805" key="FileChooserDialogImpl/0.0.1280.760/335.-1080.1920.1040@335.-1080.1920.1040" timestamp="1595346890745" />
+    <state x="1447" y="-810" width="647" height="534" key="find.popup" timestamp="1593540705795">
+      <screen x="335" y="-1080" width="1920" height="1040" />
+    </state>
+    <state x="1447" y="-810" width="647" height="534" key="find.popup/0.0.1280.760/335.-1080.1920.1040@335.-1080.1920.1040" timestamp="1593540705795" />
+  </component>
+</project>

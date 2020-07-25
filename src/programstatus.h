@@ -1,49 +1,63 @@
-//
-// Created by 86152 on 2020/5/20.
-//
-
 #ifndef MMPROF_PROGRAMSTATUS_H
 #define MMPROF_PROGRAMSTATUS_H
 
-#include "definevalues.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "mymalloc.h"
+#include "string.h"
+#include "structs.h"
 
 class ProgramStatus {
 private:
-    static bool profilerInitialized;
+    static thread_local bool profilerInitialized;
+    static bool beginConclusion;
+
     static char inputInfoFileName[MAX_FILENAME_LEN];
     static FILE * inputInfoFile;
     static char outputFileName[MAX_FILENAME_LEN];
 
-    static bool allocatorStyleIsBibop;
-    static unsigned int numberOfClassSizes;
-    static size_t classSizes[10000];
+    static size_t middleObjectThreshold;
     static size_t largeObjectThreshold;
+    static size_t largeObjectAlignment;
 
-    static bool selfMapInitialized;
+    static thread_local struct SizeClassSizeAndIndex cacheForGetClassSizeAndIndex;
 
-    static void getInputInfoFileName();
+    static void getInputInfoFileName(char * runningApplicationName);
     static void fopenInputInfoFile();
     static void readAllocatorStyleFromInfo(char*token);
     static void readAllocatorClassSizesFromInfo(char*token);
+    static void readMiddleObjectThresholdFromInfo(char*token);
     static void readLargeObjectThresholdFromInfo(char*token);
+    static void readLargeObjectAlignmentFromInfo(char*token);
     static void readInputInfoFile();
-    static void openInputInfoFile();
+    static void openInputInfoFile(char * runningApplicationName);
     static void openOutputFile();
-
-    static void setSelfMapInitializedTrue();
+    static void printLargeObjectThreshold();
 
 public:
 
     static FILE * outputFile;
-    static void setProfilerInitializedTrue();
+    static bool allocatorStyleIsBibop;
 
-    static bool profilerInitializedIsTrue();
+    static unsigned int numberOfClassSizes;
+    static size_t classSizes[10000];
+
+    static void setProfilerInitializedTrue();
+    static void setBeginConclusionTrue();
+    static void setThreadInitializedTrue();
+
+    static bool profilerNotInitialized();
+    static bool conclusionHasStarted();
     static void checkSystemIs64Bits();
 
-    static void initIO();
-    static void printStackAddr();
+    static void initIO(char * runningApplicationName);
+    static void printOutput();
 
-    static bool selfMapInitializedIsTrue();
+    static bool hasMiddleObjectThreshold();
+    static ObjectSizeType getObjectSizeType(size_t size);
+
+    static struct SizeClassSizeAndIndex getClassSizeAndIndex(size_t size);
 };
 
 #endif //MMPROF_PROGRAMSTATUS_H

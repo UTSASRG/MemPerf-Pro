@@ -1,76 +1,80 @@
-//
-// Created by 86152 on 2020/5/20.
-//
-
 #ifndef MMPROF_MYMALLOC_H
 #define MMPROF_MYMALLOC_H
 
-#define THREAD_LOCAL_PROFILER_MEMORY_SIZE ONE_GB
+#define PROFILER_MEMORY_SIZE ONE_GB
+#define MMAP_PROFILER_MEMORY_SIZE 2*ONE_GB
+#define MMAP_PROFILER_HASH_MEMORY_SIZE 8*ONE_GB
 
 #include "real.hh"
 #include "stdint.h"
 #include "definevalues.h"
+#include "spinlock.hh"
 
 struct ProfilerMemory {
-   // void * startPointer;
-   char startPointer[THREAD_LOCAL_PROFILER_MEMORY_SIZE];
-    void * endPointer = (void *) ((uint64_t)startPointer + THREAD_LOCAL_PROFILER_MEMORY_SIZE);
-    void * overheadPointer = startPointer;
+
+   char startPointer[PROFILER_MEMORY_SIZE];
+    void * endPointer;
+    void * overheadPointer;
     uint64_t objectNum = 0;
+    spinlock lock;
+    bool initialized = false;
 
-    void GetASpaceFromMemory(size_t size) {
-        overheadPointer = (void *) ((uint64_t) overheadPointer + size);
-        objectNum++;
-    }
+    void initialize();
+    void checkAndInitialize();
+    void GetASpaceFromMemory(size_t size);
+    void checkIfMemoryOutOfBound();
+    void * newObjectAddr(size_t size);
+    void * malloc(size_t size);
+    void free(void * addr);
+    bool inMemory(void * addr);
+    bool ifInProfilerMemoryThenFree(void * addr);
+};
 
-    void checkIfMemoryOutOfBound() {
-        if(overheadPointer >= endPointer) {
-            fprintf(stderr, "out of profiler memory\n");
-            abort();
-        }
-    }
+struct MMAPProfilerMemory {
 
-    void * newObjectAddr(size_t size) {
-        return (void *) ((uint64_t)overheadPointer - size);
-    }
+    void * startPointer;
+    void * endPointer;
+    void * overheadPointer;
+    uint64_t objectNum = 0;
+    size_t currentSize;
+    bool initialized = false;
 
-    void * malloc(size_t size) {
-        GetASpaceFromMemory(size);
-        checkIfMemoryOutOfBound();
-        return newObjectAddr(size);
-    }
-
-    void free(void * addr) {
-        if(addr == nullptr) {
-            return;
-        }
-        objectNum--;
-        if(objectNum == 0) {
-            overheadPointer = startPointer;
-        }
-    }
-
-    bool inMemory(void * addr) {
-        return(addr >= startPointer && addr <= endPointer);
-    }
+    void initialize(size_t setSize);
+    void finalize();
+    void GetASpaceFromMemory(size_t size);
+    void checkIfMemoryOutOfBound();
+    void * newObjectAddr(size_t size);
+    void * malloc(size_t size);
+    void free(void * addr);
+    bool inMemory(void * addr);
+    bool ifInProfilerMemoryThenFree(void * addr);
 };
 
 class MyMalloc{
 private:
-    static thread_local ProfilerMemory threadLocalProfilerMemory;
+    static ProfilerMemory profilerMemory;
+    static ProfilerMemory profilerHashMemory;
+    static MMAPProfilerMemory threadLocalProfilerMemory[MAX_THREAD_NUMBER];
+    static MMAPProfilerMemory MMAPProfilerHashMemory[MAX_THREAD_NUMBER];
+    static spinlock debugLock;
 
 public:
 
-    static void * malloc(size_t size) {
-        return threadLocalProfilerMemory.malloc(size);
-    }
+    static void initializeForThreadLocalMemory();
+    static void finalizeForThreadLocalMemory();
+    static bool threadLocalMemoryInitialized();
+    static void initializeForThreadLocalMemory(unsigned int threadIndex);
+    static void finalizeForThreadLocalMemory(unsigned int threadIndex);
+    static bool threadLocalMemoryInitialized(unsigned int threadIndex);
+    static void initializeForMMAPHashMemory();
+    static void finalizeForMMAPHashMemory();
+    static bool MMAPHashMemoryInitialized();
+    static void initializeForMMAPHashMemory(unsigned int threadIndex);
+    static void finalizeForMMAPHashMemory(unsigned int threadIndex);
+    static bool MMAPHashMemoryInitialized(unsigned int threadIndex);
 
-    static void free(void* addr) {
-        return threadLocalProfilerMemory.free(addr);
-    }
-
-    static bool inProfilerMemory(void * addr) {
-        return threadLocalProfilerMemory.inMemory(addr);
-    }
+    static void * malloc(size_t size);
+    static bool ifInProfilerMemoryThenFree(void * addr);
+    static void * hashMalloc(size_t size);
 };
 #endif //MMPROF_MYMALLOC_H

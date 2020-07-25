@@ -10,6 +10,8 @@
 #include "real.hh"
 #include "hashlist.hh"
 #include "definevalues.h"
+#include "mymalloc.h"
+#include "threadlocalstatus.h"
 
 #define LOCK_PROTECTION 1
 
@@ -92,6 +94,10 @@ public:
   HashMap() : _initialized(false) {
   }
 
+  bool initialized() {
+      return _initialized;
+  }
+
   size_t alignup(size_t size, size_t alignto) {
     return (size % alignto == 0) ? size : ((size + (alignto - 1)) & ~(alignto - 1));
   }
@@ -116,6 +122,7 @@ public:
     mapsize = alignup(mapsize, 4096);
 
     _buckets = (struct HashBucket*)RealX::mmap(NULL, mapsize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+//      _buckets = (struct HashBucket*)MyMalloc::hashMalloc(mapsize);
     if(_buckets == NULL) { 
       fprintf(stderr, "Fail to initialize the hash map\n");
       exit(-1);
@@ -150,7 +157,6 @@ public:
     assert(_initialized == true);
     size_t hindex = hashIndex(key, keylen);
     struct HashBucket* first = getHashBucket(hindex);
-    //fprintf(stderr, "find entry key %p hindex %d\n", key, hindex);
     struct Entry* entry = getEntry(first, key, keylen);
     ValueType * ret = NULL;
 
@@ -220,18 +226,13 @@ public:
     ValueType* ret = NULL;
     struct Entry * entry; 
     if(_initialized != true) {
-      fprintf(stderr, "process %d: initialized at  %p hashmap is not true\n", getpid(), &_initialized);
-      exit(0);
-      //  while(1) { ; }
+      fprintf(stderr, "process %d: initialized at  %p hashmap is not true\n", getpid(), this);
+      abort();
     }
 
     assert(_initialized == true);
     size_t hindex = hashIndex(key, keylen);
-    // PRINF("Insert entry:  before inserting\n");
     struct HashBucket* first = getHashBucket(hindex);
-//    fprintf(stderr, "insert key %p index %lx\n", key, hindex);
-
-    // PRINF("Insert entry: key %p\n", key);
 #if LOCK_PROTECTION
     first->Lock();
 #endif
@@ -310,7 +311,8 @@ private:
 
   // Create a new Entry with specified key and value.
   struct Entry* createNewEntry(const KeyType& key, size_t keylen, ValueType value) {
-    struct Entry* entry = (struct Entry*)RealX::malloc(sizeof(struct Entry));
+      struct Entry* entry = (struct Entry*)MyMalloc::hashMalloc(sizeof(struct Entry));
+
     if(entry == NULL) {
       fprintf(stderr, "fail to create entry\n");
       exit(0);
@@ -326,7 +328,6 @@ private:
     struct Entry* entry = createNewEntry(key, keylen, value);
     listInsertTail(&entry->list, &head->list);
     head->count++;
-
     // increment total number
     __atomic_add_fetch(&_totalEntry, 1, __ATOMIC_RELAXED);
     return entry;
@@ -336,7 +337,6 @@ private:
   struct Entry* getEntry(struct HashBucket* first, const KeyType& key, size_t keylen) {
     struct Entry* entry = (struct Entry*)first->getFirstEntry();
     struct Entry* result = NULL;
-
     // Check all _buckets with the same hindex.
     int count = first->count;
     while(count > 0) {
@@ -344,12 +344,10 @@ private:
         result = entry;
         break;
       }
-
       entry = entry->nextEntry();
       count--;
     }
 
-    //fprintf(stderr, "count is %d\n", count);
     return result;
   }
 
@@ -447,35 +445,6 @@ public:
   }
 
   iterator end() { return iterator(NULL, 0, this); }
-
-  void printUtilization() {
-    size_t pos = 0;
-    struct HashBucket* head = NULL;
-    size_t numEntries = 0;
-    size_t bucketsUsed = 0;
-    size_t emptyBuckets = 0;
-    size_t firstBucket = 0;
-
-    while(pos < _bucketsTotal) {
-      head = getHashBucket(pos);
-      if(head->count == 0) {
-        emptyBuckets++;
-      } else {
-        if(firstBucket == 0) {
-          firstBucket = pos;
-        }
-        bucketsUsed++;
-        numEntries += head->count;
-      }
-      //fprintf(stderr, "map %p -> bucket %04zu -> count = %zu\n", this, pos, head->count);
-      //entry = (struct Entry*)head->getFirstEntry();
-      //return iterator(entry, pos, this);
-      pos++;
-    }
-
-    fprintf(stderr, "map %p -> bucketsUsed = %zu , firstBucket = %zu, emptyBuckets = %zu, total entries = %zu\n",
-          this, bucketsUsed, firstBucket, emptyBuckets, numEntries);
-  }
 
 };
 

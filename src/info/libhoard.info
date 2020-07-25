@@ -1,0 +1,5 @@
+style bibop
+class_sizes 10 16 32 64 128 256 512 1024 2048 4096 8192
+middle_object_threshold 256
+large_object_threshold 8192
+large_object_threshold 4096
