@@ -102,18 +102,18 @@ void setupCounting(void) {
 
 	//Pinned: The pinned bit specifies that the counter should always be on
 	//the CPU if at all possible.
-	//pe_fault.pinned = 0;
-
+//	pe_fault.pinned = 0;
+//
 	//Inherit:The inherit bit specifies that this counter should count
 	//events of child tasks as well as the task specified.
 	//WARNING: It is this property that breaks perf_event_open(&pe, 0, -1...)
 	//UPDATE: this is because it does not work with the PERF_FORMAT_GROUP
 	//read format flag.
-	//pe_fault.inherit = 1;
+//	pe_fault.inherit = 1;
 
 	//Exclucive:The exclusive bit specifies that when this counter's group is
 	//on the CPU, it should be the only group using the CPU's counters.
-	//pe_fault.exclusive = 0;
+	pe_fault.exclusive = 0;
 
 	//Exclude_xxx: Do not sample a specified side of events,
 	//user, kernel, or hypevisor

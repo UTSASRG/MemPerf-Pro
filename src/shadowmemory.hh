@@ -78,6 +78,7 @@ class CacheMapEntry {
     bool falseSharingLineRecorded[NUM_OF_FALSESHARINGTYPE] = {false};
     int lastWriterThreadIndex = -1;
     int lastAllocatingThreadIndex = -1;
+    int lastFreeThreadIndex = -1;
     bool justFreedButRemainedSomeData = false;
     bool sampled = false;
 				unsigned int getUsedBytes();
@@ -92,7 +93,7 @@ class PageMapEntry {
 				CacheMapEntry * cache_map_entry;
 
 		public:
-				static bool updateCacheLines(uintptr_t uintaddr, unsigned long mega_index, unsigned page_index, unsigned size, bool isFree);
+				static bool updateCacheLines(uintptr_t uintaddr, unsigned long mega_index, unsigned page_index, size_t size, bool isFree);
 				static CacheMapEntry * getCacheMapEntry(map_tuple tuple);
 				static CacheMapEntry * getCacheMapEntry(unsigned long mega_idx, unsigned page_idx, unsigned cache_idx);
 				CacheMapEntry * getCacheMapEntry(bool mvBumpPtr = true);

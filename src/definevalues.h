@@ -13,8 +13,6 @@
 #define MAPSIZE (MMAP_PAGES * getpagesize())
 #define DATA_MAPSIZE (DATA_MMAP_PAGES * getpagesize())
 #define OVERFLOW_INTERVAL 1
-#define SHADOW_MEM_SIZE (16 * ONE_GB)
-#define WORD_SIZE (sizeof(void *))
 
 #define LOAD_ACCESS 0x81d0
 #define STORE_ACCESS 0x82d0
@@ -52,7 +50,7 @@
 #define MAX_OBJ_NUM 4194304
 #define MAX_LOCK_NUM 512
 
-#define MAX_THREAD_NUMBER 1024
+#define MAX_THREAD_NUMBER 2048
 
 #define RANDOM_PERIOD_FOR_COUNTING_EVENT 100
 
