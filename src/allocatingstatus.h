@@ -1,7 +1,3 @@
-//
-// Created by 86152 on 2020/5/23.
-//
-
 #ifndef MMPROF_ALLOCATIONSTATUS_H
 #define MMPROF_ALLOCATIONSTATUS_H
 
@@ -17,6 +13,7 @@ class AllocatingStatus {
 private:
     static thread_local AllocatingType allocatingType;
     static thread_local AllocationTypeForOutputData allocationTypeForOutputData;
+    static thread_local bool sampledForCountingEvent;
     static thread_local uint64_t cyclesBeforeRealFunction;
     static thread_local uint64_t cyclesAfterRealFunction;
     static thread_local uint64_t cyclesInRealFunction;

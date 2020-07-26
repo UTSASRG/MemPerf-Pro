@@ -18,6 +18,7 @@ class GlobalStatus {
 public:
     static spinlock lock;
     static uint64_t numOfFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
+    static uint64_t numOfSampledCountingFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
     static PerfReadInfo countingEvents[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
     static uint64_t cycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
     static OverviewLockData overviewLockData[NUM_OF_LOCKTYPES];

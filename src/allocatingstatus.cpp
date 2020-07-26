@@ -4,6 +4,7 @@ extern thread_local bool PMUinit;
 
 thread_local AllocatingType AllocatingStatus::allocatingType;
 thread_local AllocationTypeForOutputData AllocatingStatus::allocationTypeForOutputData;
+thread_local bool AllocatingStatus::sampledForCountingEvent;
 thread_local uint64_t AllocatingStatus::cyclesBeforeRealFunction;
 thread_local uint64_t AllocatingStatus::cyclesAfterRealFunction;
 thread_local uint64_t AllocatingStatus::cyclesInRealFunction;
@@ -53,12 +54,15 @@ void AllocatingStatus::updateFreeingTypeBeforeRealFunction(AllocationFunction al
 
 
 void AllocatingStatus::startCountCountingEvents() {
-    getPerfCounts(&countingDataBeforeRealFunction);
-    cyclesBeforeRealFunction = rdtscp();
+    if(sampledForCountingEvent) {
+        getPerfCounts(&countingDataBeforeRealFunction);
+        cyclesBeforeRealFunction = rdtscp();
+    }
 }
 
 void AllocatingStatus::updateAllocatingStatusBeforeRealFunction(AllocationFunction allocationFunction, size_t objectSize) {
     updateAllocatingTypeBeforeRealFunction(allocationFunction, objectSize);
+    sampledForCountingEvent = ThreadLocalStatus::randomProcessForCountingEvent();
     startCountCountingEvents();
 }
 
@@ -66,6 +70,7 @@ void AllocatingStatus::updateFreeingStatusBeforeRealFunction(AllocationFunction 
     updateFreeingTypeBeforeRealFunction(allocationFunction, objectAddress);
     AllocatingStatus::updateMemoryStatusBeforeFree();
     if(allocationFunction == FREE) {
+        sampledForCountingEvent = ThreadLocalStatus::randomProcessForCountingEvent();
         startCountCountingEvents();
     }
 }
@@ -111,10 +116,12 @@ void AllocatingStatus::removeAbnormalCountingEventValues() {
 }
 
 void AllocatingStatus::stopCountCountingEvents() {
-    cyclesAfterRealFunction = rdtscp();
-    getPerfCounts(&countingDataAfterRealFunction);
-    calculateCountingDataInRealFunction();
-    removeAbnormalCountingEventValues();
+    if(sampledForCountingEvent) {
+        cyclesAfterRealFunction = rdtscp();
+        getPerfCounts(&countingDataAfterRealFunction);
+        calculateCountingDataInRealFunction();
+        removeAbnormalCountingEventValues();
+    }
 }
 
 void AllocatingStatus::updateAllocatingStatusAfterRealFunction(void * objectAddress) {
@@ -127,7 +134,6 @@ void AllocatingStatus::updateFreeingStatusAfterRealFunction() {
     stopCountCountingEvents();
     updateFreeingTypeAfterRealFunction();
 }
-int tmp = 0;
 
 void AllocatingStatus::updateMemoryStatusAfterAllocation() {
     allocatingType.allocatingTypeGotFromMemoryWaste = MemoryWaste::allocUpdate(allocatingType.objectSize, allocatingType.objectAddress);
@@ -302,6 +308,7 @@ void AllocatingStatus::addUpOtherFunctionsInfoToThreadLocalData() {
 
 void AllocatingStatus::updateAllocatingInfoToThreadLocalData() {
     setAllocationTypeForOutputData();
+    ThreadLocalStatus::numOfFunctions[allocationTypeForOutputData]++;
     addUpOtherFunctionsInfoToThreadLocalData();
     addUpCountingEventsToThreadLocalData();
     cleanLockFunctionsInfoInAllocatingStatus();
@@ -309,9 +316,12 @@ void AllocatingStatus::updateAllocatingInfoToThreadLocalData() {
 }
 
 void AllocatingStatus::addUpCountingEventsToThreadLocalData() {
-    ThreadLocalStatus::numOfFunctions[allocationTypeForOutputData]++;
-    ThreadLocalStatus::cycles[allocationTypeForOutputData] += cyclesInRealFunction;
-    ThreadLocalStatus::countingEvents[allocationTypeForOutputData].add(countingDataInRealFunction);
+    if(sampledForCountingEvent) {
+        ThreadLocalStatus::numOfSampledCountingFunctions[allocationTypeForOutputData]++;
+        ThreadLocalStatus::cycles[allocationTypeForOutputData] += cyclesInRealFunction;
+        ThreadLocalStatus::countingEvents[allocationTypeForOutputData].add(countingDataInRealFunction);
+    }
+
 }
 
 bool AllocatingStatus::outsideTrackedAllocation() {

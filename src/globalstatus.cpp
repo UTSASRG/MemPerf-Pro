@@ -5,6 +5,7 @@ extern HashMap <void *, DetailLockData, nolock, PrivateHeap> globalLockUsage;
 
 spinlock GlobalStatus::lock;
 uint64_t GlobalStatus::numOfFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
+uint64_t GlobalStatus::numOfSampledCountingFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
 PerfReadInfo GlobalStatus::countingEvents[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
 uint64_t GlobalStatus::cycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
 OverviewLockData GlobalStatus::overviewLockData[NUM_OF_LOCKTYPES];
@@ -20,6 +21,7 @@ void GlobalStatus::globalize() {
     for(int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
         cycles[allocationType] += ThreadLocalStatus::cycles[allocationType];
         numOfFunctions[allocationType] += ThreadLocalStatus::numOfFunctions[allocationType];
+        numOfSampledCountingFunctions[allocationType] += ThreadLocalStatus::numOfSampledCountingFunctions[allocationType];
         countingEvents[allocationType].add(ThreadLocalStatus::countingEvents[allocationType]);
         criticalSectionStatus[allocationType].add(ThreadLocalStatus::criticalSectionStatus[allocationType]);
         for(int syscallType = 0; syscallType < NUM_OF_SYSTEMCALLTYPES; ++syscallType) {
@@ -86,14 +88,14 @@ void GlobalStatus::printNumOfAllocations() {
 
 void GlobalStatus::printCountingEvents() {
     for(int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
-        if(numOfFunctions[allocationType]) {
-            printTitle(allocationTypeOutputTitleString[allocationType], numOfFunctions[allocationType]);
-            fprintf(ProgramStatus::outputFile, "cycles           %20lu   avg %20lu\n", cycles[allocationType], cycles[allocationType]/numOfFunctions[allocationType]);
-            fprintf(ProgramStatus::outputFile, "faults           %20lu   avg %20lu\n", countingEvents[allocationType].faults, countingEvents[allocationType].faults/numOfFunctions[allocationType]);
-            fprintf(ProgramStatus::outputFile, "tlb read misses  %20lu   avg %20lu\n", countingEvents[allocationType].tlb_read_misses, countingEvents[allocationType].tlb_read_misses/numOfFunctions[allocationType]);
-            fprintf(ProgramStatus::outputFile, "tlb write misses %20lu   avg %20lu\n", countingEvents[allocationType].tlb_write_misses, countingEvents[allocationType].tlb_write_misses/numOfFunctions[allocationType]);
-            fprintf(ProgramStatus::outputFile, "cache misses     %20lu   avg %20lu\n", countingEvents[allocationType].cache_misses, countingEvents[allocationType].cache_misses/numOfFunctions[allocationType]);
-            fprintf(ProgramStatus::outputFile, "instructions     %20lu   avg %20lu\n", countingEvents[allocationType].instructions, countingEvents[allocationType].instructions/numOfFunctions[allocationType]);
+        if(numOfSampledCountingFunctions[allocationType]) {
+            printTitle(allocationTypeOutputTitleString[allocationType], numOfSampledCountingFunctions[allocationType]);
+            fprintf(ProgramStatus::outputFile, "cycles           %20lu   avg %20lu\n", cycles[allocationType], cycles[allocationType]/numOfSampledCountingFunctions[allocationType]);
+            fprintf(ProgramStatus::outputFile, "faults           %20lu   avg %20lu\n", countingEvents[allocationType].faults, countingEvents[allocationType].faults/numOfSampledCountingFunctions[allocationType]);
+            fprintf(ProgramStatus::outputFile, "tlb read misses  %20lu   avg %20lu\n", countingEvents[allocationType].tlb_read_misses, countingEvents[allocationType].tlb_read_misses/numOfSampledCountingFunctions[allocationType]);
+            fprintf(ProgramStatus::outputFile, "tlb write misses %20lu   avg %20lu\n", countingEvents[allocationType].tlb_write_misses, countingEvents[allocationType].tlb_write_misses/numOfSampledCountingFunctions[allocationType]);
+            fprintf(ProgramStatus::outputFile, "cache misses     %20lu   avg %20lu\n", countingEvents[allocationType].cache_misses, countingEvents[allocationType].cache_misses/numOfSampledCountingFunctions[allocationType]);
+            fprintf(ProgramStatus::outputFile, "instructions     %20lu   avg %20lu\n", countingEvents[allocationType].instructions, countingEvents[allocationType].instructions/numOfSampledCountingFunctions[allocationType]);
             fprintf(ProgramStatus::outputFile, "\n");
         }
     }

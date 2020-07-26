@@ -29,9 +29,10 @@ void * xthreadx::startThread(void * arg) {
 #ifndef NO_PMU
     initPMU();
 #endif
-//
+
     ThreadLocalStatus::addARunningThread();
     ThreadLocalStatus::getARunningThreadIndex();
+    ThreadLocalStatus::setRandomPeriodForCountingEvent(RANDOM_PERIOD_FOR_COUNTING_EVENT);
 
     ///CPU Binding
 //    cpu_set_t mask;

@@ -43,7 +43,6 @@
      __typeof__ (b) _b = (b); \
      _a < _b ? _a : _b; })
 
-#define CALLSITE_MAXIMUM_LENGTH 20
 #define ENTRY_SIZE 8
 
 #define PAGE_BITS 12
@@ -54,6 +53,8 @@
 #define MAX_LOCK_NUM 512
 
 #define MAX_THREAD_NUMBER 1024
+
+#define RANDOM_PERIOD_FOR_COUNTING_EVENT 100
 
 enum ObjectSizeType{
     SMALL,

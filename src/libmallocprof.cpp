@@ -66,7 +66,10 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
     PMU_init_check();
     RealX::initializer();
     ShadowMemory::initialize();
+
+    ThreadLocalStatus::addARunningThread();
     ThreadLocalStatus::getARunningThreadIndex();
+    ThreadLocalStatus::setRandomPeriodForCountingEvent(RANDOM_PERIOD_FOR_COUNTING_EVENT);
 
     ProgramStatus::initIO(argv[0]);
     lockUsage.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_LOCK_NUM);
