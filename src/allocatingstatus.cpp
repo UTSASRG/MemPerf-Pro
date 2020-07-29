@@ -152,36 +152,36 @@ void AllocatingStatus::setAllocationTypeForOutputData() {
 
         if(allocatingType.objectSizeType == LARGE) {
             if(ThreadLocalStatus::isCurrentlySingleThread()) {
-                allocationTypeForOutputData = SINGAL_THREAD_LARGE_MALLOC;
+                allocationTypeForOutputData = SERIAL_LARGE_MALLOC;
             } else {
-                allocationTypeForOutputData = MULTI_THREAD_LARGE_MALLOC;
+                allocationTypeForOutputData = PARALLEL_LARGE_MALLOC;
             }
         } else if(allocatingType.objectSizeType == SMALL) {
             if(allocatingType.allocatingTypeGotFromMemoryWaste.isReusedObject) {
                 if(ThreadLocalStatus::isCurrentlySingleThread()) {
-                    allocationTypeForOutputData = SINGAL_THREAD_SMALL_REUSED_MALLOC;
+                    allocationTypeForOutputData = SERIAL_SMALL_REUSED_MALLOC;
                 } else {
-                    allocationTypeForOutputData = MULTI_THREAD_SMALL_REUSED_MALLOC;
+                    allocationTypeForOutputData = PARALLEL_SMALL_REUSED_MALLOC;
                 }
             } else {
                 if(ThreadLocalStatus::isCurrentlySingleThread()) {
-                    allocationTypeForOutputData = SINGAL_THREAD_SMALL_NEW_MALLOC;
+                    allocationTypeForOutputData = SERIAL_SMALL_NEW_MALLOC;
                 } else {
-                    allocationTypeForOutputData = MULTI_THREAD_SMALL_NEW_MALLOC;
+                    allocationTypeForOutputData = PARALLEL_SMALL_NEW_MALLOC;
                 }
             }
         } else {
             if(allocatingType.allocatingTypeGotFromMemoryWaste.isReusedObject) {
                 if(ThreadLocalStatus::isCurrentlySingleThread()) {
-                    allocationTypeForOutputData = SINGAL_THREAD_MEDIUM_REUSED_MALLOC;
+                    allocationTypeForOutputData = SERIAL_MEDIUM_REUSED_MALLOC;
                 } else {
-                    allocationTypeForOutputData = MULTI_THREAD_MEDIUM_REUSED_MALLOC;
+                    allocationTypeForOutputData = PARALLEL_MEDIUM_REUSED_MALLOC;
                 }
             } else {
                 if(ThreadLocalStatus::isCurrentlySingleThread()) {
-                    allocationTypeForOutputData = SINGAL_THREAD_MEDIUM_NEW_MALLOC;
+                    allocationTypeForOutputData = SERIAL_MEDIUM_NEW_MALLOC;
                 } else {
-                    allocationTypeForOutputData = MULTI_THREAD_MEDIUM_NEW_MALLOC;
+                    allocationTypeForOutputData = PARALLEL_MEDIUM_NEW_MALLOC;
                 }
             }
         }
@@ -190,54 +190,54 @@ void AllocatingStatus::setAllocationTypeForOutputData() {
 
         if(allocatingType.objectSizeType == LARGE) {
             if(ThreadLocalStatus::isCurrentlySingleThread()) {
-                allocationTypeForOutputData = SINGAL_THREAD_LARGE_FREE;
+                allocationTypeForOutputData = SERIAL_LARGE_FREE;
             } else {
-                allocationTypeForOutputData = MULTI_THREAD_LARGE_FREE;
+                allocationTypeForOutputData = PARALLEL_LARGE_FREE;
             }
         } else if(allocatingType.objectSizeType == SMALL) {
             if(ThreadLocalStatus::isCurrentlySingleThread()) {
-                allocationTypeForOutputData = SINGAL_THREAD_SMALL_FREE;
+                allocationTypeForOutputData = SERIAL_SMALL_FREE;
             } else {
-                allocationTypeForOutputData = MULTI_THREAD_SMALL_FREE;
+                allocationTypeForOutputData = PARALLEL_SMALL_FREE;
             }
         } else {
             if(ThreadLocalStatus::isCurrentlySingleThread()) {
-                allocationTypeForOutputData = SINGAL_THREAD_MEDIUM_FREE;
+                allocationTypeForOutputData = SERIAL_MEDIUM_FREE;
             } else {
-                allocationTypeForOutputData = MULTI_THREAD_MEDIUM_FREE;
+                allocationTypeForOutputData = PARALLEL_MEDIUM_FREE;
             }
         }
 
     } else if(allocatingType.allocatingFunction == CALLOC) {
 
         if(ThreadLocalStatus::isCurrentlySingleThread()) {
-            allocationTypeForOutputData = SINGAL_THREAD_NORMAL_CALLOC;
+            allocationTypeForOutputData = SERIAL_NORMAL_CALLOC;
         } else {
-            allocationTypeForOutputData = MULTI_THREAD_NORMAL_CALLOC;
+            allocationTypeForOutputData = PARALLEL_NORMAL_CALLOC;
         }
 
     } else if(allocatingType.allocatingFunction == REALLOC) {
 
         if(ThreadLocalStatus::isCurrentlySingleThread()) {
-            allocationTypeForOutputData = SINGAL_THREAD_NORMAL_REALLOC;
+            allocationTypeForOutputData = SERIAL_NORMAL_REALLOC;
         } else {
-            allocationTypeForOutputData = MULTI_THREAD_NORMAL_REALLOC;
+            allocationTypeForOutputData = PARALLEL_NORMAL_REALLOC;
         }
 
     } else if(allocatingType.allocatingFunction == POSIX_MEMALIGN) {
 
         if(ThreadLocalStatus::isCurrentlySingleThread()) {
-            allocationTypeForOutputData = SINGAL_THREAD_NORMAL_POSIX_MEMALIGN;
+            allocationTypeForOutputData = SERIAL_NORMAL_POSIX_MEMALIGN;
         } else {
-            allocationTypeForOutputData = MULTI_THREAD_NORMAL_POSIX_MEMALIGN;
+            allocationTypeForOutputData = PARALLEL_NORMAL_POSIX_MEMALIGN;
         }
 
     } else {
 
         if(ThreadLocalStatus::isCurrentlySingleThread()) {
-            allocationTypeForOutputData = SINGAL_THREAD_NORMAL_MEMALIGN;
+            allocationTypeForOutputData = SERIAL_NORMAL_MEMALIGN;
         } else {
-            allocationTypeForOutputData = MULTI_THREAD_NORMAL_MEMALIGN;
+            allocationTypeForOutputData = PARALLEL_NORMAL_MEMALIGN;
         }
 
     }

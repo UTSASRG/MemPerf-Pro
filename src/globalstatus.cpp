@@ -49,12 +49,12 @@ void GlobalStatus::globalize() {
 
 void GlobalStatus::countPotentialMemoryLeakFunctions() {
     for(int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
-        if(allocationType == SINGAL_THREAD_NORMAL_REALLOC || allocationType == MULTI_THREAD_NORMAL_REALLOC) {
+        if(allocationType == SERIAL_NORMAL_REALLOC || allocationType == PARALLEL_NORMAL_REALLOC) {
             continue;
         }
-        if(allocationType == SINGAL_THREAD_SMALL_FREE || allocationType == MULTI_THREAD_SMALL_FREE
-        || allocationType == SINGAL_THREAD_MEDIUM_FREE || allocationType == MULTI_THREAD_MEDIUM_FREE
-        || allocationType == SINGAL_THREAD_LARGE_FREE || allocationType == MULTI_THREAD_LARGE_FREE ) {
+        if(allocationType == SERIAL_SMALL_FREE || allocationType == PARALLEL_SMALL_FREE
+        || allocationType == SERIAL_MEDIUM_FREE || allocationType == PARALLEL_MEDIUM_FREE
+        || allocationType == SERIAL_LARGE_FREE || allocationType == PARALLEL_LARGE_FREE ) {
             potentialMemoryLeakFunctions -= numOfFunctions[allocationType];
         } else {
             potentialMemoryLeakFunctions += numOfFunctions[allocationType];
@@ -227,26 +227,22 @@ void GlobalStatus::printForMatrix() {
         } else {
             fprintf(ProgramStatus::matrixFile, "-1 ");
         }
-    }
 
-    for(int lockType = 0; lockType < NUM_OF_LOCKTYPES; ++lockType) {
-        for(int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
+        uint64_t totalCyclesFromLocks = 0;
+        for(int lockType = 0; lockType < NUM_OF_LOCKTYPES; ++lockType) {
             if(overviewLockData[lockType].numOfLocks > 0 && overviewLockData[lockType].numOfCalls[allocationType] > 0) {
-                fprintf(ProgramStatus::matrixFile, "%lu ", overviewLockData[lockType].totalCycles[allocationType]/numOfFunctions[allocationType]);
-            } else {
-                fprintf(ProgramStatus::matrixFile, "-1 ");
+                totalCyclesFromLocks += overviewLockData[lockType].totalCycles[allocationType]/numOfFunctions[allocationType];
             }
         }
-    }
+        fprintf(ProgramStatus::matrixFile, "%lu ", totalCyclesFromLocks);
 
-    for(int syscallType = 0; syscallType < NUM_OF_SYSTEMCALLTYPES; ++syscallType) {
-        for(int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
+        uint64_t totalCyclesFromSyscalls = 0;
+        for(int syscallType = 0; syscallType < NUM_OF_SYSTEMCALLTYPES; ++syscallType) {
             if(systemCallData[syscallType][allocationType].num > 0) {
-                fprintf(ProgramStatus::matrixFile, "%lu ", systemCallData[syscallType][allocationType].cycles/numOfFunctions[allocationType]);
-            } else {
-                fprintf(ProgramStatus::matrixFile, "-1 ");
+                totalCyclesFromSyscalls += systemCallData[syscallType][allocationType].cycles/numOfFunctions[allocationType];
             }
         }
+        fprintf(ProgramStatus::matrixFile, "%lu ", totalCyclesFromSyscalls);
     }
 
     if(MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage) {
