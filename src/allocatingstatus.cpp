@@ -148,7 +148,6 @@ void AllocatingStatus::updateMemoryStatusBeforeFree() {
 }
 
 void AllocatingStatus::setAllocationTypeForOutputData() {
-
     if(allocatingType.allocatingFunction == MALLOC) {
 
         if(allocatingType.objectSizeType == LARGE) {

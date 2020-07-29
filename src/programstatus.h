@@ -13,6 +13,7 @@ private:
     static thread_local bool profilerInitialized;
     static bool beginConclusion;
 
+    static char matrixFileName[MAX_FILENAME_LEN];
     static char inputInfoFileName[MAX_FILENAME_LEN];
     static FILE * inputInfoFile;
     static char outputFileName[MAX_FILENAME_LEN];
@@ -23,6 +24,7 @@ private:
 
     static thread_local struct SizeClassSizeAndIndex cacheForGetClassSizeAndIndex;
 
+    static void openMatrixFile();
     static void getInputInfoFileName(char * runningApplicationName);
     static void fopenInputInfoFile();
     static void readAllocatorStyleFromInfo(char*token);
@@ -37,6 +39,8 @@ private:
 
 public:
 
+    static bool matrixFileOpened;
+    static FILE * matrixFile;
     static FILE * outputFile;
     static bool allocatorStyleIsBibop;
 

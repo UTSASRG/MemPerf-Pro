@@ -34,13 +34,21 @@ unsigned int MemoryWasteStatus::arrayIndex(unsigned int threadIndex, unsigned in
 void MemoryWasteStatus::initialize() {
     sizeOfArrays = MAX_THREAD_NUMBER * ProgramStatus::numberOfClassSizes * sizeof(uint64_t);
 
-    internalFragment = (int64_t*) MyMalloc::malloc(sizeOfArrays);
-    numOfActiveObjects.numOfAllocatedObjects = (int64_t*) MyMalloc::malloc(sizeOfArrays);
-    numOfActiveObjects.numOfFreelistObjects = (int64_t*) MyMalloc::malloc(sizeOfArrays);
-    numOfAccumulatedOperations.numOfNewAllocations = (uint64_t*) MyMalloc::malloc(sizeOfArrays);
-    numOfAccumulatedOperations.numOfReusedAllocations = (uint64_t*) MyMalloc::malloc(sizeOfArrays);
-    numOfAccumulatedOperations.numOfFree = (uint64_t*) MyMalloc::malloc(sizeOfArrays);
-    blowupFlag = (int64_t*) MyMalloc::malloc(ProgramStatus::numberOfClassSizes * sizeof(uint64_t));
+    internalFragment = (int64_t*) RealX::mmap(NULL, sizeOfArrays, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    numOfActiveObjects.numOfAllocatedObjects = (int64_t*) RealX::mmap(NULL, sizeOfArrays, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    numOfActiveObjects.numOfFreelistObjects = (int64_t*) RealX::mmap(NULL, sizeOfArrays, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    numOfAccumulatedOperations.numOfNewAllocations = (uint64_t*) RealX::mmap(NULL, sizeOfArrays, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    numOfAccumulatedOperations.numOfReusedAllocations = (uint64_t*) RealX::mmap(NULL, sizeOfArrays, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    numOfAccumulatedOperations.numOfFree = (uint64_t*) RealX::mmap(NULL, sizeOfArrays, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    blowupFlag = (int64_t*) RealX::mmap(NULL, ProgramStatus::numberOfClassSizes * sizeof(uint64_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+
+//    internalFragment = (int64_t*) MyMalloc::malloc(sizeOfArrays);
+//    numOfActiveObjects.numOfAllocatedObjects = (int64_t*) MyMalloc::malloc(sizeOfArrays);
+//    numOfActiveObjects.numOfFreelistObjects = (int64_t*) MyMalloc::malloc(sizeOfArrays);
+//    numOfAccumulatedOperations.numOfNewAllocations = (uint64_t*) MyMalloc::malloc(sizeOfArrays);
+//    numOfAccumulatedOperations.numOfReusedAllocations = (uint64_t*) MyMalloc::malloc(sizeOfArrays);
+//    numOfAccumulatedOperations.numOfFree = (uint64_t*) MyMalloc::malloc(sizeOfArrays);
+//    blowupFlag = (int64_t*) MyMalloc::malloc(ProgramStatus::numberOfClassSizes * sizeof(uint64_t));
 
 
     memset(internalFragment, 0, sizeOfArrays);
@@ -68,7 +76,7 @@ void MemoryWasteStatus::debugPrint() {
 
 void MemoryWasteStatus::updateStatus(MemoryWasteStatus newStatus) {
     lock.lock();
-//    newStatus.cleanAbnormalValues();
+    newStatus.cleanAbnormalValues();
     size_t sizeOfCopiedArrays = ThreadLocalStatus::totalNumOfThread * ProgramStatus::numberOfClassSizes * sizeof(uint64_t);
     memcpy(this->internalFragment, newStatus.internalFragment, sizeOfCopiedArrays);
     memcpy(this->numOfActiveObjects.numOfAllocatedObjects, newStatus.numOfActiveObjects.numOfAllocatedObjects, sizeOfCopiedArrays);
@@ -99,13 +107,21 @@ size_t MemoryWasteGlobalStatus::sizeOfArrays;
 void MemoryWasteGlobalStatus::initialize() {
     sizeOfArrays = ProgramStatus::numberOfClassSizes * sizeof(uint64_t);
 
-    internalFragment = (int64_t*) MyMalloc::malloc(sizeOfArrays);
-    numOfActiveObjects.numOfAllocatedObjects = (int64_t*) MyMalloc::malloc(sizeOfArrays);
-    numOfActiveObjects.numOfFreelistObjects = (int64_t*) MyMalloc::malloc(sizeOfArrays);
-    numOfAccumulatedOperations.numOfNewAllocations = (uint64_t*) MyMalloc::malloc(sizeOfArrays);
-    numOfAccumulatedOperations.numOfReusedAllocations = (uint64_t*) MyMalloc::malloc(sizeOfArrays);
-    numOfAccumulatedOperations.numOfFree = (uint64_t*) MyMalloc::malloc(sizeOfArrays);
-    memoryBlowup = (int64_t *) MyMalloc::malloc(sizeOfArrays);
+    internalFragment = (int64_t*) RealX::mmap(NULL, sizeOfArrays, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    numOfActiveObjects.numOfAllocatedObjects = (int64_t*) RealX::mmap(NULL, sizeOfArrays, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    numOfActiveObjects.numOfFreelistObjects = (int64_t*) RealX::mmap(NULL, sizeOfArrays, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    numOfAccumulatedOperations.numOfNewAllocations = (uint64_t*) RealX::mmap(NULL, sizeOfArrays, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    numOfAccumulatedOperations.numOfReusedAllocations = (uint64_t*) RealX::mmap(NULL, sizeOfArrays, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    numOfAccumulatedOperations.numOfFree = (uint64_t*) RealX::mmap(NULL, sizeOfArrays, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    memoryBlowup = (int64_t*) RealX::mmap(NULL, sizeOfArrays, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+
+//    internalFragment = (int64_t*) MyMalloc::malloc(sizeOfArrays);
+//    numOfActiveObjects.numOfAllocatedObjects = (int64_t*) MyMalloc::malloc(sizeOfArrays);
+//    numOfActiveObjects.numOfFreelistObjects = (int64_t*) MyMalloc::malloc(sizeOfArrays);
+//    numOfAccumulatedOperations.numOfNewAllocations = (uint64_t*) MyMalloc::malloc(sizeOfArrays);
+//    numOfAccumulatedOperations.numOfReusedAllocations = (uint64_t*) MyMalloc::malloc(sizeOfArrays);
+//    numOfAccumulatedOperations.numOfFree = (uint64_t*) MyMalloc::malloc(sizeOfArrays);
+//    memoryBlowup = (int64_t *) MyMalloc::malloc(sizeOfArrays);
 
     memset(internalFragment, 0, sizeOfArrays);
 //    memset(numOfActiveObjects.numOfAllocatedObjects, 0, sizeOfArrays);

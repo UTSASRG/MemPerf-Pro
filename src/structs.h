@@ -138,8 +138,8 @@ constexpr char * allocationTypeOutputString[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA] 
         (char*)"single thread memalign            ",
 
         (char*)"multi  thread small new malloc    ",
-        (char*)"multi  thread small reused malloc ",
         (char*)"multi  thread medium new malloc   ",
+        (char*)"multi  thread small reused malloc ",
         (char*)"multi  thread medium reused malloc",
         (char*)"multi  thread large malloc        ",
 
@@ -170,8 +170,8 @@ constexpr char * allocationTypeOutputTitleString[NUM_OF_ALLOCATIONTYPEFOROUTPUTD
         (char*)"SINGLE THREAD MEMALIGN",
 
         (char*)"MULTI THREAD SMALL NEW MALLOC",
-        (char*)"MULTI THREAD SMALL REUSED MALLOC",
         (char*)"MULTI THREAD MEDIUM NEW MALLOC",
+        (char*)"MULTI THREAD SMALL REUSED MALLOC",
         (char*)"MULTI THREAD MEDIUM REUSED MALLOC",
         (char*)"MULTI THREAD LARGE MALLOC",
 

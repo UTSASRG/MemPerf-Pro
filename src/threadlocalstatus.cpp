@@ -18,10 +18,15 @@ thread_local bool ThreadLocalStatus::threadIsStopping = false;
 
 thread_local std::random_device ThreadLocalStatus::randomDevice;
 thread_local uint64_t ThreadLocalStatus::randomPeriodForCountingEvent;
+thread_local bool ThreadLocalStatus::setSampleForCountingEvent;
 
 void ThreadLocalStatus::getARunningThreadIndex() {
     lock.lock();
     runningThreadIndex = totalNumOfThread++;
+    if(runningThreadIndex >= MAX_THREAD_NUMBER) {
+        fprintf(stderr, "increase MAX_THREAD_NUMBER\n");
+        abort();
+    }
     lock.unlock();
 }
 
@@ -43,10 +48,11 @@ bool ThreadLocalStatus::isCurrentlySingleThread() {
 
 void ThreadLocalStatus::setRandomPeriodForCountingEvent(uint64_t randomPeriod) {
     randomPeriodForCountingEvent = randomPeriod;
+    setSampleForCountingEvent = true;
 }
 
 bool ThreadLocalStatus::randomProcessForCountingEvent() {
-    return randomDevice()%randomPeriodForCountingEvent == 0;
+    return !setSampleForCountingEvent || randomDevice()%randomPeriodForCountingEvent == 0;
 }
 
 bool ThreadLocalStatus::randomProcess(uint64_t randomPeriod) {

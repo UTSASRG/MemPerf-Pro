@@ -49,6 +49,9 @@ void GlobalStatus::globalize() {
 
 void GlobalStatus::countPotentialMemoryLeakFunctions() {
     for(int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
+        if(allocationType == SINGAL_THREAD_NORMAL_REALLOC || allocationType == MULTI_THREAD_NORMAL_REALLOC) {
+            continue;
+        }
         if(allocationType == SINGAL_THREAD_SMALL_FREE || allocationType == MULTI_THREAD_SMALL_FREE
         || allocationType == SINGAL_THREAD_MEDIUM_FREE || allocationType == MULTI_THREAD_MEDIUM_FREE
         || allocationType == SINGAL_THREAD_LARGE_FREE || allocationType == MULTI_THREAD_LARGE_FREE ) {
@@ -79,11 +82,11 @@ void GlobalStatus::printNumOfAllocations() {
     printTitle((char*)"ALLOCATION NUM");
     for(int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
         if(numOfFunctions[allocationType]) {
-            fprintf(ProgramStatus::outputFile, "%s                         %20lu\n", allocationTypeOutputString[allocationType], numOfFunctions[allocationType]);
+            fprintf(ProgramStatus::outputFile, "%s           %20lu\n", allocationTypeOutputString[allocationType], numOfFunctions[allocationType]);
         }
     }
     countPotentialMemoryLeakFunctions();
-    fprintf(ProgramStatus::outputFile, "potential memory leak allocations           %20lu\n", potentialMemoryLeakFunctions);
+    fprintf(ProgramStatus::outputFile, "potential memory leak allocations            %20lu\n", potentialMemoryLeakFunctions);
 }
 
 void GlobalStatus::printCountingEvents() {
@@ -112,6 +115,7 @@ void GlobalStatus::printOverviewLocks() {
                     fprintf(ProgramStatus::outputFile, "calls per %s               %20lu\n", allocationTypeOutputString[allocationType], overviewLockData[lockType].numOfCalls[allocationType]/numOfFunctions[allocationType]);
                     fprintf(ProgramStatus::outputFile, "contention calls in %s     %20u\n", allocationTypeOutputString[allocationType], overviewLockData[lockType].numOfCallsWithContentions[allocationType]);
                     fprintf(ProgramStatus::outputFile, "contention calls per %s    %20lu\n", allocationTypeOutputString[allocationType], overviewLockData[lockType].numOfCallsWithContentions[allocationType]/numOfFunctions[allocationType]);
+                    fprintf(ProgramStatus::outputFile, "contention rate in %s    %20u%%\n", allocationTypeOutputString[allocationType], overviewLockData[lockType].numOfCallsWithContentions[allocationType]*100/overviewLockData[lockType].numOfCalls[allocationType]);
                     fprintf(ProgramStatus::outputFile, "cycles in %s               %20lu\n", allocationTypeOutputString[allocationType], overviewLockData[lockType].totalCycles[allocationType]);
                     fprintf(ProgramStatus::outputFile, "cycles per lock in %s      %20lu\n", allocationTypeOutputString[allocationType], overviewLockData[lockType].totalCycles[allocationType]/overviewLockData[lockType].numOfCalls[allocationType]);
                     fprintf(ProgramStatus::outputFile, "cycles per %s              %20lu\n", allocationTypeOutputString[allocationType], overviewLockData[lockType].totalCycles[allocationType]/numOfFunctions[allocationType]);
@@ -130,13 +134,13 @@ void GlobalStatus::printDetailLocks() {
         if(detailLockData->isAnImportantLock()) {
             fprintf(ProgramStatus::outputFile, "lock address %p\n", entryInHashTable.getKey());
             fprintf(ProgramStatus::outputFile, "lock type %s\n\n", lockTypeOutputString[detailLockData->lockType]);
-//            fprintf(ProgramStatus::outputFile, "max contending threads %20u\n", detailLockData->maxNumOfContendingThreads);
             for(int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
                 if(detailLockData->numOfCalls[allocationType] > 0) {
                     fprintf(ProgramStatus::outputFile, "calls in %s                  %20u\n", allocationTypeOutputString[allocationType], detailLockData->numOfCalls[allocationType]);
                     fprintf(ProgramStatus::outputFile, "calls per %s                 %20lu\n", allocationTypeOutputString[allocationType], detailLockData->numOfCalls[allocationType]/numOfFunctions[allocationType]);
                     fprintf(ProgramStatus::outputFile, "calls with contention in %s  %20u\n", allocationTypeOutputString[allocationType], detailLockData->numOfCallsWithContentions[allocationType]);
                     fprintf(ProgramStatus::outputFile, "calls with contention per %s %20lu\n", allocationTypeOutputString[allocationType], detailLockData->numOfCallsWithContentions[allocationType]/numOfFunctions[allocationType]);
+                    fprintf(ProgramStatus::outputFile, "contention rate in %s      %20u%%\n", allocationTypeOutputString[allocationType], detailLockData->numOfCallsWithContentions[allocationType]*100/detailLockData->numOfCalls[allocationType]);
                     fprintf(ProgramStatus::outputFile, "cycles in %s                 %20lu\n", allocationTypeOutputString[allocationType], detailLockData->cycles[allocationType]);
                     fprintf(ProgramStatus::outputFile, "cycles per lock in %s        %20lu\n", allocationTypeOutputString[allocationType], detailLockData->cycles[allocationType]/detailLockData->numOfCalls[allocationType]);
                     fprintf(ProgramStatus::outputFile, "cycles per %s                %20lu\n", allocationTypeOutputString[allocationType], detailLockData->cycles[allocationType]/numOfFunctions[allocationType]);
@@ -213,4 +217,62 @@ void GlobalStatus::printOutput() {
     printFriendliness();
     fflush(ProgramStatus::outputFile);
     fprintf(stderr, "writing completed\n");
+}
+
+void GlobalStatus::printForMatrix() {
+
+    for(int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
+        if(numOfSampledCountingFunctions[allocationType]) {
+            fprintf(ProgramStatus::matrixFile, "%lu ", cycles[allocationType] / numOfSampledCountingFunctions[allocationType]);
+        } else {
+            fprintf(ProgramStatus::matrixFile, "-1 ");
+        }
+    }
+
+    for(int lockType = 0; lockType < NUM_OF_LOCKTYPES; ++lockType) {
+        for(int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
+            if(overviewLockData[lockType].numOfLocks > 0 && overviewLockData[lockType].numOfCalls[allocationType] > 0) {
+                fprintf(ProgramStatus::matrixFile, "%lu ", overviewLockData[lockType].totalCycles[allocationType]/numOfFunctions[allocationType]);
+            } else {
+                fprintf(ProgramStatus::matrixFile, "-1 ");
+            }
+        }
+    }
+
+    for(int syscallType = 0; syscallType < NUM_OF_SYSTEMCALLTYPES; ++syscallType) {
+        for(int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
+            if(systemCallData[syscallType][allocationType].num > 0) {
+                fprintf(ProgramStatus::matrixFile, "%lu ", systemCallData[syscallType][allocationType].cycles/numOfFunctions[allocationType]);
+            } else {
+                fprintf(ProgramStatus::matrixFile, "-1 ");
+            }
+        }
+    }
+
+    if(MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage) {
+        fprintf(ProgramStatus::matrixFile, "%lu%% ", MemoryWaste::totalValue.internalFragment*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage);
+        fprintf(ProgramStatus::matrixFile, "%lu%% ", MemoryWaste::totalValue.memoryBlowup*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage);
+        fprintf(ProgramStatus::matrixFile, "%lu%% ", MemoryWaste::totalValue.externalFragment*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage);
+        fprintf(ProgramStatus::matrixFile, "%lu%% ", 100 - MemoryWaste::totalValue.internalFragment*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage
+                                                     - MemoryWaste::totalValue.memoryBlowup*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage
+                                                     - MemoryWaste::totalValue.externalFragment*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage);
+        fprintf(ProgramStatus::matrixFile, "%lu ", MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage/ONE_KB);
+    } else {
+        fprintf(ProgramStatus::matrixFile, "-1 -1 -1 -1 -1 ");
+    }
+
+    if(friendlinessStatus.numOfSampling / 100) {
+        fprintf(ProgramStatus::matrixFile, "%lu%% ", friendlinessStatus.totalMemoryUsageOfSampledPages/(friendlinessStatus.numOfSampling/100*PAGESIZE));
+        fprintf(ProgramStatus::matrixFile, "%lu%% ", friendlinessStatus.totalMemoryUsageOfSampledCacheLines/(friendlinessStatus.numOfSampling/100*CACHELINE_SIZE));
+    } else {
+        fprintf(ProgramStatus::matrixFile, "-1 -1 ");
+    }
+    if(friendlinessStatus.numOfSampledStoringInstructions > 0) {
+        for(int falseSharingType = 0; falseSharingType < NUM_OF_FALSESHARINGTYPE; ++falseSharingType) {
+            fprintf(ProgramStatus::matrixFile, "%u%% ", friendlinessStatus.numOfSampledFalseSharingInstructions[falseSharingType]*100/friendlinessStatus.numOfSampledStoringInstructions);
+            fprintf(ProgramStatus::matrixFile, "%u%% ", friendlinessStatus.numOfSampledFalseSharingCacheLines[falseSharingType]*100/friendlinessStatus.numOfSampledCacheLines);
+        }
+    } else {
+        fprintf(ProgramStatus::matrixFile, "-1 -1 -1 -1 -1 -1\n\n");
+    }
 }

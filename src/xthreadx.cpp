@@ -3,11 +3,12 @@
 extern thread_local HashMap <void *, DetailLockData, nolock, PrivateHeap> lockUsage;
 
 int xthreadx::thread_create(pthread_t * tid, const pthread_attr_t * attr, threadFunction * fn, void * arg) {
-    thread_t * children = (thread_t *) MyMalloc::malloc(sizeof(thread_t));
+    thread_t * children = (thread_t *) MyMalloc::xthreadMalloc(sizeof(thread_t));
     children->thread = tid;
     children->startArg = arg;
     children->startRoutine = fn;
 
+//            fprintf(stderr, "children %p\n", children);
     int result = RealX::pthread_create(tid, attr, xthreadx::startThread, (void *)children);
 
     if(result) {
@@ -17,6 +18,7 @@ int xthreadx::thread_create(pthread_t * tid, const pthread_attr_t * attr, thread
 }
 
 void * xthreadx::startThread(void * arg) {
+//    fprintf(stderr, "start thread %p\n", arg);
     void * result = nullptr;
     thread_t * current = (thread_t *) arg;
     pthread_attr_t attrs;
@@ -32,7 +34,7 @@ void * xthreadx::startThread(void * arg) {
 
     ThreadLocalStatus::addARunningThread();
     ThreadLocalStatus::getARunningThreadIndex();
-    ThreadLocalStatus::setRandomPeriodForCountingEvent(RANDOM_PERIOD_FOR_COUNTING_EVENT);
+//    ThreadLocalStatus::setRandomPeriodForCountingEvent(RANDOM_PERIOD_FOR_COUNTING_EVENT);
 
     ///CPU Binding
 //    cpu_set_t mask;
@@ -44,8 +46,8 @@ void * xthreadx::startThread(void * arg) {
 //        abort();
 //    }
 
-
-    MyMalloc::initializeForMMAPHashMemory(ThreadLocalStatus::runningThreadIndex);
+    MyMalloc::initializeForThreadLocalXthreadMemory(ThreadLocalStatus::runningThreadIndex);
+    MyMalloc::initializeForThreadLocalHashMemory(ThreadLocalStatus::runningThreadIndex);
     MyMalloc::initializeForThreadLocalMemory();
     lockUsage.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_LOCK_NUM);
     ProgramStatus::setProfilerInitializedTrue();
@@ -66,6 +68,7 @@ void xthreadx::threadExit() {
     GlobalStatus::globalize();
 
     ThreadLocalStatus::subARunningThread();
-    MyMalloc::finalizeForMMAPHashMemory(ThreadLocalStatus::runningThreadIndex);
+    MyMalloc::finalizeForThreadLocalXthreadMemory(ThreadLocalStatus::runningThreadIndex);
+    MyMalloc::finalizeForThreadLocalHashMemory(ThreadLocalStatus::runningThreadIndex);
     MyMalloc::finalizeForThreadLocalMemory();
 }

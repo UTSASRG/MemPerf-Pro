@@ -20,7 +20,6 @@ public:
     static TotalMemoryUsage globalThreadLocalMemoryUsage;
     static TotalMemoryUsage globalMemoryUsage, maxGlobalMemoryUsage;
     static spinlock debugLock;
-
     static void addToMemoryUsage(size_t size, size_t newTouchePageBytes);
     static void subRealSizeFromMemoryUsage(size_t size);
     static void subTotalSizeFromMemoryUsage(size_t size);

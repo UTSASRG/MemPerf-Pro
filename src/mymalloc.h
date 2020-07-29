@@ -1,10 +1,10 @@
 #ifndef MMPROF_MYMALLOC_H
 #define MMPROF_MYMALLOC_H
 
-//#define PROFILER_MEMORY_SIZE ONE_GB
 #define PROFILER_MEMORY_SIZE 2*ONE_GB
 #define MMAP_PROFILER_MEMORY_SIZE 2*ONE_GB
 #define MMAP_PROFILER_HASH_MEMORY_SIZE 8*ONE_GB
+#define MMAP_PROFILER_XTHREAD_MEMORY_SIZE ONE_GB
 
 #include "real.hh"
 #include "stdint.h"
@@ -55,8 +55,10 @@ class MyMalloc{
 private:
     static ProfilerMemory profilerMemory;
     static ProfilerMemory profilerHashMemory;
+    static ProfilerMemory profilerXthreadMemory;
     static MMAPProfilerMemory threadLocalProfilerMemory[MAX_THREAD_NUMBER];
-    static MMAPProfilerMemory MMAPProfilerHashMemory[MAX_THREAD_NUMBER];
+    static MMAPProfilerMemory threadLocalProfilerHashMemory[MAX_THREAD_NUMBER];
+    static MMAPProfilerMemory threadLocalProfilerXthreadMemory[MAX_THREAD_NUMBER];
     static spinlock debugLock;
 
 public:
@@ -67,15 +69,24 @@ public:
     static void initializeForThreadLocalMemory(unsigned int threadIndex);
     static void finalizeForThreadLocalMemory(unsigned int threadIndex);
     static bool threadLocalMemoryInitialized(unsigned int threadIndex);
-    static void initializeForMMAPHashMemory();
-    static void finalizeForMMAPHashMemory();
-    static bool MMAPHashMemoryInitialized();
-    static void initializeForMMAPHashMemory(unsigned int threadIndex);
-    static void finalizeForMMAPHashMemory(unsigned int threadIndex);
-    static bool MMAPHashMemoryInitialized(unsigned int threadIndex);
+
+    static void initializeForThreadLocalHashMemory();
+    static void finalizeForThreadLocalHashMemory();
+    static bool threadLocalHashMemoryInitialized();
+    static void initializeForThreadLocalHashMemory(unsigned int threadIndex);
+    static void finalizeForThreadLocalHashMemory(unsigned int threadIndex);
+    static bool threadLocalHashMemoryInitialized(unsigned int threadIndex);
+
+    static void initializeForThreadLocalXthreadMemory();
+    static void finalizeForThreadLocalXthreadMemory();
+    static bool threadLocalXthreadMemoryInitialized();
+    static void initializeForThreadLocalXthreadMemory(unsigned int threadIndex);
+    static void finalizeForThreadLocalXthreadMemory(unsigned int threadIndex);
+    static bool threadLocalXthreadMemoryInitialized(unsigned int threadIndex);
 
     static void * malloc(size_t size);
     static bool ifInProfilerMemoryThenFree(void * addr);
     static void * hashMalloc(size_t size);
+    static void * xthreadMalloc(size_t size);
 };
 #endif //MMPROF_MYMALLOC_H

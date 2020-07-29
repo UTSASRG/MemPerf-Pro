@@ -42,6 +42,7 @@ public:
     static void printMemoryUsage();
     static void printFriendliness();
     static void printOutput();
+    static void printForMatrix();
 };
 
 #endif //SRC_GLOBALSTATUS_H

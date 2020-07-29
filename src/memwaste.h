@@ -104,11 +104,12 @@ private:
     static thread_local SizeClassSizeAndIndex currentSizeClassSizeAndIndex;
     static MemoryWasteStatus currentStatus, recordStatus;
     static MemoryWasteGlobalStatus globalStatus;
-    static MemoryWasteTotalValue totalValue;
     static HashLocksSet hashLocksSet;
 
 
 public:
+
+    static MemoryWasteTotalValue totalValue;
 
     static void initialize();
 

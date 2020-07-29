@@ -27,6 +27,7 @@ public:
 
     static thread_local std::random_device randomDevice;
     static thread_local uint64_t randomPeriodForCountingEvent;
+    static thread_local bool setSampleForCountingEvent;
 
     static void getARunningThreadIndex();
     static void addARunningThread();

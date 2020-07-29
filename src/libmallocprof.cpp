@@ -56,6 +56,7 @@ void exitHandler() {
 
     GlobalStatus::globalize();
     GlobalStatus::printOutput();
+    GlobalStatus::printForMatrix();
 
 
 }
@@ -69,13 +70,14 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
 
     ThreadLocalStatus::addARunningThread();
     ThreadLocalStatus::getARunningThreadIndex();
-    ThreadLocalStatus::setRandomPeriodForCountingEvent(RANDOM_PERIOD_FOR_COUNTING_EVENT);
+//    ThreadLocalStatus::setRandomPeriodForCountingEvent(RANDOM_PERIOD_FOR_COUNTING_EVENT);
 
     ProgramStatus::initIO(argv[0]);
     lockUsage.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_LOCK_NUM);
     globalLockUsage.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_LOCK_NUM);
     MemoryWaste::initialize();
-    MyMalloc::initializeForMMAPHashMemory(ThreadLocalStatus::runningThreadIndex);
+    MyMalloc::initializeForThreadLocalXthreadMemory(ThreadLocalStatus::runningThreadIndex);
+    MyMalloc::initializeForThreadLocalHashMemory(ThreadLocalStatus::runningThreadIndex);
     MyMalloc::initializeForThreadLocalMemory();
     ProgramStatus::setProfilerInitializedTrue();
 

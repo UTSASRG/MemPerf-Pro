@@ -2,6 +2,7 @@
 
 thread_local bool ProgramStatus::profilerInitialized;
 bool ProgramStatus::beginConclusion;
+char ProgramStatus::matrixFileName[MAX_FILENAME_LEN];
 char ProgramStatus::inputInfoFileName[MAX_FILENAME_LEN];
 FILE * ProgramStatus::inputInfoFile;
 char ProgramStatus::outputFileName[MAX_FILENAME_LEN];
@@ -10,6 +11,8 @@ size_t ProgramStatus::largeObjectThreshold;
 size_t ProgramStatus::largeObjectAlignment;
 thread_local struct SizeClassSizeAndIndex ProgramStatus::cacheForGetClassSizeAndIndex;
 
+bool ProgramStatus::matrixFileOpened;
+FILE * ProgramStatus::matrixFile;
 FILE * ProgramStatus::outputFile;
 bool ProgramStatus::allocatorStyleIsBibop;
 unsigned int ProgramStatus::numberOfClassSizes;
@@ -37,6 +40,19 @@ void ProgramStatus::checkSystemIs64Bits() {
     }
 }
 
+void ProgramStatus::openMatrixFile() {
+    extern char * program_invocation_name;
+    snprintf(matrixFileName, MAX_FILENAME_LEN, "/home/jinzhou/parsec/matrix/matrix.txt");
+    fprintf(stderr, "%s\n", matrixFileName);
+    matrixFile = fopen(matrixFileName, "a+");
+    if(matrixFile == nullptr) {
+        perror("error: unable to open matrix file to write");
+        abort();
+    }
+    matrixFileOpened = true;
+    fprintf(matrixFile, "%s ", program_invocation_name);
+}
+
 void ProgramStatus::getInputInfoFileName(char * runningApplicationName) {
     char * runningAllocatorName = strrchr(runningApplicationName, '-')+1;
     if(strcmp(runningAllocatorName, "libc228") == 0) {
@@ -59,6 +75,11 @@ void ProgramStatus::getInputInfoFileName(char * runningApplicationName) {
         fprintf(stderr, "Info File Location Unknown\n");
         abort();
     }
+
+    if(ProgramStatus::matrixFileOpened) {
+        fprintf(matrixFile, "%s ", runningAllocatorName);
+    }
+
 }
 
 void ProgramStatus::fopenInputInfoFile() {
@@ -148,18 +169,20 @@ void ProgramStatus::openInputInfoFile(char * runningApplicationName) {
 
 void ProgramStatus::openOutputFile() {
     extern char * program_invocation_name;
-	snprintf(ProgramStatus::outputFileName, MAX_FILENAME_LEN, "%s_libmallocprof_%d_main_thread.txt", program_invocation_name, getpid());
-//    snprintf(ProgramStatus::outputFileName, MAX_FILENAME_LEN, "/home/jinzhou/parsec/records/%s_libmallocprof_%d_main_thread.txt", program_invocation_name, getpid());
-    fprintf(stderr, "%s\n", ProgramStatus::outputFileName);
+//	snprintf(outputFileName, MAX_FILENAME_LEN, "%s_libmallocprof_%d_main_thread.txt", program_invocation_name, getpid());
+    snprintf(outputFileName, MAX_FILENAME_LEN, "/home/jinzhou/parsec/records/%s_libmallocprof_%d_main_thread.txt", program_invocation_name, getpid());
+    fprintf(stderr, "%s\n", outputFileName);
 
-    ProgramStatus::outputFile = fopen(ProgramStatus::outputFileName, "w");
-    if(ProgramStatus::outputFile == NULL) {
+    outputFile = fopen(outputFileName, "w");
+    if(outputFile == nullptr) {
         perror("error: unable to open output file to write");
         abort();
     }
+
 }
 
 void ProgramStatus::initIO(char * runningApplicationName) {
+    ProgramStatus::openMatrixFile();
     ProgramStatus::openInputInfoFile(runningApplicationName);
     ProgramStatus::openOutputFile();
 }
@@ -180,10 +203,8 @@ ObjectSizeType ProgramStatus::getObjectSizeType(size_t size) {
     if(size > largeObjectThreshold) {
         return LARGE;
     }
-    if(hasMiddleObjectThreshold()) {
-        if(size >=  middleObjectThreshold) {
-            return MEDIUM;
-        }
+    if(hasMiddleObjectThreshold() && size >=  middleObjectThreshold) {
+        return MEDIUM;
     }
     return SMALL;
 }
