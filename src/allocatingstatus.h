@@ -6,11 +6,14 @@
 #include "memoryusage.h"
 #include "threadlocalstatus.h"
 #include "structs.h"
+#include "predictor.h"
 
 
 class AllocatingStatus {
 
 private:
+    static thread_local bool firstAllocation[10000];
+    static thread_local bool firstFree[10000];
     static thread_local AllocatingType allocatingType;
     static thread_local AllocationTypeForOutputData allocationTypeForOutputData;
     static thread_local bool sampledForCountingEvent;
@@ -200,6 +203,8 @@ private:
     static void cleanSyscallsInfoInAllocatingStatus();
 
 public:
+    static bool isFirstFunction();
+
     static void updateAllocatingStatusBeforeRealFunction(AllocationFunction allocationFunction, size_t objectSize);
     static void updateFreeingStatusBeforeRealFunction(AllocationFunction allocationFunction, void * objectAddress);
 
@@ -207,6 +212,7 @@ public:
     static void updateFreeingStatusAfterRealFunction();
 
     static void updateAllocatingInfoToThreadLocalData();
+    static void updateAllocatingInfoToPredictor();
     static bool outsideTrackedAllocation();
     static void addOneSyscallToSyscallData(SystemCallTypes systemCallTypes, uint64_t cycles);
 

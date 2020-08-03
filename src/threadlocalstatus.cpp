@@ -14,8 +14,6 @@ thread_local CriticalSectionStatus ThreadLocalStatus::criticalSectionStatus[NUM_
 thread_local SystemCallData ThreadLocalStatus::systemCallData[NUM_OF_SYSTEMCALLTYPES][NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
 thread_local FriendlinessStatus ThreadLocalStatus::friendlinessStatus;
 
-thread_local bool ThreadLocalStatus::threadIsStopping = false;
-
 thread_local std::random_device ThreadLocalStatus::randomDevice;
 thread_local uint64_t ThreadLocalStatus::randomPeriodForCountingEvent;
 thread_local bool ThreadLocalStatus::setSampleForCountingEvent;
@@ -46,12 +44,23 @@ bool ThreadLocalStatus::isCurrentlySingleThread() {
     return totalNumOfRunningThread <= 1;
 }
 
+bool ThreadLocalStatus::fromSerialToParallel() {
+    return totalNumOfRunningThread == 2;
+}
+
+bool ThreadLocalStatus::fromParallelToSerial() {
+    return totalNumOfRunningThread == 1;
+}
+
 void ThreadLocalStatus::setRandomPeriodForCountingEvent(uint64_t randomPeriod) {
     randomPeriodForCountingEvent = randomPeriod;
     setSampleForCountingEvent = true;
 }
 
 bool ThreadLocalStatus::randomProcessForCountingEvent() {
+    if(AllocatingStatus::isFirstFunction()) {
+        return false;
+    }
     return !setSampleForCountingEvent || randomDevice()%randomPeriodForCountingEvent == 0;
 }
 

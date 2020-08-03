@@ -267,7 +267,7 @@ AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(size_t size, void * ad
     if(currentStatus.blowupFlag[currentSizeClassSizeAndIndex.classSizeIndex] > 0 ) {
         currentStatus.blowupFlag[currentSizeClassSizeAndIndex.classSizeIndex]--;
     }
-    return AllocatingTypeGotFromMemoryWaste{reused, currentSizeClassSizeAndIndex.classSize};
+    return AllocatingTypeGotFromMemoryWaste{reused, currentSizeClassSizeAndIndex.classSize, currentSizeClassSizeAndIndex.classSizeIndex};
 }
 
 
@@ -278,7 +278,7 @@ AllocatingTypeWithSizeGotFromMemoryWaste MemoryWaste::freeUpdate(void* address) 
     ObjectStatus* status = objStatusMap.find(address, sizeof(void *));
     if(status == nullptr) {
         hashLocksSet.unlock(address);
-        return AllocatingTypeWithSizeGotFromMemoryWaste{0, AllocatingTypeGotFromMemoryWaste{false, 0}};
+        return AllocatingTypeWithSizeGotFromMemoryWaste{0, AllocatingTypeGotFromMemoryWaste{false, 0, 0}};
     }
     currentSizeClassSizeAndIndex = status->sizeClassSizeAndIndex;
 
@@ -292,7 +292,7 @@ AllocatingTypeWithSizeGotFromMemoryWaste MemoryWaste::freeUpdate(void* address) 
 
     currentStatus.blowupFlag[currentSizeClassSizeAndIndex.classSizeIndex]++;
     return AllocatingTypeWithSizeGotFromMemoryWaste{currentSizeClassSizeAndIndex.size,
-                                                    AllocatingTypeGotFromMemoryWaste{false, currentSizeClassSizeAndIndex.classSize}};
+                                                    AllocatingTypeGotFromMemoryWaste{false, currentSizeClassSizeAndIndex.classSize, currentSizeClassSizeAndIndex.classSizeIndex}};
 }
 
 void MemoryWaste::compareMemoryUsageAndRecordStatus(TotalMemoryUsage newTotalMemoryUsage) {

@@ -23,8 +23,6 @@ public:
     static thread_local SystemCallData systemCallData[NUM_OF_SYSTEMCALLTYPES][NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
     static thread_local FriendlinessStatus friendlinessStatus;
 
-    static thread_local bool threadIsStopping;
-
     static thread_local std::random_device randomDevice;
     static thread_local uint64_t randomPeriodForCountingEvent;
     static thread_local bool setSampleForCountingEvent;
@@ -33,6 +31,8 @@ public:
     static void addARunningThread();
     static void subARunningThread();
     static bool isCurrentlySingleThread();
+    static bool fromSerialToParallel();
+    static bool fromParallelToSerial();
 
     static void setRandomPeriodForCountingEvent(uint64_t randomPeriod);
     static bool randomProcessForCountingEvent();

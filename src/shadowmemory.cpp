@@ -36,10 +36,9 @@ bool ShadowMemory::initialize() {
 	// Allocate 4KB-to-cacheline region
 	if((void *)(page_map_begin = (PageMapEntry *)mmap((void *)PAGE_MAP_START, PAGE_MAP_SIZE,
 									PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0)) == MAP_FAILED) {
-    fprintf(stderr, "errno %d\n", ENOMEM);
-			fprintf(stderr, "mmap of global page map failed. Adddress %lx size %lx error (%d) %s\n", PAGE_MAP_START, PAGE_MAP_SIZE, errno, strerror(errno));
-      while(1) { ;} 
-//			abort();			// temporary, remove and replace with return false after testing
+        fprintf(stderr, "errno %d\n", ENOMEM);
+        fprintf(stderr, "mmap of global page map failed. Adddress %lx size %lx error (%d) %s\n", PAGE_MAP_START, PAGE_MAP_SIZE, errno, strerror(errno));
+        abort();			// temporary, remove and replace with return false after testing
 	}
 	page_map_end = page_map_begin + MAX_PAGE_MAP_ENTRIES;
 	page_map_bump_ptr = page_map_begin;

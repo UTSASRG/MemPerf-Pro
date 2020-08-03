@@ -42,7 +42,8 @@ void ProgramStatus::checkSystemIs64Bits() {
 
 void ProgramStatus::openMatrixFile() {
     extern char * program_invocation_name;
-    snprintf(matrixFileName, MAX_FILENAME_LEN, "/home/jinzhou/parsec/matrix/matrix.txt");
+//    snprintf(matrixFileName, MAX_FILENAME_LEN, "matrix.txt");
+    snprintf(matrixFileName, MAX_FILENAME_LEN, "/home/jinzhou/parsec/matrix/count.txt");
     fprintf(stderr, "%s\n", matrixFileName);
     matrixFile = fopen(matrixFileName, "a+");
     if(matrixFile == nullptr) {
@@ -182,7 +183,7 @@ void ProgramStatus::openOutputFile() {
 }
 
 void ProgramStatus::initIO(char * runningApplicationName) {
-    ProgramStatus::openMatrixFile();
+//    ProgramStatus::openMatrixFile();
     ProgramStatus::openInputInfoFile(runningApplicationName);
     ProgramStatus::openOutputFile();
 }

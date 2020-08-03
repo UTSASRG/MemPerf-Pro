@@ -16,6 +16,7 @@ struct SizeClassSizeAndIndex {
 struct AllocatingTypeGotFromMemoryWaste {
     bool isReusedObject;
     size_t objectClassSize;
+    uint64_t objectClassSizeIndex;
 };
 
 struct AllocatingTypeWithSizeGotFromMemoryWaste {

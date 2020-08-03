@@ -6,6 +6,7 @@ SRCS = 	\
 		memsample.c \
 		memwaste.cpp \
 		mymalloc.cpp \
+		predictor.cpp \
 		programstatus.cpp \
 		real.cpp \
 		shadowmemory.cpp \
@@ -25,6 +26,7 @@ INCS = \
 		memsample.h \
 		memwaste.h \
 		mymalloc.h \
+		predictor.h \
 		privateheap.hh \
 		programstatus.h \
 		real.hh \

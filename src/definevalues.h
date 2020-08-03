@@ -1,7 +1,3 @@
-//
-// Created by 86152 on 2020/5/20.
-//
-
 #ifndef MMPROF_DEFINEVALUES_H
 #define MMPROF_DEFINEVALUES_H
 

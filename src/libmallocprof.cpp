@@ -1,12 +1,3 @@
-/**
- * @file libmallocprof.cpp
- * @author Tongping Liu <http://www.cs.utsa.edu/~tongpingliu>
- * @author Sam Silvestro <sam.silvestro@utsa.edu>
- * @author Richard Salcedo <kbgagt@gmail.com>
- * @author Stefen Ramirez <stfnrmz0@gmail.com>
- */
-
-
 #include "libmallocprof.h"
 
 
@@ -49,6 +40,8 @@ extern "C" {
 void exitHandler() {
 
     ProgramStatus::setBeginConclusionTrue();
+    Predictor::outsideCyclesStop();
+    Predictor::stopSerial();
 	#ifndef NO_PMU
 	stopSampling();
     stopCounting();
@@ -79,6 +72,7 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
     MyMalloc::initializeForThreadLocalXthreadMemory(ThreadLocalStatus::runningThreadIndex);
     MyMalloc::initializeForThreadLocalHashMemory(ThreadLocalStatus::runningThreadIndex);
     MyMalloc::initializeForThreadLocalMemory();
+    Predictor::outsideCycleStart();
     ProgramStatus::setProfilerInitializedTrue();
 
     atexit(exitHandler);
@@ -108,11 +102,13 @@ extern "C" {
         if(!AllocatingStatus::outsideTrackedAllocation() || ProgramStatus::conclusionHasStarted()) {
             return RealX::malloc(sz);
         }
-
+        Predictor::outsideCyclesStop();
         AllocatingStatus::updateAllocatingStatusBeforeRealFunction(MALLOC, sz);
 		void * object = RealX::malloc(sz);
         AllocatingStatus::updateAllocatingStatusAfterRealFunction(object);
         AllocatingStatus::updateAllocatingInfoToThreadLocalData();
+        AllocatingStatus::updateAllocatingInfoToPredictor();
+        Predictor::outsideCycleStart();
         return object;
 
 	}
@@ -130,12 +126,13 @@ extern "C" {
         if(!AllocatingStatus::outsideTrackedAllocation() || ProgramStatus::conclusionHasStarted()) {
             return RealX::calloc(nelem, elsize);
         }
-
+        Predictor::outsideCyclesStop();
         AllocatingStatus::updateAllocatingStatusBeforeRealFunction(CALLOC, nelem*elsize);
         void * object = RealX::calloc(nelem, elsize);
         AllocatingStatus::updateAllocatingStatusAfterRealFunction(object);
         AllocatingStatus::updateAllocatingInfoToThreadLocalData();
-
+        AllocatingStatus::updateAllocatingInfoToPredictor();
+        Predictor::outsideCycleStart();
 		return object;
 	}
 
@@ -151,11 +148,13 @@ extern "C" {
             return RealX::free(ptr);
         }
 
-
+        Predictor::outsideCyclesStop();
         AllocatingStatus::updateFreeingStatusBeforeRealFunction(FREE, ptr);
         RealX::free(ptr);
         AllocatingStatus::updateFreeingStatusAfterRealFunction();
         AllocatingStatus::updateAllocatingInfoToThreadLocalData();
+        AllocatingStatus::updateAllocatingInfoToPredictor();
+        Predictor::outsideCycleStart();
     }
 
 
@@ -174,6 +173,7 @@ extern "C" {
             return RealX::realloc(ptr, sz);
         }
 
+        Predictor::outsideCyclesStop();
 		if(ptr) {
             AllocatingStatus::updateFreeingStatusBeforeRealFunction(REALLOC, ptr);
         }
@@ -181,6 +181,8 @@ extern "C" {
         void * object = RealX::realloc(ptr, sz);
         AllocatingStatus::updateAllocatingStatusAfterRealFunction(object);
         AllocatingStatus::updateAllocatingInfoToThreadLocalData();
+        AllocatingStatus::updateAllocatingInfoToPredictor();
+        Predictor::outsideCycleStart();
         return object;
 	}
 
@@ -193,10 +195,13 @@ extern "C" {
         if(!AllocatingStatus::outsideTrackedAllocation() || ProgramStatus::profilerNotInitialized() || ProgramStatus::conclusionHasStarted()) {
             return RealX::posix_memalign(memptr, alignment, size);
         }
+        Predictor::outsideCyclesStop();
         AllocatingStatus::updateAllocatingStatusBeforeRealFunction(POSIX_MEMALIGN, size);
         int retval = RealX::posix_memalign(memptr, alignment, size);
         AllocatingStatus::updateAllocatingStatusAfterRealFunction(*memptr);
         AllocatingStatus::updateAllocatingInfoToThreadLocalData();
+        AllocatingStatus::updateAllocatingInfoToPredictor();
+        Predictor::outsideCycleStart();
         return retval;
 
 	}
@@ -214,11 +219,13 @@ extern "C" {
      if(!AllocatingStatus::outsideTrackedAllocation() || ProgramStatus::conclusionHasStarted()) {
          return RealX::memalign(alignment, size);
      }
-
+     Predictor::outsideCyclesStop();
      AllocatingStatus::updateAllocatingStatusBeforeRealFunction(MEMALIGN, size);
      void * object = RealX::memalign(alignment, size);
      AllocatingStatus::updateAllocatingStatusAfterRealFunction(object);
      AllocatingStatus::updateAllocatingInfoToThreadLocalData();
+     AllocatingStatus::updateAllocatingInfoToPredictor();
+     Predictor::outsideCycleStart();
      return object;
 	}
 }
@@ -496,29 +503,19 @@ int pthread_spin_unlock(pthread_spinlock_t *lock) {
 }
 
 extern "C" {
-////////	 PTHREAD_CREATE
-int pthread_create(pthread_t * tid, const pthread_attr_t * attr,
-                   void *(*start_routine)(void *), void * arg) {
+int pthread_create(pthread_t * tid, const pthread_attr_t * attr, void *(*start_routine)(void *), void * arg) {
     if (!realInitialized) RealX::initializer();
     int result = xthreadx::thread_create(tid, attr, start_routine, arg);
     return result;
 }
-//
-//// PTHREAD_JOIN
-int pthread_join(pthread_t thread, void **retval) {
+
+int pthread_join(pthread_t thread, void ** retval) {
     if (!realInitialized) RealX::initializer();
-
-    int result = RealX::pthread_join (thread, retval);
-
-    return result;
+    return xthreadx::thread_join(thread, retval);
 }
 
-// PTHREAD_EXIT
 void pthread_exit(void *retval) {
-    if(!realInitialized) {
-        RealX::initializer();
-    }
-
+    if(!realInitialized) RealX::initializer();
     RealX::pthread_exit(retval);
     __builtin_unreachable();
 }

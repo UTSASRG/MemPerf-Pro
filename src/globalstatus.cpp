@@ -215,13 +215,23 @@ void GlobalStatus::printOutput() {
     MemoryUsage::printOutput();
     MemoryWaste::printOutput();
     printFriendliness();
+    Predictor::printOutput();
     fflush(ProgramStatus::outputFile);
     fprintf(stderr, "writing completed\n");
 }
 
 void GlobalStatus::printForMatrix() {
 
+    if(!ProgramStatus::matrixFileOpened) {
+        return;
+    }
+
     for(int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
+        if(allocationType == PARALLEL_MEDIUM_FREE || allocationType == PARALLEL_MEDIUM_NEW_MALLOC || allocationType == PARALLEL_MEDIUM_REUSED_MALLOC
+        || allocationType == SERIAL_MEDIUM_FREE || allocationType == SERIAL_MEDIUM_NEW_MALLOC || allocationType == SERIAL_MEDIUM_REUSED_MALLOC) {
+            continue;
+        }
+        fprintf(ProgramStatus::matrixFile, "%lu ", numOfSampledCountingFunctions[allocationType]);
         if(numOfSampledCountingFunctions[allocationType]) {
             fprintf(ProgramStatus::matrixFile, "%lu ", cycles[allocationType] / numOfSampledCountingFunctions[allocationType]);
         } else {
@@ -235,7 +245,6 @@ void GlobalStatus::printForMatrix() {
             }
         }
         fprintf(ProgramStatus::matrixFile, "%lu ", totalCyclesFromLocks);
-
         uint64_t totalCyclesFromSyscalls = 0;
         for(int syscallType = 0; syscallType < NUM_OF_SYSTEMCALLTYPES; ++syscallType) {
             if(systemCallData[syscallType][allocationType].num > 0) {
@@ -269,6 +278,8 @@ void GlobalStatus::printForMatrix() {
             fprintf(ProgramStatus::matrixFile, "%u%% ", friendlinessStatus.numOfSampledFalseSharingCacheLines[falseSharingType]*100/friendlinessStatus.numOfSampledCacheLines);
         }
     } else {
-        fprintf(ProgramStatus::matrixFile, "-1 -1 -1 -1 -1 -1\n\n");
+        fprintf(ProgramStatus::matrixFile, "-1 -1 -1 -1 -1 -1");
     }
+
+    fprintf(ProgramStatus::matrixFile, "\n");
 }

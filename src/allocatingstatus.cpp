@@ -1,7 +1,7 @@
 #include "allocatingstatus.h"
 
-extern thread_local bool PMUinit;
-
+thread_local bool AllocatingStatus::firstAllocation[10000];
+thread_local bool AllocatingStatus::firstFree[10000];
 thread_local AllocatingType AllocatingStatus::allocatingType;
 thread_local AllocationTypeForOutputData AllocatingStatus::allocationTypeForOutputData;
 thread_local bool AllocatingStatus::sampledForCountingEvent;
@@ -17,6 +17,23 @@ thread_local AllocatingStatus::OverviewLockDataInAllocatingStatus AllocatingStat
 thread_local AllocatingStatus::CriticalSectionStatusInAllocatingStatus AllocatingStatus::criticalSectionStatus;
 thread_local SystemCallData AllocatingStatus::systemCallData[NUM_OF_SYSTEMCALLTYPES];
 spinlock AllocatingStatus::debugLock;
+
+bool AllocatingStatus::isFirstFunction() {
+    if(allocatingType.allocatingFunction == MALLOC) {
+        if(!firstAllocation[allocatingType.allocatingTypeGotFromMemoryWaste.objectClassSizeIndex]) {
+            firstAllocation[allocatingType.allocatingTypeGotFromMemoryWaste.objectClassSizeIndex] = true;
+            return true;
+        }
+    }
+    if(allocatingType.allocatingFunction == FREE) {
+        if(!firstFree[allocatingType.allocatingTypeGotFromMemoryWaste.objectClassSizeIndex]) {
+            firstFree[allocatingType.allocatingTypeGotFromMemoryWaste.objectClassSizeIndex] = true;
+            return true;
+        }
+    }
+    return false;
+}
+
 
 void AllocatingStatus::QueueOfDetailLockDataInAllocatingStatus::writingNewDataInTheQueue(DetailLockData * addressOfHashLockData) {
     if(queueTail == LENGTH_OF_QUEUE-1) {
@@ -313,6 +330,12 @@ void AllocatingStatus::updateAllocatingInfoToThreadLocalData() {
     cleanLockFunctionsInfoInAllocatingStatus();
     cleanSyscallsInfoInAllocatingStatus();
 }
+
+void AllocatingStatus::updateAllocatingInfoToPredictor() {
+    Predictor::numOfFunctions[allocationTypeForOutputData]++;
+    Predictor::functionCycles[allocationTypeForOutputData] += cyclesInRealFunction;
+}
+
 
 void AllocatingStatus::addUpCountingEventsToThreadLocalData() {
     if(sampledForCountingEvent) {

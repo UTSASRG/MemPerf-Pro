@@ -3,22 +3,28 @@
 extern thread_local HashMap <void *, DetailLockData, nolock, PrivateHeap> lockUsage;
 
 int xthreadx::thread_create(pthread_t * tid, const pthread_attr_t * attr, threadFunction * fn, void * arg) {
+    ThreadLocalStatus::addARunningThread();
+    if(ThreadLocalStatus::fromSerialToParallel()) {
+        Predictor::outsideCyclesStop();
+        Predictor::stopSerial();
+    }
+
     thread_t * children = (thread_t *) MyMalloc::xthreadMalloc(sizeof(thread_t));
     children->thread = tid;
     children->startArg = arg;
     children->startRoutine = fn;
 
-//            fprintf(stderr, "children %p\n", children);
+
     int result = RealX::pthread_create(tid, attr, xthreadx::startThread, (void *)children);
 
     if(result) {
         fprintf(stderr, "error: pthread_create failed: %s\n", strerror(errno));
     }
+
     return result;
 }
 
 void * xthreadx::startThread(void * arg) {
-//    fprintf(stderr, "start thread %p\n", arg);
     void * result = nullptr;
     thread_t * current = (thread_t *) arg;
     pthread_attr_t attrs;
@@ -32,7 +38,6 @@ void * xthreadx::startThread(void * arg) {
     initPMU();
 #endif
 
-    ThreadLocalStatus::addARunningThread();
     ThreadLocalStatus::getARunningThreadIndex();
 //    ThreadLocalStatus::setRandomPeriodForCountingEvent(RANDOM_PERIOD_FOR_COUNTING_EVENT);
 
@@ -50,6 +55,7 @@ void * xthreadx::startThread(void * arg) {
     MyMalloc::initializeForThreadLocalHashMemory(ThreadLocalStatus::runningThreadIndex);
     MyMalloc::initializeForThreadLocalMemory();
     lockUsage.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_LOCK_NUM);
+    Predictor::outsideCycleStart();
     ProgramStatus::setProfilerInitializedTrue();
     result = current->startRoutine(current->startArg);
     threadExit();
@@ -59,7 +65,8 @@ void * xthreadx::startThread(void * arg) {
 
 void xthreadx::threadExit() {
 
-    ThreadLocalStatus::threadIsStopping = true;
+    Predictor::outsideCyclesStop();
+    Predictor::threadEnd();
 
 #ifndef NO_PMU
     stopSampling();
@@ -67,8 +74,17 @@ void xthreadx::threadExit() {
 #endif
     GlobalStatus::globalize();
 
-    ThreadLocalStatus::subARunningThread();
     MyMalloc::finalizeForThreadLocalXthreadMemory(ThreadLocalStatus::runningThreadIndex);
     MyMalloc::finalizeForThreadLocalHashMemory(ThreadLocalStatus::runningThreadIndex);
     MyMalloc::finalizeForThreadLocalMemory();
+}
+
+int xthreadx::thread_join(pthread_t thread, void ** retval) {
+    int result = RealX::pthread_join (thread, retval);
+    ThreadLocalStatus::subARunningThread();
+    if(ThreadLocalStatus::fromParallelToSerial()) {
+        Predictor::stopParallel();
+        Predictor::outsideCycleStart();
+    }
+    return result;
 }
