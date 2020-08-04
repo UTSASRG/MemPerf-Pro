@@ -1,0 +1,233 @@
+\section{Allocators}
+
+\subsection{Hoard}
+
+Hoard has multiple sizes: size is less than 256 (Tiny), between 256 and 8192 (Small), between 8193 and 112120064 (Big: larger than 1G). If it is larger than 112120064, we will call it as Huge. 
+%If size is less than 256, then the management is Array<NumBins, HL::SLList> _localHeap.
+The code can be seen in ThreadLocalAllocationBuffer (LargestObject is 256). The corresponding code can be seen as: 
+\begin{lstlisting}
+Hoard::ThreadLocalAllocationBuffer<11, &HL::bins<Hoard::HoardSuperblockHeader<HL::SpinLockType, 65536, Hoard::SmallHeap>, 65536>::getSizeClass, &HL::bins<Hoard::HoardSuperblockHeader<HL::SpinLockType, 65536, Hoard::SmallHeap>, 65536>::getClassSize, 256ul, 2097152ul, Hoard::HoardSuperblock<HL::SpinLockType, 65536, Hoard::SmallHeap>, 65536u, Hoard::HoardHeapType>::malloc
+
+Array<NumBins, HL::SLList> _localHeap;
+
+void * malloc (size_t sz) {
+  if (sz <= LargestObject) {
+    auto c = getSizeClass (sz);
+    auto * ptr = _localHeap(c).get();
+    if (ptr) {
+      _localHeapBytes -= getClassSize (c);         
+      return ptr;
+    }
+
+    // Now get the memory from our parent.
+    auto * ptr = _parentHeap->malloc (sz);
+    return ptr;	
+ }
+}
+\end{lstlisting}
+
+For the type of Tiny objects, the LocalHeapThreshold is 2M (what this means? if not larger than 2M, then we do not clear??), while SuperblockSize is 64K. If the size class is less than 256 bytes, then every size class is power of 2. So 16 bytes will be the class 1, 32 will be 2, 64 will be 3, 128 will be 4, and 256 will be 5. If it can't get the object, then it will also get the memory from its parent. It seems that the tiny object will utilize the BIBOP-style that objects with different size class will be located in a different page. In fact, I believe that the size of each block will 0x10000. That will be 64K. But it seems that it is not using the cache warmup mechanism of TcMalloc. If an object cannot be found in the array heap, then it will get it from its parent heap. 
+
+The parent heap is declaimed as HoardHeapType, where the definition can be seen in hoardtlab.h. As follows: \\
+
+\begin{lstlisting}
+class HoardHeapType: 
+     public HeapManager<TheLockType, HoardHeap<MaxThreads, NumHeaps>> 
+\end{lstlisting}
+
+That is, HoardHeapType is defined as HeapManager<TheLockType, HoardHeap<MaxThreads, NumHeaps>>. Among it, TheLockType will be HL::SpinLockType, as defined in hoard/hoardheap.h. MaxThreads is 2048 threads, and NumHeaps is 128, where all of these are defined in hoardconstants.h. However, there is no definition of malloc function in HeapManager. That indicates that malloc will invoke HoardHeap<MaxThreads, NumHeaps>::malloc() instead. 
+HoardHeap is defined in hoardheap.h again, and the definition is as follows: 
+\begin{lstlisting}
+class HoardHeap :
+    public HL::ANSIWrapper<
+    IgnoreInvalidFree<
+      HL::HybridHeap<Hoard::BigObjectSize,
+         ThreadPoolHeap<N, NH, Hoard::PerThreadHoardHeap>,
+         Hoard::BigHeap> > > 	
+\end{lstlisting}
+
+
+This gives Hoard the capability to control the execution again. Since HoardHeap does not have the malloc() function, then the control will go to HL::ANSIWrapper. That is, unless we can find an object in ArrayHeap, every allocation will invoke ANSIWrapper::malloc(). Therefore, if the size is larger than 2G, the allocation will fail. If the size is less than 16, it will use 16 as the minimum size class. In this class, the allocation will satisfied by IgnoreInvalidFree class. However, IgnoreInvalidFree does not have the malloc() function either, it will call HL::HybridHeap<Hoard::BigObjectSize,
+         ThreadPoolHeap<N, NH, Hoard::PerThreadHoardHeap>,
+         Hoard::BigHeap> instead. In HrbridHeap, both small allocation and big allocation will be satisfied from the same heap. 
+         Basically, the allocation will be as follows:
+         
+\begin{lstlisting}
+if (sz <= BigSize) {
+   ptr = SmallHeap::malloc (sz);
+} else {
+   ptr = slowPath (sz);
+}
+\end{lstlisting}
+
+Here, BigSize is defined as 8192. But it is very weird that we can't put any printing in this function. Otherwise, the program will crash. 
+
+\subsubsection{Small Heap}
+For small heap, it will invoke ThreadPoolHeap<N, NH, Hoard::PerThreadHoardHeap> to get the object. That is, if the size is less than 8192, it will call ThreadPoolHeap::malloc(). 
+
+
+\begin{lstlisting}
+template <int NumThreads,
+      int NumHeaps,
+      class PerThreadHeap_>
+  class ThreadPoolHeap : public PerThreadHeap_ {	
+   inline PerThreadHeap& getHeap (void) {
+      auto tid = HL::CPUInfo::getThreadId();
+      auto heapno = _tidMap(tid & NumThreadsMask);
+      return _heap(heapno);
+    }
+
+    inline void * malloc (size_t sz) {
+      return getHeap().malloc (sz);
+    }
+}
+\end{lstlisting}
+
+Now we will utilize PerThreadHeap concept here. For getThreadId(), it will invoke the pthread\_self() system call. In total, there are 128 heaps. The heap definition is at Array<MaxHeaps, PerThreadHeap>. Since PerThreadHeap is defined as Hoard::PerThreadHoardHeap, as detailed in the following (in hoardheap.h). That is, we will utilize the tid to get one per-thread heap, and then allocated from the per-thread heap. 
+
+\begin{lstlisting}
+  class PerThreadHoardHeap :
+    public RedirectFree<LockMallocHeap<SmallHeap>,
+      SmallSuperblockType>	
+\end{lstlisting}
+
+For LockMallocHeap, the definition will be like this. 
+\begin{lstlisting}
+class LockMallocHeap : public Heap {
+  public:
+    MALLOC_FUNCTION INLINE void * malloc (size_t sz) {
+      std::lock_guard<Heap> l (*this);
+      return Heap::malloc (sz);
+    }	
+\end{lstlisting}
+
+Basically, this just places a lock before doing the allocation. The real heap is actually SmallHeap as defined in the following:
+
+\begin{lstlisting}
+class SmallHeap : 
+    public ConformantHeap<
+    HoardManager<AlignedSuperblockHeap<TheLockType, SUPERBLOCK_SIZE, MmapSource>,
+     TheGlobalHeap,
+     SmallSuperblockType,
+     EMPTINESS_CLASSES,
+     TheLockType,
+     hoardThresholdFunctionClass,
+     SmallHeap> >	
+\end{lstlisting}
+
+Sine ConformantHeap has no definition of malloc, we will invoke HoardManager::malloc() instead. When there is no existing objects in the heap, it will call slowPathMalloc() to do the allocation. slowPathMalloc() actually has a for loop, when the allocation is not successful, it will invoke getAnotherSuperblock() to get a super block. Then the next loop will get one object any way. Then all objects in this super block will be utilized to satisfy requests with the same size. That is, it will invoke MmapSource to get one super block. That is, for every size class of each thread, it will get 64K for each block. 
+
+For deallocation, we will get the superblock for each object at first by invoking SuperHeap::getSuperblock(). It may force every superblock allocation to be aligned to 64 K. Then it could just use the header as the management for the superblock. For each object, it will utilize the Array<NumBins, BinManager> to manage small objects.  In total, there are 11 bins for 64K superblock size. 
+
+But Array do not have free function. In fact, it is defined in BinManager, which is ManageOneSuperblock<OrganizedByEmptiness>. That is, for every operation, it will call OrganizedByEmptiness::SuperblockType. Since OrganizedByEmptiness is defined by EmptyClass<SuperblockType, EmptinessClasses> OrganizedByEmptiness, then the actual free will invoke SmallSuperblockType::free(), and the allocation will invoke SmallSuperblockType::malloc(). But based on the definition, typedef HoardSuperblock<TheLockType, SUPERBLOCK\_SIZE, SmallHeap> SmallSuperblockType. That is, in the end, it will call  HoardSuperblock::free to free the object (\_header.free). \_header is defined as Hoard::HoardSuperblockHeader<LockType, SuperblockSize, HeapType> Header. That is, it will insert the object into the freelist ( a singular linklist). If all objects in the superblock are freed, then we will call clear operation. Basically, it will utilize the original data as the pointers for the linklist.  
+
+For each allocation, it will simply utilize the bump pointer to allocate an object. 
+
+HoardManager will also check the threshold. It will free up a superblock if we've crossed the emptiness threshold. Based on the definition, it will actually invoke hoardThresholdFunctionClass() to check the threshold. Then we will remove a superblock and give it to the 'parent heap', which is a global heap for such size class.  
+     
+\begin{lstlisting}
+bool function (int u, int a, size_t objSize)
+    {
+      auto r = (u < 0.909 * a)) 
+      && ((u < a - (2 * 64K) / objSize));
+      return r;
+    }
+\end{lstlisting}
+
+
+\subsubsection{Big Heap}
+
+The big heap is defined as following:
+\begin{lstlisting}
+Hoard::ThreadLocalAllocationBuffer<11, &HL::bins<Hoard::HoardSuperblockHeader<HL::SpinLockType, 65536, Hoard::SmallHeap>, 65536>::getSizeClass, &HL::bins<Hoard::HoardSuperblockHeader<HL::SpinLockType, 65536, Hoard::SmallHeap>, 65536>::getClassSize, 256ul, 2097152ul, Hoard::HoardSuperblock<HL::SpinLockType, 65536, Hoard::SmallHeap>, 65536u, Hoard::HoardHeapType>::malloc
+
+  class HoardHeapType :
+    public HeapManager<TheLockType, HoardHeap<MaxThreads, NumHeaps> > {
+  };
+
+  class HoardHeap :
+    public HL::ANSIWrapper<
+    IgnoreInvalidFree<
+      HL::HybridHeap<Hoard::BigObjectSize,
+         ThreadPoolHeap<N, NH, Hoard::PerThreadHoardHeap>,
+         Hoard::BigHeap> > >
+
+typedef HL::ThreadHeap<64, HL::LockedHeap<TheLockType,
+              ThresholdSegHeap<25,      // % waste
+                   1048576, // at least 1MB in any heap
+                   80,      // num size classes
+                   GeometricSizeClass<20>::size2class,
+                   GeometricSizeClass<20>::class2size,
+                   GeometricSizeClass<20>::MaxObjectSize,
+                   AdaptHeap<DLList, objectSource>,
+                   objectSource> > >
+  bigHeapType;
+  
+  class BigHeap : public bigHeapType {};
+  
+  typedef HoardSuperblock<TheLockType, SUPERBLOCK_SIZE, BigHeap> BigSuperblockType;
+	
+\end{lstlisting}
+
+
+Basically, if the size is larger than 256, then we will invoke the HoardHeapType::malloc() in class ThreadLocalAllocationBuffer. For HoardHeapType::malloc(), it will invoke HoardHeap --> HL::ANSIWrapper --> HL::HybridHeap::malloc. 
+In HybridHeap, if the size is larger than 8192, we will invoke bm.malloc. In fact, it will invoke Hoard::BigHeap::malloc(). That is, it will actually bigHeapType::malloc(). 
+
+For ThreadHeap, there are 64 heaps. The source code is as follows:
+
+\begin{lstlisting}
+ void * malloc (size_t sz) {
+   auto tid = Modulo<NumHeaps>::mod (CPUInfo::getThreadId());
+   return getHeap(tid)->malloc (sz);
+}	
+\end{lstlisting}
+
+For PerThreadHeap, it actually invokes LockedHeap (defined in lockedheap.h). In fact, this will invoke ThresholdSegHeap based on the definition of bigHeapType.  If the size is 9000, then the sizeClass is 29, and maxSize of this sizeClass is 10240. NumBins is 80, which is corresponding to more than 1G's allocation (with the size of 112120064). 
+\begin{lstlisting}
+if (sizeClass >= NumBins) {
+  return BigHeap::malloc (maxSz);
+} else {
+  void * ptr = _heap[sizeClass].malloc (maxSz);
+  if (ptr == NULL) {
+    fprintf(stderr, "sz %d maxSz %ld\n", sz, maxSz);
+    return BigHeap::malloc (maxSz);
+  }	
+\end{lstlisting}
+
+ That is, it will invoke \_heap[sizeClass].malloc for normal large allocations (between 8192 and 112120064). 
+class objectSource : public AddHeaderHeap<BigSuperblockType,
+              SUPERBLOCK\_SIZE,
+              MmapSource> {};
+
+
+
+
+
+For less than 256, we will use per thread cache bins, if the cache has some objects. The code can be seen in in superblocks/tlab.h, around line 90. If not, then we will allocate some objects from per size class. That is, if multiple threads are accessing some objects, they will allocate from the same super-block.  If there is no objects for this size class, then we will \_parentHeap->malloc() to grab one superblock. However, if the objects are not available, we will use per-thread heap. For each size class, we will have a super-block (64K). 
+
+Between 256 and 8192, we will also use power of 2 as size classes. But we will use PerThreadHeap. In fact, the allocation will be called by HoardManager::slowPathMalloc(). In this function, it will call \_otherBins(binIndex).malloc (sz). (Array<NumBins, BinManager>). But in the end, it will call ThreadPoolHeap<N, NH, Hoard::PerThreadHoardHeap>. That is, it will actually call PerThreadHoardHeap::malloc. In the end, it will get a superblock (64K) for each thread.  In fact, there maybe exists a bug for size between 256 and 8192. \todo{Even if there are freed objects in the same size class for the same heap, then the allocation will be satisfied from never-allocated objects (maybe just the last item is not reused). Also, it seems that a thread will get objects in a different thread. For instance, the main thread has two freed objects, then one of them can be utilized by the child thread. But the main thread will not get objects that are just deallocated by its child threads. That is very weird, different threads have the same heapno after the mod operation. But the objects cannot be re-used immediately.  }
+
+If the size is larger than 8192, we will use a class size, and we will only get the object with the size class without using the per-thread heap. For normal large allocations, the code is defined defined in thresholdsegheap.h around line 50.  In stead, we will just use class objectSource : public AddHeaderHeap<BigSuperblockType, AdaptHeap<DLList, objectSource>. Also, it has an issue here, by using the size class incorrectly. For instance, if the allocation is 9000, then the size class will be 10240. However, the actual object will be aligned to 3 pages. Then we will actually invoke mmap() to allocate 3 pages (not aligning to super block).
+
+
+For big objects, it will handle differently. All big objects will be utilized the same parameters to control, such as cLive, maxLive, and maxFraction. If the size class is larger than 1GB, then the object will be deallocated immediately. Otherwise, the deallocation will be based on the following code. That is, it will check whether the current live is larger than 80\%. mFraction is defined as 25\% and threshSlop is defined as 1MB. That is, if the currently-using memory is less than 1MB, then the freed object will never be returned to the OS. That may indicates that we are not actively using big objects.  If the live memory  (currently using) is less than 4 times of previous maximum live memory, then we will return the memory back to the OS. That is, we are not aggressively using more memory recently, so that we could return all available memory back. There are two issues here. First, why it does not return the memory based on the available memory of the heap? Second, why it will clear all memory in the freelists, why not save some of them for future allocation?
+
+\begin{lstlisting}
+ cLive -= sz;
+       
+ _heap[cl].free (ptr);
+ bool thresh = mLive > mFraction * cLive;
+ if ((cLive > threshSlop) && thresh && !cleared)
+ {
+    // Clear the heap.
+    for (int i = 0; i < NumBins; i++) {
+      _heap[i].clear();
+    }
+    // We won't clear again until we reach maxlive again.
+    cleared = true;
+    mLive = cLive;
+ }
+\end{lstlisting}
+
+
+

@@ -1,0 +1,51 @@
+The memory consumption of \MP{} can be seen in Table~\ref{tab:memory_consumption}. In total, \MP{} introduces 53.6\% memory overhead. It has different behaviors for applications with large footprint (with the original memory consumption larger than 100 MB) and with small footprint. The average memory overhead for applications with large footprint is 179\%, but it is $45\times$ for small footprint applications. For instance, for \texttt{freqmine} and \texttt{linear\_regression}, \MP{} only adds $68.1\%$ and $2.3\%$ separately. 
+
+Based on our analysis, \MP{} will introduce 
+more memory overhead for the Linux allocators than other allocations. The basic reason is that the default Linux allocator has 8265
+size classes. For each size class, \MP{} allocates 13 words to store per-thread information, and supports up to 1024 threads. These information include the counter for internal fragmentation and active allocations. \MP{} utilizes the per-thread counters in order to reduce the contention caused by using the global counters, trading the memory overhead for the performance. Although this mechanism may seem to use a large amount of memory. However, the real memory usage may be less than that, since the OS will only allocate physical memory on demand. 
+
+In addition to that, \MP{} also adds an additional hash table to store all allocated objects. Therefore, for an application with a large number of new allocations, \MP{} also adds significant memory overhead to storing the data of each object. \texttt{canneal} is such an example, as shown in Table~\ref{table:characteristics}. \MP{} imposes around $2\times$ memory overhead, due to 8.7 million new allocations. 
+ 
+Overall, we think that the memory overhead of \MP{} is totally acceptable, given that \MP{} could identify multiple issues that existing profilers cannot do. 
+
+%Some applications have higher ratios of memory overheads with MMProf and ones without MMProf, such as vips. One reason is that MMProf uses some per-size variables to calculate memory distributions.  For our evaluation, Glibc-2.28 has 8265 classes, therefore MMProf's per-size variable would cost more space than running other allocators. Meanwhile, vips has lower scale than other applications, which make its ratios look high.But actually, for applications with medium scales(more than 100MB memory overhead when running alone), our evaluation shows MMProf's memory overheads ratio are always lower than 3.
+
+\begin{table}[!tp]  
+\centering
+    \caption{Memory consumption of \MP{}\label{tab:memory_consumption}}
+\begin{tabular}{l r r }    
+\hline    
+Applications &  Default  & With \MP{}\\  \hline  
+ \multicolumn{3}{c}{Small Footprint (> 100MB)}		\\
+blackscholes & 628681 & 1011985 \\ 
+canneal & 872241 & 1934704 \\ 
+dedup & 1194100 & 2393497 \\ 
+facesim & 322069 & 714020 \\ 
+ferret & 125513 & 346869 \\ 
+fluidanimate & 231920 & 558696 \\ 
+freqmine & 3513129 & 5904754 \\ 
+histogram & 1376432 & 1509108 \\ 
+larson & 345286 & 435672 \\ 
+linear\_regression & 5830226 & 5963057 \\ 
+pca & 502980 & 827778 \\ 
+raytrace & 1317749 & 2198701 \\ 
+reverse\_index & 1147026 & 1842073 \\ 
+streamcluster & 114602 & 315606 \\ 
+string\_match & 1636385 & 1769350 \\ 
+threadtest & 524588 & 1142986 \\ 
+x264 & 1029130 & 1178769 \\  \hline
+\textbf{Total} &  20712057 & 30047625 \\ 
+\textbf{Average} &  & 179\% \\  \hline
+ \multicolumn{3}{c}{Small Footprint (< 100MB)}		\\
+bodytrack & 33070 & 213612 \\ 
+cache-scratch & 3450 & 152028 \\ 
+cache-thrash & 3896 & 155926 \\ 
+kmeans & 22538 & 203553 \\ 
+matrix\_multiply & 50161 & 197894 \\ 
+swaptions & 7676 & 160146 \\ 
+vips & 94312 & 283276 \\ 
+word\_count & 3129 & 729449 \\ \hline 
+\textbf{Total} & 218232&  2095884 \\   
+\textbf{Average} & & 4506\%  \\ \hline
+   \end{tabular}
+   \end{table}
