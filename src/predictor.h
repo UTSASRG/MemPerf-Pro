@@ -18,8 +18,8 @@ public:
 //                                                                                       -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
 //    static constexpr int64_t replacedFunctionCycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA] = {0, 0, 0, 0, 0, 0, 0, 0, -1, -1, -1, -1,
 //                                                                                           0, 0, 0, 0, 0, 0, 0, 0, -1, -1, -1, -1};
-    static constexpr int64_t replacedFunctionCycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA] = {199, -1, -1, -1, -1, 467, -1, -1, -1, -1, -1, -1,
-                                                                                           8403, -1, 196, -1, -1, 137, -1, -1, -1, -1, -1, -1}; ///tcmalloc-swaptions
+    static constexpr int64_t replacedFunctionCycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA] = {191, -1, 64, -1, 9821, 113, -1, 11681, -1, -1, -1, -1,
+                                                                                           577, -1, 369, -1, 2758, 234, -1, 2924, -1, -1, -1, -1}; ///tcmalloc
     static thread_local uint64_t outsideStartCycle;
     static thread_local uint64_t outsideStopCycle;
     static thread_local uint64_t outsideCycle;

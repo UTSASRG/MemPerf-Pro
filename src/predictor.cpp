@@ -39,6 +39,10 @@ void Predictor::threadEnd() {
             threadReplacedCycle[ThreadLocalStatus::runningThreadIndex] += numOfFunctions[allocationType] * replacedFunctionCycles[allocationType];
         }
     }
+//    fprintf(stderr, "thread end %lu %lu %lu: %lu %lu %lu %lu %lu\n",
+//            ThreadLocalStatus::runningThreadIndex, threadCycle[ThreadLocalStatus::runningThreadIndex], threadReplacedCycle[ThreadLocalStatus::runningThreadIndex],
+//            functionCycles[12], functionCycles[14], functionCycles[16], functionCycles[17], functionCycles[19]);
+
 }
 
 void Predictor::stopSerial() {
@@ -52,8 +56,8 @@ void Predictor::stopSerial() {
             replacedCriticalCycle += numOfFunctions[allocationType] * replacedFunctionCycles[allocationType];
         }
     }
+//    fprintf(stderr, "start parallel %lu %lu\n", criticalCycle, replacedCriticalCycle);
     cleanStageData();
-    fprintf(stderr, "stop serial: %lu, %lu\n", criticalCycle, replacedCriticalCycle);
 }
 
 void Predictor::stopParallel() {
@@ -67,8 +71,8 @@ void Predictor::stopParallel() {
     }
     criticalCycle += criticalStageCycle;
     replacedCriticalCycle += criticalReplacedStageCycle;
+//    fprintf(stderr, "stop parallel %lu %lu\n", criticalCycle, replacedCriticalCycle);
     cleanStageData();
-    fprintf(stderr, "stop parallel: %lu, %lu\n", criticalCycle, replacedCriticalCycle);
 }
 
 void Predictor::printOutput() {
@@ -80,6 +84,11 @@ void Predictor::printOutput() {
     }
     fprintf(ProgramStatus::outputFile, "original critical cycle %20lu\n", criticalCycle);
     fprintf(ProgramStatus::outputFile, "predicted critical cycle%20lu\n", replacedCriticalCycle);
+    if(criticalCycle) {
+        fprintf(ProgramStatus::outputFile, "ratio %3lu%%\n", replacedCriticalCycle*100/criticalCycle);
+    } else {
+        fprintf(ProgramStatus::outputFile, "ratio 100%%\n");
+    }
     if(criticalCycle && replacedCriticalCycle < criticalCycle) {
         fprintf(ProgramStatus::outputFile, "speed up %3lu%%\n", (criticalCycle-replacedCriticalCycle)*100/replacedCriticalCycle);
     } else {

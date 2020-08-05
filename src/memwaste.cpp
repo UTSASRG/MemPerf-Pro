@@ -315,31 +315,9 @@ void MemoryWaste::printOutput() {
 
     GlobalStatus::printTitle((char*)"MEMORY WASTE");
 
-    for (unsigned int classSizeIndex = 0; classSizeIndex < ProgramStatus::numberOfClassSizes; ++classSizeIndex) {
-
-        if(globalStatus.internalFragment[classSizeIndex]/ONE_KB == 0 && globalStatus.memoryBlowup[classSizeIndex]/ONE_KB == 0) {
-            continue;
-        }
-        if(classSizeIndex != ProgramStatus::numberOfClassSizes - 1) {
-            fprintf(ProgramStatus::outputFile, "size: %10lu\t\t\t", ProgramStatus::classSizes[classSizeIndex]);
-        } else {
-            fprintf(ProgramStatus::outputFile, "large object:   \t\t\t");
-        }
-
-        fprintf(ProgramStatus::outputFile, "internal fragmentation: %10ldK\t\t\tmemory blowup: %10luK\t\t\t"
-                        "active alloc: %10ld\t\t\tfreelist objects: %10ld\t\t\t"
-                        "new allocated: %10lu\t\t\treused allocated: %10lu\t\t\tfreed: %10lu\n",
-                        globalStatus.internalFragment[classSizeIndex]/ONE_KB, globalStatus.memoryBlowup[classSizeIndex]/ONE_KB,
-                globalStatus.numOfActiveObjects.numOfAllocatedObjects[classSizeIndex],
-                globalStatus.numOfActiveObjects.numOfFreelistObjects[classSizeIndex],
-                globalStatus.numOfAccumulatedOperations.numOfNewAllocations[classSizeIndex],
-                globalStatus.numOfAccumulatedOperations.numOfReusedAllocations[classSizeIndex],
-                globalStatus.numOfAccumulatedOperations.numOfFree[classSizeIndex]);
-    }
-
     if(MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage) {
 
-        fprintf(ProgramStatus::outputFile, "\ntotal:\t\t\t\t\t\t\t\t\t\t"
+        fprintf(ProgramStatus::outputFile, "total:\t\t\t\t\t\t\t\t\t\t"
                                            "total internal fragmentation:%10ldK(%3lu%%)\n\t\t\t\t\t\t\t\t\t\t\t\t\t",
                 totalValue.internalFragment/ONE_KB, totalValue.internalFragment*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage);
 
@@ -361,6 +339,30 @@ void MemoryWaste::printOutput() {
                 totalValue.numOfActiveObjects.numOfAllocatedObjects, totalValue.numOfActiveObjects.numOfFreelistObjects,
                 totalValue.numOfAccumulatedOperations.numOfNewAllocations, totalValue.numOfAccumulatedOperations.numOfReusedAllocations,
                 totalValue.numOfAccumulatedOperations.numOfFree);
+    }
+
+    fprintf(ProgramStatus::outputFile, "\n");
+
+    for (unsigned int classSizeIndex = 0; classSizeIndex < ProgramStatus::numberOfClassSizes; ++classSizeIndex) {
+
+        if(globalStatus.internalFragment[classSizeIndex]/ONE_KB == 0 && globalStatus.memoryBlowup[classSizeIndex]/ONE_KB == 0) {
+            continue;
+        }
+        if(classSizeIndex != ProgramStatus::numberOfClassSizes - 1) {
+            fprintf(ProgramStatus::outputFile, "size: %10lu\t\t\t", ProgramStatus::classSizes[classSizeIndex]);
+        } else {
+            fprintf(ProgramStatus::outputFile, "large object:   \t\t\t");
+        }
+
+        fprintf(ProgramStatus::outputFile, "internal fragmentation: %10ldK\t\t\tmemory blowup: %10luK\t\t\t"
+                                           "active alloc: %10ld\t\t\tfreelist objects: %10ld\t\t\t"
+                                           "new allocated: %10lu\t\t\treused allocated: %10lu\t\t\tfreed: %10lu\n",
+                globalStatus.internalFragment[classSizeIndex]/ONE_KB, globalStatus.memoryBlowup[classSizeIndex]/ONE_KB,
+                globalStatus.numOfActiveObjects.numOfAllocatedObjects[classSizeIndex],
+                globalStatus.numOfActiveObjects.numOfFreelistObjects[classSizeIndex],
+                globalStatus.numOfAccumulatedOperations.numOfNewAllocations[classSizeIndex],
+                globalStatus.numOfAccumulatedOperations.numOfReusedAllocations[classSizeIndex],
+                globalStatus.numOfAccumulatedOperations.numOfFree[classSizeIndex]);
     }
 
 }

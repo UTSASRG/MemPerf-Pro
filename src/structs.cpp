@@ -112,7 +112,7 @@ void FriendlinessStatus::add(FriendlinessStatus newFriendlinessStatus) {
 }
 
 void FriendlinessStatus::debugPrint() {
-    fprintf(stderr, "numOfSampling = %u\n", numOfSampling);
+    fprintf(stderr, "numOfSampling = %lu\n", numOfSampling);
     if(numOfSampling / 100) {
         fprintf(stderr, "totalMemoryUsageOfSampledPages = %lu, avg = %3lu%%\n",
                 totalMemoryUsageOfSampledPages,
@@ -120,8 +120,8 @@ void FriendlinessStatus::debugPrint() {
         fprintf(stderr, "totalMemoryUsageOfSampledCacheLines = %lu, avg = %3lu%%\n",
                 totalMemoryUsageOfSampledCacheLines,
                 totalMemoryUsageOfSampledCacheLines/(numOfSampling/100*CACHELINE_SIZE));
-        fprintf(stderr, "numOfSampledStoringInstructions = %u\n", numOfSampledStoringInstructions);
-        fprintf(stderr, "numOfSampledCacheLines = %u\n", numOfSampledCacheLines);
+        fprintf(stderr, "numOfSampledStoringInstructions = %lu\n", numOfSampledStoringInstructions);
+        fprintf(stderr, "numOfSampledCacheLines = %lu\n", numOfSampledCacheLines);
         fprintf(stderr, "\n");
     }
 }

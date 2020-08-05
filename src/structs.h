@@ -84,13 +84,13 @@ struct CriticalSectionStatus {
 };
 
 struct FriendlinessStatus {
-    unsigned int numOfSampling;
+    uint64_t numOfSampling;
     uint64_t totalMemoryUsageOfSampledPages;
     uint64_t totalMemoryUsageOfSampledCacheLines;
-    unsigned int numOfSampledStoringInstructions;
-    unsigned int numOfSampledCacheLines;
-    unsigned int numOfSampledFalseSharingInstructions[NUM_OF_FALSESHARINGTYPE];
-    unsigned int numOfSampledFalseSharingCacheLines[NUM_OF_FALSESHARINGTYPE];
+    uint64_t numOfSampledStoringInstructions;
+    uint64_t numOfSampledCacheLines;
+    uint64_t numOfSampledFalseSharingInstructions[NUM_OF_FALSESHARINGTYPE];
+    uint64_t numOfSampledFalseSharingCacheLines[NUM_OF_FALSESHARINGTYPE];
 
     void recordANewSampling(uint64_t memoryUsageOfCacheLine, uint64_t memoryUsageOfPage);
     void add(FriendlinessStatus newFriendlinessStatus);

@@ -42,6 +42,7 @@ void exitHandler() {
     ProgramStatus::setBeginConclusionTrue();
     Predictor::outsideCyclesStop();
     Predictor::stopSerial();
+
 	#ifndef NO_PMU
 	stopSampling();
     stopCounting();
@@ -511,6 +512,7 @@ int pthread_create(pthread_t * tid, const pthread_attr_t * attr, void *(*start_r
 
 int pthread_join(pthread_t thread, void ** retval) {
     if (!realInitialized) RealX::initializer();
+    fprintf(stderr, "join\n");
     return xthreadx::thread_join(thread, retval);
 }
 
