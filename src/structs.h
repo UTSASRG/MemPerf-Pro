@@ -108,9 +108,10 @@ struct TotalMemoryUsage {
 
 struct PerfReadInfo {
     uint64_t faults = 0;
-    uint64_t tlb_read_misses = 0;
-    uint64_t tlb_write_misses = 0;
-    uint64_t cache_misses = 0;
+//    uint64_t cache_refer = 0;
+//    uint64_t cache_misses = 0;
+    uint64_t l1cache_load = 0;
+    uint64_t l1cache_load_miss = 0;
     uint64_t instructions = 0;
 
     void add(struct PerfReadInfo newPerfReadInfo);

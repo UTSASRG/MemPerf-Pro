@@ -72,6 +72,7 @@ void MMAPProfilerMemory::initialize(size_t setSize) {
 
 void MMAPProfilerMemory::finalize() {
     RealX::munmap(overheadPointer, (uint64_t)endPointer - (uint64_t)overheadPointer);
+    initialized = false;
 }
 
 void MMAPProfilerMemory::GetASpaceFromMemory(size_t size) {

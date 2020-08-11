@@ -58,9 +58,9 @@ void ThreadLocalStatus::setRandomPeriodForCountingEvent(uint64_t randomPeriod) {
 }
 
 bool ThreadLocalStatus::randomProcessForCountingEvent() {
-    if(AllocatingStatus::isFirstFunction()) {
-        return false;
-    }
+//    if(AllocatingStatus::isFirstFunction()) {
+//        return false;
+//    }
     return !setSampleForCountingEvent || randomDevice()%randomPeriodForCountingEvent == 0;
 }
 

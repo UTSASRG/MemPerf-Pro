@@ -4,7 +4,7 @@
 #define CACHELINE_SIZE 64
 #define PAGESIZE 4096
 #define SAMPLING_PERIOD 10000
-#define MMAP_PAGES 129 // must be in the form of 2^N + 1
+#define MMAP_PAGES 257 // must be in the form of 2^N + 1
 #define DATA_MMAP_PAGES (MMAP_PAGES - 1)
 #define MAPSIZE (MMAP_PAGES * getpagesize())
 #define DATA_MAPSIZE (DATA_MMAP_PAGES * getpagesize())

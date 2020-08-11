@@ -105,8 +105,11 @@ unsigned ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_index,
 				} else {
 						current->addUsedBytes(curPageBytes);
 						if(!current->isTouched()) {
-								current->setTouched();
-								numNewPagesTouched++;
+						    current->setTouched();
+						    numNewPagesTouched++;
+						    if(current->donatedBySyscall) {
+                                Predictor::faultedPages++;
+						    }
 						}
 				}
 				size_remain -= curPageBytes;
@@ -129,8 +132,11 @@ unsigned ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_index,
 				} else {
 						current->addUsedBytes(curPageBytes);
 						if(!current->isTouched()) {
-								current->setTouched();
-								numNewPagesTouched++;
+                            current->setTouched();
+                            numNewPagesTouched++;
+                            if(current->donatedBySyscall) {
+                                Predictor::faultedPages++;
+                            }
 						}
 				}
 				size_remain -= curPageBytes;
@@ -189,23 +195,24 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType)
             return;
         }
 
-//    fprintf(stderr, "sample: addr = %p, type = %d\n", uintaddr, accessType);
 
     cme += tuple.cache_index;
+
+//    fprintf(stderr, "sample: addr = %p, type = %d, status = %d\n", uintaddr, accessType, cme->falseSharingStatus);
 
     ThreadLocalStatus::friendlinessStatus.recordANewSampling(cme->getUsedBytes(), pme->getUsedBytes());
     if(accessType == E_MEM_STORE) {
         ThreadLocalStatus::friendlinessStatus.numOfSampledStoringInstructions++;
         if(cme->lastWriterThreadIndex != ThreadLocalStatus::runningThreadIndex && cme->lastWriterThreadIndex != -1) {
             ThreadLocalStatus::friendlinessStatus.numOfSampledFalseSharingInstructions[cme->falseSharingStatus]++;
-            if(cme->falseSharingLineRecorded[cme->falseSharingStatus] == false) {
+            if(!cme->falseSharingLineRecorded[cme->falseSharingStatus]) {
                 ThreadLocalStatus::friendlinessStatus.numOfSampledFalseSharingCacheLines[cme->falseSharingStatus]++;
                 cme->falseSharingLineRecorded[cme->falseSharingStatus] = true;
             }
         }
         cme->lastWriterThreadIndex = ThreadLocalStatus::runningThreadIndex;
     }
-    if(cme->sampled == false) {
+    if(!cme->sampled) {
         ThreadLocalStatus::friendlinessStatus.numOfSampledCacheLines++;
         cme->sampled = true;
     }
@@ -241,6 +248,7 @@ void PageMapEntry::clear() {
 				memset(cache_map_entry, 0, cache_entries_size);
 		}
 		touched = false;
+		donatedBySyscall = true;
 		num_used_bytes = 0;
 }
 

@@ -39,10 +39,10 @@ typedef struct {
   int perf_fd2;
   uint64_t prev_head;
 	int perf_fd_fault;
-	int perf_fd_tlb_reads;
-	int perf_fd_tlb_writes;
-	int perf_fd_cache_miss;
-	int perf_fd_cache_ref;
+//    int perf_fd_cache_refer;
+//    int perf_fd_cache_miss;
+	int perf_fd_l1cache_load;
+	int perf_fd_l1cache_load_miss;
 	int perf_fd_instr;
 
   char * data_buf_copy = NULL;

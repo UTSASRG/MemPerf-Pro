@@ -25,8 +25,8 @@ public:
     static CriticalSectionStatus criticalSectionStatus[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
     static SystemCallData systemCallData[NUM_OF_SYSTEMCALLTYPES][NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
     static FriendlinessStatus friendlinessStatus;
-
     static int64_t potentialMemoryLeakFunctions;
+
     static void globalize();
 
     static void countPotentialMemoryLeakFunctions();

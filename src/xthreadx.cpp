@@ -6,7 +6,10 @@ int xthreadx::thread_create(pthread_t * tid, const pthread_attr_t * attr, thread
     ThreadLocalStatus::addARunningThread();
     if(ThreadLocalStatus::fromSerialToParallel()) {
         Predictor::outsideCyclesStop();
+        Predictor::outsideCountingEventsStop();
         Predictor::stopSerial();
+        Predictor::outsideCountingEventsStart();
+        Predictor::outsideCycleStart();
     }
 
     thread_t * children = (thread_t *) MyMalloc::xthreadMalloc(sizeof(thread_t));
@@ -33,14 +36,14 @@ void * xthreadx::startThread(void * arg) {
         abort();
     }
 
-
+//
 #ifndef NO_PMU
     initPMU();
 #endif
 
     ThreadLocalStatus::getARunningThreadIndex();
 //    fprintf(stderr, "%d thread create\n", ThreadLocalStatus::runningThreadIndex);
-//    ThreadLocalStatus::setRandomPeriodForCountingEvent(RANDOM_PERIOD_FOR_COUNTING_EVENT);
+    ThreadLocalStatus::setRandomPeriodForCountingEvent(RANDOM_PERIOD_FOR_COUNTING_EVENT);
 
     ///CPU Binding
 //    cpu_set_t mask;
@@ -56,6 +59,8 @@ void * xthreadx::startThread(void * arg) {
     MyMalloc::initializeForThreadLocalHashMemory(ThreadLocalStatus::runningThreadIndex);
     MyMalloc::initializeForThreadLocalMemory();
     lockUsage.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_LOCK_NUM);
+    Predictor::threadInit();
+    Predictor::outsideCountingEventsStart();
     Predictor::outsideCycleStart();
     ProgramStatus::setProfilerInitializedTrue();
     result = current->startRoutine(current->startArg);
@@ -67,6 +72,7 @@ void * xthreadx::startThread(void * arg) {
 void xthreadx::threadExit() {
 
     Predictor::outsideCyclesStop();
+    Predictor::outsideCountingEventsStop();
     Predictor::threadEnd();
 
 #ifndef NO_PMU
@@ -84,7 +90,11 @@ int xthreadx::thread_join(pthread_t thread, void ** retval) {
     int result = RealX::pthread_join (thread, retval);
     ThreadLocalStatus::subARunningThread();
     if(ThreadLocalStatus::fromParallelToSerial()) {
+        Predictor::outsideCyclesStop();
+        Predictor::outsideCountingEventsStop();
+        Predictor::threadEnd();
         Predictor::stopParallel();
+        Predictor::outsideCountingEventsStart();
         Predictor::outsideCycleStart();
     }
     return result;

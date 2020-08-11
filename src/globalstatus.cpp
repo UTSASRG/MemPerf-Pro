@@ -92,12 +92,22 @@ void GlobalStatus::printCountingEvents() {
     for(int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
         if(numOfSampledCountingFunctions[allocationType]) {
             printTitle(allocationTypeOutputTitleString[allocationType], numOfSampledCountingFunctions[allocationType]);
-            fprintf(ProgramStatus::outputFile, "cycles           %20lu   avg %20lu\n", cycles[allocationType], cycles[allocationType]/numOfSampledCountingFunctions[allocationType]);
-            fprintf(ProgramStatus::outputFile, "faults           %20lu   avg %20lu\n", countingEvents[allocationType].faults, countingEvents[allocationType].faults/numOfSampledCountingFunctions[allocationType]);
-            fprintf(ProgramStatus::outputFile, "tlb read misses  %20lu   avg %20lu\n", countingEvents[allocationType].tlb_read_misses, countingEvents[allocationType].tlb_read_misses/numOfSampledCountingFunctions[allocationType]);
-            fprintf(ProgramStatus::outputFile, "tlb write misses %20lu   avg %20lu\n", countingEvents[allocationType].tlb_write_misses, countingEvents[allocationType].tlb_write_misses/numOfSampledCountingFunctions[allocationType]);
-            fprintf(ProgramStatus::outputFile, "cache misses     %20lu   avg %20lu\n", countingEvents[allocationType].cache_misses, countingEvents[allocationType].cache_misses/numOfSampledCountingFunctions[allocationType]);
-            fprintf(ProgramStatus::outputFile, "instructions     %20lu   avg %20lu\n", countingEvents[allocationType].instructions, countingEvents[allocationType].instructions/numOfSampledCountingFunctions[allocationType]);
+            fprintf(ProgramStatus::outputFile, "cycles                %20lu   avg %20lu\n", cycles[allocationType], cycles[allocationType]/numOfSampledCountingFunctions[allocationType]);
+            fprintf(ProgramStatus::outputFile, "faults                %20lu   avg %20lu\n", countingEvents[allocationType].faults, countingEvents[allocationType].faults/numOfSampledCountingFunctions[allocationType]);
+//            fprintf(ProgramStatus::outputFile, "cache refer           %20lu   avg %20lu\n", countingEvents[allocationType].cache_refer, countingEvents[allocationType].cache_refer/numOfSampledCountingFunctions[allocationType]);
+//            fprintf(ProgramStatus::outputFile, "cache misses          %20lu   avg %20lu\n", countingEvents[allocationType].cache_misses, countingEvents[allocationType].cache_misses/numOfSampledCountingFunctions[allocationType]);
+            fprintf(ProgramStatus::outputFile, "l1-dcache-loads       %20lu   avg %20lu\n", countingEvents[allocationType].l1cache_load, countingEvents[allocationType].l1cache_load/numOfSampledCountingFunctions[allocationType]);
+            fprintf(ProgramStatus::outputFile, "l1-dcache-load-misses %20lu   avg %20lu\n", countingEvents[allocationType].l1cache_load_miss, countingEvents[allocationType].l1cache_load_miss/numOfSampledCountingFunctions[allocationType]);
+            if(countingEvents[allocationType].l1cache_load_miss) {
+                if(countingEvents[allocationType].l1cache_load_miss < countingEvents[allocationType].l1cache_load) {
+                    fprintf(ProgramStatus::outputFile, "l1-dcache-load-miss-rate %3lu%%\n", countingEvents[allocationType].l1cache_load_miss*100/countingEvents[allocationType].l1cache_load);
+                } else {
+                    fprintf(ProgramStatus::outputFile, "l1-dcache-load-miss-rate 100%%\n");
+                }
+            } else {
+                fprintf(ProgramStatus::outputFile, "l1-dcache-load-miss-rate 0%%\n");
+            }
+            fprintf(ProgramStatus::outputFile, "instructions          %20lu   avg %20lu\n", countingEvents[allocationType].instructions, countingEvents[allocationType].instructions/numOfSampledCountingFunctions[allocationType]);
             fprintf(ProgramStatus::outputFile, "\n");
         }
     }
@@ -225,33 +235,36 @@ void GlobalStatus::printForMatrix() {
         return;
     }
 
-//    for(int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
-//        if(allocationType == PARALLEL_MEDIUM_FREE || allocationType == PARALLEL_MEDIUM_NEW_MALLOC || allocationType == PARALLEL_MEDIUM_REUSED_MALLOC
-//        || allocationType == SERIAL_MEDIUM_FREE || allocationType == SERIAL_MEDIUM_NEW_MALLOC || allocationType == SERIAL_MEDIUM_REUSED_MALLOC) {
-//            continue;
-//        }
-//        fprintf(ProgramStatus::matrixFile, "%lu ", numOfSampledCountingFunctions[allocationType]);
-//        if(numOfSampledCountingFunctions[allocationType]) {
-//            fprintf(ProgramStatus::matrixFile, "%lu ", cycles[allocationType] / numOfSampledCountingFunctions[allocationType]);
-//        } else {
-//            fprintf(ProgramStatus::matrixFile, "-1 ");
-//        }
-//
-//        uint64_t totalCyclesFromLocks = 0;
-//        for(int lockType = 0; lockType < NUM_OF_LOCKTYPES; ++lockType) {
-//            if(overviewLockData[lockType].numOfLocks > 0 && overviewLockData[lockType].numOfCalls[allocationType] > 0) {
-//                totalCyclesFromLocks += overviewLockData[lockType].totalCycles[allocationType]/numOfFunctions[allocationType];
-//            }
-//        }
-//        fprintf(ProgramStatus::matrixFile, "%lu ", totalCyclesFromLocks);
-//        uint64_t totalCyclesFromSyscalls = 0;
-//        for(int syscallType = 0; syscallType < NUM_OF_SYSTEMCALLTYPES; ++syscallType) {
-//            if(systemCallData[syscallType][allocationType].num > 0) {
-//                totalCyclesFromSyscalls += systemCallData[syscallType][allocationType].cycles/numOfFunctions[allocationType];
-//            }
-//        }
-//        fprintf(ProgramStatus::matrixFile, "%lu ", totalCyclesFromSyscalls);
-//    }
+    for(int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
+        if(allocationType == PARALLEL_MEDIUM_FREE || allocationType == PARALLEL_MEDIUM_NEW_MALLOC || allocationType == PARALLEL_MEDIUM_REUSED_MALLOC
+           || allocationType == SERIAL_MEDIUM_FREE || allocationType == SERIAL_MEDIUM_NEW_MALLOC || allocationType == SERIAL_MEDIUM_REUSED_MALLOC
+           || allocationType == SERIAL_NORMAL_CALLOC || allocationType == SERIAL_NORMAL_REALLOC || allocationType == SERIAL_NORMAL_POSIX_MEMALIGN || allocationType == SERIAL_NORMAL_MEMALIGN
+           || allocationType == PARALLEL_NORMAL_CALLOC || allocationType == PARALLEL_NORMAL_REALLOC || allocationType == PARALLEL_NORMAL_POSIX_MEMALIGN || allocationType == PARALLEL_NORMAL_MEMALIGN) {
+            continue;
+        }
+        fprintf(ProgramStatus::matrixFile, "%lu ", numOfSampledCountingFunctions[allocationType]);
+        if(numOfSampledCountingFunctions[allocationType]) {
+            fprintf(ProgramStatus::matrixFile, "%lu ", cycles[allocationType] / numOfSampledCountingFunctions[allocationType]);
+        } else {
+            fprintf(ProgramStatus::matrixFile, "-1 ");
+        }
+
+        uint64_t totalCyclesFromLocks = 0;
+        for(int lockType = 0; lockType < NUM_OF_LOCKTYPES; ++lockType) {
+            if(overviewLockData[lockType].numOfLocks > 0 && overviewLockData[lockType].numOfCalls[allocationType] > 0) {
+                totalCyclesFromLocks += overviewLockData[lockType].totalCycles[allocationType]/numOfFunctions[allocationType];
+            }
+        }
+        fprintf(ProgramStatus::matrixFile, "%lu ", totalCyclesFromLocks);
+        uint64_t totalCyclesFromSyscalls = 0;
+        for(int syscallType = 0; syscallType < NUM_OF_SYSTEMCALLTYPES; ++syscallType) {
+            if(systemCallData[syscallType][allocationType].num > 0) {
+                totalCyclesFromSyscalls += systemCallData[syscallType][allocationType].cycles/numOfFunctions[allocationType];
+            }
+        }
+        fprintf(ProgramStatus::matrixFile, "%lu ", totalCyclesFromSyscalls);
+        fprintf(ProgramStatus::matrixFile, "%lu ", countingEvents[allocationType].faults);
+    }
 //
 //    if(MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage) {
 //        fprintf(ProgramStatus::matrixFile, "%lu%% ", MemoryWaste::totalValue.internalFragment*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage);
@@ -280,19 +293,19 @@ void GlobalStatus::printForMatrix() {
 //        fprintf(ProgramStatus::matrixFile, "-1 -1 -1 -1 -1 -1");
 //    }
 
-    fprintf(ProgramStatus::matrixFile, "%lu ", Predictor::criticalCycle);
-    fprintf(ProgramStatus::matrixFile, "%lu ", Predictor::replacedCriticalCycle);
-
-    if(Predictor::criticalCycle) {
-        fprintf(ProgramStatus::matrixFile, "%3lu%% ", Predictor::replacedCriticalCycle*100/Predictor::criticalCycle);
-    } else {
-        fprintf(ProgramStatus::matrixFile, "100%% ");
-    }
-    if(Predictor::criticalCycle && Predictor::replacedCriticalCycle < Predictor::criticalCycle) {
-        fprintf(ProgramStatus::matrixFile, "%3lu%% ", (Predictor::criticalCycle-Predictor::replacedCriticalCycle)*100/Predictor::replacedCriticalCycle);
-    } else {
-        fprintf(ProgramStatus::matrixFile, "0%% ");
-    }
+//    fprintf(ProgramStatus::matrixFile, "%lu ", Predictor::criticalCycle);
+//    fprintf(ProgramStatus::matrixFile, "%lu ", Predictor::replacedCriticalCycle);
+//
+//    if(Predictor::replacedCriticalCycle) {
+//        fprintf(ProgramStatus::matrixFile, "%3lu%% ", Predictor::criticalCycle*100/Predictor::replacedCriticalCycle);
+//    } else {
+//        fprintf(ProgramStatus::matrixFile, "100%% ");
+//    }
+//    if(Predictor::replacedCriticalCycle && Predictor::replacedCriticalCycle < Predictor::criticalCycle) {
+//        fprintf(ProgramStatus::matrixFile, "%3lu%% ", (Predictor::criticalCycle-Predictor::replacedCriticalCycle)*100/Predictor::replacedCriticalCycle);
+//    } else {
+//        fprintf(ProgramStatus::matrixFile, "0%% ");
+//    }
 
     fprintf(ProgramStatus::matrixFile, "\n");
 }

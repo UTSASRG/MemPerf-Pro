@@ -16,10 +16,12 @@ private:
     static thread_local bool firstFree[10000];
     static thread_local AllocatingType allocatingType;
     static thread_local AllocationTypeForOutputData allocationTypeForOutputData;
+    static thread_local AllocationTypeForOutputData allocationTypeForPrediction;
     static thread_local bool sampledForCountingEvent;
     static thread_local uint64_t cyclesBeforeRealFunction;
     static thread_local uint64_t cyclesAfterRealFunction;
     static thread_local uint64_t cyclesInRealFunction;
+    static thread_local uint64_t cyclesMinus;
     static thread_local PerfReadInfo countingDataBeforeRealFunction;
     static thread_local PerfReadInfo countingDataAfterRealFunction;
     static thread_local PerfReadInfo countingDataInRealFunction;
@@ -195,6 +197,7 @@ private:
     static void stopCountCountingEvents();
 
     static void setAllocationTypeForOutputData();
+    static void setAllocationTypeForPrediction();
 
     static void cleanOverviewLockDataInAllocatingStatus();
     static void cleanDetailLockDataInAllocatingStatus();
@@ -228,6 +231,8 @@ public:
 
     static void debugPrint();
     static size_t debugReturnSize();
+
+    static void minusCycles(uint64_t cycles);
 
 };
 

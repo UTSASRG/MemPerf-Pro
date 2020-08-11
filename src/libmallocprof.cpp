@@ -41,6 +41,7 @@ void exitHandler() {
 
     ProgramStatus::setBeginConclusionTrue();
     Predictor::outsideCyclesStop();
+    Predictor::outsideCountingEventsStop();
     Predictor::stopSerial();
 
 	#ifndef NO_PMU
@@ -57,14 +58,23 @@ void exitHandler() {
 
 // MallocProf's main function
 int libmallocprof_main(int argc, char ** argv, char ** envp) {
-    ProgramStatus::checkSystemIs64Bits();
+//    ProgramStatus::checkSystemIs64Bits();
     PMU_init_check();
     RealX::initializer();
     ShadowMemory::initialize();
 
     ThreadLocalStatus::addARunningThread();
     ThreadLocalStatus::getARunningThreadIndex();
-//    ThreadLocalStatus::setRandomPeriodForCountingEvent(RANDOM_PERIOD_FOR_COUNTING_EVENT);
+    ThreadLocalStatus::setRandomPeriodForCountingEvent(RANDOM_PERIOD_FOR_COUNTING_EVENT);
+
+//    cpu_set_t mask;
+//    CPU_ZERO(&mask);
+//    CPU_SET(ThreadLocalStatus::runningThreadIndex%40, &mask);
+//    if (sched_setaffinity(0, sizeof(mask), &mask) == -1)
+//    {
+//        fprintf(stderr, "warning: could not set CPU affinity\n");
+//        abort();
+//    }
 
     ProgramStatus::initIO(argv[0]);
     lockUsage.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_LOCK_NUM);
@@ -73,6 +83,9 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
     MyMalloc::initializeForThreadLocalXthreadMemory(ThreadLocalStatus::runningThreadIndex);
     MyMalloc::initializeForThreadLocalHashMemory(ThreadLocalStatus::runningThreadIndex);
     MyMalloc::initializeForThreadLocalMemory();
+    Predictor::globalInit();
+
+    Predictor::outsideCountingEventsStart();
     Predictor::outsideCycleStart();
     ProgramStatus::setProfilerInitializedTrue();
 
@@ -96,7 +109,6 @@ extern "C" {
         if(sz == 0) {
             return NULL;
         }
-
         if(ProgramStatus::profilerNotInitialized()) {
             return MyMalloc::malloc(sz);
         }
@@ -268,6 +280,7 @@ void *yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offse
     void *retval = RealX::mmap(addr, length, prot, flags, fd, offset);
     uint64_t timeStop = rdtscp();
 
+    AllocatingStatus::minusCycles(120);
     AllocatingStatus::addOneSyscallToSyscallData(MMAP, timeStop - timeStart);
 
     return retval;
@@ -278,7 +291,6 @@ int madvise(void *addr, size_t length, int advice) {
     if (AllocatingStatus::outsideTrackedAllocation()) {
         return RealX::madvise(addr, length, advice);
     }
-
     if (advice == MADV_DONTNEED) {
         size_t cleanedPageSize = ShadowMemory::cleanupPages((uintptr_t) addr, length);
         MemoryUsage::subTotalSizeFromMemoryUsage(cleanedPageSize);
@@ -288,6 +300,7 @@ int madvise(void *addr, size_t length, int advice) {
     int result = RealX::madvise(addr, length, advice);
     uint64_t timeStop = rdtscp();
 
+    AllocatingStatus::minusCycles(120);
     AllocatingStatus::addOneSyscallToSyscallData(MADVISE, timeStop - timeStart);
 
     return result;
@@ -303,6 +316,7 @@ void *sbrk(intptr_t increment) {
     void *retptr = RealX::sbrk(increment);
     uint64_t timeStop = rdtscp();
 
+    AllocatingStatus::minusCycles(120);
     AllocatingStatus::addOneSyscallToSyscallData(SBRK, timeStop - timeStart);
 
     return retptr;
@@ -318,6 +332,7 @@ int mprotect(void *addr, size_t len, int prot) {
     int ret = RealX::mprotect(addr, len, prot);
     uint64_t timeStop = rdtscp();
 
+    AllocatingStatus::minusCycles(120);
     AllocatingStatus::addOneSyscallToSyscallData(MPROTECT, timeStop - timeStart);
 
     return ret;
@@ -330,7 +345,6 @@ int munmap(void *addr, size_t length) {
     if (AllocatingStatus::outsideTrackedAllocation()) {
         return RealX::munmap(addr, length);
     }
-
     size_t cleanedPageSize = ShadowMemory::cleanupPages((intptr_t) addr, length);
     MemoryUsage::subTotalSizeFromMemoryUsage(cleanedPageSize);
 
@@ -338,6 +352,7 @@ int munmap(void *addr, size_t length) {
     int ret = RealX::munmap(addr, length);
     uint64_t timeStop = rdtscp();
 
+    AllocatingStatus::minusCycles(120);
     AllocatingStatus::addOneSyscallToSyscallData(MUNMAP, timeStop - timeStart);
 
 
@@ -361,6 +376,7 @@ void *mremap(void *old_address, size_t old_size, size_t new_size, int flags, ...
     void *ret = RealX::mremap(old_address, old_size, new_size, flags, new_address);
     uint64_t timeStop = rdtscp();
 
+    AllocatingStatus::minusCycles(120);
     AllocatingStatus::addOneSyscallToSyscallData(MREMAP, timeStop - timeStart);
 
     return ret;
@@ -371,7 +387,6 @@ int pthread_mutex_lock(pthread_mutex_t *mutex) {
         if (!realInitialized) RealX::initializer();
         return RealX::pthread_mutex_lock(mutex);
     }
-
     DetailLockData * detailLockData = lockUsage.find((void *)mutex, sizeof(void *));
     if(detailLockData == nullptr)  {
         detailLockData = lockUsage.insert((void*)mutex, sizeof(void*), DetailLockData::newDetailLockData(MUTEX));
@@ -388,6 +403,7 @@ int pthread_mutex_lock(pthread_mutex_t *mutex) {
     int result = RealX::pthread_mutex_lock(mutex);
     uint64_t timeStop = rdtscp();
 
+    AllocatingStatus::minusCycles(120);
     AllocatingStatus::recordLockCallAndCycles(1, timeStop-timeStart);
     AllocatingStatus::checkAndStartRecordingACriticalSection();
 
@@ -399,7 +415,6 @@ int pthread_spin_lock(pthread_spinlock_t *lock) {
         if (!realInitialized) RealX::initializer();
         return RealX::pthread_spin_lock(lock);
     }
-
     DetailLockData * detailLockData = lockUsage.find((void *)lock, sizeof(void *));
     if(detailLockData == nullptr)  {
         detailLockData = lockUsage.insert((void*)lock, sizeof(void*), DetailLockData::newDetailLockData(SPIN));
@@ -417,6 +432,7 @@ int pthread_spin_lock(pthread_spinlock_t *lock) {
     int result = RealX::pthread_spin_lock(lock);
     uint64_t timeStop = rdtscp();
 
+    AllocatingStatus::minusCycles(120);
     AllocatingStatus::recordLockCallAndCycles(1, timeStop-timeStart);
     AllocatingStatus::checkAndStartRecordingACriticalSection();
 
@@ -447,6 +463,7 @@ int pthread_spin_trylock(pthread_spinlock_t *lock) {
         AllocatingStatus::checkAndStartRecordingACriticalSection();
     }
 
+    AllocatingStatus::minusCycles(120);
     AllocatingStatus::recordLockCallAndCycles(1, timeStop-timeStart);
 
     return result;
@@ -476,6 +493,7 @@ int pthread_mutex_trylock(pthread_mutex_t *mutex) {
         AllocatingStatus::checkAndStartRecordingACriticalSection();
     }
 
+    AllocatingStatus::minusCycles(120);
     AllocatingStatus::recordLockCallAndCycles(1, timeStop-timeStart);
 
     return result;
@@ -498,6 +516,7 @@ int pthread_spin_unlock(pthread_spinlock_t *lock) {
         return RealX::pthread_spin_unlock(lock);
     }
 
+    AllocatingStatus::minusCycles(120);
     AllocatingStatus::checkAndStopRecordingACriticalSection();
     return RealX::pthread_spin_unlock(lock);
 }
@@ -512,7 +531,7 @@ int pthread_create(pthread_t * tid, const pthread_attr_t * attr, void *(*start_r
 
 int pthread_join(pthread_t thread, void ** retval) {
     if (!realInitialized) RealX::initializer();
-    fprintf(stderr, "join\n");
+//    fprintf(stderr, "join\n");
     return xthreadx::thread_join(thread, retval);
 }
 

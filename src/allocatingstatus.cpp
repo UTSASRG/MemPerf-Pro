@@ -4,10 +4,12 @@ thread_local bool AllocatingStatus::firstAllocation[10000];
 thread_local bool AllocatingStatus::firstFree[10000];
 thread_local AllocatingType AllocatingStatus::allocatingType;
 thread_local AllocationTypeForOutputData AllocatingStatus::allocationTypeForOutputData;
+thread_local AllocationTypeForOutputData AllocatingStatus::allocationTypeForPrediction;
 thread_local bool AllocatingStatus::sampledForCountingEvent;
 thread_local uint64_t AllocatingStatus::cyclesBeforeRealFunction;
 thread_local uint64_t AllocatingStatus::cyclesAfterRealFunction;
 thread_local uint64_t AllocatingStatus::cyclesInRealFunction;
+thread_local uint64_t AllocatingStatus::cyclesMinus;
 thread_local PerfReadInfo AllocatingStatus::countingDataBeforeRealFunction;
 thread_local PerfReadInfo AllocatingStatus::countingDataAfterRealFunction;
 thread_local PerfReadInfo AllocatingStatus::countingDataInRealFunction;
@@ -104,10 +106,18 @@ void AllocatingStatus::updateFreeingTypeAfterRealFunction() {
 
 void AllocatingStatus::calculateCountingDataInRealFunction() {
     cyclesInRealFunction = cyclesAfterRealFunction - cyclesBeforeRealFunction;
+    if(cyclesInRealFunction > cyclesMinus) {
+        cyclesInRealFunction -= cyclesMinus;
+    } else {
+        cyclesInRealFunction = 0;
+    }
+    cyclesMinus = 0;
+
     countingDataInRealFunction.faults = countingDataAfterRealFunction.faults - countingDataBeforeRealFunction.faults;
-    countingDataInRealFunction.cache_misses = countingDataAfterRealFunction.cache_misses - countingDataBeforeRealFunction.cache_misses;
-    countingDataInRealFunction.tlb_read_misses = countingDataAfterRealFunction.tlb_read_misses - countingDataBeforeRealFunction.tlb_read_misses;
-    countingDataInRealFunction.tlb_write_misses = countingDataAfterRealFunction.tlb_write_misses - countingDataBeforeRealFunction.tlb_write_misses;
+//    countingDataInRealFunction.cache_refer = countingDataAfterRealFunction.cache_refer - countingDataBeforeRealFunction.cache_refer;
+//    countingDataInRealFunction.cache_misses = countingDataAfterRealFunction.cache_misses - countingDataBeforeRealFunction.cache_misses;
+    countingDataInRealFunction.l1cache_load = countingDataAfterRealFunction.l1cache_load - countingDataBeforeRealFunction.l1cache_load;
+    countingDataInRealFunction.l1cache_load_miss = countingDataAfterRealFunction.l1cache_load_miss - countingDataBeforeRealFunction.l1cache_load_miss;
     countingDataInRealFunction.instructions = countingDataAfterRealFunction.instructions - countingDataBeforeRealFunction.instructions;
 }
 
@@ -118,14 +128,17 @@ void AllocatingStatus::removeAbnormalCountingEventValues() {
     if(countingDataInRealFunction.faults > ABNORMAL_VALUE) {
         countingDataInRealFunction.faults = 0;
     }
-    if(countingDataInRealFunction.cache_misses > ABNORMAL_VALUE) {
-        countingDataInRealFunction.cache_misses = 0;
+//    if(countingDataInRealFunction.cache_refer > ABNORMAL_VALUE) {
+//        countingDataInRealFunction.cache_refer = 0;
+//    }
+//    if(countingDataInRealFunction.cache_misses > ABNORMAL_VALUE) {
+//        countingDataInRealFunction.cache_misses = 0;
+//    }
+    if(countingDataInRealFunction.l1cache_load > ABNORMAL_VALUE) {
+        countingDataInRealFunction.l1cache_load = 0;
     }
-    if(countingDataInRealFunction.tlb_read_misses > ABNORMAL_VALUE) {
-        countingDataInRealFunction.tlb_read_misses = 0;
-    }
-    if(countingDataInRealFunction.tlb_write_misses > ABNORMAL_VALUE) {
-        countingDataInRealFunction.tlb_write_misses = 0;
+    if(countingDataInRealFunction.l1cache_load_miss > ABNORMAL_VALUE) {
+        countingDataInRealFunction.l1cache_load_miss = 0;
     }
     if(countingDataInRealFunction.instructions > ABNORMAL_VALUE) {
         countingDataInRealFunction.instructions = 0;
@@ -260,6 +273,102 @@ void AllocatingStatus::setAllocationTypeForOutputData() {
     }
 }
 
+void AllocatingStatus::setAllocationTypeForPrediction() {
+    if(allocatingType.allocatingFunction == MALLOC) {
+
+        if(allocatingType.objectSizeType > Predictor::replacedLargeObjectThreshold) {
+            if(ThreadLocalStatus::isCurrentlySingleThread()) {
+                allocationTypeForPrediction = SERIAL_LARGE_MALLOC;
+            } else {
+                allocationTypeForPrediction = PARALLEL_LARGE_MALLOC;
+            }
+        } else if(allocatingType.objectSizeType <= Predictor::replacedMiddleObjectThreshold) {
+            if(allocatingType.allocatingTypeGotFromMemoryWaste.isReusedObject) {
+                if(ThreadLocalStatus::isCurrentlySingleThread()) {
+                    allocationTypeForPrediction = SERIAL_SMALL_REUSED_MALLOC;
+                } else {
+                    allocationTypeForPrediction = PARALLEL_SMALL_REUSED_MALLOC;
+                }
+            } else {
+                if(ThreadLocalStatus::isCurrentlySingleThread()) {
+                    allocationTypeForPrediction = SERIAL_SMALL_NEW_MALLOC;
+                } else {
+                    allocationTypeForPrediction = PARALLEL_SMALL_NEW_MALLOC;
+                }
+            }
+        } else {
+            if(allocatingType.allocatingTypeGotFromMemoryWaste.isReusedObject) {
+                if(ThreadLocalStatus::isCurrentlySingleThread()) {
+                    allocationTypeForPrediction = SERIAL_MEDIUM_REUSED_MALLOC;
+                } else {
+                    allocationTypeForPrediction = PARALLEL_MEDIUM_REUSED_MALLOC;
+                }
+            } else {
+                if(ThreadLocalStatus::isCurrentlySingleThread()) {
+                    allocationTypeForPrediction = SERIAL_MEDIUM_NEW_MALLOC;
+                } else {
+                    allocationTypeForPrediction = PARALLEL_MEDIUM_NEW_MALLOC;
+                }
+            }
+        }
+
+    } else if(allocatingType.allocatingFunction == FREE) {
+
+        if(allocatingType.objectSizeType > Predictor::replacedLargeObjectThreshold) {
+            if(ThreadLocalStatus::isCurrentlySingleThread()) {
+                allocationTypeForPrediction = SERIAL_LARGE_FREE;
+            } else {
+                allocationTypeForPrediction = PARALLEL_LARGE_FREE;
+            }
+        } else if(allocatingType.objectSizeType <= Predictor::replacedMiddleObjectThreshold) {
+            if(ThreadLocalStatus::isCurrentlySingleThread()) {
+                allocationTypeForPrediction = SERIAL_SMALL_FREE;
+            } else {
+                allocationTypeForPrediction = PARALLEL_SMALL_FREE;
+            }
+        } else {
+            if(ThreadLocalStatus::isCurrentlySingleThread()) {
+                allocationTypeForPrediction = SERIAL_MEDIUM_FREE;
+            } else {
+                allocationTypeForPrediction = PARALLEL_MEDIUM_FREE;
+            }
+        }
+
+    } else if(allocatingType.allocatingFunction == CALLOC) {
+
+        if(ThreadLocalStatus::isCurrentlySingleThread()) {
+            allocationTypeForPrediction = SERIAL_NORMAL_CALLOC;
+        } else {
+            allocationTypeForPrediction = PARALLEL_NORMAL_CALLOC;
+        }
+
+    } else if(allocatingType.allocatingFunction == REALLOC) {
+
+        if(ThreadLocalStatus::isCurrentlySingleThread()) {
+            allocationTypeForPrediction = SERIAL_NORMAL_REALLOC;
+        } else {
+            allocationTypeForPrediction = PARALLEL_NORMAL_REALLOC;
+        }
+
+    } else if(allocatingType.allocatingFunction == POSIX_MEMALIGN) {
+
+        if(ThreadLocalStatus::isCurrentlySingleThread()) {
+            allocationTypeForPrediction = SERIAL_NORMAL_POSIX_MEMALIGN;
+        } else {
+            allocationTypeForPrediction = PARALLEL_NORMAL_POSIX_MEMALIGN;
+        }
+
+    } else {
+
+        if(ThreadLocalStatus::isCurrentlySingleThread()) {
+            allocationTypeForPrediction = SERIAL_NORMAL_MEMALIGN;
+        } else {
+            allocationTypeForPrediction = PARALLEL_NORMAL_MEMALIGN;
+        }
+
+    }
+}
+
 void AllocatingStatus::addUpOverviewLockDataToThreadLocalData() {
     for(int lockType = 0; lockType < NUM_OF_LOCKTYPES; ++lockType) {
         ThreadLocalStatus::overviewLockData[lockType].numOfLocks += overviewLockData[lockType].numOfLocks;
@@ -324,26 +433,26 @@ void AllocatingStatus::addUpOtherFunctionsInfoToThreadLocalData() {
 
 void AllocatingStatus::updateAllocatingInfoToThreadLocalData() {
     setAllocationTypeForOutputData();
-    ThreadLocalStatus::numOfFunctions[allocationTypeForOutputData]++;
-    addUpOtherFunctionsInfoToThreadLocalData();
-    addUpCountingEventsToThreadLocalData();
+    if(sampledForCountingEvent) {
+        ThreadLocalStatus::numOfFunctions[allocationTypeForOutputData]++;
+        addUpOtherFunctionsInfoToThreadLocalData();
+        addUpCountingEventsToThreadLocalData();
+    }
     cleanLockFunctionsInfoInAllocatingStatus();
     cleanSyscallsInfoInAllocatingStatus();
 }
 
 void AllocatingStatus::updateAllocatingInfoToPredictor() {
-    Predictor::numOfFunctions[allocationTypeForOutputData]++;
-    Predictor::functionCycles[allocationTypeForOutputData] += cyclesInRealFunction;
+    AllocatingStatus::setAllocationTypeForPrediction();
+    Predictor::numOfFunctions[allocationTypeForPrediction]++;
+    Predictor::functionCycles[allocationTypeForPrediction] += cyclesInRealFunction;
 }
 
 
 void AllocatingStatus::addUpCountingEventsToThreadLocalData() {
-    if(sampledForCountingEvent) {
         ThreadLocalStatus::numOfSampledCountingFunctions[allocationTypeForOutputData]++;
         ThreadLocalStatus::cycles[allocationTypeForOutputData] += cyclesInRealFunction;
         ThreadLocalStatus::countingEvents[allocationTypeForOutputData].add(countingDataInRealFunction);
-    }
-
 }
 
 bool AllocatingStatus::outsideTrackedAllocation() {
@@ -411,4 +520,8 @@ void AllocatingStatus::debugPrint() {
 
 size_t AllocatingStatus::debugReturnSize() {
     return(allocatingType.objectSize);
+}
+
+void AllocatingStatus::minusCycles(uint64_t cycles) {
+    cyclesMinus += cycles;
 }
