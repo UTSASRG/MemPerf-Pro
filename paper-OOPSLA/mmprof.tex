@@ -1,9 +1,5 @@
-\documentclass[pageno]{jpaper}
-
-%replace XXX with the submission number you are given from the ASPLOS submission site.
-\newcommand{\asplossubmissionnumber}{127}
-
-\usepackage[normalem]{ulem}
+\documentclass[acmsmall,anonymous,review]{acmart}
+\settopmatter{printfolios=true,printccs=false,printacmref=false}
 
 \usepackage{times}
 \usepackage{datetime}
@@ -43,18 +39,24 @@
 \newcommand{\DL}{\texttt{DLmalloc}}
 \newcommand{\JE}{\texttt{jemalloc}}
 \newcommand{\MP}{\texttt{mmprof}}
+
+\citestyle{acmauthoryear}
+\def\bibfont{\normalfont}
 \newcommand{\RN}[1]{\uppercase\expandafter{\romannumeral #1\relax}}
 
 
 \begin{document}
 
 \title{mmprof: A General Profiler for Different Memory Allocators}
-\date{}
+\author{Anonymous}
+
+
 \maketitle
-
-\thispagestyle{empty}
-
 \input{abstract}
+
+\keywords{
+Performance, Synchronization, Multithreaded Programs, Profiling, Instrumentation}
+
 
 \input{introduction}
 \input{background}
@@ -63,10 +65,10 @@
 \input{evaluation}
 \input{discussion}
 \input{relatedwork}
-%\input{hoard}
+\input{hoard}
 \input{conclusion}
 {
-\bibliographystyle{plain}
+\bibliographystyle{ACM-Reference-Format}
 \bibliography{refs, tongping, sam}
 }
 

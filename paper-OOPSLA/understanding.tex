@@ -1,0 +1,31 @@
+\section{Understanding the Code}
+
+If we are trying to understanding the source code, we need to understand the following aspects:
+
+\paragraph{What is the purpose of this software? }
+It is a library that is used to profile different allocators. 
+
+\paragraph{How to perform the profile?} 
+First, it will intercept all memory allocation/deallocation APIs in order to collect the execution time and other details of allocation/deallocation. 
+
+Second, it will intercept all synchronizations in order to identify the potential contention inside the user space. 
+
+Third, it will intercept memory-related system calls to identify kernel contention during allocation and deallocation. 
+
+Fourth, it utilizes the hardware performance counters to collect some details of each malloc/dealloc. 
+
+Fifth, it utilizes the hardware performance counters to sample memory accesses, and then check the cache line emptiness and page emptiness. 
+
+\paragraph{Why it could intercept all memory allocation and deallocations, synchronizations, and mmaps}
+The library is preloaded before every other libraries, using -rdynamic during the compilation time. Therefore, for each allocation, the library will be invoked at first. 
+
+\paragraph{What information will it report: allocation time?}
+What are the parameters in the source code?
+
+\paragraph{What information will it report: deallocation time?}
+What are the parameters in the source code?
+
+\paragraph{What information will it report: outside allocation/deallocation?}
+What are the parameters in the source code?
+
+
