@@ -1,7 +1,8 @@
 \section{Design and Implementation}
 \label{sec:implementation}
 
-This section discusses the implementation and design of \MP{}. To profile an allocator, \MP{} intercepts memory allocations/deallocations, memory-related system calls, and synchronizations. This also indicates that an allocator should utilize standard APIs in order for \MP{} to collect corresponding information. However, the Linux allocator utilizes the internal implementation of synchronizations by default. For the profiling purpose, it should be changed to invoke explicit POSIX-APIs instead. Fortunately, most allocators do not need any change or the recompilation.  \MP{} profiles the performance, memory overhead, scalability, and application friendliness, as discussed in different subsections. 
+This section discusses the implementation and design of \MP{} on profiling different aspects of an allocator as follows. 
+%To profile an allocator, \MP{} intercepts memory allocations/deallocations, memory-related system calls, and synchronizations. This also indicates that an allocator should utilize standard APIs in order for \MP{} to collect corresponding information. However, the Linux allocator utilizes the internal implementation of synchronizations by default. For the profiling purpose, it should be changed to invoke explicit POSIX-APIs instead. Fortunately, most allocators do not need any change or the recompilation.  \MP{} profiles the performance, memory overhead, scalability, and application friendliness, as discussed in different subsections. 
 
  %It also discusses some common issues, such as adapting to different allocators, and the performance issue of collecting data. 
 
@@ -9,67 +10,49 @@ This section discusses the implementation and design of \MP{}. To profile an all
 
 \label{sec:performanceimplement}
 
-\MP{} profiles the performance overhead of every memory management operation. Since an allocator typically has different execution paths for different scenarios (as discussed in Section~\ref{sec:allocator}), such as new or re-used allocations, small or big objects, \MP{} further collects the information for each scenario separately. The fine-grained data helps identify a particular design issue inside. For instance, DieHarder has a serious performance issue for deallocating small objects for \texttt{dedup}, with 744105 cycles and 2.8 cache misses for each deallocation. However, it has the similar number of cycles and deallocation runtime  for deallocating big objects. Given the fine-grained data, programmers could only focus on the deallocation path relating to small objects.
+\MP{} profiles the average time of every memory management operation, such as allocations and deallocations, which will be utilized to predict the performance impact (as discussed in Section~\ref{sec:predict}). The RDTSC instruction is employed to collect the time due to its accuracy and low overhead. Basically, \MP{} intercepts all allocation invocations, such as \texttt{malloc}, \texttt{calloc}, and \texttt{realloc}, and memory deallocations, such as \texttt{free}, and collects the time before and after each operation. The difference between them is the runtime of this operation.  
 
-\MP{} collects the allocation data for small objects and large object separately, where small objects further include new and re-used allocation. For deallocation, \MP{} collects the deallocation data for small and big objects separately. \MP{} collects the average runtime of each allocation and deallocation with the RDTSC instruction,
-%(Section~\ref{sec:pmu}), 
-due to the performance and accuracy reason. Time stamps are taken before and after each operation, and then the difference between them is the runtime of an operation. 
+% How to differentiate based the type? How to verify whether this a new/re-used allocation (efficiently)? 
+Since an allocator typically has different execution paths for different types of objects, such as new or re-used allocations of small objects, or allocation of big objects, \MP{} further collects the information for each type separately. Note that some allocators, such as Hoard, even have a different execution path for  objects with medium sizes. Based on our evaluation, the average allocation time for small and big objects can be as large as $2256\times$ difference for the \texttt{glibc-2.21} allocator. The fine-grained data helps identify design issues for a specific type. \MP{} differentiates the types of allocations and deallocations as follows. To differentiate small and big objects, \MP{} checks the requested size with the threshold stored in the configuration file (as described in Section~\ref{sec:understandingallocators}). In order to differentiate new allocations from re-used allocations that typically have over $3\times$ performance difference, \MP{} utilizes a global hash table to track objects: every allocated object will be inserted into the hash table in its allocation time, and will be kept in the table; If an allocation is found to be in the hash table, then this allocation is a re-used allocation. Otherwise, it is a new allocation. 
 
-\MP{} differentiates the types of an operation as follows. To differentiate small and big objects, \MP{} relies on a configuration file as further described in Section~\ref{sec:understandingallocators}. It is also important to differentiate between new and re-used allocations, since they typically have over $20\times$ performance difference on average. \MP{} uses a global hash map to assist this differentiation: every allocated object will be inserted into the global hash map in its allocation time, and will be kept in the table; If an allocation is found to be in the hash map, then this allocation is a re-used allocation. Otherwise, it is a new allocation.  
+\MP{} also differentiates operations for the serial and parallel phase. In the serial phase, there is just one thread, typically just the main thread. There are multiple threads in parallel phase, as its name implies. The operation of the parallel phase may require more than $3\times$ of time than that in serial phase, mainly caused by user-space or kernel space contention in the parallel phase. For the preciseness, \MP{} excludes the time for the first allocation, since many allocators will perform its initialization upon the first allocation.  
 
+% How to use sampling mechanism to further reduce the overhead? 
+\MP{} also employs the PMUs to collect hardware events of each memory operation, such as cache misses, page faults, TLB misses, and instructions. These hardware events are  significant supplements for identifying an issue, given that \MP{} is a non-intrusive profiler that cannot know the implementation details of an allocator. For instance, DieHarder is generally very slow, which often has an unusual number of cache misses for each deallocation. With the events of cache misses, we could identify a design issue of DieHarder: it traverses all memory bags one by one to determine the original bag for an allocation, causing an excessive number of cache misses. Similarly, \MP{} collects hardware events before and after each operation, and uses the difference of two counters as the number of events occurring inside an operation. The Linux kernel has supported PMUs starting from 2009 (Linux-2.6.31)~\cite{pmulinuxsupport}, where users could set up performance monitoring via the \texttt{perf\_event\_open} system call. However, the collection of hardware events is still the most expensive operation in \MP{}, which will incur more than $2\times$ slowdown on average if all memory operations will collect such events. Therefore, \MP{} samples hardware events for 1 out of 100 operations, which helps reduce the overhead to \todo{around $57\%$ on average}.  
 
-\MP{} also employs the PMUs to collect hardware events of each operation, such as cache misses, page faults, TLB misses, and instructions. These hardware data are  significant supplements for identifying an issue, given that \MP{} is a non-intrusive profiler that cannot know the implementation details of an allocator. Let us revisit the issue of DieHarder. DieHarder is found to have a large number of cycles for its deallocation. However, it is difficult to know the particular issue inside, if without more information. An unusual number of cache misses for each deallocation helps identify the design issue: DieHarder traverses all bags one by one to determine the original bag for an allocation, causing excessive number of cache misses. Similarly, \MP{} collects hardware events before and after each operation, and uses the difference of two counters as the number of events occurring inside an operation. 
 
 \subsection{Profiling Memory Overhead}
 \label{sec:profilingmemory}
 
-For memory overhead, \MP{} reports the ratio of different types of memory overhead, such as internal fragmentation, memory blowup, and other memory overhead, and real memory usage. Therefore, programmers can pinpoint memory consumption clearly. We have described the concepts of different types of overhead in Section~\ref{sec:memoryconsumption}. However, it is challenging to collect corresponding data correctly and efficiently.
+For memory overhead, \MP{} reports the amount and the ratio of different types of memory overhead, such as internal fragmentation, memory blowup, and external fragmentation (and others), and real memory usage, so that programmers can pinpoint the issues of excessive memory consumption. \MP{} tracks real memory usage on pages precisely, since the OS will allocate a physical page only when any word of this page is assessed. \MP{} intercepts memory-related system calls in order to obtain the total memory usage. For an allocator, the difference between total and real memory usage is memory overhead, which is the sum of internal fragmentation, memory blowup, and external memory fragmentation. Note that the metadata will be attributed to the type of external fragmentation and others, which cannot be easily separated. It is challenging to measure these memory overhead precisely and efficiently, as discussed in the following. 
+
+For a small object, internal fragmentation is the difference between the size class and the requested size. But we cannot compute in this way, if the difference is larger than a page. We need to consider page allocation policy that the OS always allocates a physical page in a demanding way, even if only one word is used. For such objects, internal fragmentation should be computed differently: for a new allocation, the internal fragmentation will be difference between the end of the object and the end of its last page; For a re-used object, \MP{} should track the maximum pages of this object, and use the difference between the end of its last page and the end of the object as internal fragmentation. When an object is released, its internal fragmentation should be decremented. \MP{} utilizes the same hash table as described in Section~\ref{sec:performanceimplement} to track the maximum pages for each object. 
+
+It is also challenging to compute memory blowup. By definition, a new allocation will be treated as memory blowup if there exist freed objects of this size class in the freelists of other threads. However, this definition does not specify whether memory blowup should be reduced upon the succeeding deallocation and re-allocation. Instead, \MP{} is based on such an observation: \textit{all freed objects of a size class represent the upper bound for its memory blowup; This upper bound subtracted by the size of recently-freed objects will be memory blowup for a size class}. Based on this observation, \MP{} further implements a practical method that uses a global counter to track recently-freed objects for each size class. This global counter is incremented upon every deallocation, but will be decremented upon each allocation if the counter is greater than zero. \MP{} will compute memory blowup for each size class of small objects and for big objects, and then utilizes the summary as the final memory blowup. After getting the memory blowup, \MP{} will compute external memory consumption (and others) that is equal to the subtraction of memory blowup and internal fragmentation from total memory overhead.
 
 
-Conceptually, internal fragmentation is the difference between the size class and the requested size for a small object. However, if the difference is larger than a page, the internal fragmentation cannot be computed  with this method. We need to consider page allocation policy, where the OS only allocates a physical page if it is used. Based on this, internal fragmentation for such objects should be adjusted correspondingly: for a new allocation, the fragmentation will be difference between the end of the object and the end of its last page; For a re-used object, \MP{} should track the maximum pages of this object, and use the difference between the end of its last page and the end of the object as internal fragmentation. When an object is released, its internal fragmentation should be decremented. \MP{} utilizes the same hash map as described in Section~\ref{sec:performanceimplement} to track the maximum pages for each object. 
-
-It is challenging to compute memory blowup correctly. By the definition of Section~\ref{sec:memoryconsumption}, a new allocation will be treated as memory blowup if there exist freed objects of this size class in the freelists of other threads. However, this definition does not specify whether memory blowup should be reduced upon deallocations, and what to do if such objects are subsequently re-allocated again. \MP{} computes memory blowup based on the following observation: \textit{all freed objects of a size class represent the upper bound for its memory blowup.} Then, \textit{the upper bound deducted by the size of recently-freed objects represents its memory blowup}. This definition is intuitive, since recently-freed objects do not belong to memory blowup, as they will exist anyway by necessity. Based on this definition, \MP{} further implements a practical method to compute the number of recent objects. The intuitive method simply utilizes a global counter to track recently-freed objects across each size class. This counter is incremented upon every deallocation, but will be decremented upon each allocation as long as the counter's value is greater than zero.
-
-
-In addition, it is very expensive to frequently collect all data, when memory consumption reaches its maximum value. Therefore, \MP{} only updates this data periodically, when the total memory usage is increased by 1MB. Also, it is also very expensive to update all data using global counters, since this will cause significant cache contention. Therefore, \MP{} tracks most data using thread-local variables, then summarizes all data together when reaching the maximum memory consumption. \MP{} only uses global variables for the memory consumption and the counts of recently-freed objects. However, even with these two global variables, it is expensive to update them with the full synchronization or even atomic variables. Instead, \MP{} updates these variables without synchronization primitives or the use of atomic variables, which may lose some updates. However, based on our evaluation, \MP{} should still provide a reliable percentage for different types of memory overhead.  
-
-%these data,  real memory usage is the amount of memory actually requested by the application, where real allocated memory is the sum of real memory usage and internal fragmentation due to size-class based allocation. For example, if an application requests the memory by \texttt{malloc(454)}, then real memory usage is incremented by $454$, but real allocated memory will be incremented by the size of its corresponding class size. For this example, total memory will be incremented by page size instead (e.g., 4096 bytes), provided that the page was previously unused. 
-
-
-
-%\MP{} also collects different types of memory overhead, such as internal fragmentation, memory blowup, and others. It also collects the available memory and total memory consumption of each size class. The detailed data help programmers to pinpoint its memory overhead issue. For instance, if memory overhead mainly comes from the internal fragmentation, then the allocator should utilize more fine-grained size classes. If the memory overhead mainly comes from memory blowup, the allocator may require to adjust its synchronization frequency or take a more aggressive method for its synchronization~\citep{DBLP:conf/iwmm/LiLD19}. The memory overhead could be reduced with coalescence or splitting, if the major memory overhead comes from external fragmentation. 
-
-%\MP{} typically records different counters upon each allocation and deallocation. For the performance reason, \MP{} typically maintains a per-thread counter in order to reduce the contention issue. The per-thread counters includes the number of allocations and deallocations for each size class, the number of bytes for internal fragmentation, and allocated objects for each size class. \MP{} utilizes a global hash table to track the status information for each object, Therefore, \MP{} could adjust the internal fragmentation upon each deallocation. 
-
-
-
-% \MP{} reports other memory overhead as a summarized value, including external fragmentation, metadata overhead, and explicitly skipped objects. It is difficult to differentiate them without the implementation details. %Since \MP{} traps all memory usage requested by the allocator, the remaining memory except internal fragmentation and memory blowup will be reported. 
- 
-
- 
- %External fragmentation occurs when an allocator has sufficient memory but in a non-continuous way. Therefore, \MP{} keeps a global counter for the available memory, so that it could determine whether an allocation causes the external fragmentation issue or not.  The counter for the memory blowup will be incremented, if the current per-thread heap has no freed objects but there exit freed objects with the requested size class in other per-thread heaps. Therefore, \MP{} maintains a global counter for each size class. 
-
-% Upon an allocation request, if the current thread does not possess any freed objects of the given size class -- but if the global counter does -- we record this event as an allocation responsible for increasing the allocator's memory blowup.
-
-  
-%  \todo{Based on the definitions of memory blowup and external fragmentation, an allocation will be counted as a memory blowup if there exists freed objects with the same size class. However, it is difficult to evaluate the external fragmentation. For instance, if freed objects with smaller class sizes exist, with the total size larger than the requested size, then the current allocation should be counted as external fragmentation. However, if freed objects with larger class sizes exist, it should not count as external fragmentation. But the overhead is caused by the issue of size class or without-splitting. Maybe we should make it clear in Section 3.3. }     
- 
+In the end, \MP{} will report memory wastes when memory consumption of an application reaches its maximum value. However, it is very expensive to frequently collect the data of memory wastes. Instead, \MP{} only updates this data, when the total memory usage is increased by 1MB. Also, it is also very expensive to update all data frequently using global counters, since this will cause significant cache contention. Therefore, \MP{} tracks most data with thread-local variables, and summarizes all data together when necessary. \MP{} only uses global variables for total memory consumption and counters of recently-freed objects for each size class. 
+%However, even with global variables, it is still expensive to update them with the full synchronization or even atomic variables. Instead, \MP{} updates these variables without synchronization, which may lose some updates. However, based on our evaluation, \MP{} should still provide a reliable percentage for different types of memory overhead.  
 
 \subsection{Profiling Scalability}
 \label{sec:profilingscale}
 
-\MP{} also collects the scalability data of a memory allocator. As described in Section~\ref{sec:scalability}, \MP{} evaluates the scalability for both user space and kernel space. 
+\MP{} reports the scalability of a memory allocator. More specifically, \MP{} evaluates the scalability for both user space and kernel space. 
 
-For user-space scalability, \MP{} mainly collects the number of acquisitions, the runtime of each acquisition (with the RDTSC instruction), the runtime of each critical section, the number of contentions, and the number of maximum contending threads. \MP{} utilizes the RDTSC instruction to collect the runtime. The challenging part is to track the contention information, without re-implementing synchronizations. \MP{} dynamically maintains the contention state of each lock. Before the acquisition, \MP{} increments the contention threads of the corresponding lock, which will be decremented upon the release of this lock. \MP{} utilizes a hash table to track the status of every lock. In theory, the contention data is not very accurate, since increments and decrements are not atomic. However, the data could still show the contending status of locks inside an allocator.    
+For user-space scalability, \MP{} mainly collects the number of lock acquisitions, the runtime of each lock acquisition and each critical section, and the number of contentions for each lock and in total. \MP{} utilizes the RDTSC instruction to collect the runtime. The challenging part is to track the contention information, without re-implementing synchronizations. 
+   
+% How to determine the contention. 
 
 For the kernel-space scalability, \MP{} focuses on memory-related system calls inside the allocation and deallocation paths, including \texttt{mmap}, \texttt{munmap}, \texttt{mremap}, \texttt{sbrk}, \texttt{madvise}, and \texttt{mprotect}. \MP{} profiles the runtime of each invocation with the RDSTC instruction, as well as the number of invocations made for each system call. In order to identify the issues of a specific execution path, \MP{} also collects the data for each type of allocation and deallocation, similar to the performance overhead discussed in Section~\ref{sec:performanceimplement}.
 In fact, even simple data could actually uncover serious scalability issues of a memory allocator. For instance, the Linux allocator of \texttt{glibc-2.21} slows down an application by 20\%, which can be uncovered by the excessive number of \texttt{madvise} system calls and a higher runtime for the corresponding \texttt{mmap} and \texttt{mprotect} system call. 
 
 
+For scalability data, we will also classify based on the allocation type. For those locks, we will provide per-lock data. 
+
 \subsection{Application Friendliness}
 \label{sec:profilefriendliness}
 
-%Currently, the Linux kernel has supported PMUs starting from 2009 (Linux-2.6.31)~\cite{pmulinuxsupport}, where users could set up performance monitoring via  the \texttt{perf\_event\_open} system call. After collecting events, the user program could fetch these events. 
+%Currently,
 
 \begin{comment}
 Cache line utilization: 
@@ -131,7 +114,27 @@ To predict the runtime reduction, \MP{} further collects the runtime outside mem
 	
 \end{comment}
 
-\subsection{Adapting To Different Allocators}
+\subsection{Prediction on Performance Impact}
+
+\label{sec:predict}
+
+\MP{} evaluates the performance impact that can be caused by the allocator. It utilizes the collected . 
+
+What type of data will be predicted. We could not predict the potential performance impact caused by passive/active false sharing, or other cache-friendliness. 
+
+But we could predict the performance impact by allocation's implementation. Basically, we will replace the time. 
+
+% How to handle multithreaded applications? 
+
+% How to deal with the baseline? 
+Currently, we are using the data of TcMalloc as the base line. But how to choose the right baseline. We are using the averaged runtime for each type of cycles. 
+
+% How to deal with the allocation type difference? For instance, one small allocation will be treated as big allocation in another allocators. 
+
+
+\todo{Track the page faults and madvise}
+
+\subsection{Collecting Allocator-Specific Information}
 \label{sec:understandingallocators}
 
 \MP{} is designed as a general profiler for sequential and BiBOP-style allocators, as described in Section~\ref{sec:allocator}. The primary challenge is to adapt to different allocators. \MP{} interprets a configuration file to identify the differences and unique characteristics of every allocator during its initialization phase, such as the allocator's style (BiBOP-style versus sequential), the sizes of its different classes, and the threshold separating small objects from large objects. Alternatively, this configuration can also be provided manually. \MP{} also provides a pre-run program to automatically determine these details for a given allocator.

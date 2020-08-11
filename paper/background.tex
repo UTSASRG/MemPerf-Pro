@@ -12,14 +12,15 @@
 \section{Background and Overview}
 \label{sec:background}
 
-This section presents the background about memory allocators, and some important factors of allocators. Then the basic idea of \MP{} is presented. 
+This section presents the background about memory allocators, and then describes the basic idea of \MP{}. 
 
 \subsection{Background of Allocators}
 
 \label{sec:allocator}
-Memory allocators are typically responsible for managing virtual memory inside the user space by satisfying memory requests from applications. Since the number of small objects is significantly larger than that of big objects, most allocators utilize different mechanisms to manage small and big objects~\cite{Hoard}. In order to reduce external fragmentation and encourage memory utilization, memory blocks are managed by size classes, and every allocation will be rounded to its next largest size class.  
+Memory allocators are typically responsible for managing virtual memory inside the user space by satisfying memory requests from applications. Since the number of small objects is significantly larger than that of big objects,  allocators typically utilize different mechanisms to manage small and big objects~\cite{Hoard}. Small objects are typically managed by size classes, so that every allocation request will be rounded to its next largest size class, which helps reduce external fragmentation and encourage memory utilization. In order to reduce potential contention, modern allocators are typically utilizing per-thread freelists to track objects freed by the current thread, which will introduce memory blowup issue~\cite{Hoard}.
 
-Based on this knowledge, \MP{} designs a pre-run program to collect the threshold of big objects and multiple class size information of small objects for a specific allocator, and then stores them into a file. Users could also provide such a file for an allocator. Based on this information, \MP{} will collect the data for big and small objects separately, in order to identify the specific design issues inside. 
+Based on this knowledge, \MP{} designs a pre-run program to collect the threshold of big objects and small objects, and collect class size information for small objects. All these information will be stored into a file that will be utilized by \MP{}, where users could also provide such a file for an allocator. Based on this information, \MP{} will collect the data for big and small objects separately, in order to identify the specific design issues inside. The information of size class is able to help identify internal fragmentation. Due to per-thread design, it is very important to identify memory wastes caused by memory blowup. 
+
  
 %For big objects, allocators may obtain a block of memory from the OS directly during the allocation, and then return it to the OS upon the deallocation~\cite{Hoard}. For small objects, allocators may utilize freelists or bitmaps to track freed objects upon deallocations. 
 
@@ -29,6 +30,8 @@ Based on this knowledge, \MP{} designs a pre-run program to collect the threshol
 
 %The metadata of these heap objects, such as their size and availability information, are typically stored in a separate area. Thus, BiBOP-style allocators improve security and reliability by avoiding metadata corruption caused by buffer overflows.  BiBOP-style allocators may utilize freelists or bitmaps to manage the availability of objects. 
 %When using a bitmap, only a single bit is sufficient to track the availability of an object, which may introduce less memory overhead for the metadata, but possibly with a higher performance overhead due to the manipulation of the bitmap and the loss of temporal locality.  
+
+\begin{comment}
 
 \subsection{Important Metrics of Allocators}
 
@@ -110,34 +113,12 @@ Overall, \MP{} reports the cache utilization rate, page utilization rate, cache 
 %employs the PMU hardware to collect these parameters. It employs the PMU-based sampling to sample memory accesses, and collects the data of cache and page utilization data upon sample events, as described in Section~\ref{sec:profilefriendliness}. \MP{} employs PMU to collect cache misses/page faults outside memory management.
 
 \subsubsection{Summary of Important Metrics}
-
-As described above, \MP{} reports many important metrics of an allocator, as shown in Table~\ref{table:metrics}. 
-%These metrics help answer whether an allocator is the culprit of a performance issue, and helps identify a particular design issue within the allocator. 
-Table~\ref{table:metrics} also provides collection techniques for specific metrics, which are further discussed in Section~\ref{sec:idea}. 
-
-\begin{table}[h]
-  \centering
-  \caption{Important metrics and corresponding collection techniques.\label{table:metrics}}
-  \footnotesize
- % \setlength{\tabcolsep}{1.0em}
-\begin{tabular}{l | l | l}
-\hline
-Category & Important Metrics & Collection Techniques \\ \hline
-\multirow{2}{*}{Performance} & {Alloc/Free runtime} & Timestamp\\ \cline{2-3}
-& {Cache misses, page faults, TLB misses, instructions} & Performance Monitoring Units (PMU) \\ \hline
-\multirow{4}{*}{Memory} & Internal fragmentation & \\ \cline{2-3}
-	& Memory blowup &  \\ \cline{2-3}
-& {Other overhead (e.g., external fragmentation)} &  \\ \cline{2-3}
-& Real memory usage & \\ \hline
-\multirow{2}{*}{Scalability} & \specialcell{User space contention: per-lock data} & Timestamp\\ \cline{2-3}
-& {Kernel space contention: per-syscall data} &  Timestamp \\ \hline
-\multirow{3}{*}{\specialcell{Application \\ Friendliness}} & Cache/page utilization rate & PMU  \\ \cline{2-3}
-& False sharing effect &  PMU\\ \cline{2-3}
-& Cache contention rate &  PMU \\ \hline
-  \end{tabular}
-\end{table}
+	
+\end{comment}
 
 
+
+\begin{comment}
 \subsection{Allocator's Performance}
 
 \todo{Maybe integrate the previous description}
@@ -165,5 +146,8 @@ Based on our current understanding, the following factors may affect the perform
 \item Low page utilization rate: similarly, this could affect the performance. 
 \item Active/passive false sharing issue: an allocator may introduce active/passive false sharing for applications running on it. 
 \end{itemize}
+	
+\end{comment}
+
 
 

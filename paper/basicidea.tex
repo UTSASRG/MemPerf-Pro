@@ -7,19 +7,46 @@
 \caption{Basic idea of \texttt{mmprof}.\label{fig:basicidea}}
 \end{figure}
 
-\MP{} is designed as a drop-in library that can be simply linked to applications (and allocators) with the preloading mechanism, which does not require the change or the re-compilation of applications and allocators.
+\MP{} is designed as a drop-in library that can be simply linked to applications (and allocators) with the preloading mechanism, which does not require the change or the re-compilation of applications and allocators, as far as an allocator utilizes standard synchronizations and system calls.
 
-\MP{} reports important metrics of an  allocator as discussed in Section~\ref{sec:factors}. Since allocators provide the same APIs to applications, invoke a limited set of system calls, and employ the similar thread synchronization primitives, \MP{} intercepts the interactions between an allocator and other components of the system. Such components include the application, the OS, and the pthreads library. The basic idea of \MP{} is shown as Fig.~\ref{fig:basicidea}. The interception allows \MP{} to collect the information of each interaction, and report the corresponding data in the end. 
+\MP{} aims to report important metrics of an allocator, as shown in Table~\ref{table:metrics}. These metrics help answer whether an allocator is the culprit of a performance issue, with a particular design/implementation issue, and the memory overhead of different categories. 
+%Table~\ref{table:metrics} also provides collection techniques for specific metrics, which are further discussed in Section~\ref{sec:idea}. 
 
-In order to collect the runtime of each interaction, \MP{} further employs the Time-Stamp Counter with the RDTSC instruction~\cite{coorporation1997using}. The Time-Stamp Counter is a hardware register available in X86 computers, which tracks the number of cycles since the reset time. The RDTSC instruction has two advantages over a system call, such as \texttt{gettimeofday}. First, its overhead is much lower than invoking a system call, typically around 30  cycles~\cite{rdtscoverhead}, instead of thousands of cycles. Second, it provides the information in the granularity of cycles, which is much finer than the microseconds that a system call can provide~\cite{pitfallsrdtsc}. With the RDTSC instruction, \MP{} obtains the timestamp before and after each operation, and uses the difference of timestamps as the runtime of a specific operation. \MP{} is able to measure the averaged runtime of each system call, each synchronization, and each memory management operation. 
+\begin{table}[h]
+  \centering
+    \footnotesize
+ % \setlength{\tabcolsep}{1.0em}
+\begin{tabular}{l | l }
+\hline
+Category & Important Metrics \\ \hline
+\multirow{2}{*}{Performance} & {Alloc/Free cycle} \\ \cline{2-2}
+& {Cache misses, page faults, instructions} \\\hline
+\multirow{3}{*}{Memory} & Internal fragmentation  \\ \cline{2-2}
+	& Memory blowup  \\ \cline{2-2}
+& {External fragmentation and others}  \\ \hline
+\multirow{2}{*}{Scalability} & \specialcell{User space contention} \\ \cline{2-2}
+& {Kernel space contention} \\ \hline
+\multirow{3}{*}{\specialcell{Application \\ Friendliness}} & Cache/page utilization rate  \\ \cline{2-2}
+& Passive/active false sharing \\ \cline{2-2}
+& Cache invalidation rate \\ \hline
+  \end{tabular}
+ \caption{Important metrics of memory allocator.\label{table:metrics}}
+\end{table}
 
-However, the invocation information alone cannot  explain the design issue inside and an allocator's application friendliness. \MP{} further employs hardware Performance Monitoring Units (PMU) to collect the information of memory accesses and hardware events. As shown in Fig.~\ref{fig:basicidea}, \MP{} focuses on accesses and events for both inside and outside of memory management operations. The PMU hardware is ubiquitous in modern architectures~\cite{AMDIBS:07, IntelArch:PEBS:Sept09, armpmu}, and has been  employed to sample memory accesses or hardware-related events~\cite{DBLP:conf/sc/ItzkowitzWAK03, ibs-sc, Sheng:2011:RLN:1985793.1985848}.
+Since all allocators provide the same APIs to applications, invoke a limited set of system calls, and employ the similar thread synchronization primitives, \MP{} intercepts the interactions between an allocator and other components of the system, such as the application (memory allocations and deallocations), the OS (memory-related system calls), and the pthreads library (synchronization APIs). The basic idea of \MP{} is shown as Fig.~\ref{fig:basicidea}. The interception allows \MP{} to collect the information of these interactions. 
+
+In order to collect the runtime of each interaction, \MP{} further employs the Time-Stamp Counter with the RDTSC instruction~\cite{coorporation1997using}. The Time-Stamp Counter is a hardware register available in X86 computers, which tracks the number of cycles since the reset time. The RDTSC instruction has two advantages over a system call to get the time, such as \texttt{gettimeofday}. First, its overhead is much lower than invoking a system call, typically around 30~60  cycles~\cite{rdtscoverhead}, instead of thousands of cycles. Second, it provides a fine-grained information (e.g., cycles), instead of microseconds that a system call can provide~\cite{pitfallsrdtsc}. With the RDTSC instruction, \MP{} obtains the timestamp before and after each operation, and uses the difference of timestamps as the runtime of a specific operation. \MP{} is able to measure the averaged runtime of each system call, each synchronization, and each memory management operation. 
+
+However, the invocation information alone cannot  explain the design issue inside and an allocator's application friendliness. \MP{} further employs hardware Performance Monitoring Units (PMU) to collect the information of memory accesses and hardware events. As shown in Fig.~\ref{fig:basicidea}, \MP{} focuses on accesses and events for both inside and outside of each memory management operation. The PMU hardware is ubiquitous in modern architectures~\cite{AMDIBS:07, IntelArch:PEBS:Sept09, armpmu}, and has been  employed to sample memory accesses or hardware-related events~\cite{DBLP:conf/sc/ItzkowitzWAK03, ibs-sc, Sheng:2011:RLN:1985793.1985848}.
 %, such as memory loads and stores, hardware instructions, cache misses, and TLB misses
-For each sampled memory access, PMUs provides the type of an access (load or store), and instruction position, timestamp, and memory address. \MP{} utilizes sampled memory accesses to identify cache contention rate, false sharing effect, cache utilization rate, and page utilize rate, as discussed in Section~\ref{sec:profilefriendliness}. PMUs also reports the number of instructions, page faults, TLB misses, and cache misses for inside and outside of allocation. Therefore, \MP{} helps programmers identify particular design issues inside an allocator. 
+%For each sampled memory access, PMUs provides the type of an access (load or store), and instruction position, timestamp, and memory address. 
+\MP{} utilizes sampled memory accesses to identify cache invalidation rate, false sharing effect, cache utilization rate, and page utilize rate, as discussed in Section~\ref{sec:profilefriendliness}. PMUs also reports the number of instructions, page faults, and cache misses for each memory management operation. Therefore, \MP{} helps programmers identify particular design issues inside an allocator. 
 
-Overall, \MP{} reports all metrics listed in Table~\ref{table:metrics}, by employing  RDTSC and PMUs techniques. The reported data, when combined together, explains the performance, scalability, memory consumption of an allocator. 
+%Overall, \MP{} reports all metrics listed in Table~\ref{table:metrics}, by employing  RDTSC and PMUs techniques. The reported data, when combined together, explains the performance, scalability, memory consumption of an allocator. 
 %The reported data will benefit both allocator designers and normal programmers. 
 %I helps predict the potential performance issue of an allocator. 
+
+\begin{comment}
 
 \subsection{Technical Challenges}
 
@@ -48,6 +75,8 @@ The last challenge is to predict the performance impact of an allocator. The rep
 % Comparing to the method of utilizing system calls, such as \texttt{gettimeofday()}, the RDTSC instruction has two advantages. First, the overhead is much lower than issuing a system call, typically around 25-35 cycles~\cite{rdtscoverhead}. Second, it provides a high-resolution timer, with the granularity of cycles, which is much finer than traditional system calls~\cite{pitfallsrdtsc}. For instance, the system call \texttt{gettimeofday} could only provide the microsecond granularity, which is too coarse for measuring the performance of system calls or synchronization overhead.  
 
 
+	
+\end{comment}
 
 
 
