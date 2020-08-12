@@ -13,8 +13,8 @@ Experiments were performed on a two-processor machine, where each processor is I
 \subsection{Effectiveness}
 \label{sec:effectiveness}
 
-\todo{What could benefit normal users? What could benefit allocator designers?}
 
+\subsubsection{Benefiting Allocator Designers}
 In order to evaluate the effectiveness, we evaluate \MP{} with five widely-used allocators, including two versions of the Linux allocator (versions 2.21 and 2.28), TCMalloc~\cite{tcmalloc}, jemalloc, and Hoard, and two secure allocators, i.e. DieHarder and OpenBSD. These allocators include both sequential and BiBOP-style allocators. Secure allocators were included, since they have their unique memory management policies. 
 
 For the evaluation, we use the default configurations of these allocators. However, we make some changes in order to  intercept synchronizations. Since the Linux allocators are included within the \texttt{glibc} libraries, they invoke the internal synchronizations (\texttt{lll\_lock}) directly, which cannot be intercepted by \MP{}. They are thus recompiled separately as a stand-alone library for the purposes of evaluation. Because Hoard is using \texttt{std::lock\_guard} for its synchronization, we replaced these with POSIX spinlocks to track its synchronization behavior.
@@ -32,9 +32,13 @@ For the evaluation, we use the default configurations of these allocators. Howev
 
 %It seems that BIBOP style allocators are the trend of allocators, which not only has a better performance overhead on average, but also has better safety by separating the metadata from the actual heap. 
 
+\subsubsection{Benefiting Normal Users}
+\todo{What could benefit normal users? What could benefit allocator designers?}
 
 
-\subsection{Performance Overhead}
+\subsection{Overhead of \MP{}}
+
+\subsubsection{Performance Overhead}
 \label{sec:perf}
 
 \begin{figure}[!ht]
