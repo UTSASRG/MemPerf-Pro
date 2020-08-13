@@ -118,26 +118,30 @@ To predict the runtime reduction, \MP{} further collects the runtime outside mem
 
 \label{sec:predict}
 
-\MP{} predicts the performance impact that can be caused by the allocator by replacing the current allocator with a well-performed allocator. Currently, we are using the data of . 
+\MP{} predicts performance impact of the current allocator. More specifically, it can predict the possible performance improvement if the current allocator is replaced by a target allocator. The prediction is able to predict the slowdown caused by slow memory management operations, but not the performance impact caused by application-friendliness, which is too complicated to predict accurately. \todo{For instance, a sampled 50\% cache contention rate may lead to $47\times$ performance difference of TcMalloc on the \texttt{cache-thrash}, comparing to .}
+
+The basic idea of the prediction is to replace the cycles of every memory management operation with the corresponding ones in the target allocator. Currently, the default target allocator is TcMalloc, which could be easily changed to any allocator via a configuration file. Different types of memory management operations have a vast difference in their cycles, including parallel or serial phases, small or big objects, allocations or deallocations, and re-used or new allocations, which should be specified separately in the configuration file. For TcMalloc, the average cycles of all applications is used. 
+
+ 
+\todo{Should we utilize a configuration file to make this functionality flexible? How to design this configuration file? }  
+%The prediction will help both allocator designers and normal users. 
 
 
-\todo{How to deal with madvise and munmap?} 
 
-\todo{\MP{} will predict whether the performance can be improved or not by changing the cycles of memory operations. If not, then the performance difference of an allocator will be caused by some application-friendliness. }
-What type of data will be predicted. We could not predict the potential performance impact caused by passive/active false sharing, or other cache-friendliness. 
+\begin{figure}[!ht]
+\centering
+\includegraphics[width=3.2in]{figures/forkjoin}
+\caption{Simplified runtime for the prediction, where rectangles indicate the runtime of memory management operations and hexagons are the runtime of others. \label{fig:time}}
+\end{figure}
 
-But we could predict the performance impact by allocation's implementation. Basically, we will replace the time. 
+\MP{} handles the prediction for both single and multi-threaded applications. The execution of an application is simplified as Figure~\ref{fig:time}, where multithreaded applications have interleaved parallel and serial phases. There is only one serial phase for single-threaded applications. The prediction will replace the cycles of memory management operations with the ones in the target allocator. If the predicted runtime is shorter than the original one, \MP{} will predict some performance improvement. Otherwise, it may cause slowdown. For multithreaded applications, \MP{} provides two types of prediction. First, for each parallel phase, it will compute the predicted runtime for every thread separately (treating every thread independently), and then utilize the longest runtime as the runtime for this parallel phase. Second, it will compute the runtime for all threads, but utilizing the average runtime as the prediction for this parallel phase. After that, it will combine the runtime of parallel phases and serial phases, and utilize the total runtime as the prediction. 
 
 % How to handle multithreaded applications? 
-\MP{} will automatically detect the critical path for multithreaded applications. For each parallel phase, \MP{} select the thread with most cycles as its critical thread, and calculate the performance improvement of the critical path as the improvement of the whole program. Besides, \MP{} will gather the number of pages faults outside allocations for all threads, in order to indicate implict factors triggered by allocators that could influence the performance.
+%\MP{} will automatically detect the critical path for multithreaded applications. For each parallel phase, \MP{} select the thread with most cycles as its critical thread, and calculate the performance improvement of the critical path as the improvement of the whole program. 
 
-% How to deal with the baseline? 
-Currently, we are using the data of TcMalloc as the base line. But how to choose the right baseline. We are using the averaged runtime for each type of cycles. 
+\todo{For applications like \texttt{dedup}, \MP{} will gather the number of pages faults outside allocations for all threads, in order to indicate implicit factors triggered by allocators that could influence the performance}.
 
-% How to deal with the allocation type difference? For instance, one small allocation will be treated as big allocation in another allocators. 
-\MP{} will seperately determine allocation types in the allocator chosen for prediction, in which way it could handle the allocation type difference.
-
-\todo{Track the page faults and madvise}
+The prediction will benefit both allocator developers and normal users. Normal users could base on the prediction to decide whether to change to a new allocator without requiring the execution, if \MP{} reports no issues on cache-friendliness. Allocator developers will only check cache-friendliness parameters, if the prediction indicates no performance difference. 
 
 \subsection{Collecting Allocator-Specific Information}
 \label{sec:understandingallocators}
