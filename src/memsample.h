@@ -39,11 +39,11 @@ typedef struct {
   int perf_fd2;
   uint64_t prev_head;
 	int perf_fd_fault;
-//    int perf_fd_cache_refer;
-//    int perf_fd_cache_miss;
 	int perf_fd_l1cache_load;
 	int perf_fd_l1cache_load_miss;
-	int perf_fd_instr;
+    int perf_fd_llc_load;
+    int perf_fd_llc_load_miss;
+//	int perf_fd_instr;
 
   char * data_buf_copy = NULL;
   void * ring_buf = NULL;

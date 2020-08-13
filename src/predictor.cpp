@@ -91,21 +91,21 @@ void Predictor::outsideCountingEventsStop() {
     if(stopCountingEvent.faults > startCountingEvent.faults) {
         countingEvent.faults += stopCountingEvent.faults - startCountingEvent.faults;
     }
-//    if(stopCountingEvent.cache_refer > startCountingEvent.cache_refer) {
-//        countingEvent.cache_refer += stopCountingEvent.cache_refer - startCountingEvent.cache_refer;
-//    }
-//    if(stopCountingEvent.cache_misses > startCountingEvent.cache_misses) {
-//        countingEvent.cache_misses += stopCountingEvent.cache_misses - startCountingEvent.cache_misses;
-//    }
     if(stopCountingEvent.l1cache_load > startCountingEvent.l1cache_load) {
         countingEvent.l1cache_load += stopCountingEvent.l1cache_load - startCountingEvent.l1cache_load;
     }
     if(stopCountingEvent.l1cache_load_miss > startCountingEvent.l1cache_load_miss) {
         countingEvent.l1cache_load_miss += stopCountingEvent.l1cache_load_miss - startCountingEvent.l1cache_load_miss;
     }
-    if(stopCountingEvent.instructions > startCountingEvent.instructions) {
-        countingEvent.instructions += stopCountingEvent.instructions - startCountingEvent.instructions;
+    if(stopCountingEvent.llc_load > startCountingEvent.llc_load) {
+        countingEvent.llc_load += stopCountingEvent.llc_load - startCountingEvent.llc_load;
     }
+    if(stopCountingEvent.llc_load_miss > startCountingEvent.llc_load_miss) {
+        countingEvent.llc_load_miss += stopCountingEvent.llc_load_miss - startCountingEvent.llc_load_miss;
+    }
+//    if(stopCountingEvent.instructions > startCountingEvent.instructions) {
+//        countingEvent.instructions += stopCountingEvent.instructions - startCountingEvent.instructions;
+//    }
 }
 
 void Predictor::threadEnd() {
@@ -153,8 +153,8 @@ void Predictor::stopSerial() {
     }
 
     criticalCountingEvent.add(countingEvent);
-    fprintf(stderr, "start parallel %lu %lu %lu %lu\n", criticalCycle, replacedCriticalCycle, outsideCycle, faultedPages * cyclePerPageFault);
-    criticalCountingEvent.debugPrint();
+//    fprintf(stderr, "start parallel %lu %lu %lu %lu\n", criticalCycle, replacedCriticalCycle, outsideCycle, faultedPages * cyclePerPageFault);
+//    criticalCountingEvent.debugPrint();
     cleanStageData();
 }
 
@@ -181,8 +181,8 @@ void Predictor::stopParallel() {
 
     criticalCycle += criticalStageCycle;
     replacedCriticalCycle += criticalReplacedStageCycle;
-    fprintf(stderr, "stop parallel %lu %lu\n", criticalCycle, replacedCriticalCycle);
-    criticalCountingEvent.debugPrint();
+//    fprintf(stderr, "stop parallel %lu %lu\n", criticalCycle, replacedCriticalCycle);
+//    criticalCountingEvent.debugPrint();
     cleanStageData();
 }
 
@@ -207,16 +207,14 @@ void Predictor::printOutput() {
     }
 
     fprintf(ProgramStatus::outputFile, "total cycles               %20lu\n", totalCycle);
-    if(totalCycle) {
+    if(totalCycle/1000) {
         fprintf(ProgramStatus::outputFile, "faults                     %20lu    %20lu per 1k cycle\n",
                 criticalCountingEvent.faults, criticalCountingEvent.faults/(totalCycle/1000));
-//    fprintf(ProgramStatus::outputFile, "cache refer              %20lu\n", criticalCountingEvent.cache_refer);
-//    fprintf(ProgramStatus::outputFile, "cache misses             %20lu\n", criticalCountingEvent.cache_misses);
+
         fprintf(ProgramStatus::outputFile, "l1-dcache-loads            %20lu    %20lu per 1k cycle\n",
                 criticalCountingEvent.l1cache_load, criticalCountingEvent.l1cache_load/(totalCycle/1000));
         fprintf(ProgramStatus::outputFile, "l1-dcache-load-misses      %20lu    %20lu per 1k cycle\n",
                 criticalCountingEvent.l1cache_load_miss, criticalCountingEvent.l1cache_load_miss/(totalCycle/1000));
-
         if(criticalCountingEvent.l1cache_load_miss) {
             if(criticalCountingEvent.l1cache_load_miss < criticalCountingEvent.l1cache_load) {
                 fprintf(ProgramStatus::outputFile, "l1-dcache-load-misses-rate %3lu%%\n", criticalCountingEvent.l1cache_load_miss*100/criticalCountingEvent.l1cache_load);
@@ -227,8 +225,22 @@ void Predictor::printOutput() {
             fprintf(ProgramStatus::outputFile, "l1-dcache-load-misses-rate 0%%\n");
         }
 
-        fprintf(ProgramStatus::outputFile, "instructions               %20lu    %20lu per 1k cycle\n",
-                criticalCountingEvent.instructions, criticalCountingEvent.instructions/(totalCycle/1000));
+        fprintf(ProgramStatus::outputFile, "llc-load            %20lu    %20lu per 1k cycle\n",
+                criticalCountingEvent.llc_load, criticalCountingEvent.llc_load/(totalCycle/1000));
+        fprintf(ProgramStatus::outputFile, "llc-load-misses      %20lu    %20lu per 1k cycle\n",
+                criticalCountingEvent.llc_load_miss, criticalCountingEvent.llc_load_miss/(totalCycle/1000));
+        if(criticalCountingEvent.llc_load_miss) {
+            if(criticalCountingEvent.llc_load_miss < criticalCountingEvent.llc_load) {
+                fprintf(ProgramStatus::outputFile, "llc-load-misses-rate %6lu%%%%\n", criticalCountingEvent.llc_load_miss*10000/criticalCountingEvent.llc_load);
+            } else {
+                fprintf(ProgramStatus::outputFile, "llc-load-misses-rate 10000%%%%\n");
+            }
+        } else {
+            fprintf(ProgramStatus::outputFile, "llc-load-misses-rate 0%%\n");
+        }
+
+//        fprintf(ProgramStatus::outputFile, "instructions               %20lu    %20lu per 1k cycle\n",
+//                criticalCountingEvent.instructions, criticalCountingEvent.instructions/(totalCycle/1000));
     }
 
 }

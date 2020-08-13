@@ -94,8 +94,6 @@ void GlobalStatus::printCountingEvents() {
             printTitle(allocationTypeOutputTitleString[allocationType], numOfSampledCountingFunctions[allocationType]);
             fprintf(ProgramStatus::outputFile, "cycles                %20lu   avg %20lu\n", cycles[allocationType], cycles[allocationType]/numOfSampledCountingFunctions[allocationType]);
             fprintf(ProgramStatus::outputFile, "faults                %20lu   avg %20lu\n", countingEvents[allocationType].faults, countingEvents[allocationType].faults/numOfSampledCountingFunctions[allocationType]);
-//            fprintf(ProgramStatus::outputFile, "cache refer           %20lu   avg %20lu\n", countingEvents[allocationType].cache_refer, countingEvents[allocationType].cache_refer/numOfSampledCountingFunctions[allocationType]);
-//            fprintf(ProgramStatus::outputFile, "cache misses          %20lu   avg %20lu\n", countingEvents[allocationType].cache_misses, countingEvents[allocationType].cache_misses/numOfSampledCountingFunctions[allocationType]);
             fprintf(ProgramStatus::outputFile, "l1-dcache-loads       %20lu   avg %20lu\n", countingEvents[allocationType].l1cache_load, countingEvents[allocationType].l1cache_load/numOfSampledCountingFunctions[allocationType]);
             fprintf(ProgramStatus::outputFile, "l1-dcache-load-misses %20lu   avg %20lu\n", countingEvents[allocationType].l1cache_load_miss, countingEvents[allocationType].l1cache_load_miss/numOfSampledCountingFunctions[allocationType]);
             if(countingEvents[allocationType].l1cache_load_miss) {
@@ -107,7 +105,18 @@ void GlobalStatus::printCountingEvents() {
             } else {
                 fprintf(ProgramStatus::outputFile, "l1-dcache-load-miss-rate 0%%\n");
             }
-            fprintf(ProgramStatus::outputFile, "instructions          %20lu   avg %20lu\n", countingEvents[allocationType].instructions, countingEvents[allocationType].instructions/numOfSampledCountingFunctions[allocationType]);
+            fprintf(ProgramStatus::outputFile, "llc-loads       %20lu   avg %20lu\n", countingEvents[allocationType].llc_load, countingEvents[allocationType].llc_load/numOfSampledCountingFunctions[allocationType]);
+            fprintf(ProgramStatus::outputFile, "llc-load-misses %20lu   avg %20lu\n", countingEvents[allocationType].llc_load_miss, countingEvents[allocationType].llc_load_miss/numOfSampledCountingFunctions[allocationType]);
+            if(countingEvents[allocationType].llc_load_miss) {
+                if(countingEvents[allocationType].llc_load_miss < countingEvents[allocationType].llc_load) {
+                    fprintf(ProgramStatus::outputFile, "llc-load-misses-rate %3lu%%\n", countingEvents[allocationType].llc_load_miss*100/countingEvents[allocationType].llc_load);
+                } else {
+                    fprintf(ProgramStatus::outputFile, "llc-load-misses-rate 100%%\n");
+                }
+            } else {
+                fprintf(ProgramStatus::outputFile, "llc-load-misses-rate 0%%\n");
+            }
+//            fprintf(ProgramStatus::outputFile, "instructions          %20lu   avg %20lu\n", countingEvents[allocationType].instructions, countingEvents[allocationType].instructions/numOfSampledCountingFunctions[allocationType]);
             fprintf(ProgramStatus::outputFile, "\n");
         }
     }

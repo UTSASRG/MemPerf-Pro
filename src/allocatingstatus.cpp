@@ -114,11 +114,11 @@ void AllocatingStatus::calculateCountingDataInRealFunction() {
     cyclesMinus = 0;
 
     countingDataInRealFunction.faults = countingDataAfterRealFunction.faults - countingDataBeforeRealFunction.faults;
-//    countingDataInRealFunction.cache_refer = countingDataAfterRealFunction.cache_refer - countingDataBeforeRealFunction.cache_refer;
-//    countingDataInRealFunction.cache_misses = countingDataAfterRealFunction.cache_misses - countingDataBeforeRealFunction.cache_misses;
     countingDataInRealFunction.l1cache_load = countingDataAfterRealFunction.l1cache_load - countingDataBeforeRealFunction.l1cache_load;
     countingDataInRealFunction.l1cache_load_miss = countingDataAfterRealFunction.l1cache_load_miss - countingDataBeforeRealFunction.l1cache_load_miss;
-    countingDataInRealFunction.instructions = countingDataAfterRealFunction.instructions - countingDataBeforeRealFunction.instructions;
+    countingDataInRealFunction.llc_load = countingDataAfterRealFunction.llc_load - countingDataBeforeRealFunction.llc_load;
+    countingDataInRealFunction.llc_load_miss = countingDataAfterRealFunction.llc_load_miss - countingDataBeforeRealFunction.llc_load_miss;
+//    countingDataInRealFunction.instructions = countingDataAfterRealFunction.instructions - countingDataBeforeRealFunction.instructions;
 }
 
 void AllocatingStatus::removeAbnormalCountingEventValues() {
@@ -128,21 +128,21 @@ void AllocatingStatus::removeAbnormalCountingEventValues() {
     if(countingDataInRealFunction.faults > ABNORMAL_VALUE) {
         countingDataInRealFunction.faults = 0;
     }
-//    if(countingDataInRealFunction.cache_refer > ABNORMAL_VALUE) {
-//        countingDataInRealFunction.cache_refer = 0;
-//    }
-//    if(countingDataInRealFunction.cache_misses > ABNORMAL_VALUE) {
-//        countingDataInRealFunction.cache_misses = 0;
-//    }
     if(countingDataInRealFunction.l1cache_load > ABNORMAL_VALUE) {
         countingDataInRealFunction.l1cache_load = 0;
     }
     if(countingDataInRealFunction.l1cache_load_miss > ABNORMAL_VALUE) {
         countingDataInRealFunction.l1cache_load_miss = 0;
     }
-    if(countingDataInRealFunction.instructions > ABNORMAL_VALUE) {
-        countingDataInRealFunction.instructions = 0;
+    if(countingDataInRealFunction.llc_load > ABNORMAL_VALUE) {
+        countingDataInRealFunction.llc_load = 0;
     }
+    if(countingDataInRealFunction.llc_load_miss > ABNORMAL_VALUE) {
+        countingDataInRealFunction.llc_load_miss = 0;
+    }
+//    if(countingDataInRealFunction.instructions > ABNORMAL_VALUE) {
+//        countingDataInRealFunction.instructions = 0;
+//    }
 }
 
 void AllocatingStatus::stopCountCountingEvents() {
