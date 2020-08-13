@@ -223,6 +223,7 @@ void GlobalStatus::printFriendliness() {
 
 void GlobalStatus::printOutput() {
     fprintf(stderr, "writing output file.....\n");
+    fprintf(stderr, "%d threads\n", ThreadLocalStatus::maxNumOfRunningThread);
     ProgramStatus::printOutput();
     printNumOfAllocations();
     printCountingEvents();

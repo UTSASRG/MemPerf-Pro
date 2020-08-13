@@ -20,26 +20,19 @@ public:
     static thread_local PerfReadInfo countingEvent;
     static thread_local uint64_t numOfFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
     static thread_local uint64_t functionCycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
-//    static constexpr int64_t replacedFunctionCycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-//                                                                                       -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
-//    static constexpr int64_t replacedFunctionCycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA] = {0, 0, 0, 0, 0, 0, 0, 0, -1, -1, -1, -1,
-//                                                                                           0, 0, 0, 0, 0, 0, 0, 0, -1, -1, -1, -1};
-//    static constexpr int64_t replacedFunctionCycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA] = {172, -1, 64, -1, 8006, 113, -1, 9559, -1, -1, -1, -1,
-//                                                                                           475, -1, 279, -1, 2144, 219, -1, 2761, -1, -1, -1, -1}; ///fault3000
-//    static constexpr int64_t replacedFunctionCycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA] = {113, -1, 47, -1, 1529, 62, -1, 1490, -1, -1, -1, -1,
-//                                                                                           577, -1, 369, -1, 2758, 234, -1, 2924, -1, -1, -1, -1}; ///raytrace
-    static constexpr int64_t replacedFunctionCycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA] = {191, -1, 64, -1, 9821, 113, -1, 11681, -1, -1, -1, -1,
-                                                                                           577, -1, 369, -1, 2758, 234, -1, 2924, -1, -1, -1, -1}; ///avg
+    static size_t replacedFunctionCycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];///avg
 
-    static const uint64_t replacedMiddleObjectThreshold = 188424;
-    static const uint64_t replacedLargeObjectThreshold = 188424;
+    static size_t replacedMiddleObjectThreshold;
+    static size_t replacedLargeObjectThreshold;
     static thread_local uint64_t outsideStartCycle;
     static thread_local uint64_t outsideStopCycle;
     static thread_local uint64_t outsideCycle;
     static thread_local uint64_t outsideCycleMinus;
 
     static thread_local uint64_t faultedPages;
-    static const uint64_t cyclePerPageFault = 2900;
+    static uint64_t cyclePerPageFault;
+
+    static FILE * predictorInfoFile;
 
     static void globalInit();
     static void threadInit();
@@ -53,6 +46,13 @@ public:
     static void stopSerial();
     static void stopParallel();
     static void printOutput();
+    static void readFunctionCyclesFromInfo(char*token);
+    static void readMiddleObjectThresholdFromInfo(char*token);
+    static void readLargeObjectThresholdFromInfo(char*token);
+    static void readPageFaultCycleFromInfo(char*token);
+    static void fopenPredictorInfoFile();
+    static void readPredictorInfoFile();
+    static void openPredictorInfoFile();
 };
 
 #endif //SRC_PREDICTOR_H

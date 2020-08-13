@@ -10,6 +10,7 @@
 class ThreadLocalStatus {
 public:
     static unsigned int totalNumOfThread;
+    static unsigned int maxNumOfRunningThread;
     static unsigned int totalNumOfRunningThread;
     static thread_local int runningThreadIndex;
     static spinlock lock;
