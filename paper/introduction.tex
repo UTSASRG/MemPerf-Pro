@@ -46,7 +46,7 @@ Overall, \MP{} profiles multiple important aspects of memory allocators, such as
 Overall, this paper makes the following contributions. 
 
 \begin{itemize}
-\item It proposes the first general profiler--\MP{}--to profile different memory allocators, without the need of the change of the allocator and the underlying OS, if an allocator utilizes the standard synchronization.  
+\item It proposes the first general profiler--\MP{}--to profile different memory allocators, without the need of the change of the allocator and the underlying OS, if an allocator utilizes the standard synchronization and system calls.  
 
 \item \MP{} profiles multiple important aspects of an allocator that will significantly impact the performance and memory overhead of an allocator, with the assistance of PMUs, time-stamp counters, and simple counters together. 
 
@@ -54,7 +54,7 @@ Overall, this paper makes the following contributions.
 %profile cache/page utilization rate, memory blowup, active/passive false sharing, and kernel contention for the first time.
 %, and attributes the data to each allocation and deallocation, helps discover designing issues that cannot be discovered with general profilers.  
  
-\item This paper performs extensive experimentation to confirm its effectiveness, performance, and memory overhead.    
+\item This paper performs extensive experimentation to confirm its effectiveness and overhead.    
 
 \end{itemize} 
 
