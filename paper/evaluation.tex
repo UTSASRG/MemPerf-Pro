@@ -8,7 +8,7 @@ This experimental evaluation will answer the following questions:
 \item What is the memory overhead of \MP{}? (Section~\ref{sec:memory})
 \end{itemize}
 
-Experiments were performed on a two-processor machine, where each processor is Intel(R) Xeon(R) Gold 6230 and each processor has 20 cores. This machine has 256GB of main memory, 20MB of L2 cache, and 1280KB L1 cache. The underlying OS is Ubuntu 18.04.3 LTS, installed with the Linux-5.3.0-40. All applications were compiled using GCC-7.5.0, with \texttt{-O2} and \texttt{-g} flags.
+Experiments were performed on a two-processor machine, where each processor is Intel(R) Xeon(R) Gold 6230 and each processor has 20 cores. This machine has 256GB of main memory, 20MB of L2 cache, and 1280KB L1 cache. The underlying OS is Ubuntu 18.04.3 LTS, installed with the Linux-5.3.0-40. All applications were compiled using GCC-7.5.0, with \texttt{-O2} and \texttt{-g} flags. Since \MP{} is not designed to profile NUMA related performance issues, we only utilize 16 hardware cores in node 0, and close other cores. 
 
 \subsection{Effectiveness}
 \label{sec:effectiveness}
@@ -19,8 +19,9 @@ In order to evaluate the effectiveness, we evaluate \MP{} with five widely-used 
 
 For the evaluation, we use the default configurations of these allocators. However, we make some changes in order to  intercept synchronizations. Since the Linux allocators are included within the \texttt{glibc} libraries, they invoke the internal synchronizations (\texttt{lll\_lock}) directly, which cannot be intercepted by \MP{}. They are thus recompiled separately as a stand-alone library for the purposes of evaluation. Because Hoard is using \texttt{std::lock\_guard} for its synchronization, we replaced these with POSIX spinlocks to track its synchronization behavior.
 
-%\todo{Let's use a table to list all dramatic difference between these allocators. This gives us some evidence of allocators}
-%\subsection{Issues Identified in Different Allocators}
+\todo{Adding average cycles (range) for each type of allocations. This gives us some evidence of allocators (maybe includes the average number of locks??)}
+
+\todo{What are workflow?}
 
 \input{applications} 
 \input{metrics}
