@@ -155,17 +155,31 @@ void Predictor::stopSerial() {
 void Predictor::stopParallel() {
     uint64_t criticalStageCycle = 0;
     uint64_t criticalReplacedStageCycle = 0;
+    uint64_t numOfActiveThreads = 0;
     PerfReadInfo criticalStageCountingEvent;
     memset(&criticalStageCountingEvent, 0, sizeof(PerfReadInfo));
 
-    ///max
+///max
+//    for(unsigned int index = 1; index < ThreadLocalStatus::totalNumOfThread; ++index) {
+//        if(threadCycle[index] && threadReplacedCycle[index]) {
+//            criticalStageCycle = MAX(criticalStageCycle, threadCycle[index]);
+//            criticalReplacedStageCycle = MAX(criticalReplacedStageCycle, threadReplacedCycle[index]);
+//        }
+//    }
+
+
+///avg
     for(unsigned int index = 1; index < ThreadLocalStatus::totalNumOfThread; ++index) {
         if(threadCycle[index] && threadReplacedCycle[index]) {
-            criticalStageCycle = MAX(criticalStageCycle, threadCycle[index]);
-            criticalReplacedStageCycle = MAX(criticalReplacedStageCycle, threadReplacedCycle[index]);
+            numOfActiveThreads++;
+            criticalStageCycle += threadCycle[index];
+            criticalReplacedStageCycle += threadReplacedCycle[index];
         }
     }
+    criticalStageCycle /= numOfActiveThreads;
+    criticalReplacedStageCycle /= numOfActiveThreads;
 
+    
     for(unsigned int index = 0; index < ThreadLocalStatus::totalNumOfThread; ++index) {
         if(threadCycle[index] && threadReplacedCycle[index]) {
             totalCycle += threadCycle[index];

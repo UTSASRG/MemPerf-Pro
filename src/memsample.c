@@ -56,6 +56,9 @@ inline int create_perf_event(perf_event_attr * attr, int group) {
 
 //get data from PMU and store it into the PerfReadInfo struct
 void getPerfCounts (PerfReadInfo * i) {
+    ///No Counting event
+    return;
+
 #ifdef NO_PMU
 #warning NO_PMU flag set -> sampling will be disabled
     return;
@@ -385,7 +388,7 @@ int initPMU(void) {
 		#ifdef NO_PMU
 				#warning MEMORY ACCESS SAMPLING IS DISABLED
 		#else
-		setupCounting();
+//		setupCounting();
 		setupSampling();
 		#endif
 
