@@ -146,15 +146,11 @@ void TotalMemoryUsage::debugPrint() {
 
 void PerfReadInfo::add(struct PerfReadInfo newPerfReadInfo) {
     faults += newPerfReadInfo.faults;
-    l1cache_load += newPerfReadInfo.l1cache_load;
-    l1cache_load_miss += newPerfReadInfo.l1cache_load_miss;
-    llc_load += newPerfReadInfo.llc_load;
-    llc_load_miss += newPerfReadInfo.llc_load_miss;
-//    instructions += newPerfReadInfo.instructions;
+    instructions += newPerfReadInfo.instructions;
 }
 
 
 void PerfReadInfo::debugPrint() {
-    fprintf(stderr, "faults = %ld, l1cache_load = %lu, l1cache_load_miss = %lu, llc_load = %lu, llc_load_miss = %lu\n",
-                    faults, l1cache_load, l1cache_load_miss, llc_load, llc_load_miss);
+//    fprintf(stderr, "faults = %ld, l1cache_load = %lu, l1cache_load_miss = %lu, llc_load = %lu, llc_load_miss = %lu\n",
+//                    faults, l1cache_load, l1cache_load_miss, llc_load, llc_load_miss);
 }

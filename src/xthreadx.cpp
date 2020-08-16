@@ -43,7 +43,7 @@ void * xthreadx::startThread(void * arg) {
 
     ThreadLocalStatus::getARunningThreadIndex();
 //    fprintf(stderr, "%d thread create\n", ThreadLocalStatus::runningThreadIndex);
-    ThreadLocalStatus::setRandomPeriodForCountingEvent(RANDOM_PERIOD_FOR_COUNTING_EVENT);
+//    ThreadLocalStatus::setRandomPeriodForCountingEvent(RANDOM_PERIOD_FOR_COUNTING_EVENT);
 
     ///CPU Binding
 //    cpu_set_t mask;

@@ -1,6 +1,7 @@
 #include "threadlocalstatus.h"
 
 unsigned int ThreadLocalStatus::totalNumOfThread;
+unsigned int ThreadLocalStatus::maxNumOfRunningThread = 0;
 unsigned int ThreadLocalStatus::totalNumOfRunningThread;
 thread_local int ThreadLocalStatus::runningThreadIndex;
 spinlock ThreadLocalStatus::lock;
@@ -31,6 +32,7 @@ void ThreadLocalStatus::getARunningThreadIndex() {
 void ThreadLocalStatus::addARunningThread() {
     lock.lock();
     totalNumOfRunningThread++;
+    maxNumOfRunningThread = MAX(maxNumOfRunningThread, totalNumOfRunningThread);
     lock.unlock();
 }
 

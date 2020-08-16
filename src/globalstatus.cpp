@@ -94,29 +94,7 @@ void GlobalStatus::printCountingEvents() {
             printTitle(allocationTypeOutputTitleString[allocationType], numOfSampledCountingFunctions[allocationType]);
             fprintf(ProgramStatus::outputFile, "cycles                %20lu   avg %20lu\n", cycles[allocationType], cycles[allocationType]/numOfSampledCountingFunctions[allocationType]);
             fprintf(ProgramStatus::outputFile, "faults                %20lu   avg %20lu\n", countingEvents[allocationType].faults, countingEvents[allocationType].faults/numOfSampledCountingFunctions[allocationType]);
-            fprintf(ProgramStatus::outputFile, "l1-dcache-loads       %20lu   avg %20lu\n", countingEvents[allocationType].l1cache_load, countingEvents[allocationType].l1cache_load/numOfSampledCountingFunctions[allocationType]);
-            fprintf(ProgramStatus::outputFile, "l1-dcache-load-misses %20lu   avg %20lu\n", countingEvents[allocationType].l1cache_load_miss, countingEvents[allocationType].l1cache_load_miss/numOfSampledCountingFunctions[allocationType]);
-            if(countingEvents[allocationType].l1cache_load_miss) {
-                if(countingEvents[allocationType].l1cache_load_miss < countingEvents[allocationType].l1cache_load) {
-                    fprintf(ProgramStatus::outputFile, "l1-dcache-load-miss-rate %3lu%%\n", countingEvents[allocationType].l1cache_load_miss*100/countingEvents[allocationType].l1cache_load);
-                } else {
-                    fprintf(ProgramStatus::outputFile, "l1-dcache-load-miss-rate 100%%\n");
-                }
-            } else {
-                fprintf(ProgramStatus::outputFile, "l1-dcache-load-miss-rate 0%%\n");
-            }
-            fprintf(ProgramStatus::outputFile, "llc-loads       %20lu   avg %20lu\n", countingEvents[allocationType].llc_load, countingEvents[allocationType].llc_load/numOfSampledCountingFunctions[allocationType]);
-            fprintf(ProgramStatus::outputFile, "llc-load-misses %20lu   avg %20lu\n", countingEvents[allocationType].llc_load_miss, countingEvents[allocationType].llc_load_miss/numOfSampledCountingFunctions[allocationType]);
-            if(countingEvents[allocationType].llc_load_miss) {
-                if(countingEvents[allocationType].llc_load_miss < countingEvents[allocationType].llc_load) {
-                    fprintf(ProgramStatus::outputFile, "llc-load-misses-rate %3lu%%\n", countingEvents[allocationType].llc_load_miss*100/countingEvents[allocationType].llc_load);
-                } else {
-                    fprintf(ProgramStatus::outputFile, "llc-load-misses-rate 100%%\n");
-                }
-            } else {
-                fprintf(ProgramStatus::outputFile, "llc-load-misses-rate 0%%\n");
-            }
-//            fprintf(ProgramStatus::outputFile, "instructions          %20lu   avg %20lu\n", countingEvents[allocationType].instructions, countingEvents[allocationType].instructions/numOfSampledCountingFunctions[allocationType]);
+            fprintf(ProgramStatus::outputFile, "instructions          %20lu   avg %20lu\n", countingEvents[allocationType].instructions, countingEvents[allocationType].instructions/numOfSampledCountingFunctions[allocationType]);
             fprintf(ProgramStatus::outputFile, "\n");
         }
     }
@@ -223,6 +201,7 @@ void GlobalStatus::printFriendliness() {
 
 void GlobalStatus::printOutput() {
     fprintf(stderr, "writing output file.....\n");
+    fprintf(stderr, "%d threads\n", ThreadLocalStatus::maxNumOfRunningThread);
     ProgramStatus::printOutput();
     printNumOfAllocations();
     printCountingEvents();
@@ -275,46 +254,45 @@ void GlobalStatus::printForMatrix() {
         fprintf(ProgramStatus::matrixFile, "%lu ", countingEvents[allocationType].faults);
     }
 //
-//    if(MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage) {
-//        fprintf(ProgramStatus::matrixFile, "%lu%% ", MemoryWaste::totalValue.internalFragment*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage);
-//        fprintf(ProgramStatus::matrixFile, "%lu%% ", MemoryWaste::totalValue.memoryBlowup*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage);
-//        fprintf(ProgramStatus::matrixFile, "%lu%% ", MemoryWaste::totalValue.externalFragment*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage);
-//        fprintf(ProgramStatus::matrixFile, "%lu%% ", 100 - MemoryWaste::totalValue.internalFragment*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage
-//                                                     - MemoryWaste::totalValue.memoryBlowup*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage
-//                                                     - MemoryWaste::totalValue.externalFragment*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage);
-//        fprintf(ProgramStatus::matrixFile, "%lu ", MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage/ONE_KB);
-//    } else {
-//        fprintf(ProgramStatus::matrixFile, "-1 -1 -1 -1 -1 ");
-//    }
-//
-//    if(friendlinessStatus.numOfSampling / 100) {
-//        fprintf(ProgramStatus::matrixFile, "%lu%% ", friendlinessStatus.totalMemoryUsageOfSampledPages/(friendlinessStatus.numOfSampling/100*PAGESIZE));
-//        fprintf(ProgramStatus::matrixFile, "%lu%% ", friendlinessStatus.totalMemoryUsageOfSampledCacheLines/(friendlinessStatus.numOfSampling/100*CACHELINE_SIZE));
-//    } else {
-//        fprintf(ProgramStatus::matrixFile, "-1 -1 ");
-//    }
-//    if(friendlinessStatus.numOfSampledStoringInstructions > 0) {
-//        for(int falseSharingType = 0; falseSharingType < NUM_OF_FALSESHARINGTYPE; ++falseSharingType) {
-//            fprintf(ProgramStatus::matrixFile, "%u%% ", friendlinessStatus.numOfSampledFalseSharingInstructions[falseSharingType]*100/friendlinessStatus.numOfSampledStoringInstructions);
-//            fprintf(ProgramStatus::matrixFile, "%u%% ", friendlinessStatus.numOfSampledFalseSharingCacheLines[falseSharingType]*100/friendlinessStatus.numOfSampledCacheLines);
-//        }
-//    } else {
-//        fprintf(ProgramStatus::matrixFile, "-1 -1 -1 -1 -1 -1");
-//    }
+    if(MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage) {
+        fprintf(ProgramStatus::matrixFile, "%lu%% ", MemoryWaste::totalValue.internalFragment*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage);
+        fprintf(ProgramStatus::matrixFile, "%lu%% ", MemoryWaste::totalValue.memoryBlowup*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage);
+        fprintf(ProgramStatus::matrixFile, "%lu%% ", MemoryWaste::totalValue.externalFragment*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage);
+        fprintf(ProgramStatus::matrixFile, "%lu%% ", 100 - MemoryWaste::totalValue.internalFragment*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage
+                                                     - MemoryWaste::totalValue.memoryBlowup*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage
+                                                     - MemoryWaste::totalValue.externalFragment*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage);
+        fprintf(ProgramStatus::matrixFile, "%lu ", MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage/ONE_KB);
+    } else {
+        fprintf(ProgramStatus::matrixFile, "-1 -1 -1 -1 -1 ");
+    }
 
-//    fprintf(ProgramStatus::matrixFile, "%lu ", Predictor::criticalCycle);
-//    fprintf(ProgramStatus::matrixFile, "%lu ", Predictor::replacedCriticalCycle);
-//
-//    if(Predictor::replacedCriticalCycle) {
-//        fprintf(ProgramStatus::matrixFile, "%3lu%% ", Predictor::criticalCycle*100/Predictor::replacedCriticalCycle);
-//    } else {
-//        fprintf(ProgramStatus::matrixFile, "100%% ");
-//    }
-//    if(Predictor::replacedCriticalCycle && Predictor::replacedCriticalCycle < Predictor::criticalCycle) {
-//        fprintf(ProgramStatus::matrixFile, "%3lu%% ", (Predictor::criticalCycle-Predictor::replacedCriticalCycle)*100/Predictor::replacedCriticalCycle);
-//    } else {
-//        fprintf(ProgramStatus::matrixFile, "0%% ");
-//    }
+    if(friendlinessStatus.numOfSampling / 100) {
+        fprintf(ProgramStatus::matrixFile, "%lu%% ", friendlinessStatus.totalMemoryUsageOfSampledPages/(friendlinessStatus.numOfSampling/100*PAGESIZE));
+        fprintf(ProgramStatus::matrixFile, "%lu%% ", friendlinessStatus.totalMemoryUsageOfSampledCacheLines/(friendlinessStatus.numOfSampling/100*CACHELINE_SIZE));
+    } else {
+        fprintf(ProgramStatus::matrixFile, "-1 -1 ");
+    }
+    if(friendlinessStatus.numOfSampledStoringInstructions > 0) {
+        for(int falseSharingType = 0; falseSharingType < NUM_OF_FALSESHARINGTYPE; ++falseSharingType) {
+            fprintf(ProgramStatus::matrixFile, "%lu%% ", friendlinessStatus.numOfSampledFalseSharingInstructions[falseSharingType]*100/friendlinessStatus.numOfSampledStoringInstructions);
+            fprintf(ProgramStatus::matrixFile, "%lu%% ", friendlinessStatus.numOfSampledFalseSharingCacheLines[falseSharingType]*100/friendlinessStatus.numOfSampledCacheLines);
+        }
+    } else {
+        fprintf(ProgramStatus::matrixFile, "-1 -1 -1 -1 -1 -1");
+    }
+
+    fprintf(ProgramStatus::matrixFile, "%lu ", Predictor::criticalCycle);
+    fprintf(ProgramStatus::matrixFile, "%lu ", Predictor::replacedCriticalCycle);
+    if(Predictor::replacedCriticalCycle) {
+        fprintf(ProgramStatus::matrixFile, "%3lu%% ", Predictor::criticalCycle*100/Predictor::replacedCriticalCycle);
+    } else {
+        fprintf(ProgramStatus::matrixFile, "100%% ");
+    }
+    if(Predictor::replacedCriticalCycle && Predictor::replacedCriticalCycle < Predictor::criticalCycle) {
+        fprintf(ProgramStatus::matrixFile, "%3lu%% ", (Predictor::criticalCycle-Predictor::replacedCriticalCycle)*100/Predictor::replacedCriticalCycle);
+    } else {
+        fprintf(ProgramStatus::matrixFile, "0%% ");
+    }
 
     fprintf(ProgramStatus::matrixFile, "\n");
 }

@@ -15,7 +15,10 @@ thread_local PerfReadInfo Predictor::countingEvent;
 
 thread_local uint64_t Predictor::numOfFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
 thread_local uint64_t Predictor::functionCycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
-const int64_t Predictor::replacedFunctionCycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
+size_t Predictor::replacedFunctionCycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
+
+size_t Predictor::replacedMiddleObjectThreshold;
+size_t Predictor::replacedLargeObjectThreshold;
 
 thread_local uint64_t Predictor::outsideStartCycle;
 thread_local uint64_t Predictor::outsideStopCycle;
@@ -23,9 +26,12 @@ thread_local uint64_t Predictor::outsideCycle;
 thread_local uint64_t Predictor::outsideCycleMinus;
 
 thread_local uint64_t Predictor::faultedPages;
-const uint64_t Predictor::cyclePerPageFault;
+uint64_t Predictor::cyclePerPageFault;
+
+FILE * Predictor::predictorInfoFile;
 
 void Predictor::globalInit() {
+    openPredictorInfoFile();
     totalCycle = 0;
     criticalCycle = 0;
     replacedCriticalCycle = 0;
@@ -91,21 +97,9 @@ void Predictor::outsideCountingEventsStop() {
     if(stopCountingEvent.faults > startCountingEvent.faults) {
         countingEvent.faults += stopCountingEvent.faults - startCountingEvent.faults;
     }
-    if(stopCountingEvent.l1cache_load > startCountingEvent.l1cache_load) {
-        countingEvent.l1cache_load += stopCountingEvent.l1cache_load - startCountingEvent.l1cache_load;
+    if(stopCountingEvent.instructions > startCountingEvent.instructions) {
+        countingEvent.instructions += stopCountingEvent.instructions - startCountingEvent.instructions;
     }
-    if(stopCountingEvent.l1cache_load_miss > startCountingEvent.l1cache_load_miss) {
-        countingEvent.l1cache_load_miss += stopCountingEvent.l1cache_load_miss - startCountingEvent.l1cache_load_miss;
-    }
-    if(stopCountingEvent.llc_load > startCountingEvent.llc_load) {
-        countingEvent.llc_load += stopCountingEvent.llc_load - startCountingEvent.llc_load;
-    }
-    if(stopCountingEvent.llc_load_miss > startCountingEvent.llc_load_miss) {
-        countingEvent.llc_load_miss += stopCountingEvent.llc_load_miss - startCountingEvent.llc_load_miss;
-    }
-//    if(stopCountingEvent.instructions > startCountingEvent.instructions) {
-//        countingEvent.instructions += stopCountingEvent.instructions - startCountingEvent.instructions;
-//    }
 }
 
 void Predictor::threadEnd() {
@@ -113,7 +107,7 @@ void Predictor::threadEnd() {
     threadReplacedCycle[ThreadLocalStatus::runningThreadIndex] += outsideCycle;
     for(unsigned int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
         threadCycle[ThreadLocalStatus::runningThreadIndex] += functionCycles[allocationType];
-        if(replacedFunctionCycles[allocationType] == -1) {
+        if(replacedFunctionCycles[allocationType] == 0) {
             threadReplacedCycle[ThreadLocalStatus::runningThreadIndex] += functionCycles[allocationType];
         } else {
             threadReplacedCycle[ThreadLocalStatus::runningThreadIndex] += numOfFunctions[allocationType] * replacedFunctionCycles[allocationType];
@@ -139,7 +133,7 @@ void Predictor::stopSerial() {
     for(unsigned int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
         outsideCycle += functionCycles[allocationType];
         criticalCycle += functionCycles[allocationType];
-        if(replacedFunctionCycles[allocationType] == -1) {
+        if(replacedFunctionCycles[allocationType] == 0) {
             replacedCriticalCycle += functionCycles[allocationType];
         } else {
             replacedCriticalCycle += numOfFunctions[allocationType] * replacedFunctionCycles[allocationType];
@@ -189,7 +183,7 @@ void Predictor::stopParallel() {
 void Predictor::printOutput() {
     GlobalStatus::printTitle((char*)"PREDICTION");
     for(unsigned int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
-        if(replacedFunctionCycles[allocationType] != -1) {
+        if(replacedFunctionCycles[allocationType] != 0) {
             fprintf(ProgramStatus::outputFile, "replacing cycles in %s %20lu\n", allocationTypeOutputString[allocationType], replacedFunctionCycles[allocationType]);
         }
     }
@@ -210,37 +204,69 @@ void Predictor::printOutput() {
     if(totalCycle/1000) {
         fprintf(ProgramStatus::outputFile, "faults                     %20lu    %20lu per 1k cycle\n",
                 criticalCountingEvent.faults, criticalCountingEvent.faults/(totalCycle/1000));
-
-        fprintf(ProgramStatus::outputFile, "l1-dcache-loads            %20lu    %20lu per 1k cycle\n",
-                criticalCountingEvent.l1cache_load, criticalCountingEvent.l1cache_load/(totalCycle/1000));
-        fprintf(ProgramStatus::outputFile, "l1-dcache-load-misses      %20lu    %20lu per 1k cycle\n",
-                criticalCountingEvent.l1cache_load_miss, criticalCountingEvent.l1cache_load_miss/(totalCycle/1000));
-        if(criticalCountingEvent.l1cache_load_miss) {
-            if(criticalCountingEvent.l1cache_load_miss < criticalCountingEvent.l1cache_load) {
-                fprintf(ProgramStatus::outputFile, "l1-dcache-load-misses-rate %3lu%%\n", criticalCountingEvent.l1cache_load_miss*100/criticalCountingEvent.l1cache_load);
-            } else {
-                fprintf(ProgramStatus::outputFile, "l1-dcache-load-misses-rate 100%%\n");
-            }
-        } else {
-            fprintf(ProgramStatus::outputFile, "l1-dcache-load-misses-rate 0%%\n");
-        }
-
-        fprintf(ProgramStatus::outputFile, "llc-load            %20lu    %20lu per 1k cycle\n",
-                criticalCountingEvent.llc_load, criticalCountingEvent.llc_load/(totalCycle/1000));
-        fprintf(ProgramStatus::outputFile, "llc-load-misses      %20lu    %20lu per 1k cycle\n",
-                criticalCountingEvent.llc_load_miss, criticalCountingEvent.llc_load_miss/(totalCycle/1000));
-        if(criticalCountingEvent.llc_load_miss) {
-            if(criticalCountingEvent.llc_load_miss < criticalCountingEvent.llc_load) {
-                fprintf(ProgramStatus::outputFile, "llc-load-misses-rate %6lu%%%%\n", criticalCountingEvent.llc_load_miss*10000/criticalCountingEvent.llc_load);
-            } else {
-                fprintf(ProgramStatus::outputFile, "llc-load-misses-rate 10000%%%%\n");
-            }
-        } else {
-            fprintf(ProgramStatus::outputFile, "llc-load-misses-rate 0%%\n");
-        }
-
-//        fprintf(ProgramStatus::outputFile, "instructions               %20lu    %20lu per 1k cycle\n",
-//                criticalCountingEvent.instructions, criticalCountingEvent.instructions/(totalCycle/1000));
+        fprintf(ProgramStatus::outputFile, "instructions               %20lu    %20lu per 1k cycle\n",
+                criticalCountingEvent.instructions, criticalCountingEvent.instructions/(totalCycle/1000));
     }
 
+}
+
+void Predictor::fopenPredictorInfoFile() {
+    char predictorInfoFileName[MAX_FILENAME_LEN];
+    strcpy(predictorInfoFileName, "/home/jinzhou/mmprof/predictor.info");
+    fprintf(stderr, "Opening prediction info file %s...\n", predictorInfoFileName);
+    if ((predictorInfoFile = fopen (predictorInfoFileName, "r")) == NULL) {
+        perror("Failed to open prediction info file");
+        abort();
+    }
+}
+
+void Predictor::readFunctionCyclesFromInfo(char*token) {
+    if ((strcmp(token, "function_cycles")) == 0) {
+        for (unsigned int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; allocationType++) {
+            token = strtok(NULL, " ");
+            replacedFunctionCycles[allocationType] = (size_t) atoi(token);
+        }
+    }
+}
+
+void Predictor::readMiddleObjectThresholdFromInfo(char*token) {
+    if ((strcmp(token, "middle_object_threshold")) == 0) {
+        token = strtok(NULL, " ");
+        replacedMiddleObjectThreshold = (size_t) atoi(token);
+    }
+}
+
+void Predictor::readLargeObjectThresholdFromInfo(char*token) {
+    if ((strcmp(token, "large_object_threshold")) == 0) {
+        token = strtok(NULL, " ");
+        replacedLargeObjectThreshold = (size_t) atoi(token);
+    }
+}
+
+void Predictor::readPageFaultCycleFromInfo(char*token) {
+    if ((strcmp(token, "cycle_page_fault")) == 0) {
+        token = strtok(NULL, " ");
+        cyclePerPageFault = (size_t) atoi(token);
+    }
+}
+
+
+void Predictor::readPredictorInfoFile() {
+    size_t bufferSize = 65535;
+    char * buffer = (char*)MyMalloc::malloc(bufferSize);
+
+    while (getline(&buffer, &bufferSize, predictorInfoFile) > 0) {
+        char *token = strtok(buffer, " ");
+        if(token) {
+            readFunctionCyclesFromInfo(token);
+            readMiddleObjectThresholdFromInfo(token);
+            readLargeObjectThresholdFromInfo(token);
+            readPageFaultCycleFromInfo(token);
+        }
+    }
+}
+
+void Predictor::openPredictorInfoFile() {
+    fopenPredictorInfoFile();
+    readPredictorInfoFile();
 }
