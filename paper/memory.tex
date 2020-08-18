@@ -1,14 +1,18 @@
-The memory consumption of \MP{} can be seen in Table~\ref{tab:memory_consumption}. In total, \MP{} introduces 53.6\% memory overhead. It has different behaviors for applications with large footprint (with the original memory consumption larger than 100 MB) and with small footprint. The average memory overhead for applications with large footprint is 179\%, but it is $45\times$ for small footprint applications. For instance, for \texttt{freqmine} and \texttt{linear\_regression}, \MP{} only adds $68.1\%$ and $2.3\%$ separately. 
+The memory consumption of \MP{} is around $2.6\times$ in total, where the specific data is skipped due to the page limitation. Basically, the memory overhead for applications with large footprint is typically smaller, comparing to applications with small footprint. 
 
-Based on our analysis, \MP{} will introduce 
-more memory overhead for the Linux allocators than other allocations. The basic reason is that the default Linux allocator has 8265
-size classes. For each size class, \MP{} allocates 13 words to store per-thread information, and supports up to 1024 threads. These information include the counter for internal fragmentation and active allocations. \MP{} utilizes the per-thread counters in order to reduce the contention caused by using the global counters, trading the memory overhead for the performance. Although this mechanism may seem to use a large amount of memory. However, the real memory usage may be less than that, since the OS will only allocate physical memory on demand. 
+Multiple reasons may contribute to \MP{}'s memory overhead.  \MP{} will store per-thread information for each size class, including the counters for internal fragmentation and active allocations. \MP{} utilizes the per-thread counters in order to reduce the contention caused by using the global counters, trading the memory overhead for the performance. 
 
-In addition to that, \MP{} also adds an additional hash table to store all allocated objects. Therefore, for an application with a large number of new allocations, \MP{} also adds significant memory overhead to storing the data of each object. \texttt{canneal} is such an example, as shown in Table~\ref{table:characteristics}. \MP{} imposes around $2\times$ memory overhead, due to 8.7 million new allocations. 
+In addition to that, \MP{} also adds an additional hash table to store all allocated objects. Therefore, for an application with a large number of new allocations, \MP{} also adds significant memory overhead to storing the data of each object. For instance, \MP{} imposes around $2.6\times$ memory overhead for \texttt{canneal}, due to 8.7 million new allocations. 
  
-Overall, we think that the memory overhead of \MP{} is totally acceptable, given that \MP{} could identify multiple issues that existing profilers cannot do. 
+
+%In total, \MP{} introduces 53.6\% memory overhead. It has different behaviors for applications with large footprint (with the original memory consumption larger than 100 MB) and with small footprint. The average memory overhead for applications with large footprint is 179\%, but it is $45\times$ for small footprint applications. For instance, for \texttt{freqmine} and \texttt{linear\_regression}, \MP{} only adds $68.1\%$ and $2.3\%$ separately. 
+
+%Based on our analysis, \MP{} will introduce more memory overhead for the Linux allocators than other allocations. The basic reason is that the default Linux allocator has 8265size classes. 
+
+
 
 %Some applications have higher ratios of memory overheads with MMProf and ones without MMProf, such as vips. One reason is that MMProf uses some per-size variables to calculate memory distributions.  For our evaluation, Glibc-2.28 has 8265 classes, therefore MMProf's per-size variable would cost more space than running other allocators. Meanwhile, vips has lower scale than other applications, which make its ratios look high.But actually, for applications with medium scales(more than 100MB memory overhead when running alone), our evaluation shows MMProf's memory overheads ratio are always lower than 3.
+\begin{comment}
 
 \begin{table}[!tp]  
 \centering
@@ -49,3 +53,5 @@ word\_count & 3129 & 729449 \\ \hline
 \textbf{Average} & & 4506\%  \\ \hline
    \end{tabular}
    \end{table}
+	
+\end{comment}

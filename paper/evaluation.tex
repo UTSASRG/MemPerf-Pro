@@ -8,11 +8,36 @@ This experimental evaluation will answer the following questions:
 \item What is the memory overhead of \MP{}? (Section~\ref{sec:memory})
 \end{itemize}
 
-Experiments were performed on a two-processor machine, where each processor is Intel(R) Xeon(R) Gold 6230 and each processor has 20 cores. This machine has 256GB of main memory, 20MB of L2 cache, and 1280KB L1 cache. The underlying OS is Ubuntu 18.04.3 LTS, installed with the Linux-5.3.0-40. All applications were compiled using GCC-7.5.0, with \texttt{-O2} and \texttt{-g} flags. Since \MP{} is not designed to profile NUMA related performance issues, we only utilize 16 hardware cores in node 0, and close other cores. 
+Experiments were performed on a two-processor machine, where each processor is Intel(R) Xeon(R) Gold 6230 and each processor has 20 cores. This machine has 256GB of main memory, 20MB of L2 cache, and 1280KB L1 cache. The underlying OS is Ubuntu 18.04.3 LTS, installed with the Linux-5.3.0-40. All applications were compiled using GCC-7.5.0, with \texttt{-O2} and \texttt{-g} flags. Since \MP{} is not designed to profile NUMA related performance issues, we only utilize 16 hardware cores in node 0 for the evaluation. 
 
 \subsection{Effectiveness}
 \label{sec:effectiveness}
 
+In the following, we evaluate how \MP{} could benefit both normal users and allocator designers. 
+
+\subsubsection{Benefiting Normal Users}
+
+\MP{} will benefit normal users as follows. 
+
+\textbf{Prediction of Performance Improvement:} It could predict the performance improvement of an application, if switching to a new allocator. Here, we are using TcMalloc as an example, where we are utilizing the average cycles of TcMalloc listed in Table~\ref{tbl:metrics}. We evaluate on applications that are listed in Figure~\ref{fig:motivation}, and the  prediction results can be seen in Table~\ref{}. Since TcMalloc is extremely slow on \texttt{cache-scratch} and \texttt{cache-thrash}, these two applications are excluded. 
+
+\todo{Add the table}
+\todo{Add the explanation}
+\begin{table}[h]
+  \centering
+  \footnotesize
+  \setlength{\tabcolsep}{0.2em}
+\begin{tabular}{l|r|r|r|r|}
+\hline
+\end{tabular}
+\end{table}
+
+  
+
+\textbf{Reporting Memory Overhead:} 
+
+
+\textbf{Reporting Application Friendliness:} 
 
 \subsubsection{Benefiting Allocator Designers}
 In order to evaluate the effectiveness, we evaluate \MP{} with five widely-used allocators, including two versions of the Linux allocator (versions 2.21 and 2.28), TCMalloc~\cite{tcmalloc}, jemalloc, and Hoard, and two secure allocators, i.e. DieHarder and OpenBSD. These allocators include both sequential and BiBOP-style allocators. Secure allocators were included, since they have their unique memory management policies. 
@@ -33,8 +58,6 @@ For the evaluation, we use the default configurations of these allocators. Howev
 
 %It seems that BIBOP style allocators are the trend of allocators, which not only has a better performance overhead on average, but also has better safety by separating the metadata from the actual heap. 
 
-\subsubsection{Benefiting Normal Users}
-\todo{What could benefit normal users? What could benefit allocator designers?}
 
 
 \subsection{Overhead of \MP{}}
@@ -77,7 +100,6 @@ histogram 10.23x, 0.12s when running alone, 4 alloc+free
 
 Upon every allocation and deallocation, \MP{} collects the runtime and acquisition information.
 
-\end{comment}
 
 \begin{table}[h]
   \centering
@@ -120,6 +142,7 @@ Upon every allocation and deallocation, \MP{} collects the runtime and acquisiti
    \hline
   \end{tabular}
 \end{table}
+\end{comment}
 
 
 \subsection{Memory Overhead}
@@ -147,9 +170,33 @@ We will provide the important metrics of different allocators, and then have som
 
 \subsubsection{Observations for Allocators:} 
 
+
+\begin{table}[h]
+  \centering
+  \footnotesize
+  \setlength{\tabcolsep}{0.2em}
+\begin{tabular}{l|r|r|r|r|r|r|r|r|r|r}
+\hline
+\multirow{3}{*}{Allocator} & 
+\multicolumn{6}{c|}{Small Objects}    & 
+\multicolumn{4}{c}{Big Objects}     \\ \cline{2-11}
+& \multicolumn{2}{c|}{New Alloc} & \multicolumn{2}{c|} {Re-Alloc} & \multicolumn{2}{c|} {Free} & \multicolumn{2}{c|}{Alloc} & \multicolumn{2}{c} {Free} \\ \cline{2-11}
+& Ser & Par. & Ser & Par. & Ser & Par. & Ser & Par. & Ser & Par. \\ \hline
+TcMalloc & 154 & 327 & 66 & 212 & 106 & 210 & 6994 & 1588 & 19180 & 1967 \\ \hline
+jemalloc &  135 & 331 & 69 & 312 & 161 & 361 & 5057 & 2015 & 2397 & 2183 \\ \hline
+Glibc-2.28 & 322 & 922 & 78 & 648 & 159 & 540 & 7985 & 21833 & 1202541 & 27406 \\ \hline
+Glibc-2.21 & 295 & 1281 & 202 & 669 & 134 & 575 & 7208 & 35399 & 1237736 & 44618 \\ \hline
+Hoard & 111 & 495 & 79 & 106 & 185 & 108 & 8847 & 1564 & 7849 & 608\\ \hline
+%DieHarder & 474 & 71618 & 308 & 75765 & 1271 & 60373 & 18343 & 59604 & 34169 & 66806\\ \hline
+  \end{tabular}
+   \caption{Average cycles of allocation/deallocation operation of different allocators\label{tbl:metrics}}
+\end{table}
+
+We evaluated the runtime of different types of allocations/deallocations using  22 applications of Section~\ref{}, and Table~\ref{tbl:metrics} listed the detailed data for each general-purpose data. DieHarder's data is omitted due to space limit, but its runtime of parallel allocations and deallocations is over 60 times of Hoard due to the contention of using a global lock. Notice that Hoard although has shown reasonable runtime for small objects and big objects in Table~\ref{tbl:metrics}. However, it actually has an additional medium class, where the performance slowdown is mainly caused by the management of medium-size objects. For instance, Hoard's average cycles for new allocation, re-allocation, and free in parallel phase are 1293, 523, and 745 cycles separately, which is much slower than small allocations of TcMalloc and \texttt{jemalloc}.     
+ 
 We have some observations on commonalities of a performant allocator. 
 
-\paragraph{Synchronization:} It is better to reduce lock usages for an allocator. For instance, TcMalloc and jemalloc utilize per-thread cache to store objects, so that there is no need to acquire a lock if an allocation can be satisfied from a per-thread heap. Hoard, although with its per-thread heap design, actually can be slowed down a lot via its hashing mechanism. The other two counterexamples are OpenBSD's allocator and DieHarder. They both use the same lock to manage different size classes, which is one most important issue for their big slowdown. 
+\paragraph{Synchronization:} It is better to reduce lock usages for an allocator. For instance, TcMalloc and jemalloc utilize per-thread cache to store objects, so that there is no need to acquire a lock if an allocation can be satisfied from a per-thread heap. Hoard, although with its per-thread heap design, actually can be slowed down a lot via its hashing mechanism for medium-size objects. The other counterexample is DieHarder, which use the same lock to manage different size classes, which is the most important reason for its slowdown. 
 
 \paragraph{Active/Passive False Sharing:} TcMalloc although with the good performance, but it has very serious both active and passive false sharing. This could significantly slowdown the performance, even if it has almost the fast allocation/deallocation speed.  
 
