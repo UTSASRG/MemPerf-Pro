@@ -24,6 +24,7 @@ struct ObjectStatus{
     size_t maxTouchedBytes = 0;
 
     size_t internalFragment();
+    static ObjectStatus newObjectStatus();
     static ObjectStatus newObjectStatus(SizeClassSizeAndIndex SizeClassSizeAndIndex, size_t maxTouchBytes);
 };
 
@@ -100,7 +101,8 @@ struct HashLocksSet {
 
 class MemoryWaste{
 private:
-    static HashMap <void*, ObjectStatus, nolock, PrivateHeap> objStatusMap;
+//    static HashMap <void*, ObjectStatus, nolock, PrivateHeap> objStatusMap;
+    static HashMap <void*, ObjectStatus, PrivateHeap> objStatusMap;
     static thread_local SizeClassSizeAndIndex currentSizeClassSizeAndIndex;
     static MemoryWasteStatus currentStatus, recordStatus;
     static MemoryWasteGlobalStatus globalStatus;

@@ -4,8 +4,10 @@
 thread_local bool PMUinit = false;
 
 
-thread_local HashMap <void *, DetailLockData, nolock, PrivateHeap> lockUsage;
-HashMap <void *, DetailLockData, nolock, PrivateHeap> globalLockUsage;
+//thread_local HashMap <void *, DetailLockData, nolock, PrivateHeap> lockUsage;
+//HashMap <void *, DetailLockData, nolock, PrivateHeap> globalLockUsage;
+thread_local HashMap <void *, DetailLockData, PrivateHeap> lockUsage;
+HashMap <void *, DetailLockData, PrivateHeap> globalLockUsage;
 
 //// pre-init private allocator memory
 typedef int (*main_fn_t)(int, char **, char **);
@@ -23,8 +25,8 @@ extern "C" {
 	void * memalign(size_t, size_t) __attribute__ ((weak, alias("yymemalign")));
 	int posix_memalign(void **, size_t, size_t) __attribute__ ((weak,
 				alias("yyposix_memalign")));
-    void * mmap(void *addr, size_t length, int prot, int flags,
-            int fd, off_t offset) __attribute__ ((weak, alias("yymmap")));
+//    void * mmap(void *addr, size_t length, int prot, int flags,
+//            int fd, off_t offset) __attribute__ ((weak, alias("yymmap")));
 }
 
  inline void PMU_init_check() {
@@ -46,12 +48,12 @@ void exitHandler() {
 
 	#ifndef NO_PMU
 	stopSampling();
-//    stopCounting();
+    stopCounting();
     #endif
 
     GlobalStatus::globalize();
     GlobalStatus::printOutput();
-    GlobalStatus::printForMatrix();
+//    GlobalStatus::printForMatrix();
 
 
 }
@@ -272,7 +274,7 @@ void operator delete[] (void * ptr) __THROW {
 extern "C" {
 void *yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset) {
     if (!realInitialized) RealX::initializer();
-    if (AllocatingStatus::outsideTrackedAllocation()) {
+    if (AllocatingStatus::outsideTrackedAllocation() || !AllocatingStatus::sampledForCountingEvent) {
         return RealX::mmap(addr, length, prot, flags, fd, offset);
     }
 
@@ -296,6 +298,10 @@ int madvise(void *addr, size_t length, int advice) {
         MemoryUsage::subTotalSizeFromMemoryUsage(cleanedPageSize);
     }
 
+    if(!AllocatingStatus::sampledForCountingEvent) {
+        return RealX::madvise(addr, length, advice);
+    }
+
     uint64_t timeStart = rdtscp();
     int result = RealX::madvise(addr, length, advice);
     uint64_t timeStop = rdtscp();
@@ -308,7 +314,7 @@ int madvise(void *addr, size_t length, int advice) {
 
 void *sbrk(intptr_t increment) {
     if (!realInitialized) RealX::initializer();
-    if (AllocatingStatus::outsideTrackedAllocation()) {
+    if (AllocatingStatus::outsideTrackedAllocation()|| !AllocatingStatus::sampledForCountingEvent) {
         return RealX::sbrk(increment);
     }
 
@@ -324,7 +330,7 @@ void *sbrk(intptr_t increment) {
 
 int mprotect(void *addr, size_t len, int prot) {
     if (!realInitialized) RealX::initializer();
-    if (AllocatingStatus::outsideTrackedAllocation()) {
+    if (AllocatingStatus::outsideTrackedAllocation()|| !AllocatingStatus::sampledForCountingEvent) {
         return RealX::mprotect(addr, len, prot);
     }
 
@@ -348,6 +354,10 @@ int munmap(void *addr, size_t length) {
     size_t cleanedPageSize = ShadowMemory::cleanupPages((intptr_t) addr, length);
     MemoryUsage::subTotalSizeFromMemoryUsage(cleanedPageSize);
 
+    if(!AllocatingStatus::sampledForCountingEvent) {
+        return RealX::munmap(addr, length);
+    }
+
     uint64_t timeStart = rdtscp();
     int ret = RealX::munmap(addr, length);
     uint64_t timeStop = rdtscp();
@@ -368,7 +378,7 @@ void *mremap(void *old_address, size_t old_size, size_t new_size, int flags, ...
     void *new_address = va_arg(ap, void * );
     va_end(ap);
 
-    if (AllocatingStatus::outsideTrackedAllocation()) {
+    if (AllocatingStatus::outsideTrackedAllocation()|| !AllocatingStatus::sampledForCountingEvent) {
         return RealX::mremap(old_address, old_size, new_size, flags, new_address);
     }
 
@@ -383,7 +393,7 @@ void *mremap(void *old_address, size_t old_size, size_t new_size, int flags, ...
 }
 
 int pthread_mutex_lock(pthread_mutex_t *mutex) {
-    if (AllocatingStatus::outsideTrackedAllocation()) {
+    if (AllocatingStatus::outsideTrackedAllocation() || !AllocatingStatus::sampledForCountingEvent) {
         if (!realInitialized) RealX::initializer();
         return RealX::pthread_mutex_lock(mutex);
     }
@@ -411,7 +421,7 @@ int pthread_mutex_lock(pthread_mutex_t *mutex) {
 }
 
 int pthread_spin_lock(pthread_spinlock_t *lock) {
-    if (AllocatingStatus::outsideTrackedAllocation()) {
+    if (AllocatingStatus::outsideTrackedAllocation()|| !AllocatingStatus::sampledForCountingEvent) {
         if (!realInitialized) RealX::initializer();
         return RealX::pthread_spin_lock(lock);
     }
@@ -440,7 +450,7 @@ int pthread_spin_lock(pthread_spinlock_t *lock) {
 }
 
 int pthread_spin_trylock(pthread_spinlock_t *lock) {
-    if (AllocatingStatus::outsideTrackedAllocation()) {
+    if (AllocatingStatus::outsideTrackedAllocation()|| !AllocatingStatus::sampledForCountingEvent) {
         if (!realInitialized) RealX::initializer();
         return RealX::pthread_spin_trylock(lock);
     }
@@ -470,7 +480,7 @@ int pthread_spin_trylock(pthread_spinlock_t *lock) {
 }
 
 int pthread_mutex_trylock(pthread_mutex_t *mutex) {
-    if (AllocatingStatus::outsideTrackedAllocation()) {
+    if (AllocatingStatus::outsideTrackedAllocation()|| !AllocatingStatus::sampledForCountingEvent) {
         if (!realInitialized) RealX::initializer();
         return RealX::pthread_mutex_trylock(mutex);
     }
@@ -501,7 +511,7 @@ int pthread_mutex_trylock(pthread_mutex_t *mutex) {
 
 // PTHREAD_MUTEX_UNLOCK
 int pthread_mutex_unlock(pthread_mutex_t *mutex) {
-    if(AllocatingStatus::outsideTrackedAllocation()) {
+    if(AllocatingStatus::outsideTrackedAllocation()|| !AllocatingStatus::sampledForCountingEvent) {
         if (!realInitialized) RealX::initializer();
         return RealX::pthread_mutex_unlock(mutex);
     }
@@ -511,7 +521,7 @@ int pthread_mutex_unlock(pthread_mutex_t *mutex) {
 }
 
 int pthread_spin_unlock(pthread_spinlock_t *lock) {
-    if(AllocatingStatus::outsideTrackedAllocation()) {
+    if(AllocatingStatus::outsideTrackedAllocation()|| !AllocatingStatus::sampledForCountingEvent) {
         if (!realInitialized) RealX::initializer();
         return RealX::pthread_spin_unlock(lock);
     }

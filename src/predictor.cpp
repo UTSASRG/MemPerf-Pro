@@ -97,6 +97,9 @@ void Predictor::outsideCountingEventsStop() {
     if(stopCountingEvent.faults > startCountingEvent.faults) {
         countingEvent.faults += stopCountingEvent.faults - startCountingEvent.faults;
     }
+    if(stopCountingEvent.cache > startCountingEvent.cache) {
+        countingEvent.cache += stopCountingEvent.cache - startCountingEvent.cache;
+    }
     if(stopCountingEvent.instructions > startCountingEvent.instructions) {
         countingEvent.instructions += stopCountingEvent.instructions - startCountingEvent.instructions;
     }
@@ -160,24 +163,24 @@ void Predictor::stopParallel() {
     memset(&criticalStageCountingEvent, 0, sizeof(PerfReadInfo));
 
 ///max
-//    for(unsigned int index = 1; index < ThreadLocalStatus::totalNumOfThread; ++index) {
-//        if(threadCycle[index] && threadReplacedCycle[index]) {
-//            criticalStageCycle = MAX(criticalStageCycle, threadCycle[index]);
-//            criticalReplacedStageCycle = MAX(criticalReplacedStageCycle, threadReplacedCycle[index]);
-//        }
-//    }
+    for(unsigned int index = 1; index < ThreadLocalStatus::totalNumOfThread; ++index) {
+        if(threadCycle[index] && threadReplacedCycle[index]) {
+            criticalStageCycle = MAX(criticalStageCycle, threadCycle[index]);
+            criticalReplacedStageCycle = MAX(criticalReplacedStageCycle, threadReplacedCycle[index]);
+        }
+    }
 
 
 ///avg
-    for(unsigned int index = 1; index < ThreadLocalStatus::totalNumOfThread; ++index) {
-        if(threadCycle[index] && threadReplacedCycle[index]) {
-            numOfActiveThreads++;
-            criticalStageCycle += threadCycle[index];
-            criticalReplacedStageCycle += threadReplacedCycle[index];
-        }
-    }
-    criticalStageCycle /= numOfActiveThreads;
-    criticalReplacedStageCycle /= numOfActiveThreads;
+//    for(unsigned int index = 1; index < ThreadLocalStatus::totalNumOfThread; ++index) {
+//        if(threadCycle[index] && threadReplacedCycle[index]) {
+//            numOfActiveThreads++;
+//            criticalStageCycle += threadCycle[index];
+//            criticalReplacedStageCycle += threadReplacedCycle[index];
+//        }
+//    }
+//    criticalStageCycle /= numOfActiveThreads;
+//    criticalReplacedStageCycle /= numOfActiveThreads;
 
     
     for(unsigned int index = 0; index < ThreadLocalStatus::totalNumOfThread; ++index) {
@@ -218,6 +221,8 @@ void Predictor::printOutput() {
     if(totalCycle/1000) {
         fprintf(ProgramStatus::outputFile, "faults                     %20lu    %20lu per 1k cycle\n",
                 criticalCountingEvent.faults, criticalCountingEvent.faults/(totalCycle/1000));
+        fprintf(ProgramStatus::outputFile, "cache misses               %20lu    %20lu per 1k cycle\n",
+                criticalCountingEvent.cache, criticalCountingEvent.cache/(totalCycle/1000));
         fprintf(ProgramStatus::outputFile, "instructions               %20lu    %20lu per 1k cycle\n",
                 criticalCountingEvent.instructions, criticalCountingEvent.instructions/(totalCycle/1000));
     }

@@ -1,7 +1,8 @@
 
 #include "memwaste.h"
 
-HashMap<void*, ObjectStatus, nolock, PrivateHeap> MemoryWaste::objStatusMap;
+//HashMap<void*, ObjectStatus, nolock, PrivateHeap> MemoryWaste::objStatusMap;
+HashMap<void*, ObjectStatus, PrivateHeap> MemoryWaste::objStatusMap;
 thread_local SizeClassSizeAndIndex MemoryWaste::currentSizeClassSizeAndIndex;
 MemoryWasteStatus MemoryWaste::currentStatus, MemoryWaste::recordStatus;
 MemoryWasteGlobalStatus MemoryWaste::globalStatus;
@@ -11,6 +12,11 @@ HashLocksSet MemoryWaste::hashLocksSet;
 size_t ObjectStatus::internalFragment() {
     size_t unusedPageSize = (sizeClassSizeAndIndex.classSize - maxTouchedBytes) / PAGESIZE * PAGESIZE;
     return sizeClassSizeAndIndex.classSize - unusedPageSize - sizeClassSizeAndIndex.size;
+}
+
+ObjectStatus ObjectStatus::newObjectStatus() {
+    ObjectStatus newObjectStatus;
+    return newObjectStatus;
 }
 
 ObjectStatus ObjectStatus::newObjectStatus(SizeClassSizeAndIndex sizeClassSizeAndIndex, size_t maxTouchBytes) {
@@ -226,13 +232,13 @@ void MemoryWaste::initialize() {
 
 AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(size_t size, void * address) {
     bool reused;
+    ObjectStatus * status;
 
     hashLocksSet.lock(address);
-    ObjectStatus * status = objStatusMap.find(address, sizeof(unsigned long));
+    status = objStatusMap.findOrAdd(address, sizeof(unsigned long), ObjectStatus::newObjectStatus());
     if(!status) {
         reused = false;
         currentSizeClassSizeAndIndex = ProgramStatus::getClassSizeAndIndex(size);
-        status = objStatusMap.insert(address, sizeof(void *), ObjectStatus::newObjectStatus(currentSizeClassSizeAndIndex, size));
 
         status->sizeClassSizeAndIndex = currentSizeClassSizeAndIndex;
         status->maxTouchedBytes = size;
@@ -257,9 +263,6 @@ AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(size_t size, void * ad
         currentStatus.numOfAccumulatedOperations.numOfReusedAllocations[arrayIndex()]++;
 
     }
-//    if(currentStatus.internalFragment[arrayIndex()] >= 0x1000000000) {
-//        currentStatus.internalFragment[arrayIndex()] = 0;
-//    }
     currentStatus.internalFragment[arrayIndex()] += (int64_t)status->internalFragment();
     hashLocksSet.unlock(address);
 
@@ -267,6 +270,7 @@ AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(size_t size, void * ad
     if(currentStatus.blowupFlag[currentSizeClassSizeAndIndex.classSizeIndex] > 0 ) {
         currentStatus.blowupFlag[currentSizeClassSizeAndIndex.classSizeIndex]--;
     }
+
     return AllocatingTypeGotFromMemoryWaste{reused, currentSizeClassSizeAndIndex.classSize, currentSizeClassSizeAndIndex.classSizeIndex};
 }
 

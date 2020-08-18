@@ -114,6 +114,7 @@ void AllocatingStatus::calculateCountingDataInRealFunction() {
     cyclesMinus = 0;
 
     countingDataInRealFunction.faults = countingDataAfterRealFunction.faults - countingDataBeforeRealFunction.faults;
+    countingDataInRealFunction.cache = countingDataAfterRealFunction.cache - countingDataBeforeRealFunction.cache;
     countingDataInRealFunction.instructions = countingDataAfterRealFunction.instructions - countingDataBeforeRealFunction.instructions;
 }
 
@@ -123,6 +124,9 @@ void AllocatingStatus::removeAbnormalCountingEventValues() {
     }
     if(countingDataInRealFunction.faults > ABNORMAL_VALUE) {
         countingDataInRealFunction.faults = 0;
+    }
+    if(countingDataInRealFunction.cache > ABNORMAL_VALUE) {
+        countingDataInRealFunction.cache = 0;
     }
     if(countingDataInRealFunction.instructions > ABNORMAL_VALUE) {
         countingDataInRealFunction.instructions = 0;
@@ -416,14 +420,14 @@ void AllocatingStatus::addUpOtherFunctionsInfoToThreadLocalData() {
 
 
 void AllocatingStatus::updateAllocatingInfoToThreadLocalData() {
-    setAllocationTypeForOutputData();
     if(sampledForCountingEvent) {
+        setAllocationTypeForOutputData();
         ThreadLocalStatus::numOfFunctions[allocationTypeForOutputData]++;
         addUpOtherFunctionsInfoToThreadLocalData();
         addUpCountingEventsToThreadLocalData();
+        cleanLockFunctionsInfoInAllocatingStatus();
+        cleanSyscallsInfoInAllocatingStatus();
     }
-    cleanLockFunctionsInfoInAllocatingStatus();
-    cleanSyscallsInfoInAllocatingStatus();
 }
 
 void AllocatingStatus::updateAllocatingInfoToPredictor() {

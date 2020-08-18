@@ -39,6 +39,7 @@ typedef struct {
   int perf_fd2;
   uint64_t prev_head;
 	int perf_fd_fault;
+	int perf_fd_cache;
 	int perf_fd_instr;
 
   char * data_buf_copy = NULL;

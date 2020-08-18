@@ -13,7 +13,8 @@
 #include "mymalloc.h"
 #include "threadlocalstatus.h"
 
-#define LOCK_PROTECTION 1
+//#define LOCK_PROTECTION 1
+#define LOCK_PROTECTION 0
 
 class PrivateHeap {
 
@@ -154,7 +155,6 @@ public:
   // If existing, return true. *value should be carried specific value for this key.
   // Otherwise, return false.
   ValueType * find(const KeyType& key, size_t keylen) {
-    assert(_initialized == true);
     size_t hindex = hashIndex(key, keylen);
     struct HashBucket* first = getHashBucket(hindex);
     struct Entry* entry = getEntry(first, key, keylen);
@@ -168,7 +168,6 @@ public:
   }
  
   void * findEntry(const KeyType& key, size_t keylen) {
-    assert(_initialized == true);
     size_t hindex = hashIndex(key, keylen);
     struct HashBucket* first = getHashBucket(hindex);
 #if LOCK_PROTECTION
@@ -194,7 +193,6 @@ public:
 
   // this function is customized for call stack array
   ValueType* findOrAdd(const KeyType& key, size_t keylen, ValueType newval){
-    assert(_initialized == true);
     ValueType* ret = NULL;
     size_t hindex = hashIndex(key, keylen);
     struct HashBucket* first = getHashBucket(hindex);
@@ -204,7 +202,6 @@ public:
     first->Lock();
 #endif
     // Check all _buckets with the same hindex.
-    entry = getEntry(first, key, keylen);
     if(entry == NULL) {
      // fprintf(stderr, "entry not exists. Now add the current one to the map\n");
       // insert new call stack into map 

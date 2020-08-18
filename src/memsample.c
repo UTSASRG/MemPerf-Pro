@@ -4,7 +4,7 @@
 
 #include "memsample.h"
 
-#define PERF_GROUP_SIZE 2
+#define PERF_GROUP_SIZE 3
 
 
 long long perf_mmap_read();
@@ -56,8 +56,6 @@ inline int create_perf_event(perf_event_attr * attr, int group) {
 
 //get data from PMU and store it into the PerfReadInfo struct
 void getPerfCounts (PerfReadInfo * i) {
-    ///No Counting event
-    return;
 
 #ifdef NO_PMU
 #warning NO_PMU flag set -> sampling will be disabled
@@ -89,6 +87,7 @@ void setupCounting(void) {
 	isCountingInit = true;
 
 	struct perf_event_attr pe_fault;
+    struct perf_event_attr pe_cache;
     struct perf_event_attr pe_instr;
 	memset(&pe_fault, 0, sizeof(struct perf_event_attr));
 
@@ -141,12 +140,17 @@ void setupCounting(void) {
     pe_fault.exclude_host = 0;
     pe_fault.exclude_guest = 1;
 
+    memcpy(&pe_cache, &pe_fault, sizeof(struct perf_event_attr));
     memcpy(&pe_instr, &pe_fault, sizeof(struct perf_event_attr));
+
+    pe_cache.type = PERF_TYPE_HARDWARE;
+    pe_cache.config = PERF_COUNT_HW_CACHE_MISSES;
 
     pe_instr.type = PERF_TYPE_HARDWARE;
 	pe_instr.config = PERF_COUNT_HW_INSTRUCTIONS;
 
 	perfInfo.perf_fd_fault = create_perf_event(&pe_fault, -1);
+    perfInfo.perf_fd_cache = create_perf_event(&pe_cache, perfInfo.perf_fd_fault);
     perfInfo.perf_fd_instr = create_perf_event(&pe_instr, perfInfo.perf_fd_fault);
 
 }
@@ -323,6 +327,7 @@ void stopCounting(void) {
 		isCountingInit = false;
 
     close(perfInfo.perf_fd_fault);
+    close(perfInfo.perf_fd_cache);
     close(perfInfo.perf_fd_instr);
 }
 
@@ -388,7 +393,7 @@ int initPMU(void) {
 		#ifdef NO_PMU
 				#warning MEMORY ACCESS SAMPLING IS DISABLED
 		#else
-//		setupCounting();
+		setupCounting();
 		setupSampling();
 		#endif
 

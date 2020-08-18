@@ -17,7 +17,6 @@ private:
     static thread_local AllocatingType allocatingType;
     static thread_local AllocationTypeForOutputData allocationTypeForOutputData;
     static thread_local AllocationTypeForOutputData allocationTypeForPrediction;
-    static thread_local bool sampledForCountingEvent;
     static thread_local uint64_t cyclesBeforeRealFunction;
     static thread_local uint64_t cyclesAfterRealFunction;
     static thread_local uint64_t cyclesInRealFunction;
@@ -206,6 +205,9 @@ private:
     static void cleanSyscallsInfoInAllocatingStatus();
 
 public:
+
+    static thread_local bool sampledForCountingEvent;
+
     static bool isFirstFunction();
 
     static void updateAllocatingStatusBeforeRealFunction(AllocationFunction allocationFunction, size_t objectSize);

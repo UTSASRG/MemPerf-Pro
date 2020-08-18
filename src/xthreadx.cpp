@@ -1,6 +1,7 @@
 #include "xthreadx.hh"
 
-extern thread_local HashMap <void *, DetailLockData, nolock, PrivateHeap> lockUsage;
+//extern thread_local HashMap <void *, DetailLockData, nolock, PrivateHeap> lockUsage;
+extern thread_local HashMap <void *, DetailLockData, PrivateHeap> lockUsage;
 
 int xthreadx::thread_create(pthread_t * tid, const pthread_attr_t * attr, threadFunction * fn, void * arg) {
     ThreadLocalStatus::addARunningThread();
@@ -77,7 +78,7 @@ void xthreadx::threadExit() {
 
 #ifndef NO_PMU
     stopSampling();
-//    stopCounting();
+    stopCounting();
 #endif
     GlobalStatus::globalize();
 

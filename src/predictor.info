@@ -1,4 +1,4 @@
-function_cycles 191 0 64 0 9821 113 0 11681 0 0 0 0 577 0 369 0 2758 234 0 2924 0 0 0 0
+function_cycles 154 0 66 0 6994 106 0 19180 0 0 0 0 489 0 459 0 19034 391 0 2223 0 0 0 0
 middle_object_threshold 188424
 large_object_threshold 188424
 cycle_page_fault 2900

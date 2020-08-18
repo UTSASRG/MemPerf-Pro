@@ -1,7 +1,9 @@
 #include "globalstatus.h"
 
-extern thread_local HashMap <void *, DetailLockData, nolock, PrivateHeap> lockUsage;
-extern HashMap <void *, DetailLockData, nolock, PrivateHeap> globalLockUsage;
+//extern thread_local HashMap <void *, DetailLockData, nolock, PrivateHeap> lockUsage;
+//extern HashMap <void *, DetailLockData, nolock, PrivateHeap> globalLockUsage;
+extern thread_local HashMap <void *, DetailLockData, PrivateHeap> lockUsage;
+extern HashMap <void *, DetailLockData, PrivateHeap> globalLockUsage;
 
 spinlock GlobalStatus::lock;
 uint64_t GlobalStatus::numOfFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
@@ -94,6 +96,7 @@ void GlobalStatus::printCountingEvents() {
             printTitle(allocationTypeOutputTitleString[allocationType], numOfSampledCountingFunctions[allocationType]);
             fprintf(ProgramStatus::outputFile, "cycles                %20lu   avg %20lu\n", cycles[allocationType], cycles[allocationType]/numOfSampledCountingFunctions[allocationType]);
             fprintf(ProgramStatus::outputFile, "faults                %20lu   avg %20lu\n", countingEvents[allocationType].faults, countingEvents[allocationType].faults/numOfSampledCountingFunctions[allocationType]);
+            fprintf(ProgramStatus::outputFile, "cache misses          %20lu   avg %20lu\n", countingEvents[allocationType].cache, countingEvents[allocationType].cache/numOfSampledCountingFunctions[allocationType]);
             fprintf(ProgramStatus::outputFile, "instructions          %20lu   avg %20lu\n", countingEvents[allocationType].instructions, countingEvents[allocationType].instructions/numOfSampledCountingFunctions[allocationType]);
             fprintf(ProgramStatus::outputFile, "\n");
         }
@@ -183,9 +186,9 @@ void GlobalStatus::printFriendliness() {
     fprintf(ProgramStatus::outputFile, "sampling access              %20lu\n", friendlinessStatus.numOfSampling);
     if(friendlinessStatus.numOfSampling / 100) {
         fprintf(ProgramStatus::outputFile, "page utilization                             %3lu%%\n",
-                friendlinessStatus.totalMemoryUsageOfSampledPages/(friendlinessStatus.numOfSampling/100*PAGESIZE));
+                friendlinessStatus.totalMemoryUsageOfSampledPages*100/friendlinessStatus.numOfSampling/PAGESIZE);
         fprintf(ProgramStatus::outputFile, "cache utilization                            %3lu%%\n",
-                friendlinessStatus.totalMemoryUsageOfSampledCacheLines/(friendlinessStatus.numOfSampling/100*CACHELINE_SIZE));
+                friendlinessStatus.totalMemoryUsageOfSampledCacheLines*100/friendlinessStatus.numOfSampling/CACHELINE_SIZE);
         fprintf(ProgramStatus::outputFile, "accessed store instructions  %20lu\n", friendlinessStatus.numOfSampledStoringInstructions);
         fprintf(ProgramStatus::outputFile, "accessed cache lines         %20lu\n", friendlinessStatus.numOfSampledCacheLines);
         fprintf(ProgramStatus::outputFile, "\n");
@@ -230,6 +233,12 @@ void GlobalStatus::printForMatrix() {
            || allocationType == PARALLEL_NORMAL_CALLOC || allocationType == PARALLEL_NORMAL_REALLOC || allocationType == PARALLEL_NORMAL_POSIX_MEMALIGN || allocationType == PARALLEL_NORMAL_MEMALIGN) {
             continue;
         }
+
+//        if(allocationType != SERIAL_MEDIUM_NEW_MALLOC && allocationType != SERIAL_MEDIUM_REUSED_MALLOC && allocationType != SERIAL_MEDIUM_FREE &&
+//        allocationType != PARALLEL_MEDIUM_NEW_MALLOC && allocationType != PARALLEL_MEDIUM_REUSED_MALLOC && allocationType != PARALLEL_MEDIUM_FREE) {
+//            continue;
+//        }
+
         fprintf(ProgramStatus::matrixFile, "%lu ", numOfSampledCountingFunctions[allocationType]);
         if(numOfSampledCountingFunctions[allocationType]) {
             fprintf(ProgramStatus::matrixFile, "%lu ", cycles[allocationType] / numOfSampledCountingFunctions[allocationType]);

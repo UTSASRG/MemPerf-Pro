@@ -146,6 +146,7 @@ void TotalMemoryUsage::debugPrint() {
 
 void PerfReadInfo::add(struct PerfReadInfo newPerfReadInfo) {
     faults += newPerfReadInfo.faults;
+    cache += newPerfReadInfo.cache;
     instructions += newPerfReadInfo.instructions;
 }
 
