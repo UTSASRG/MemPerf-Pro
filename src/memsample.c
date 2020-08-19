@@ -143,8 +143,9 @@ void setupCounting(void) {
     memcpy(&pe_cache, &pe_fault, sizeof(struct perf_event_attr));
     memcpy(&pe_instr, &pe_fault, sizeof(struct perf_event_attr));
 
-    pe_cache.type = PERF_TYPE_HARDWARE;
-    pe_cache.config = PERF_COUNT_HW_CACHE_MISSES;
+    pe_cache.type = PERF_TYPE_HW_CACHE;
+    pe_cache.config = (PERF_COUNT_HW_CACHE_L1D) | (PERF_COUNT_HW_CACHE_OP_READ << 8) |
+                      (PERF_COUNT_HW_CACHE_RESULT_MISS << 16);
 
     pe_instr.type = PERF_TYPE_HARDWARE;
 	pe_instr.config = PERF_COUNT_HW_INSTRUCTIONS;
