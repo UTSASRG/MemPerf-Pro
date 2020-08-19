@@ -235,11 +235,12 @@ AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(size_t size, void * ad
     ObjectStatus * status;
 
     hashLocksSet.lock(address);
-    status = objStatusMap.findOrAdd(address, sizeof(unsigned long), ObjectStatus::newObjectStatus());
+    status = objStatusMap.find(address, sizeof(unsigned long));
     if(!status) {
         reused = false;
         currentSizeClassSizeAndIndex = ProgramStatus::getClassSizeAndIndex(size);
 
+        status = objStatusMap.insert(address, sizeof(unsigned long), ObjectStatus::newObjectStatus(currentSizeClassSizeAndIndex, size));
         status->sizeClassSizeAndIndex = currentSizeClassSizeAndIndex;
         status->maxTouchedBytes = size;
 

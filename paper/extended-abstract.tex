@@ -1,0 +1,160 @@
+\documentclass[pageno]{jpaper}
+
+%replace XXX with the submission number you are given from the ASPLOS submission site.
+\newcommand{\asplossubmissionnumber}{XXX}
+
+\usepackage[normalem]{ulem}
+
+\begin{document}
+
+\title{Your Paper Title \\ \textbf{Extended Abstract}}
+
+\date{}
+
+\maketitle
+
+\thispagestyle{empty}
+
+% No abstract needed for the extended abstract
+%\begin{abstract}
+%\end{abstract}
+
+
+\section{Motivation}
+\label{sec:motivation}
+
+
+\begin{itemize}
+\item What is the problem your work attacks? Be specific.
+\end{itemize}
+
+\noindent
+This paper presents such a profiler--\MP{}--that focuses on different aspects of an allocator that will benefit both allocator designers and normal users. Overall, \MP{} profiles multiple important aspects of memory allocators, such as performance, memory, scalability, and application-friendliness. Based on our extensive evaluation, \MP{} successfully identifies multiple known and \textbf{un-known} design issues inside popular allocators, as further described in Section~\ref{sec:effectiveness}. Due to its careful design, \todo{\MP{}'s performance overhead is around $50\%$ and its memory overhead is around $56\%$}. This efficient design reduces \MP{}'s interference to the original execution. \MP{} does not need the change of the allocator, the application, and the underlying OS, which will be convenient for the employment. 
+
+\begin{itemize}
+\item Why is it an important problem?
+\end{itemize}
+
+\noindent
+A memory allocator is a key component that could significantly impact the performance and memory consumption of the corresponding applications. We performed an experiment on applications of PARSEC~\cite{parsec}, and stress tests of Hoard~\cite{Hoard}, with multiple well-known memory allocators. These allocators include two versions of Linux allocators (glibc-2.28 and glibc-2.21), TcMalloc~\cite{tcmalloc}, \texttt{jemalloc}~\cite{jemalloc}, and Hoard~\cite{Hoard}, among them both TcMalloc and \texttt{jemalloc} are industrial level allocators. We have the following observations: (1)~the performance difference with different allocators can be as large as $38\times$, i.e. \texttt{cache-thrash} with TcMalloc; (2)~No allocator performs consistently the best across all tested applications, indicating the importance of identifying the internal reason.
+%, indicating that sometimes spending additional effort toward optimizing the application code may have a smaller  impact than simply switching to a better-suited allocator. (2)~No allocator performs consistently the best across all tested applications, indicating the importance of identifying the internal reason. 
+
+\section{Limitations of the State of the Art}
+\label{sec:limitations}
+
+\begin{itemize}
+\item What is the state of the art in this topic today (if any)?
+\end{itemize}
+
+\noindent
+General profilers, such as \texttt{gprof}~\cite{DBLP:conf/sigplan/GrahamKM82} and \texttt{perf}~\cite{perf}, could report the time accumulation of different functions, and \texttt{Coz}~\cite{Coz} presents a quantitative performance impact of improving a particular region of code. We used \texttt{perf}, \texttt{gprof}, and \texttt{Coz} to analyze the performance issue of TcMalloc on \texttt{cache-thrash}, since it runs around $38\times$ slower than the default Linux allocator. \texttt{perf} reports the \texttt{worker} function as the primary function to focus on, which unfortunately has nothing to do with the slowdown reason. \texttt{gprof} reports a similar result as \texttt{perf}. \texttt{Coz} reports reports the program lines of exercising these objects with passive false sharing issues, i.e. lines 85-87 of \texttt{cache-thrash.cpp}, and predicts that the performance can be improved up to \textbf{10\%} if these lines can be improved by 100\%. However, \texttt{Coz} does not pinpoint that the performance slowdown is actually caused by the allocator, as discussed in Section~\ref{sec:effectiveness}, and its prediction on the performance impact is obviously much smaller than the real one.
+
+\begin{itemize}
+\item What are its limits?
+\end{itemize}
+
+\noindent
+However, they cannot identify the performance issues of a memory allocator, due to the following reasons. \texttt{First}, they do not collect allocator-specific data, and provide no metrics for evaluating an allocator. For instance, \texttt{perf} may report the number of cache misses, but it is impossible to know how many of these events are actually caused by the allocator. Without that information, it is unable to determine whether a performance issue is originating from the allocator. \texttt{Second}, none of these tools collect kernel contention information, an important issue related to the allocator. For instance, the glibc-2.21 allocator slows down the performance of \texttt{dedup} by more than 20\%, which is caused by frequent \texttt{madivse} system calls that directly lead to the heavy kernel contention. However, such an important issue cannot be identified by general profilers~\cite{DBLP:conf/sigplan/GrahamKM82, Coz, perf}%, \todo{as discussed in Section~\ref{}}.
+%Third, none of these profilers report the application friendliness of an allocator, which is critical to understanding the performance slowdown caused by a particular allocator.   
+
+
+\section{Key Insights}
+\label{sec:key-insights}
+
+\begin{itemize}
+\item What are the one or two key new insights in this paper?
+\end{itemize}
+
+\noindent
+Firstly, \MP{} is the first systematic approach to evaluate and profile different memory allocators, without changing the internal implementation of allocators. More specifically, \MP{} proposes the combination of function interception (based on common APIs) and PMU-based sampling to perform the profiling. Besides, \MP{} proposes the first mechanisms to quantitatively measure memory blowup (and external fragmentation), cache/page utilization rate, and passive/active false sharing impact. 
+
+\begin{itemize}
+\item How does it advance the state of the art?
+\end{itemize}
+
+\noindent
+\MP{} will benefit normal users in the following ways. First, \MP{} can predict potential performance improvement when switching to an exemplar allocator (such as TcMalloc), which clearly indicates whether it is necessary to improve the allocator or switch to a new allocator. Second, \MP{} will report detailed memory wastes caused by an allocator, which is overlooked by existing profilers. Third, \MP{} will also report multiple application-friendliness metrics, which tells whether an allocator is tapped with allocation/deallocation pattern or access pattern of a particular application. As described above, a well-performed allocator like TcMalloc may be not suitable for a particular application (e.g., \texttt{cache-thrash}). Overall, \MP{} will provide a range of metrics on evaluating an allocator for normal users, not just limiting to the runtime. 
+
+\begin{itemize}
+\item What makes it more effective than past approaches?
+\end{itemize}
+
+\noindent
+\begin{itemize}
+\item It will quantify application-friendliness, which is not available in existing work, and which helps users to decide which allocator should be used for a specific application. 
+\item It will provide the memory usage (overhead) information, such as internal fragmentation, and objects that are not freed but yet which remain unused. 
+\item It will provide some information that only exists across multiple profilers, for instance, the average number of instructions of each allocation and deallocation, the average time spent within each allocation and deallocation (PMU sampling will be placed outside of the time span, thus not avoiding an erroneous measurement of how long this allocation and deallocation request has been sampled), whether there are some contentions during allocation (user space and kernel space), how many lock acquisitions.  
+\end{itemize}
+
+\section{Main Artifacts}
+\label{sec:main-artifacts}
+
+\begin{itemize}
+\item What are the key artifacts presented in your paper: a
+  methodology, a hardware design, a software algorithm, an
+  optimization or control technique, etc.?
+\end{itemize}
+
+\noindent
+To profile an allocator, \MP{} intercepts memory allocations/deallocations, memory-related system calls, and synchronizations. This also indicates that an allocator should utilize standard APIs in order for \MP{} to collect corresponding information. However, the Linux allocator utilizes the internal implementation of synchronizations by default. For the profiling purpose, it should be changed to invoke explicit POSIX-APIs instead. Fortunately, most allocators do not need any change or the recompilation.  \MP{} profiles the performance, memory overhead, scalability, and application friendliness, as discussed in different subsections. It also discusses some common issues, such as adapting to different allocators, and the performance issue of collecting data. 
+
+\begin{itemize}
+  \item How were your artifacts implemented and evaluated? 
+\end{itemize}
+
+\noindent
+MMProf is written as a C++ dynamic library. 
+We evaluate how \MP{} could benefit both normal users and allocator designers. 
+The former includes \textbf{Prediction of Performance Improvement}, \textbf{Reporting Memory Overhead} and \textbf{Reporting Application Friendliness}. 
+To evaluate the latter one, we evaluate \MP{} with five widely-used allocators, including two versions of the Linux allocator (versions 2.21 and 2.28), TCMalloc~\cite{tcmalloc}, jemalloc, and Hoard, and two secure allocators, i.e. DieHarder and OpenBSD. These allocators include both sequential and BiBOP-style allocators. Secure allocators were included, since they have their unique memory management policies. 
+
+
+\section{Key Results and Contributions}
+\label{sec:key-contributions}
+
+\begin{itemize}
+  \item What are the most important \emph{one or two} empirical or theoretical
+    results of this approach?
+\end{itemize}
+
+\begin{itemize}
+  \item What are the contributions that this paper makes to the state of the
+    art? List them in an \texttt{itemize} section. Each contribution should be no more than a few sentences long.
+\end{itemize}
+
+\begin{itemize}
+  \item Clearly describe its advantages over past work, including how it overcomes their limitations.
+\end{itemize}
+
+
+\section{Why ASPLOS}
+\label{sec:why-asplos}
+
+Firstly, \MP{} is an effective tool which could help both allocator designers and normal users, so we are confident that \MP{} benefits multidisciplinary areas. Second, the paper concludes and shares core understanding of relationship between application performance and allocators, which is a basic but significant topic for multiple fields.
+
+
+\section{Citation for Most Influential Paper Award}
+\label{sec:citation}
+
+Provide the citation for your paper if it won a Most Influential
+Paper award. You can find example citations
+on the \href{https://www.sigops.org/awards/hof/}{SIGOPS Hall of Fame}
+and \href{https://www.sigplan.org/Awards/PLDI/}{PLDI most influential
+  paper list}.  Limit the citation to 1-3 sentences
+\emph{Recall that your citation here must be anonymous}; do not include names or affiliations.
+
+%  \url{https://rb.gy/hd1hms}).
+
+\section{Revisions}
+\label{sec:revisions}
+
+ \emph{Optional:} Describe how this paper has been revised, if it was previously submitted to another conference.
+
+ 
+\pagebreak
+\bibliographystyle{plain}
+\bibliography{references}
+
+
+\end{document}
+
