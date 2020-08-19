@@ -53,7 +53,7 @@ Applications                    & Allocator  & Real & Prediction \\ \hline
 
 explain for overhead------------------------------
 
-We evaluate the performance overhead of \MP{} using PARSEC~\cite{parsec},  Phoenix~\cite{phoenix}, and synthetic applications from Hoard~\cite{Hoard}. To rationalize the overhead evaluation, we remove applications which would complete in 1 seconds, including \texttt{histogram}, \texttt{linear_regression} and \texttt{string_match}. Additionally, as \texttt{larson}'s behavior would change by its overhead, we remove it as well to make sure the evaluation fair. 
+We evaluate the performance overhead of \MP{} using PARSEC~\cite{parsec},  Phoenix~\cite{phoenix}, and synthetic applications from Hoard~\cite{Hoard}. To rationalize the overhead evaluation, we removed applications which would complete in 1 seconds, including \texttt{histogram}, \texttt{linear_regression} and \texttt{string_match}. Additionally, as \texttt{larson}'s behavior would change by its overhead, we remove it as well to make sure the evaluation fair. 
 
 To benefit different level users, we separately evaluate the overheads of \MP{} and \MP{} with PMU events.
 
