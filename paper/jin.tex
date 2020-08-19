@@ -1,3 +1,6 @@
+
+table for prediction-------------------------------
+
 \begin{table}[]
 \begin{tabular}{|l|l|l|l|}
 \hline
@@ -46,3 +49,27 @@ Applications                    & Allocator  & Real & Prediction \\ \hline
                                 & Dieharder  & 5.7  & 3.8        \\ \hline
 \end{tabular}
 \end{table}
+
+
+explain for overhead------------------------------
+
+We evaluate the performance overhead of \MP{} using PARSEC~\cite{parsec},  Phoenix~\cite{phoenix}, and synthetic applications from Hoard~\cite{Hoard}. To rationalize the overhead evaluation, we remove applications which would complete in 1 seconds, including \texttt{histogram}, \texttt{linear_regression} and \texttt{string_match}. Additionally, as \texttt{larson}'s behavior would change by its overhead, we remove it as well to make sure the evaluation fair. 
+
+To benefit different level users, we separately evaluate the overheads of \MP{} and \MP{} with PMU events.
+
+The performance overhead can be seen in Fig.~\ref{fig:overhead}, which is the average runtime of five executions. From this figure, we can see that \MP{} runs $0.35\times$ slower than the default allocator, and \MP{} with PMU events has an average overhead of 2.2\times compared to the default. 
+
+According to Fig.~\ref{fig:overhead}, \texttt{reverse_index} imposes $3\times$ performance overhead. The additional overhead mainly comes from \MP{}'s initialization. For instance, \MP{} calls mmap() and initializes chunks of memory at the beginning of programs. As \texttt{reverse_index} itself is a simple program(which would complete in only 1.5 seconds with the default allocator), the overhead of MMProf's fixed initialization shows a higher ratio to \texttt{reverse_index}'s original short runtime.
+
+For \MP{} with PMU events, two other applications(\texttt{fluidanimate} and \texttt{pca}) have higher overheads. As they have more allocations per unit time than other applications, interruptions of counting events take higher ratios of overheads. In fact, the frequency of PMU events could be switched(currently we call PMU events in 1\% probability for each allocation). For applications with high numbers of allocations, users could set a lower probability of calling PMU events to further reduce their overheads. As more allocations happened, a less ratio of PMU events is still enough to gain useful information for users.
+
+explain for prediction-------------------------------
+
+Comparing normalized runtimes and \MP()'s prediction, we find that \MP{} could successfully indicate performance impacts directly caused by the speed of allocations. In \texttt{fluidanimate}, \texttt{pca} and \textt{swaptions}, \MP{} could successfully predict runtime differences, especially for the allocator which allocation cycles are beyond the normal range running a specific application. However, \MP{} could not catch all of the performance impacts for three reasons:
+
+
+First, \MP{} could only catch the impact of allocation speeds, while there are some factors triggered by allocators that could influence performance as well. For example, allocators have different strategies of allocation memory scheduling, which would implicitly cause memory-related issues, such as page faults, false sharing, cache invalidation, and NUMA issues. Those problems are harsh to detect and quantify, therefore in \texttt{freqmine} and \texttt{kmeans}, even if their allocating cycles are only small parts of whole programs, they show obvious performance differences using different allocators. Thus in those applications, \MP{}'s prediction would be inaccurate.
+
+Second, \MP{} handles serial and parallel phases by intercepting the default pthread library. However, \texttt{freqmine} does not use the default but uses OpenMP, thus \MP{} misses its parallel phase then fails the prediction.
+
+Third, \MP assumes no dependency between children threads of predicted applications. However \texttt{dedup}'s threads break that assumption. One of its children thread was implicitly designed to complete after all other children threads, which causes \MP{} predicts its parallel phase incorrectly.
