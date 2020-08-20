@@ -158,7 +158,7 @@ void Predictor::stopSerial() {
 void Predictor::stopParallel() {
     uint64_t criticalStageCycle = 0;
     uint64_t criticalReplacedStageCycle = 0;
-    uint64_t numOfActiveThreads = 0;
+//    uint64_t numOfActiveThreads = 0;
     PerfReadInfo criticalStageCountingEvent;
     memset(&criticalStageCountingEvent, 0, sizeof(PerfReadInfo));
 

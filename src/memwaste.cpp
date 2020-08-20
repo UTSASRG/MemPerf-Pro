@@ -360,11 +360,12 @@ void MemoryWaste::printOutput() {
         }
 
         fprintf(ProgramStatus::outputFile, "internal fragmentation: %10ldK\t\t\tmemory blowup: %10luK\t\t\t"
-                                           "active alloc: %10ld\t\t\tfreelist objects: %10ld\t\t\t"
+                                           "active alloc: %10ld\t\t\tfreelist objects: %10ld\t\t\trecently freed objects: %10ld\t\t\t"
                                            "new allocated: %10lu\t\t\treused allocated: %10lu\t\t\tfreed: %10lu\n",
                 globalStatus.internalFragment[classSizeIndex]/ONE_KB, globalStatus.memoryBlowup[classSizeIndex]/ONE_KB,
                 globalStatus.numOfActiveObjects.numOfAllocatedObjects[classSizeIndex],
                 globalStatus.numOfActiveObjects.numOfFreelistObjects[classSizeIndex],
+                MAX(recordStatus.blowupFlag[classSizeIndex], 0),
                 globalStatus.numOfAccumulatedOperations.numOfNewAllocations[classSizeIndex],
                 globalStatus.numOfAccumulatedOperations.numOfReusedAllocations[classSizeIndex],
                 globalStatus.numOfAccumulatedOperations.numOfFree[classSizeIndex]);

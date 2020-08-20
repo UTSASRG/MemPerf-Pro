@@ -67,7 +67,7 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
 
     ThreadLocalStatus::addARunningThread();
     ThreadLocalStatus::getARunningThreadIndex();
-    ThreadLocalStatus::setRandomPeriodForCountingEvent(RANDOM_PERIOD_FOR_COUNTING_EVENT);
+//    ThreadLocalStatus::setRandomPeriodForCountingEvent(RANDOM_PERIOD_FOR_COUNTING_EVENT);
 
 //    cpu_set_t mask;
 //    CPU_ZERO(&mask);
