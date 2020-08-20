@@ -1,13 +1,16 @@
+\subsection{Effectiveness}
+\label{sec:effectiveness}
+
 In the following, we evaluate how \MP{} could benefit both normal users and allocator designers. 
 \subsubsection{Benefiting Normal Users\\} 
 
-\noindent \textbf{Prediction of Performance Impact:} 
+\noindent \textbf{Predicting Performance Impact:} 
 \MP{} can predict the performance impact if switching to a new allocator as discussed in Section~\ref{sec:predict}. Here, we are utilizing the average cycles of TcMalloc listed in Table~\ref{tbl:metrics} to predict the performance impact of switching to TcMalloc. All applications in Figure~\ref{fig:motivation} are evaluated, except \texttt{cache-scratch},  \texttt{cache-thrash}, and \texttt{freqmine}.  Since \texttt{cache-scratch} and \texttt{cache-thrash} are running much slower with TcMalloc due to passive/active false sharing issue, their performance results with TcMalloc cannot serve as the baseline correctly. \texttt{freqmine} is an openmp program that \MP{} cannot support well. The prediction results can be seen in Table~\ref{tbl:predictionResult}, where ``reverse'' is the abbreviation of reverse\_index. 
 
 \begin{table}[]
   \centering
   \footnotesize
-  \setlength{\tabcolsep}{0.1em}
+  \setlength{\tabcolsep}{0.2em}
 \begin{tabular}{l|c|c|c|c|c|c|c|c|c|c|c|c}
 \hline
  \multirow{2}{*}{APP} &
@@ -26,40 +29,35 @@ raytrace       & 1.27 & 1.02 & 1.27 & 1.05 & 1.20 & 1.00 & 1.00 & 1.00 & 1.10 & 
 reverse & 1.00 & 1.07 & 0.99 & 1.07 & 1.05 & 1.08 & 1.00 & 1.04 & 1.15 & 1.16 & 2.42 & 1.89 \\ \hline
 swaptions      & 0.99 & 0.99 & 0.99 & 1.00 & 0.98 & 0.96 & 1.00 & 0.96 & 2.04 & 1.11 & 5.67 & 3.82 \\ \hline
 \end{tabular}
-   \caption{Normalized runtime to TcMalloc. ``R'' and ``P'' columns list real and predicted result.  \label{tbl:predictionResult}}
+   \caption{ Results of \MP{}'s performance prediction, where data is normalized to the target allocator -- TcMalloc. ``R'' and ``P'' columns list real and predicted result.  \label{tbl:predictionResult}}
 \end{table}
 
-Overall, \MP{} could successfully predict serious performance impact (over 20\%) of  applications caused by an allocator (e.g., Hoard and DieHarder), although the exact numbers are different. For instance, \MP{} predicts that switching DieHarder to TcMalloc may boost the performance of \texttt{canneal} by $2\times$, but TcMalloc only improves the performance by 39\% in reality. Multiple reasons can contribute to the prediction difference or inaccuracy:
-
-First, \MP{} is using the averaged cycles as the baseline for prediction. However, the  runtime in different applications can be affected by multiple factors, such as number of page faults, system calls, and lock contention. Some of them are very difficult to quantify, which are not considered during the prediction. 
-
-Second, \MP{} could only predict the impact caused by slow memory management operations. However, the performance can be also affected by other factors, such as false sharing or cache misses. For instance, the runtime of memory management operations in \texttt{kmeans} is only a small portion of the total runtime (less than 3\%), with less than 2000 allocations. 
-
-Third, \MP{} assumes no dependency between children threads of predicted applications, and predicts the performance based on the maximum parallel phase. However, in \texttt{dedup}, the longest thread was waiting for other threads, but it has not many allocations and deallocations. To be more precise, the prediction should consider the critical path~\cite{wPerf}, which is too complicated itself.
+Overall, \MP{} could successfully predict serious performance impact (over 20\%) of  applications caused by an allocator (e.g., Hoard and DieHarder), although the exact numbers are different. For instance, \MP{} predicts that switching DieHarder to TcMalloc may boost the performance of \texttt{canneal} by $2\times$, but TcMalloc only improves the performance by 39\% in reality. Multiple reasons can contribute to the prediction difference or inaccuracy. First, \MP{} uses the averaged cycles as the baseline for prediction. But the runtime can be affected by multiple factors, such as number of page faults, system calls, and lock contention. Some of them are very difficult to quantify, and thus not considered during the prediction. Second, \MP{} can only predict the impact caused by slow memory management operations, but not on impact caused by false sharing or cache misses. For instance, the runtime of memory management operations in \texttt{kmeans} is only a small portion of the total runtime (less than 3\%), with less than 2000 allocations. Third, \MP{} assumes no dependency between threads and predicts  based on the maximum parallel phase. However, in \texttt{dedup}, the longest thread was always waiting for other threads, but with no many allocations and deallocations inside. Although other threads could be significantly improved, \MP{} could not predict much impact. To be more accurate, the prediction should consider the critical path~\cite{wPerf}, but that is too complicated itself to be included here.
 
 \textbf{Reporting Memory Overhead:} 
-\MP{} shows high memory overhead caused by  allocators. 
+\MP{} shows high memory overhead caused by  different allocators. For instance, \MP{} reports that \texttt{jemalloc} has high memory overhead in \texttt{freqmine}, \texttt{pca}, \texttt{raytrace} and \texttt{vips}. For these applications, \texttt{jemalloc} consumes 11\% more memory on average, compared to the default Linux allocator. \MP{} also reports that \texttt{TcMalloc} has memory issues in \texttt{swaptions} and \texttt{vips}, where it spends 26\% more memory than the default Linux allcator on average. 
+%Take \texttt{raytrace} as an example,  when the allocator is \texttt{jemalloc}, the memory overhead is 10\% more than the default Linux allocator. \MP{} presents \texttt{jemalloc} only effectively utilizes 65\% of its memory consumption, and the other 35\% is the external fragmentation, which indicates \texttt{jemalloc} could have a memory management issue when running \texttt{raytrace}.
 
-According to our investigation, \texttt{canneal} has 72\% extra memory overhead when running with \texttt{DieHarder}, compared with the default Linux allocator. 
-In \MP{}'s report, when \texttt{DieHarder} spends maximum memory on allocations, allocated objects only occupy 57\% of the total memory consumption. As when running with the default Linux allocator the percentage is 85\%, it shows that the extra memory consumption derives from \texttt{DieHarder}'s immature strategy of memory management. More precisely, \MP{} reports 10\% of \texttt{DieHarder}'s memory consumption is internal fragmentation of objects, 3\% is caused by memory blowup and the other 30\% comes from external fragmentation. 
 
-One other example is \texttt{vips} when running with \texttt{jemalloc}, which spends 15\% more memory than the default Linux allocator. \MP{} presents \texttt{jemalloc} only effectively utilizes 59\% of its memory consumption, and percentages of internal fragmentation, memory blowup and external fragmentation are 2\%, 39\% and 0\%, which indicates \texttt{jemalloc} could have a memory blowup issue when running \texttt{vips}.
+%In \texttt{vips}, \MP{} shows the size of objects only occupies 72\% of \texttt{TcMalloc}'s memory consumption, and percentages of internal fragmentation, memory blowup and external fragmentation are 3\%, 12\% and 13\%.
 
 \textbf{Reporting Application Friendliness:} 
-Due to the length limit, we will only present one example of page utilization, and another example of false sharing issues.
+\todo{We will report multiple examples with false sharing effect or low cache/page utilization rate}. 
+In \texttt{fluidanimate} running with \texttt{DieHarder}, \MP{} indicates its page utilization is only 79\%, while the default Linux allcaor is 97\%. That abnormal number could indicate \texttt{DieHarder} does not fit well with the memory usage pattern and the access pattern of \texttt{fluidanimate}. Actually, \texttt{fluidanimate} that runs with \texttt{DieHarder} has 25\% higher memory overhead, and has 25\% more page faults than the default Linux allocator. All the aspects consistently show that \texttt{DieHarder} does not tap well with \texttt{fluidanimate}.
 
-In \texttt{fluidanimate} running with \texttt{DieHarder}, \MP{} indicates its page utilization is only 79\%, while the default Linux allcator is 97\%. That abnormal number could indicate \texttt{DieHarder} does not fit well with the memory usage pattern and the access pattern of \texttt{fluidanimate}. Actually, \texttt{fluidanimate} that runs with \texttt{DieHarder} has 25\% higher memory overhead, and has 25\% more page faults than the default Linux allocator. All the aspects consistently show that \texttt{DieHarder} does not tap well with \texttt{fluidanimate}.
+One other example is \texttt{keans} runs with the default Linux allocator and \texttt{glibc-2.21}. \MP{} presents their page utilization are both only 66\%, and their cache utilization are 65\%. On average of all allocators except the above two, the page utilization and the cache utilization are 85\% and 87\%. In fact, those two allocators run around 10\% slower than other allocators in \texttt{kmeans}, though their time for allocations have almost no difference with others. Thus, \MP{}'s information of utilization provides a useful clue of the slowdown that \texttt{kmeans} does not fit well with the default Linux allocator and \texttt{glibc-2.21}.
 
 In \texttt{cache-scratch}, \texttt{TcMalloc} runs around $2.7\times$ slower compared to the default Linux allocator because of the passive false sharing issue.
 \MP{} presents that when the allocator is \texttt{TcMalloc}, 22\% of the sampled instructions trigger a passive false sharing, while when using the default Linux allocator, only 3\% of instructions are detected with passive false sharing.
 The result proves that \MP{} could detect whether a program is suffering from severe false sharing issues introduced by the allocator.
 
 \subsubsection{Benefiting Allocator Designers}
-In order to evaluate the effectiveness, we evaluate \MP{} with five widely-used allocators, including two versions of the Linux allocator (versions 2.21 and 2.28), TCMalloc~\cite{tcmalloc}, jemalloc, and Hoard, and two secure allocators, i.e. DieHarder and OpenBSD. These allocators include both sequential and BiBOP-style allocators. Secure allocators were included, since they have their unique memory management policies. 
 
-For the evaluation, we use the default configurations of these allocators. However, we make some changes in order to  intercept synchronizations. Since the Linux allocators are included within the \texttt{glibc} libraries, they invoke the internal synchronizations (\texttt{lll\_lock}) directly, which cannot be intercepted by \MP{}. They are thus recompiled separately as a stand-alone library for the purposes of evaluation. Because Hoard is using \texttt{std::lock\_guard} for its synchronization, we replaced these with POSIX spinlocks to track its synchronization behavior.
+As described before, \MP{} will benefit allocator designers by presenting more details related to the performance and memory overhead. Due to the space limit, we only utilize multiple examples to show the effectiveness and helpfulness of \MP{}. 
+%For performance, it shows the number of instructions, page faults and cache misses for each operation, the potential issues caused by synchronizations and system calls, different application-friendliness metrics. For memory overhead, it will show different types of memory overhead. 
 
-\todo{Adding average cycles (range) for each type of allocations. This gives us some evidence of allocators (maybe includes the average number of locks??)}
+
+
 
 \todo{What are workflow?}
 
