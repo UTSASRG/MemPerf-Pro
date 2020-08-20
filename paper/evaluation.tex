@@ -32,6 +32,7 @@ In the following, we evaluate how \MP{} could benefit both normal users and allo
 \end{tabular}
 \end{table}
 
+
   
 
 \textbf{Reporting Memory Overhead:} 
@@ -67,17 +68,23 @@ For the evaluation, we use the default configurations of these allocators. Howev
 
 \begin{figure}[!ht]
 \centering
-\includegraphics[width=\columnwidth]{figures/perfoverhead}
+\includegraphics[width=\columnwidth]{figures/mmprofPerformance}
 \caption{Performance overhead of \texttt{mmprof}, normalized to the runtime of default Linux allocator.\label{fig:overhead}}
 \end{figure}
 
-We evaluate the performance overhead of 
-\MP{} using PARSEC~\cite{parsec},  Phoenix~\cite{phoenix}, and synthetic applications from Hoard~\cite{Hoard}. The performance overhead can be seen in Fig.~\ref{fig:overhead}, which is the average runtime of five executions. From this figure, we can see that \MP{} runs $2.6\times$ slower than the default allocator, where two applications (\texttt{histogram} and \texttt{threadtest}) impose over $5\times$ performance overhead. Based on our understanding, both the number of memory operations and the number of lock acquisitions can significantly impact the performance overhead. To help the explanation, we further collect the characteristics of these applications, as shown in Table~\ref{table:characteristics}.  
+We evaluated the performance overhead of 
+\MP{} using PARSEC~\cite{parsec},  Phoenix~\cite{phoenix}, and synthetic applications from Hoard~\cite{Hoard}. Applications that are running too short (e.g., less than 2 seconds) are excluded from the evaluation, such as \texttt{histogram}, \texttt{linear\_regression} and \texttt{string\_match}. 
+Since normal users and allocator designers would require different types of information, \MP{} supports two different modes with different execution overhead. By default, \MP{} will not collect hardware performance counters upon each memory operation, which could not report the number of instructions, page faults, and cache misses for each memory operation. In the other mode, \MP{} will collect PMU events with a sampling rate of 1\% in order to help diagnose allocator design issues. 
 
-First, if an application invokes extensive applications and deallocations in a short period of time, then \MP{} may introduce a large performance overhead. For each memory operation, \MP{} invokes two RDTSC instructions to collect the runtime, updates multiple counters, and updates the state in the global hash table. Second, the number of lock acquisitions inside memory operations could also significantly affect the performance. Similarly, \MP{} also collects the runtime data of each lock acquisition via the RDTSC instruction, and update different counters. 
-Since \texttt{canneal} invokes 11 million memory operations and 0.3 million locks acquisitions per second, and \texttt{threadtest} has 6 million memory operations and 33 lock acquisitions per second, that explains why these applications have a large overhead with \MP{}.  
+The performance overhead of \MP{} can be seen in Figure~\ref{fig:overhead}, where all data are normalized to the data of the default allocator (glibc-2.28). The default mode of \MP{} introduces 35\% performance overhead, while collecting PMU events upon each memory operations adds additional 85\%  overhead (up to $2.2\times$ slower than  the default allocator). 
 
-\texttt{histogram} and \texttt{linear\_regression} are two exceptions, since they have a small number of allocations. For these two applications, \texttt{histogram}'s execution time is 0.12 seconds and \texttt{linear\_regression} is 0.3 seconds. \MP{} has an initialization phase to perform the initialization, and an finalization phase to analyze the data and write out results to the external file, which may add more overhead than a program's execution time. 
+For the default mode, only two applications imposes over 100\% performance overhead, including \texttt{reverse\_index} and \texttt{canneal}. \texttt{reverse\_index} is a short-running program that only runs around 1.5 seconds, where the initialization overhead of \MP{} contributes to a higher ratio of the overhead. \todo{\texttt{Canneal} is running slower because it invokes 11 million memory operations and 0.3 million locks acquisitions inside per second, then intercepting these operations and lock acquisitions imposes significant overhead.} 
+
+For \MP{} with collecting PMU events, two other applications(\texttt{fluidanimate} and \texttt{pca}) impose high overhead. Based on our investigation, these applications have more allocations per second than other applications. If the performance is a big concern, the sampling rate of collecting  PMU events could be further reduced. 
+
+%The performance overhead can be seen in Fig.~\ref{fig:overhead}, which is the average runtime of ten executions. From this figure, we can see that \MP{} runs $2.6\times$ slower than the default allocator, where two applications (\texttt{histogram} and \texttt{threadtest}) impose over $5\times$ performance overhead. Based on our understanding, both the number of memory operations and the number of lock acquisitions can significantly impact the performance overhead. To help the explanation, we further collect the characteristics of these applications, as shown in Table~\ref{table:characteristics}.  
+
+%First, if an application invokes extensive applications and deallocations in a short period of time, then \MP{} may introduce a large performance overhead. For each memory operation, \MP{} invokes two RDTSC instructions to collect the runtime, updates multiple counters, and updates the state in the global hash table. Second, the number of lock acquisitions inside memory operations could also significantly affect the performance. Similarly, \MP{} also collects the runtime data of each lock acquisition via the RDTSC instruction, and update different counters. Since \texttt{canneal} invokes 11 million memory operations and 0.3 million locks acquisitions per second, and \texttt{threadtest} has 6 million memory operations and 33 lock acquisitions per second, that explains why these applications have a large overhead with \MP{}.  \texttt{histogram} and \texttt{linear\_regression} are two exceptions, since they have a small number of allocations. For these two applications, \texttt{histogram}'s execution time is 0.12 seconds and \texttt{linear\_regression} is 0.3 seconds. \MP{} has an initialization phase to perform the initialization, and an finalization phase to analyze the data and write out results to the external file, which may add more overhead than a program's execution time. 
 %For instance, \texttt{histogram} only takes 0.12 seconds to finish. Therefore, \MP{} adds more overhead than the program's execution time.  has the same issue, with the total execution time of 0.3 seconds.  
 %for some tiny applications like \texttt{histogram}, which only takes 0.1 second when running along, \MP{}'s initialization and conclusion would take more time than themselves. Thus, performance overhead ratios for tiny applications could be larger.
 %\texttt{threadtest} actually imposes more performance overhead, due to the reason that most memory opeations are actually 
@@ -182,10 +189,10 @@ We will provide the important metrics of different allocators, and then have som
 \multicolumn{4}{c}{Big Objects}     \\ \cline{2-11}
 & \multicolumn{2}{c|}{New Alloc} & \multicolumn{2}{c|} {Re-Alloc} & \multicolumn{2}{c|} {Free} & \multicolumn{2}{c|}{Alloc} & \multicolumn{2}{c} {Free} \\ \cline{2-11}
 & Ser & Par. & Ser & Par. & Ser & Par. & Ser & Par. & Ser & Par. \\ \hline
-TcMalloc & 154 & 327 & 66 & 212 & 106 & 210 & 6994 & 1588 & 19180 & 1967 \\ \hline
-jemalloc &  135 & 331 & 69 & 312 & 161 & 361 & 5057 & 2015 & 2397 & 2183 \\ \hline
 Glibc-2.28 & 322 & 922 & 78 & 648 & 159 & 540 & 7985 & 21833 & 1202541 & 27406 \\ \hline
 Glibc-2.21 & 295 & 1281 & 202 & 669 & 134 & 575 & 7208 & 35399 & 1237736 & 44618 \\ \hline
+jemalloc &  135 & 331 & 69 & 312 & 161 & 361 & 5057 & 2015 & 2397 & 2183 \\ \hline
+TcMalloc & 154 & 327 & 66 & 212 & 106 & 210 & 6994 & 1588 & 19180 & 1967 \\ \hline
 Hoard & 111 & 495 & 79 & 106 & 185 & 108 & 8847 & 1564 & 7849 & 608\\ \hline
 %DieHarder & 474 & 71618 & 308 & 75765 & 1271 & 60373 & 18343 & 59604 & 34169 & 66806\\ \hline
   \end{tabular}
