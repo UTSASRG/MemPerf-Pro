@@ -13,53 +13,7 @@ Experiments were performed on a two-processor machine, where each processor is I
 \subsection{Effectiveness}
 \label{sec:effectiveness}
 
-In the following, we evaluate how \MP{} could benefit both normal users and allocator designers. 
-
-\subsubsection{Benefiting Normal Users}
-
-\MP{} will benefit normal users as follows. 
-
-\textbf{Prediction of Performance Improvement:} It could predict the performance improvement of an application, if switching to a new allocator. Here, we are using TcMalloc as an example, where we are utilizing the average cycles of TcMalloc listed in Table~\ref{tbl:metrics}. We evaluate on applications that are listed in Figure~\ref{fig:motivation}, and the  prediction results can be seen in Table~\ref{}. Since TcMalloc is extremely slow on \texttt{cache-scratch} and \texttt{cache-thrash}, these two applications are excluded. 
-
-\todo{Add the table}
-\todo{Add the explanation}
-\begin{table}[h]
-  \centering
-  \footnotesize
-  \setlength{\tabcolsep}{0.2em}
-\begin{tabular}{l|r|r|r|r|}
-\hline
-\end{tabular}
-\end{table}
-
-
-  
-
-\textbf{Reporting Memory Overhead:} 
-
-
-\textbf{Reporting Application Friendliness:} 
-
-\subsubsection{Benefiting Allocator Designers}
-In order to evaluate the effectiveness, we evaluate \MP{} with five widely-used allocators, including two versions of the Linux allocator (versions 2.21 and 2.28), TCMalloc~\cite{tcmalloc}, jemalloc, and Hoard, and two secure allocators, i.e. DieHarder and OpenBSD. These allocators include both sequential and BiBOP-style allocators. Secure allocators were included, since they have their unique memory management policies. 
-
-For the evaluation, we use the default configurations of these allocators. However, we make some changes in order to  intercept synchronizations. Since the Linux allocators are included within the \texttt{glibc} libraries, they invoke the internal synchronizations (\texttt{lll\_lock}) directly, which cannot be intercepted by \MP{}. They are thus recompiled separately as a stand-alone library for the purposes of evaluation. Because Hoard is using \texttt{std::lock\_guard} for its synchronization, we replaced these with POSIX spinlocks to track its synchronization behavior.
-
-\todo{Adding average cycles (range) for each type of allocations. This gives us some evidence of allocators (maybe includes the average number of locks??)}
-
-\todo{What are workflow?}
-
-\input{applications} 
-\input{metrics}
-
-%For a performant allocator, what's the common things within the average allocator. We could utilize a table to list the average points of each allocator. Potentially, we could utilize these parameters to evaluate a new allocator. 
-
-%For evaluating purpose, we could provide two information, one is the average with all evaluated allocators, another one is to omit one allocator with the lowest scores. 
-
-
-%It seems that BIBOP style allocators are the trend of allocators, which not only has a better performance overhead on average, but also has better safety by separating the metadata from the actual heap. 
-
-
+\input{effectiveness}
 
 \subsection{Overhead of \MP{}}
 
@@ -78,7 +32,7 @@ Since normal users and allocator designers would require different types of info
 
 The performance overhead of \MP{} can be seen in Figure~\ref{fig:overhead}, where all data are normalized to the data of the default allocator (glibc-2.28). The default mode of \MP{} introduces 35\% performance overhead, while collecting PMU events upon each memory operations adds additional 85\%  overhead (up to $2.2\times$ slower than  the default allocator). 
 
-For the default mode, only two applications imposes over 100\% performance overhead, including \texttt{reverse\_index} and \texttt{canneal}. \texttt{reverse\_index} is a short-running program that only runs around 1.5 seconds, where the initialization overhead of \MP{} contributes to a higher ratio of the overhead. \todo{\texttt{Canneal} is running slower because it invokes 11 million memory operations and 0.3 million locks acquisitions inside per second, then intercepting these operations and lock acquisitions imposes significant overhead.} 
+For the default mode, only two applications imposes over 100\% performance overhead, including \texttt{reverse\_index} and \texttt{canneal}. \texttt{reverse\_index} is a short-running program that only runs 1.5 seconds, where the initialization overhead of \MP{} contributes to a higher ratio of the overhead. \todo{Confirm this: \texttt{Canneal} is running slower because it invokes 11 million memory operations and 0.3 million locks acquisitions inside per second, then intercepting these operations and lock acquisitions imposes significant overhead.} 
 
 For \MP{} with collecting PMU events, two other applications(\texttt{fluidanimate} and \texttt{pca}) impose high overhead. Based on our investigation, these applications have more allocations per second than other applications. If the performance is a big concern, the sampling rate of collecting  PMU events could be further reduced. 
 
