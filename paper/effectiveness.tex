@@ -42,7 +42,6 @@ Overall, \MP{} could successfully predict serious performance impact (over 20\%)
 %In \texttt{vips}, \MP{} shows the size of objects only occupies 72\% of \texttt{TcMalloc}'s memory consumption, and percentages of internal fragmentation, memory blowup and external fragmentation are 3\%, 12\% and 13\%.
 
 \textbf{Reporting Application Friendliness:} 
-\todo{We will report multiple examples with false sharing effect or low cache/page utilization rate}. 
 In \texttt{fluidanimate} running with \texttt{DieHarder}, \MP{} indicates its page utilization is only 79\%, while the default Linux allcaor is 97\%. That abnormal number could indicate \texttt{DieHarder} does not fit well with the memory usage pattern and the access pattern of \texttt{fluidanimate}. Actually, \texttt{fluidanimate} that runs with \texttt{DieHarder} has 25\% higher memory overhead, and has 25\% more page faults than the default Linux allocator. All the aspects consistently show that \texttt{DieHarder} does not tap well with \texttt{fluidanimate}.
 
 One other example is \texttt{keans} runs with the default Linux allocator and \texttt{glibc-2.21}. \MP{} presents their page utilization are both only 66\%, and their cache utilization are 65\%. On average of all allocators except the above two, the page utilization and the cache utilization are 85\% and 87\%. In fact, those two allocators run around 10\% slower than other allocators in \texttt{kmeans}, though their time for allocations have almost no difference with others. Thus, \MP{}'s information of utilization provides a useful clue of the slowdown that \texttt{kmeans} does not fit well with the default Linux allocator and \texttt{glibc-2.21}.
@@ -52,7 +51,7 @@ In \texttt{cache-scratch}, \texttt{TcMalloc} runs around $2.7\times$ slower comp
 The result proves that \MP{} could detect whether a program is suffering from severe false sharing issues introduced by the allocator.
 
 \subsubsection{Benefiting Allocator Designers}
-
+\label{sec: benifitdesigners}
 As described before, \MP{} will benefit allocator designers by presenting more details related to the performance and memory overhead. Due to the space limit, we only utilize multiple examples to show the effectiveness and helpfulness of \MP{}. 
 %For performance, it shows the number of instructions, page faults and cache misses for each operation, the potential issues caused by synchronizations and system calls, different application-friendliness metrics. For memory overhead, it will show different types of memory overhead. 
 
