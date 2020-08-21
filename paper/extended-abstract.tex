@@ -63,15 +63,16 @@
 A memory allocator is a key component that could significantly impact the performance and memory consumption of the corresponding applications by up to orders of magnitude. However, none of existing tools could answer the following questions related to the memory allocator. \\
 
 \begin{itemize}
-\item Whether the allocator introduces   some performance slowdown for this application? 
-\item How much the performance can be improved if switching to a well-performed allocator (e.g., TcMalloc)?
-\item How much memory wastes the allocator introduces?
-\item What are the possible design issues for performance slowdown and memory wastes separately? 
+\item \textbf{Q1:} \textit{Whether the allocator introduces some performance slowdown for this application? }
+\item \textbf{Q2:} \textit{How much the performance can be improved if switching to a well-performed allocator (e.g., TcMalloc)?}
+\item \textbf{Q3:} \textit{How much memory wastes the allocator introduces?}
+\item \textbf{Q4:} \textit{What are the possible design issues for performance slowdown?}
+\item \textbf{Q5:} \textit{What are the reasons for memory wastes?} 
 %\item What are quantitative metrics to evaluate a memory allocator? 
 \end{itemize}
 \vspace{0.1in}
 
-Due to the obvious importance of a memory allocator, it is emergent to design a profiler that could answer these research questions about an allocator. This paper presents such a profiler--\MP{}--that profiles different aspects of an allocator that will benefit both allocator designers and normal users. 
+Due to the obvious importance of a memory allocator, it is emergent to design a profiler that could answer these research questions about an allocator. This paper presents such a profiler--\MP{}--that profiles different aspects of an allocator, which will benefit both allocator designers and normal users. 
 
 \MP{} will benefit normal users by predicting potential performance impact, reporting detailed memory wastes, and judging whether an allocator is tapped with allocation/deallocation pattern or access pattern of the current application. \MP{} will also benefit allocator designers that help diagnose the specific design issues inside the allocator. 
 
@@ -88,65 +89,60 @@ General profilers, such as \texttt{gprof}~\cite{DBLP:conf/sigplan/GrahamKM82} an
 \section{Key Insights}
 \label{sec:key-insights}
 
-\begin{itemize}
-\item What are the one or two key new insights in this paper?
-\end{itemize}
+%\begin{itemize}
+%\item What are the one or two key new insights in this paper?
+%\end{itemize}
+
+\MP{} aims to identify the performance and memory impact caused by the allocator. However, the key question is that what aspects of an allocator could introduce the performance and memory impact? 
+
+Based on our observation, an allocator can affect the performance of applications in two ways: first, the performance of memory management operations will affect the performance of applications, where slow operations may degrade the performance.  Second, whether an allocator is tapping well with memory usage and access pattern of a particular application, called ``\textit{application friendliness}'', including cache utilization rate, page utilization rate, passive/active false sharing, and cache invalidation rate. 
+
+The performance of memory management operations can be affected by the following factors. The first reason is due to the complexity of the implementation, which can be measured by the number of instructions inside each operation. The second reason can be caused by some hardware events of the algorithm design, such as cache misses. The third reason can be caused by user space contention, which could be evaluated via lock acquisitions and lock contention inside each memory management operation. The fourth reason is due to kernel contention, which could be caused by memory-related system calls. Based on this observation, \MP{} proposes to utilize hardware Performance Monitoring Units (PMUs) to collect the number of instructions and hardware events inside each memory operation, and intercepts synchronizations and memory related system calls in order to identify user and kernel space contention. It further utilizes RTDSC timestamp to measure the runtime. The basic idea is shown as Figure~\ref{fig:basicidea}. 
 
 \begin{figure}[!ht]
 \centering
-\includegraphics[width=3in]{figures/overview}
+\includegraphics[width=3in]{figures/basicidea}
 \caption{Basic idea of \texttt{mmprof}.\label{fig:basicidea}}
 \end{figure}
 
-\MP{} is designed as a drop-in library that can be simply linked to applications (and allocators) with the preloading mechanism, which does not require the change or the re-compilation of applications and allocators, as far as an allocator utilizes standard synchronizations and system calls.
+
+\MP{} reports different types of memory wastes introduced by an allocator. Based on our observation, memory wastes of an allocator can be caused by the following aspects: metadata overhead, internal fragmentation, memory blowup, and external fragmentation.  Although it is straightforward to measure internal fragmentation, but not for memory blowup and external fragmentation. Memory blowup occurs when memory deallocations from one thread cannot be utilized to satisfy subsequent memory requests from other threads~\cite{Hoard}, due to the employment of per-thread heaps. However, this definition cannot be utilized directly to collect the total memory blowup, as it does not specify how to update it upon consequent deallocations and re-allocations. \MP{} measures memory blowup with a key observation: \textit{the total size of freed objects represent the upper bound of memory blowup for a size class}. Then the memory blowup can be measured by subtracting the total size with the size of recently-freed objects. After computing the memory blowup, \MP{} is able to compute the overhead of external fragmentation and metadata afterwards. 
+ 
 
 
-\begin{itemize}
-\item How does it advance the state of the art?
-\end{itemize}
 
-\noindent
-Firstly, \MP{} is the first systematic approach to evaluate and profile different memory allocators, without changing the internal implementation of allocators. More specifically, \MP{} proposes the combination of function interception (based on common APIs) and PMU-based sampling to perform the profiling. Besides, \MP{} proposes the first mechanisms to quantitatively measure memory blowup (and external fragmentation), cache/page utilization rate, and passive/active false sharing impact.  
+%\begin{itemize}
+%\item What makes it more effective than past approaches?
+%\end{itemize}
 
-%\MP{} will benefit normal users in the following ways. First, \MP{} can predict potential performance improvement when switching to an exemplar allocator (such as TcMalloc), which clearly indicates whether it is necessary to improve the allocator or switch to a new allocator. Second, \MP{} will report detailed memory wastes caused by an allocator, which is overlooked by existing profilers. Third, \MP{} will also report multiple application-friendliness metrics, which tells whether an allocator is tapped with allocation/deallocation pattern or access pattern of a particular application. As described above, a well-performed allocator like TcMalloc may be not suitable for a particular application (e.g., \texttt{cache-thrash}). Overall, \MP{} will provide a range of metrics on evaluating an allocator for normal users, not just limiting to the runtime. 
-
-\begin{itemize}
-\item What makes it more effective than past approaches?
-\end{itemize}
-
-\begin{itemize}
-\item It will quantify application-friendliness, which is not available in existing work, and which helps users to decide which allocator should be used for a specific application. 
-\item It will provide the memory usage (overhead) information, such as internal fragmentation, and objects that are not freed but yet which remain unused. 
-\item It will provide some information that only exists across multiple profilers, for instance, the average number of instructions of each allocation and deallocation, the average time spent within each allocation and deallocation (PMU sampling will be placed outside of the time span, thus not avoiding an erroneous measurement of how long this allocation and deallocation request has been sampled), whether there are some contentions during allocation (user space and kernel space), how many lock acquisitions.  
-\end{itemize}
 
 \section{Main Artifacts}
 \label{sec:main-artifacts}
 
-\begin{itemize}
-\item What are the key artifacts presented in your paper: a
-  methodology, a hardware design, a software algorithm, an
-  optimization or control technique, etc.?
-\end{itemize}
+%\begin{itemize}
+%\item What are the key artifacts presented in your paper: a methodology, a hardware design, a software algorithm, an optimization or control technique, etc.?
+%\end{itemize}
 
-The key artifacts of this paper is a profiling tool that could 
+The key artifacts is a profiling tool that could identify different aspects of an allocator, such as performance, memory, application-friendliness. 
 
-\noindent
-To profile an allocator, \MP{} intercepts memory allocations/deallocations, memory-related system calls, and synchronizations. This also indicates that an allocator should utilize standard APIs in order for \MP{} to collect corresponding information. However, the Linux allocator utilizes the internal implementation of synchronizations by default. For the profiling purpose, it should be changed to invoke explicit POSIX-APIs instead. Fortunately, most allocators do not need any change or the recompilation.  \MP{} profiles the performance, memory overhead, scalability, and application friendliness, as discussed in different subsections. It also discusses some common issues, such as adapting to different allocators, and the performance issue of collecting data. 
+\MP{} is designed as a drop-in library that can be simply linked to applications (and allocators) with the preloading mechanism, which does not require the change or the re-compilation of applications and allocators, as far as an allocator utilizes standard synchronizations and system calls.
 
-\begin{itemize}
-  \item How were your artifacts implemented and evaluated? 
-\end{itemize}
+We evaluated \MP{} with five widely-used allocators, including two versions of the Linux allocator (versions 2.21 and 2.28), TCMalloc~\cite{tcmalloc}, jemalloc, and Hoard, and one secure allocator--DieHarder. Overall, the evaluation includes the effectiveness and the overhead. The experimental results show that \MP{} successfully identifies multiple known and \textbf{unknown} design issues inside popular allocators. Due to its careful design, \MP{} only imposes 35\% performance overhead on average. This efficient design reduces \MP{}'s interference to the original execution. \MP{} does not need the change of the allocator, the application, and the underlying OS, which will be convenient for the employment. 
+
+
+%\MP{} is the first systematic approach to evaluate and profile different memory allocators, without changing the internal implementation of allocators. More specifically, \MP{} proposes the combination of function interception (based on common APIs) and PMU-based sampling to perform the profiling. Besides, \MP{} proposes the first tool to quantitatively measure memory blowup (and external fragmentation), cache/page utilization rate, and passive/active false sharing impact.  
+
+%\begin{itemize}
+%  \item How were your artifacts implemented and evaluated? 
+%\end{itemize}
 
 \noindent
 \MP{} is written as a runtime library that could be attached to different allocators, as far as . 
-We evaluate how \MP{} could benefit both normal users and allocator designers. 
-The former includes \textbf{Prediction of Performance Improvement}, \textbf{Reporting Memory Overhead} and \textbf{Reporting Application Friendliness}. 
-To evaluate the latter one, we evaluate \MP{} with five widely-used allocators, including two versions of the Linux allocator (versions 2.21 and 2.28), TCMalloc~\cite{tcmalloc}, jemalloc, and Hoard, and two secure allocators, i.e. DieHarder and OpenBSD. These allocators include both sequential and BiBOP-style allocators. Secure allocators were included, since they have their unique memory management policies. 
-
 
 \section{Key Results and Contributions}
 \label{sec:key-contributions}
+
+\begin{comment}
 
 \begin{itemize}
   \item What are the most important \emph{one or two} empirical or theoretical
@@ -161,37 +157,41 @@ To evaluate the latter one, we evaluate \MP{} with five widely-used allocators, 
 \begin{itemize}
   \item Clearly describe its advantages over past work, including how it overcomes their limitations.
 \end{itemize}
+	
+\end{comment}
+
+This paper makes the following contributions. 
+
+\begin{itemize}
+\item \MP{} is the first systematic approach to evaluate and profile different memory allocators, without changing the internal implementation of allocators. More specifically, \MP{} proposes the combination of function interception (based on common APIs) and PMU-based sampling to perform the profiling.
+ 
+
+\item \MP{} analyzes multiple relevant factors that an allocator may impact the performance of applications.
+
+
+\item \MP{} proposes the first experimental mechanisms to quantitatively measure memory blowup (and external fragmentation), cache/page utilization rate, and passive/active false sharing impact. 
+
+\item This paper performs extensive experimentation to confirm \MP{}'s effectiveness and overhead. The experiments also uncovers multiple known and unknown design issues in widely-used allocators.  
+
+\end{itemize} 
 
 
 \section{Why ASPLOS}
 \label{sec:why-asplos}
 
-This paper describes a tool that could be utilized to identify .
-Firstly, \MP{} is an effective tool which could help both allocator designers and normal users, so we are confident that \MP{} benefits multidisciplinary areas. Second, the paper concludes and shares core understanding of relationship between application performance and allocators, which is a basic but significant topic for multiple fields.
+This paper describes a tool that could be utilized to identify performance and memory issues brought by the memory allocator. Since the tool belongs to the runtime system, it will certainly be the interests of people in both Programming Languages and Operating Systems field. 
 
+In addition, the paper presents some core understanding and some basic metrics that will benefit people in designing an efficient memory allocator.
 
 \section{Citation for Most Influential Paper Award}
 \label{sec:citation}
 
-Provide the citation for your paper if it won a Most Influential
-Paper award. You can find example citations
-on the \href{https://www.sigops.org/awards/hof/}{SIGOPS Hall of Fame}
-and \href{https://www.sigplan.org/Awards/PLDI/}{PLDI most influential
-  paper list}.  Limit the citation to 1-3 sentences
-\emph{Recall that your citation here must be anonymous}; do not include names or affiliations.
-
-%  \url{https://rb.gy/hd1hms}).
+\MP{} is a work that will have the important impact on the allocator designer. It could benefit allocator designers in the following aspects. First, it will shed light on how an allocator could significantly impact the performance of the corresponding applications. Second, what are the key metrics for industrial level allocators. Third, the tool could be utilized by allocator designers when they design or improve the memory allocator, without reinventing the wheel to implement a profiler. \MP{} will also benefit normal users that they could know whether some performance or memory issues have been introduced by the allocator. Overall, this is the first systematic and quantitative work that are investigating the impact caused by the memory allocator. 
 
 \section{Revisions}
 \label{sec:revisions}
 
-     a lack sufficient research novelty
-    high tool overhead
-    lack of portability
-    many unanswered questions concerning the empirical methodology and results
-    the use case for the tool is overly narrow for an OOPSLA publication.
-
-The revision of this paper is improved in the following aspects. First, we significantly reduce its performance overhead via two approaches. First, the overhead of collecting counting events is the most significant overhead, where the overhead could be delayed to second time, where most of  sampling technique. Second, this version also strengths how \MP{} could be utilized to benefit normal users, avoiding the narrow usage issue pointed out by previous reviewers. Third, we re-write the introduction to focus more on research novelty. 
+The revision of this paper has improved in the following aspects. First, we significantly reduce its profiling overhead from originally more than $2\times$ to around 35\%. This is based on the observation that most normal users have no interest in the detailed hardware events, where only allocator designers do. Therefore, the collection of PMU events will be an option for the system, which could be enabled via environment variable. Second, this version also strengths how \MP{} could benefit normal users, avoiding the narrow usage issue pointed out by previous reviewers. Third, we re-write the introduction to focus more on research novelty. 
  
 \pagebreak
 {
