@@ -22,7 +22,7 @@ A memory allocator is a key component that could significantly impact the perfor
 Due to the obvious importance of a memory allocator, it is emergent to design a profiler that could answer the following questions related to an allocator. \\
 
 \begin{itemize}
-\item \textbf{Q1:} \textit{Whether the allocator introduces some performance slowdown for this application? }
+\item \textbf{Q1:} \textit{Whether the allocator introduces some potential performance slowdown for this application? }
 \item \textbf{Q2:} \textit{How much the performance can be improved if switching to a well-performed allocator (e.g., TcMalloc)?}
 \item \textbf{Q3:} \textit{How much memory wastes the allocator introduces?}
 \item \textbf{Q4:} \textit{What are the possible design issues for performance slowdown?}
@@ -46,7 +46,7 @@ In order to answer the question \textbf{Q1}, it is required to understand how an
 
 %in order to reduce the performance overhead. For instance, to collect cache utilization rate, \MP{} tracks used bytes of every cache line, and then updates the overall cache utilization rate upon every sampled access. Overall, these parameters will help users to understand the performance degradation on a specific application. For the previous example, \MP{} reports that the passive false sharing is the direct reason for TcMalloc's low performance on \texttt{cache-trash} application.
 
-It is straightforward to collect the cycles of memory management operations during the execution. Then we propose to replace the collected cycles with those of a target allocator in order to predict the possible performance impact after switching to the target allocator, which helps answer the question \textbf{Q2}. However, there exist multiple issues. The first issue is the accuracy, since the performance for different types of allocations are substantially different (as shown in Table~\ref{tbl:metrics}), such as allocations of small and big objects, serial and parallel phase, new and reused allocations, allocations and deallocations. The second issue is that the target allocator may has different threshold for small and big objects from the current allocator. The third issue is the prediction of multithreaded applications. \MP{} solves all of these issues as discussed in Section~\ref{sec:predict}.
+It is straightforward to collect the cycles of memory management operations during the execution. Then we propose to replace the collected cycles with those of a target allocator in order to predict the possible performance impact after switching to the target allocator, which helps answer the question \textbf{Q2}. However, there exist multiple issues. The first issue is the accuracy, since the performance for different types of allocations are substantially different (as shown in Table~\ref{tbl:metrics}), such as allocations of small and big objects, serial and parallel phase, new and reused allocations, allocations and deallocations. The second issue is that the target allocator may has a different threshold for small and big objects from the current allocator. The third issue is the prediction of multithreaded applications. \MP{} solves all of these issues as discussed in Section~\ref{sec:predict}.
 
 The question \textbf{Q3} is related to memory wastes caused by the allocator. The straightforward method is to intercept memory-related system calls (e.g., \texttt{mmap} and \texttt{sbrk}) inside memory operations to collect the total memory consumption, and then subtract it by  consumption of applications. However, virtual memory is different from physical memory, since physical pages are typically allocated on demand inside the OS. In addition, the allocator may return physical pages to the OS via \texttt{madvise} or \texttt{munmap}. Instead, \MP{} proposes to utilize a page-based mechanism to track memory consumption, where a page is treated as ``allocated'' only when some objects in this page have been allocated to the application. It further tracks \texttt{madvise} and \texttt{munmap} to update memory consumption timely. 
 
@@ -77,15 +77,15 @@ Overall, this paper makes the following contributions.
 
 %It proposes the first general profiler--\MP{}--to profile different memory allocators, without the need of the change of the allocator and the underlying OS, if an allocator utilizes the standard synchronization and system calls.  
 
-\item \MP{} analyzes multiple relevant factors that an allocator may impact the performance of applications.
+\item \MP{} analyzes relevant factors that may impact the performance and memory consumption of applications.
 %important reasons that may impact  of an allocator that will significantly impact the performance and memory overhead of an allocator, with the assistance of PMUs, time-stamp counters, and simple counters together. 
 
-\item \MP{} proposes the first experimental mechanisms to quantitatively measure memory blowup (and external fragmentation), cache/page utilization rate, and passive/active false sharing impact. 
+\item \MP{} performs an experimental evaluation to quantitatively measure memory blowup (and external fragmentation), cache/page utilization rate, and passive/active false sharing. 
 %, multiple practical methods to profile some metrics precisely and efficiently for the first time, such as memory blowup, . 
 %profile cache/page utilization rate, memory blowup, active/passive false sharing, and kernel contention for the first time.
 %, and attributes the data to each allocation and deallocation, helps discover designing issues that cannot be discovered with general profilers.  
 %\item \MP{} proposes a practical method to predict the performance impact of the current allocator, which allows normal users to 
-\item This paper performs extensive experimentation to confirm \MP{}'s effectiveness and overhead. The experiments also uncovers multiple known and unknown design issues in widely-used allocators.  
+\item This paper performs extensive experimentation to confirm \MP{}'s effectiveness and low overhead. These experiments also uncover multiple known and unknown design issues in widely-used allocators.  
 
 \end{itemize} 
 
@@ -103,4 +103,4 @@ Overall, this paper makes the following contributions.
 
 \subsection*{Outline}
 
-The remained of this paper is organized as follows. Section~\ref{sec:background} discusses the background of memory allocators, and the basic idea and challenges of \MP{}. Then Section~\ref{sec:implementation} presents the detailed implementation. After that, Section~\ref{sec:evaluation} shows the results of experiments on different allocators using \MP{}, and Section~\ref{sec:limitation} discusses some limitations. In the end, Section~\ref{sec:relatedwork} discusses related work in this field, and Section~\ref{sec:conclusion} concludes this paper.
+The remained of this paper is organized as follows. Section~\ref{sec:background} discusses the background of memory allocators, and the basic idea of \MP{}. Then Section~\ref{sec:implementation} presents the detailed implementation. After that, Section~\ref{sec:evaluation} shows experimental results on different allocators using \MP{}, and Section~\ref{sec:limitation} discusses a potential limitation. In the end, Section~\ref{sec:relatedwork} discusses related work in this field, and Section~\ref{sec:conclusion} concludes this paper.
