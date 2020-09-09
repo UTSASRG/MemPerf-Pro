@@ -1,7 +1,6 @@
 
 #include "memwaste.h"
 
-//HashMap<void*, ObjectStatus, nolock, PrivateHeap> MemoryWaste::objStatusMap;
 HashMap<void*, ObjectStatus, PrivateHeap> MemoryWaste::objStatusMap;
 thread_local SizeClassSizeAndIndex MemoryWaste::currentSizeClassSizeAndIndex;
 MemoryWasteStatus MemoryWaste::currentStatus, MemoryWaste::recordStatus;
@@ -272,6 +271,11 @@ AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(size_t size, void * ad
         currentStatus.blowupFlag[currentSizeClassSizeAndIndex.classSizeIndex]--;
     }
 
+//    if(currentSizeClassSizeAndIndex.size == 390144) {
+//        fprintf(stderr, "alloc: size = %lu, addr = %p, reused = %d\n", size, address, reused);
+//        abort();
+//    }
+
     return AllocatingTypeGotFromMemoryWaste{reused, currentSizeClassSizeAndIndex.classSize, currentSizeClassSizeAndIndex.classSizeIndex};
 }
 
@@ -296,6 +300,12 @@ AllocatingTypeWithSizeGotFromMemoryWaste MemoryWaste::freeUpdate(void* address) 
 
 
     currentStatus.blowupFlag[currentSizeClassSizeAndIndex.classSizeIndex]++;
+
+//    if(currentSizeClassSizeAndIndex.size == 390144) {
+//        fprintf(stderr, "free: size = %lu, addr = %p\n", currentSizeClassSizeAndIndex.size, address);
+//        abort();
+//    }
+
     return AllocatingTypeWithSizeGotFromMemoryWaste{currentSizeClassSizeAndIndex.size,
                                                     AllocatingTypeGotFromMemoryWaste{false, currentSizeClassSizeAndIndex.classSize, currentSizeClassSizeAndIndex.classSizeIndex}};
 }

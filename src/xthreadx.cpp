@@ -1,6 +1,5 @@
 #include "xthreadx.hh"
 
-//extern thread_local HashMap <void *, DetailLockData, nolock, PrivateHeap> lockUsage;
 extern thread_local HashMap <void *, DetailLockData, PrivateHeap> lockUsage;
 
 int xthreadx::thread_create(pthread_t * tid, const pthread_attr_t * attr, threadFunction * fn, void * arg) {
@@ -37,24 +36,24 @@ void * xthreadx::startThread(void * arg) {
         abort();
     }
 
-//
-#ifndef NO_PMU
     initPMU();
-#endif
 
     ThreadLocalStatus::getARunningThreadIndex();
-//    fprintf(stderr, "%d thread create\n", ThreadLocalStatus::runningThreadIndex);
-//    ThreadLocalStatus::setRandomPeriodForCountingEvent(RANDOM_PERIOD_FOR_COUNTING_EVENT);
 
-    ///CPU Binding
-//    cpu_set_t mask;
-//    CPU_ZERO(&mask);
-//    CPU_SET(ThreadLocalStatus::runningThreadIndex%40, &mask);
-//    if (sched_setaffinity(0, sizeof(mask), &mask) == -1)
-//    {
-//        fprintf(stderr, "warning: could not set CPU affinity\n");
-//        abort();
-//    }
+#ifdef OPEN_SAMPLING_FOR_ALLOCS
+    ThreadLocalStatus::setRandomPeriodForAllocations(RANDOM_PERIOD_FOR_ALLOCS);
+#endif
+
+#ifdef OPEN_CPU_BINDING
+    cpu_set_t mask;
+    CPU_ZERO(&mask);
+    CPU_SET(ThreadLocalStatus::runningThreadIndex%40, &mask);
+    if (sched_setaffinity(0, sizeof(mask), &mask) == -1)
+    {
+        fprintf(stderr, "warning: could not set CPU affinity\n");
+        abort();
+    }
+#endif
 
     MyMalloc::initializeForThreadLocalXthreadMemory(ThreadLocalStatus::runningThreadIndex);
     MyMalloc::initializeForThreadLocalHashMemory(ThreadLocalStatus::runningThreadIndex);
@@ -76,10 +75,9 @@ void xthreadx::threadExit() {
     Predictor::outsideCountingEventsStop();
     Predictor::threadEnd();
 
-#ifndef NO_PMU
     stopSampling();
     stopCounting();
-#endif
+
     GlobalStatus::globalize();
 
     MyMalloc::finalizeForThreadLocalXthreadMemory(ThreadLocalStatus::runningThreadIndex);

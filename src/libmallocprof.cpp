@@ -3,9 +3,6 @@
 
 thread_local bool PMUinit = false;
 
-
-//thread_local HashMap <void *, DetailLockData, nolock, PrivateHeap> lockUsage;
-//HashMap <void *, DetailLockData, nolock, PrivateHeap> globalLockUsage;
 thread_local HashMap <void *, DetailLockData, PrivateHeap> lockUsage;
 HashMap <void *, DetailLockData, PrivateHeap> globalLockUsage;
 
@@ -25,19 +22,9 @@ extern "C" {
 	void * memalign(size_t, size_t) __attribute__ ((weak, alias("yymemalign")));
 	int posix_memalign(void **, size_t, size_t) __attribute__ ((weak,
 				alias("yyposix_memalign")));
-//    void * mmap(void *addr, size_t length, int prot, int flags,
-//            int fd, off_t offset) __attribute__ ((weak, alias("yymmap")));
+    void * mmap(void *addr, size_t length, int prot, int flags,
+            int fd, off_t offset) __attribute__ ((weak, alias("yymmap")));
 }
-
- inline void PMU_init_check() {
-    #ifndef NO_PMU
-    // If the PMU sampler has not yet been set up for this thread, set it up now
-    if(__builtin_expect(!PMUinit, false)) {
-      initPMU();
-      PMUinit = true;
-    }
-    #endif
- }
 
 void exitHandler() {
 
@@ -46,10 +33,8 @@ void exitHandler() {
     Predictor::outsideCountingEventsStop();
     Predictor::stopSerial();
 
-	#ifndef NO_PMU
 	stopSampling();
     stopCounting();
-    #endif
 
     GlobalStatus::globalize();
     GlobalStatus::printOutput();
@@ -58,25 +43,37 @@ void exitHandler() {
 
 }
 
+uintptr_t retvals[1000] = {0};
+size_t lengths[1000] = {0};
+unsigned hugePageBeforeInit = 0;
+
 // MallocProf's main function
 int libmallocprof_main(int argc, char ** argv, char ** envp) {
-//    ProgramStatus::checkSystemIs64Bits();
-    PMU_init_check();
+    fprintf(stderr, "start of mmprof\n");
+    initPMU();
     RealX::initializer();
     ShadowMemory::initialize();
+    for(unsigned i = 0; i < hugePageBeforeInit; ++i) {
+        ShadowMemory::setHugePages(retvals[i], lengths[i]);
+    }
 
     ThreadLocalStatus::addARunningThread();
     ThreadLocalStatus::getARunningThreadIndex();
-//    ThreadLocalStatus::setRandomPeriodForCountingEvent(RANDOM_PERIOD_FOR_COUNTING_EVENT);
 
-//    cpu_set_t mask;
-//    CPU_ZERO(&mask);
-//    CPU_SET(ThreadLocalStatus::runningThreadIndex%40, &mask);
-//    if (sched_setaffinity(0, sizeof(mask), &mask) == -1)
-//    {
-//        fprintf(stderr, "warning: could not set CPU affinity\n");
-//        abort();
-//    }
+#ifdef OPEN_SAMPLING_FOR_ALLOCS
+    ThreadLocalStatus::setRandomPeriodForAllocations(RANDOM_PERIOD_FOR_ALLOCS);
+#endif
+
+#ifdef OPEN_CPU_BINDING
+    cpu_set_t mask;
+    CPU_ZERO(&mask);
+    CPU_SET(ThreadLocalStatus::runningThreadIndex%40, &mask);
+    if (sched_setaffinity(0, sizeof(mask), &mask) == -1)
+    {
+        fprintf(stderr, "warning: could not set CPU affinity\n");
+        abort();
+    }
+#endif
 
     ProgramStatus::initIO(argv[0]);
     lockUsage.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_LOCK_NUM);
@@ -117,8 +114,14 @@ extern "C" {
         if(!AllocatingStatus::outsideTrackedAllocation() || ProgramStatus::conclusionHasStarted()) {
             return RealX::malloc(sz);
         }
+        if(AllocatingStatus::isFirstFunction()) {
+            setupCounting();
+        }
         Predictor::outsideCyclesStop();
         AllocatingStatus::updateAllocatingStatusBeforeRealFunction(MALLOC, sz);
+//        if(ThreadLocalStatus::runningThreadIndex == 1) {
+//            fprintf(stderr, "sz = %lu\n", sz);
+//        }
 		void * object = RealX::malloc(sz);
         AllocatingStatus::updateAllocatingStatusAfterRealFunction(object);
         AllocatingStatus::updateAllocatingInfoToThreadLocalData();
@@ -141,6 +144,7 @@ extern "C" {
         if(!AllocatingStatus::outsideTrackedAllocation() || ProgramStatus::conclusionHasStarted()) {
             return RealX::calloc(nelem, elsize);
         }
+
         Predictor::outsideCyclesStop();
         AllocatingStatus::updateAllocatingStatusBeforeRealFunction(CALLOC, nelem*elsize);
         void * object = RealX::calloc(nelem, elsize);
@@ -162,7 +166,9 @@ extern "C" {
         if(!AllocatingStatus::outsideTrackedAllocation() || ProgramStatus::conclusionHasStarted()) {
             return RealX::free(ptr);
         }
-
+        if(AllocatingStatus::isFirstFunction()) {
+            setupCounting();
+        }
         Predictor::outsideCyclesStop();
         AllocatingStatus::updateFreeingStatusBeforeRealFunction(FREE, ptr);
         RealX::free(ptr);
@@ -210,6 +216,7 @@ extern "C" {
         if(!AllocatingStatus::outsideTrackedAllocation() || ProgramStatus::profilerNotInitialized() || ProgramStatus::conclusionHasStarted()) {
             return RealX::posix_memalign(memptr, alignment, size);
         }
+
         Predictor::outsideCyclesStop();
         AllocatingStatus::updateAllocatingStatusBeforeRealFunction(POSIX_MEMALIGN, size);
         int retval = RealX::posix_memalign(memptr, alignment, size);
@@ -234,6 +241,7 @@ extern "C" {
      if(!AllocatingStatus::outsideTrackedAllocation() || ProgramStatus::conclusionHasStarted()) {
          return RealX::memalign(alignment, size);
      }
+
      Predictor::outsideCyclesStop();
      AllocatingStatus::updateAllocatingStatusBeforeRealFunction(MEMALIGN, size);
      void * object = RealX::memalign(alignment, size);
@@ -274,13 +282,31 @@ void operator delete[] (void * ptr) __THROW {
 extern "C" {
 void *yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset) {
     if (!realInitialized) RealX::initializer();
-    if (AllocatingStatus::outsideTrackedAllocation() || !AllocatingStatus::sampledForCountingEvent) {
-        return RealX::mmap(addr, length, prot, flags, fd, offset);
+    if (ProgramStatus::profilerNotInitialized()) {
+        void * retval =  RealX::mmap(addr, length, prot, flags, fd, offset);
+        if(flags & MAP_HUGETLB) {
+            retvals[hugePageBeforeInit] = (uintptr_t)retval;
+            lengths[hugePageBeforeInit] = length;
+            hugePageBeforeInit++;
+        }
+        return retval;
+    }
+
+    if(AllocatingStatus::outsideTrackedAllocation() || !AllocatingStatus::sampledForCountingEvent) {
+        void * retval = RealX::mmap(addr, length, prot, flags, fd, offset);
+        if(flags & MAP_HUGETLB) {
+            ShadowMemory::setHugePages((uintptr_t) retval, length);
+        }
+        return retval;
     }
 
     uint64_t timeStart = rdtscp();
     void *retval = RealX::mmap(addr, length, prot, flags, fd, offset);
     uint64_t timeStop = rdtscp();
+
+    if(flags & MAP_HUGETLB) {
+        ShadowMemory::setHugePages((uintptr_t) retval, length);
+    }
 
     AllocatingStatus::minusCycles(120);
     AllocatingStatus::addOneSyscallToSyscallData(MMAP, timeStop - timeStart);
@@ -298,7 +324,7 @@ int madvise(void *addr, size_t length, int advice) {
         MemoryUsage::subTotalSizeFromMemoryUsage(cleanedPageSize);
     }
 
-    if(!AllocatingStatus::sampledForCountingEvent) {
+    if (!AllocatingStatus::sampledForCountingEvent) {
         return RealX::madvise(addr, length, advice);
     }
 
@@ -314,7 +340,7 @@ int madvise(void *addr, size_t length, int advice) {
 
 void *sbrk(intptr_t increment) {
     if (!realInitialized) RealX::initializer();
-    if (AllocatingStatus::outsideTrackedAllocation()|| !AllocatingStatus::sampledForCountingEvent) {
+    if (AllocatingStatus::outsideTrackedAllocation() || !AllocatingStatus::sampledForCountingEvent) {
         return RealX::sbrk(increment);
     }
 
@@ -330,7 +356,7 @@ void *sbrk(intptr_t increment) {
 
 int mprotect(void *addr, size_t len, int prot) {
     if (!realInitialized) RealX::initializer();
-    if (AllocatingStatus::outsideTrackedAllocation()|| !AllocatingStatus::sampledForCountingEvent) {
+    if (AllocatingStatus::outsideTrackedAllocation() || !AllocatingStatus::sampledForCountingEvent) {
         return RealX::mprotect(addr, len, prot);
     }
 
@@ -354,7 +380,7 @@ int munmap(void *addr, size_t length) {
     size_t cleanedPageSize = ShadowMemory::cleanupPages((intptr_t) addr, length);
     MemoryUsage::subTotalSizeFromMemoryUsage(cleanedPageSize);
 
-    if(!AllocatingStatus::sampledForCountingEvent) {
+    if (!AllocatingStatus::sampledForCountingEvent) {
         return RealX::munmap(addr, length);
     }
 
@@ -369,7 +395,7 @@ int munmap(void *addr, size_t length) {
     return ret;
 }
 
-void *mremap(void *old_address, size_t old_size, size_t new_size, int flags, ... ) {
+void *mremap(void *old_address, size_t old_size, size_t new_size, int flags, ...) {
 
     if (!realInitialized) RealX::initializer();
 
@@ -378,7 +404,7 @@ void *mremap(void *old_address, size_t old_size, size_t new_size, int flags, ...
     void *new_address = va_arg(ap, void * );
     va_end(ap);
 
-    if (AllocatingStatus::outsideTrackedAllocation()|| !AllocatingStatus::sampledForCountingEvent) {
+    if (AllocatingStatus::outsideTrackedAllocation() || !AllocatingStatus::sampledForCountingEvent) {
         return RealX::mremap(old_address, old_size, new_size, flags, new_address);
     }
 
@@ -391,12 +417,15 @@ void *mremap(void *old_address, size_t old_size, size_t new_size, int flags, ...
 
     return ret;
 }
+}
 
+extern "C" {
 int pthread_mutex_lock(pthread_mutex_t *mutex) {
     if (AllocatingStatus::outsideTrackedAllocation() || !AllocatingStatus::sampledForCountingEvent) {
         if (!realInitialized) RealX::initializer();
         return RealX::pthread_mutex_lock(mutex);
     }
+
     DetailLockData * detailLockData = lockUsage.find((void *)mutex, sizeof(void *));
     if(detailLockData == nullptr)  {
         detailLockData = lockUsage.insert((void*)mutex, sizeof(void*), DetailLockData::newDetailLockData(MUTEX));

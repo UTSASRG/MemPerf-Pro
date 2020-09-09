@@ -12,8 +12,7 @@
 class AllocatingStatus {
 
 private:
-    static thread_local bool firstAllocation[10000];
-    static thread_local bool firstFree[10000];
+    static thread_local bool firstAllocation;
     static thread_local AllocatingType allocatingType;
     static thread_local AllocationTypeForOutputData allocationTypeForOutputData;
     static thread_local AllocationTypeForOutputData allocationTypeForPrediction;
@@ -193,6 +192,9 @@ private:
 
     static void calculateCountingDataInRealFunction();
     static void removeAbnormalCountingEventValues();
+    static void calculateCycleInRealFunction();
+    static void removeAbnormalCycleValues();
+
     static void stopCountCountingEvents();
 
     static void setAllocationTypeForOutputData();

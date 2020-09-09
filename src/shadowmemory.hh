@@ -10,45 +10,56 @@
 #include "spinlock.hh"
 #include "threadlocalstatus.h"
 #include "memsample.h"
+#include "definevalues.h"
 
-
-#define PAGESIZE 4096
 #define NUM_CACHELINES_PER_PAGE 64
+#define NUM_CACHELINES_PER_PAGE_HUGE 32768
+
 #define NUM_PAGES_PER_MEGABYTE 256
+#define NUM_PAGES_PER_TWO_MEGABYTE_HUGE 1
+
 #define CACHELINES_PER_PAGE_MASK (NUM_CACHELINES_PER_PAGE - 1)
+#define CACHELINES_PER_PAGE_MASK_HUGE (NUM_CACHELINES_PER_PAGE_HUGE - 1)
+
 #define CACHELINE_SIZE_MASK (CACHELINE_SIZE - 1)
+
 #define PAGESIZE_MASK (PAGESIZE - 1)
-#define MEGABYTE_MASK (ONE_MEGABYTE - 1)
+#define PAGESIZE_MASK_HUGE (PAGESIZE_HUGE - 1)
+
+#define MEGABYTE_MASK (ONE_MB - 1)
+#define TWO_MEGABYTE_MASK_HUGE (2 * ONE_MB - 1)
+
 #define NUM_PAGES_PER_MEGABYTE_MASK (NUM_PAGES_PER_MEGABYTE - 1)
+#define NUM_PAGES_PER_TWO_MEGABYTE_MASK_HUGE 0
+
 #define NUM_MEGABYTE_MAP_ENTRIES (1 << 27)
+#define NUM_TWO_MEGABYTE_MAP_ENTRIES_HUGE (1 << 26)
+
 #define LOG2_NUM_CACHELINES_PER_PAGE 6
+#define LOG2_NUM_CACHELINES_PER_PAGE_HUGE 15
+
 #define LOG2_NUM_PAGES_PER_MEGABYTE 8
+#define LOG2_NUM_PAGES_PER_TWO_MEGABYTE_HUGE 0
+
 #define LOG2_MEGABYTE_SIZE 20
+#define LOG2_TWO_MEGABYTE_SIZE_HUGE 21
+
 #define LOG2_PAGESIZE 12
+#define LOG2_PAGESIZE_HUGE 21
+
+
 #define LOG2_CACHELINE_SIZE 6
-#define LOG2_DWORD_SIZE 4
-#define LOG2_WORD_SIZE 3
-#define ONE_MEGABYTE 0x100000l
-#define ONE_GIGABYTE 0x40000000l
-#define ONE_TERABYTE 0x10000000000l
-//#define MEGABYTE_MAP_START ((uintptr_t *)(1l << 47))		// this addr doesn't work, not addressable by userspace
+
 #define MEGABYTE_MAP_START ((uintptr_t)0x10000000)
-#define MEGABYTE_MAP_SIZE ONE_GIGABYTE
+#define MEGABYTE_MAP_SIZE ONE_GB
 #define PAGE_MAP_START (MEGABYTE_MAP_START + MEGABYTE_MAP_SIZE)
 #define CACHE_MAP_START (PAGE_MAP_START + PAGE_MAP_SIZE)
 #define OBJ_SIZE_MAP_START (CACHE_MAP_START + CACHE_MAP_SIZE)
-#define PAGE_MAP_SIZE (64 * ONE_GIGABYTE)
-#define CACHE_MAP_SIZE (64 * ONE_GIGABYTE)
-#define OBJ_SIZE_MAP_SIZE (64 * ONE_GIGABYTE)
+#define PAGE_MAP_SIZE (64 * ONE_GB)
+#define CACHE_MAP_SIZE (64 * ONE_GB)
+#define OBJ_SIZE_MAP_SIZE (64 * ONE_GB)
 #define MAX_PAGE_MAP_ENTRIES (PAGE_MAP_SIZE / sizeof(PageMapEntry))
 #define MAX_CACHE_MAP_ENTRIES (CACHE_MAP_SIZE / sizeof(CacheMapEntry))
-#define LIBC_MIN_OBJECT_SIZE 24
-#define LIBC_METADATA_SIZE 8
-#define OBJECT_SIZE_SENTINEL_SIZE 4
-#define OBJECT_SIZE_SENTINEL 0xbaa80000				// 0x1755 << 19
-#define OBJECT_SIZE_SENTINEL_MASK 0xfff80000	// 0x1fff << 19
-#define OBJECT_SIZE_MASK 0x7ffff
-#define MAX_OBJECT_SIZE 524287								// 2^19 - 1
 
 // Located in libmallocprof.cpp globals
 extern char * allocator_name;
@@ -94,6 +105,7 @@ private:
 
 public:
     bool donatedBySyscall;
+    bool hugePage;
     static bool updateCacheLines(uintptr_t uintaddr, unsigned long mega_index, unsigned page_index, size_t size, bool isFree);
     static CacheMapEntry * getCacheMapEntry(map_tuple tuple);
     static CacheMapEntry * getCacheMapEntry(unsigned long mega_idx, unsigned page_idx, unsigned cache_idx);
@@ -127,6 +139,7 @@ public:
     static void doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType);
     static bool initialize();
     static inline PageMapEntry ** getMegaMapEntry(unsigned long mega_index);
+    static void setHugePages(uintptr_t uintaddr, size_t length);
     static size_t cleanupPages(uintptr_t uintaddr, size_t length);
     static CacheMapEntry * doCacheMapBumpPointer();
     static PageMapEntry * doPageMapBumpPointer();

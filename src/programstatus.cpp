@@ -32,14 +32,6 @@ bool ProgramStatus::conclusionHasStarted() {
     return beginConclusion;
 }
 
-// Ensure we are operating on a system using 64-bit pointers.
-void ProgramStatus::checkSystemIs64Bits() {
-    if(sizeof(void *) != EIGHT_BYTES) {
-        fprintf(stderr, "error: unsupported pointer size: %zu\n", sizeof(void *));
-        abort();
-    }
-}
-
 void ProgramStatus::openMatrixFile() {
     extern char * program_invocation_name;
 //    snprintf(matrixFileName, MAX_FILENAME_LEN, "matrix.txt");
@@ -144,6 +136,7 @@ void ProgramStatus::readLargeObjectAlignmentFromInfo(char *token) {
         largeObjectAlignment = (size_t) atoi(token);
     }
 }
+
 
 void ProgramStatus::readInputInfoFile() {
 

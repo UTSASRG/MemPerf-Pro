@@ -70,7 +70,7 @@ void DetailLockData::quitFromContending() {
 
 bool DetailLockData::isAnImportantLock() {
     for(unsigned int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
-        if(GlobalStatus::numOfFunctions[allocationType] && cycles[allocationType]/GlobalStatus::numOfFunctions[allocationType] > 500) {
+        if(GlobalStatus::numOfSampledCountingFunctions[allocationType] && cycles[allocationType]/GlobalStatus::numOfSampledCountingFunctions[allocationType] > 500) {
             return true;
         }
     }
@@ -131,7 +131,8 @@ bool TotalMemoryUsage::isLowerThan(TotalMemoryUsage newTotalMemoryUsage, size_t 
 }
 
 bool TotalMemoryUsage::isLowerThan(TotalMemoryUsage newTotalMemoryUsage) {
-    return this->totalMemoryUsage < newTotalMemoryUsage.totalMemoryUsage;
+    return (this->totalMemoryUsage < newTotalMemoryUsage.totalMemoryUsage) ||
+           ((this->totalMemoryUsage == newTotalMemoryUsage.totalMemoryUsage) && (this->realMemoryUsage < newTotalMemoryUsage.realMemoryUsage));
 }
 
 void TotalMemoryUsage::ifLowerThanReplace(TotalMemoryUsage newTotalMemoryUsage) {

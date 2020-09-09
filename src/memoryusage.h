@@ -25,7 +25,6 @@ public:
     static void subTotalSizeFromMemoryUsage(size_t size);
     static void globalize();
     static void printOutput();
-    static void clearAbnormalValues();
 
 };
 

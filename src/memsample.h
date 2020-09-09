@@ -47,9 +47,6 @@ typedef struct {
   void * ring_buf_data_start = NULL;
   void * aux_buf = NULL;
   bool samplesLost;
-  long numSampleReadOps;
-  long numSamples;
-  long numSignalsRecvd;
   long numSampleHits;
   uint64_t time_zero;
   uint64_t time_mult;
@@ -58,7 +55,7 @@ typedef struct {
 	pid_t tid;
 } perf_info;
 
-int initPMU(void);
+void initPMU(void);
 void setupCounting(void);
 void setupSampling(void);
 void stopSampling(void);

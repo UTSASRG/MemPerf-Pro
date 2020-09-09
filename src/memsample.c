@@ -41,26 +41,19 @@ inline void acquireGlobalPerfLock() {
 }
 
 inline void releaseGlobalPerfLock() {
-//		pthread_spin_unlock(&_perf_spin_lock);
     _perf_spin_lock.unlock();
 }
 
 inline int create_perf_event(perf_event_attr * attr, int group) {
 	int fd = perf_event_open(attr, 0, -1, group, 0);
 	if(fd == -1) {
-		fprintf(stderr, "Failed to open perf event %s\n", strerror(errno));
-        abort();
+        isCountingInit = false;
 	}
 	return fd;
 }
 
 //get data from PMU and store it into the PerfReadInfo struct
 void getPerfCounts (PerfReadInfo * i) {
-
-#ifdef NO_PMU
-#warning NO_PMU flag set -> sampling will be disabled
-    return;
-#endif
 
     if (!isCountingInit) {
         return;
@@ -77,9 +70,10 @@ void getPerfCounts (PerfReadInfo * i) {
 }
 
 void setupCounting(void) {
-	#ifdef NO_PMU
-	return;
-	#endif
+
+#ifndef OPEN_COUNTING_EVENT
+    return;
+#endif
 
 	if(isCountingInit) {
 			return;
@@ -149,21 +143,25 @@ void setupCounting(void) {
 
     pe_instr.type = PERF_TYPE_HARDWARE;
 	pe_instr.config = PERF_COUNT_HW_INSTRUCTIONS;
-
 	perfInfo.perf_fd_fault = create_perf_event(&pe_fault, -1);
     perfInfo.perf_fd_cache = create_perf_event(&pe_cache, perfInfo.perf_fd_fault);
     perfInfo.perf_fd_instr = create_perf_event(&pe_instr, perfInfo.perf_fd_fault);
 
+    if(!isCountingInit) {
+        fprintf(stderr, "Warning: Failed to open perf event %s\n", strerror(errno));
+        close(perfInfo.perf_fd_fault);
+        close(perfInfo.perf_fd_cache);
+        close(perfInfo.perf_fd_instr);
+    }
+
 }
 
 void sampleHandler(int signum, siginfo_t *info, void *p) {
-  #ifndef NDEBUG
-    perfInfo->numSignalsRecvd++;
-  #endif
 
     if(!perfInfo.initialized || !isSamplingInit) {
         return;
     }
+
     if(info->si_code == POLL_HUP) {
         Predictor::outsideCyclesStop();
 			doSampleRead();
@@ -174,16 +172,20 @@ void sampleHandler(int signum, siginfo_t *info, void *p) {
 }
 
 void doSampleRead() {
-
-  #ifndef NDEBUG
-  perfInfo->numSampleReadOps++;
-  //fprintf(stderr, "thread %d numSampleReadOps++ == %ld -> %ld\n", current->index, perfInfo->numSampleReadOps, ++perfInfo->numSampleReadOps);
-  #endif
-
   perfInfo.prev_head = perf_mmap_read();
 }
 
 void setupSampling() {
+#ifndef OPEN_SAMPLING_EVENT
+    return;
+#endif
+
+    if(isSamplingInit) {
+        return;
+    }
+    isSamplingInit = true;
+
+
 	// Create the perf_event for this thread on all CPUs with no event group
 	// Second parameter (target thread): 0=self, -1=cpu-wide mode
 	// Third parameter: cpu: -1 == any
@@ -321,11 +323,11 @@ void setupSampling() {
 }
 
 void stopCounting(void) {
-		if(!isCountingInit) {
-				return;
-		}
+    if(!isCountingInit) {
+        return;
+    }
 
-		isCountingInit = false;
+    isCountingInit = false;
 
     close(perfInfo.perf_fd_fault);
     close(perfInfo.perf_fd_cache);
@@ -333,72 +335,60 @@ void stopCounting(void) {
 }
 
 void stopSampling(void) {
-		if(!isSamplingInit) {
-				return;
-		}
 
-		isSamplingInit = false;
+    if(!isSamplingInit) {
+        return;
+    }
 
-		if(ioctl(perfInfo.perf_fd, PERF_EVENT_IOC_DISABLE, 0) == -1) {
-				fprintf(stderr, "Failed to disable perf event: %s\n", strerror(errno));
-		}
-		if(ioctl(perfInfo.perf_fd2, PERF_EVENT_IOC_DISABLE, 0) == -1) {
-				fprintf(stderr, "Failed to disable perf event: %s\n", strerror(errno));
-		}
-		// process any sample data still remaining in the ring buffer
-		doSampleRead();
+    isSamplingInit = false;
 
-		// Relinquish our mmap'd memory and close perf file descriptors
-		if(munmap(perfInfo.ring_buf, MAPSIZE)) {
-				fprintf(stderr, "Unable to unmap perf ring buffer\n");
-		}
-		if(close(perfInfo.perf_fd) == -1) {
-				fprintf(stderr, "Unable to close perf_fd file descriptor: %s\n", strerror(errno));
-		}
-		if(close(perfInfo.perf_fd2) == -1) {
-				fprintf(stderr, "Unable to close perf_fd2 file descriptor: %s\n", strerror(errno));
-		}
+    if(ioctl(perfInfo.perf_fd, PERF_EVENT_IOC_DISABLE, 0) == -1) {
+        fprintf(stderr, "Failed to disable perf event: %s\n", strerror(errno));
+    }
+    if(ioctl(perfInfo.perf_fd2, PERF_EVENT_IOC_DISABLE, 0) == -1) {
+        fprintf(stderr, "Failed to disable perf event: %s\n", strerror(errno));
+    }
+    // process any sample data still remaining in the ring buffer
+    doSampleRead();
+
+    // Relinquish our mmap'd memory and close perf file descriptors
+    if(munmap(perfInfo.ring_buf, MAPSIZE)) {
+        fprintf(stderr, "Unable to unmap perf ring buffer\n");
+    }
+    if(close(perfInfo.perf_fd) == -1) {
+        fprintf(stderr, "Unable to close perf_fd file descriptor: %s\n", strerror(errno));
+    }
+    if(close(perfInfo.perf_fd2) == -1) {
+        fprintf(stderr, "Unable to close perf_fd2 file descriptor: %s\n", strerror(errno));
+    }
 }
 
-int initPMU(void) {
-		if(isSamplingInit) {
-				return -1;
-		} else {
-				isSamplingInit = true;
-		}
+void initPMU(void) {
 
     _perf_spin_lock.init();
 
+    perfInfo.tid = syscall(__NR_gettid);
 
-		perfInfo.tid = syscall(__NR_gettid);
+    struct sigaction sa;
+    sigemptyset(&sa.sa_mask);
+    sigaddset(&sa.sa_mask, SIGUSR2);
+    sigaddset(&sa.sa_mask, SIGRTMIN);
+    sa.sa_sigaction = sampleHandler;
+    sa.sa_flags = SA_SIGINFO;
 
-		struct sigaction sa;
-		sigemptyset(&sa.sa_mask);
-		sigaddset(&sa.sa_mask, SIGUSR2);
-		sigaddset(&sa.sa_mask, SIGRTMIN);
-		sa.sa_sigaction = sampleHandler;
-		sa.sa_flags = SA_SIGINFO;
+    if(sigaction(SIGIO, &sa, NULL) != 0) {
+        fprintf(stderr, "failed to set SIGIO handler: %s\n", strerror(errno));
+        abort();
+    }
 
-		if(sigaction(SIGIO, &sa, NULL) != 0) {
-				fprintf(stderr, "failed to set SIGIO handler: %s\n", strerror(errno));
-				abort();
-		}
+    perfInfo.data_buf_copy = (char *)mmap(NULL, DATA_MAPSIZE, PROT_READ | PROT_WRITE,
+                                          MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if(perfInfo.data_buf_copy == MAP_FAILED) {
+        fprintf(stderr, "mmap failed in %s\n", __FUNCTION__);
+        abort();
+    }
 
-		perfInfo.data_buf_copy = (char *)mmap(NULL, DATA_MAPSIZE, PROT_READ | PROT_WRITE,
-						MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-		if(perfInfo.data_buf_copy == MAP_FAILED) {
-				fprintf(stderr, "mmap failed in %s\n", __FUNCTION__);
-				abort();
-		}
-
-		#ifdef NO_PMU
-				#warning MEMORY ACCESS SAMPLING IS DISABLED
-		#else
-		setupCounting();
-		setupSampling();
-		#endif
-
-		return 0;
+    setupSampling();
 }
 
 long long perf_mmap_read() {
@@ -506,10 +496,6 @@ long long perf_mmap_read() {
 
 		// Move the offset counter ahead by the size given in the event header.
 		offset = starting_offset + event->size;
-
-		#ifndef NDEBUG
-		perfInfo.numSamples++;
-		#endif
 	}
 	//PRDBG("thread %d finished reading samples, size = %ld, offset = %ld", getThreadIndex(&size), size, offset);
 

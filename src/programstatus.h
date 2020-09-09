@@ -47,13 +47,14 @@ public:
     static unsigned int numberOfClassSizes;
     static size_t classSizes[10000];
 
+    static bool useHugePage;
+
     static void setProfilerInitializedTrue();
     static void setBeginConclusionTrue();
     static void setThreadInitializedTrue();
 
     static bool profilerNotInitialized();
     static bool conclusionHasStarted();
-    static void checkSystemIs64Bits();
 
     static void initIO(char * runningApplicationName);
     static void printOutput();
@@ -62,6 +63,7 @@ public:
     static ObjectSizeType getObjectSizeType(size_t size);
 
     static struct SizeClassSizeAndIndex getClassSizeAndIndex(size_t size);
+
 };
 
 #endif //MMPROF_PROGRAMSTATUS_H

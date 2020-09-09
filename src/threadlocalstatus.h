@@ -7,6 +7,8 @@
 #include "definevalues.h"
 #include "structs.h"
 
+extern thread_local bool isCountingInit;
+
 class ThreadLocalStatus {
 public:
     static unsigned int totalNumOfThread;
@@ -25,7 +27,7 @@ public:
     static thread_local FriendlinessStatus friendlinessStatus;
 
     static thread_local std::random_device randomDevice;
-    static thread_local uint64_t randomPeriodForCountingEvent;
+    static thread_local uint64_t randomPeriodForAllocations;
     static thread_local bool setSampleForCountingEvent;
 
     static void getARunningThreadIndex();
@@ -35,7 +37,7 @@ public:
     static bool fromSerialToParallel();
     static bool fromParallelToSerial();
 
-    static void setRandomPeriodForCountingEvent(uint64_t randomPeriod);
+    static void setRandomPeriodForAllocations(uint64_t randomPeriod);
     static bool randomProcessForCountingEvent();
     static bool randomProcess(uint64_t randomPeriod);
 

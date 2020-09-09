@@ -1,31 +1,32 @@
 #ifndef MMPROF_DEFINEVALUES_H
 #define MMPROF_DEFINEVALUES_H
 
-#define CACHELINE_SIZE 64
-#define PAGESIZE 4096
-#define SAMPLING_PERIOD 10000
-#define MMAP_PAGES 257 // must be in the form of 2^N + 1
-#define DATA_MMAP_PAGES (MMAP_PAGES - 1)
-#define MAPSIZE (MMAP_PAGES * getpagesize())
-#define DATA_MAPSIZE (DATA_MMAP_PAGES * getpagesize())
-#define OVERFLOW_INTERVAL 1
+//#define OPEN_COUNTING_EVENT 1
+//#define OPEN_SAMPLING_EVENT 1
+#define OPEN_SAMPLING_FOR_ALLOCS 1
+#define RANDOM_PERIOD_FOR_ALLOCS 100
+//#define OPEN_CPU_BINDING 1
 
 #define LOAD_ACCESS 0x81d0
 #define STORE_ACCESS 0x82d0
 #define LAST_USER_ADDR 0x7fffffffffff
 #define MALLOC_HEADER_SIZE (sizeof(size_t))
 #define EIGHT_BYTES 8
-#define EIGHT_MB 8388608
-#define ONE_HUNDRED_MB 104857600l
-#define FIVE_HUNDRED_MB 524288000l
-#define EIGHT_HUNDRED_MB 838860800l
 #define ONE_KB 1024l
 #define ONE_MB 1048576l
 #define ONE_GB 1073741824l
-#define TEN_GB 10737418240l
 #define MAX_FILENAME_LEN 256
-#define TEMP_BUF_SIZE EIGHT_MB
+#define TEMP_BUF_SIZE 8*ONE_MB
 
+#define CACHELINE_SIZE 64
+#define PAGESIZE 4096
+#define PAGESIZE_HUGE 2*ONE_MB
+#define SAMPLING_PERIOD 10000
+#define MMAP_PAGES 257 // must be in the form of 2^N + 1
+#define DATA_MMAP_PAGES (MMAP_PAGES - 1)
+#define MAPSIZE (MMAP_PAGES * PAGESIZE)
+#define DATA_MAPSIZE (DATA_MMAP_PAGES * PAGESIZE)
+#define OVERFLOW_INTERVAL 1
 
 
 #define MAX(a,b) \
@@ -47,8 +48,6 @@
 #define MAX_LOCK_NUM 512
 
 #define MAX_THREAD_NUMBER 2048
-
-#define RANDOM_PERIOD_FOR_COUNTING_EVENT 100
 
 enum ObjectSizeType{
     SMALL,

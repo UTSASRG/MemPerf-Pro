@@ -1,7 +1,5 @@
 #include "globalstatus.h"
 
-//extern thread_local HashMap <void *, DetailLockData, nolock, PrivateHeap> lockUsage;
-//extern HashMap <void *, DetailLockData, nolock, PrivateHeap> globalLockUsage;
 extern thread_local HashMap <void *, DetailLockData, PrivateHeap> lockUsage;
 extern HashMap <void *, DetailLockData, PrivateHeap> globalLockUsage;
 
@@ -95,9 +93,11 @@ void GlobalStatus::printCountingEvents() {
         if(numOfSampledCountingFunctions[allocationType]) {
             printTitle(allocationTypeOutputTitleString[allocationType], numOfSampledCountingFunctions[allocationType]);
             fprintf(ProgramStatus::outputFile, "cycles                %20lu   avg %20lu\n", cycles[allocationType], cycles[allocationType]/numOfSampledCountingFunctions[allocationType]);
+#ifdef OPEN_COUNTING_EVENT
             fprintf(ProgramStatus::outputFile, "faults                %20lu   avg %20lu\n", countingEvents[allocationType].faults, countingEvents[allocationType].faults/numOfSampledCountingFunctions[allocationType]);
             fprintf(ProgramStatus::outputFile, "cache misses          %20lu   avg %20lu\n", countingEvents[allocationType].cache, countingEvents[allocationType].cache/numOfSampledCountingFunctions[allocationType]);
             fprintf(ProgramStatus::outputFile, "instructions          %20lu   avg %20lu\n", countingEvents[allocationType].instructions, countingEvents[allocationType].instructions/numOfSampledCountingFunctions[allocationType]);
+#endif
             fprintf(ProgramStatus::outputFile, "\n");
         }
     }
@@ -111,13 +111,13 @@ void GlobalStatus::printOverviewLocks() {
             for(int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
                 if(overviewLockData[lockType].numOfCalls[allocationType] > 0) {
                     fprintf(ProgramStatus::outputFile, "calls in %s                %20u\n", allocationTypeOutputString[allocationType], overviewLockData[lockType].numOfCalls[allocationType]);
-                    fprintf(ProgramStatus::outputFile, "calls per %s               %20.1lf\n", allocationTypeOutputString[allocationType], (double)overviewLockData[lockType].numOfCalls[allocationType]/(double)numOfFunctions[allocationType]);
+                    fprintf(ProgramStatus::outputFile, "calls per %s               %20.1lf\n", allocationTypeOutputString[allocationType], (double)overviewLockData[lockType].numOfCalls[allocationType]/(double)numOfSampledCountingFunctions[allocationType]);
                     fprintf(ProgramStatus::outputFile, "contention calls in %s     %20u\n", allocationTypeOutputString[allocationType], overviewLockData[lockType].numOfCallsWithContentions[allocationType]);
-                    fprintf(ProgramStatus::outputFile, "contention calls per %s    %20.1lf\n", allocationTypeOutputString[allocationType], (double)overviewLockData[lockType].numOfCallsWithContentions[allocationType]/(double)numOfFunctions[allocationType]);
+                    fprintf(ProgramStatus::outputFile, "contention calls per %s    %20.1lf\n", allocationTypeOutputString[allocationType], (double)overviewLockData[lockType].numOfCallsWithContentions[allocationType]/(double)numOfSampledCountingFunctions[allocationType]);
                     fprintf(ProgramStatus::outputFile, "contention rate in %s    %20u%%\n", allocationTypeOutputString[allocationType], overviewLockData[lockType].numOfCallsWithContentions[allocationType]*100/overviewLockData[lockType].numOfCalls[allocationType]);
                     fprintf(ProgramStatus::outputFile, "cycles in %s               %20lu\n", allocationTypeOutputString[allocationType], overviewLockData[lockType].totalCycles[allocationType]);
                     fprintf(ProgramStatus::outputFile, "cycles per lock in %s      %20lu\n", allocationTypeOutputString[allocationType], overviewLockData[lockType].totalCycles[allocationType]/overviewLockData[lockType].numOfCalls[allocationType]);
-                    fprintf(ProgramStatus::outputFile, "cycles per %s              %20lu\n", allocationTypeOutputString[allocationType], overviewLockData[lockType].totalCycles[allocationType]/numOfFunctions[allocationType]);
+                    fprintf(ProgramStatus::outputFile, "cycles per %s              %20lu\n", allocationTypeOutputString[allocationType], overviewLockData[lockType].totalCycles[allocationType]/numOfSampledCountingFunctions[allocationType]);
                     fprintf(ProgramStatus::outputFile, "\n");
                 }
             }
@@ -136,13 +136,13 @@ void GlobalStatus::printDetailLocks() {
             for(int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
                 if(detailLockData->numOfCalls[allocationType] > 0) {
                     fprintf(ProgramStatus::outputFile, "calls in %s                  %20u\n", allocationTypeOutputString[allocationType], detailLockData->numOfCalls[allocationType]);
-                    fprintf(ProgramStatus::outputFile, "calls per %s                 %20.1lf\n", allocationTypeOutputString[allocationType], (double)detailLockData->numOfCalls[allocationType]/(double)numOfFunctions[allocationType]);
+                    fprintf(ProgramStatus::outputFile, "calls per %s                 %20.1lf\n", allocationTypeOutputString[allocationType], (double)detailLockData->numOfCalls[allocationType]/(double)numOfSampledCountingFunctions[allocationType]);
                     fprintf(ProgramStatus::outputFile, "calls with contention in %s  %20u\n", allocationTypeOutputString[allocationType], detailLockData->numOfCallsWithContentions[allocationType]);
-                    fprintf(ProgramStatus::outputFile, "calls with contention per %s %20.1lf\n", allocationTypeOutputString[allocationType], (double)detailLockData->numOfCallsWithContentions[allocationType]/(double)numOfFunctions[allocationType]);
+                    fprintf(ProgramStatus::outputFile, "calls with contention per %s %20.1lf\n", allocationTypeOutputString[allocationType], (double)detailLockData->numOfCallsWithContentions[allocationType]/(double)numOfSampledCountingFunctions[allocationType]);
                     fprintf(ProgramStatus::outputFile, "contention rate in %s      %20u%%\n", allocationTypeOutputString[allocationType], detailLockData->numOfCallsWithContentions[allocationType]*100/detailLockData->numOfCalls[allocationType]);
                     fprintf(ProgramStatus::outputFile, "cycles in %s                 %20lu\n", allocationTypeOutputString[allocationType], detailLockData->cycles[allocationType]);
                     fprintf(ProgramStatus::outputFile, "cycles per lock in %s        %20lu\n", allocationTypeOutputString[allocationType], detailLockData->cycles[allocationType]/detailLockData->numOfCalls[allocationType]);
-                    fprintf(ProgramStatus::outputFile, "cycles per %s                %20lu\n", allocationTypeOutputString[allocationType], detailLockData->cycles[allocationType]/numOfFunctions[allocationType]);
+                    fprintf(ProgramStatus::outputFile, "cycles per %s                %20lu\n", allocationTypeOutputString[allocationType], detailLockData->cycles[allocationType]/numOfSampledCountingFunctions[allocationType]);
                     fprintf(ProgramStatus::outputFile, "\n");
                 }
             }
@@ -156,10 +156,10 @@ void GlobalStatus::printCriticalSections() {
     for(unsigned int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
         if(criticalSectionStatus[allocationType].numOfCriticalSections > 0) {
             fprintf(ProgramStatus::outputFile, "critical section in %s            %20u\n", allocationTypeOutputString[allocationType], criticalSectionStatus[allocationType].numOfCriticalSections);
-            fprintf(ProgramStatus::outputFile, "critical section per %s           %20.1lf\n", allocationTypeOutputString[allocationType], (double)criticalSectionStatus[allocationType].numOfCriticalSections/(double)numOfFunctions[allocationType]);
+            fprintf(ProgramStatus::outputFile, "critical section per %s           %20.1lf\n", allocationTypeOutputString[allocationType], (double)criticalSectionStatus[allocationType].numOfCriticalSections/(double)numOfSampledCountingFunctions[allocationType]);
             fprintf(ProgramStatus::outputFile, "critical section cycles in %s     %20lu\n", allocationTypeOutputString[allocationType], criticalSectionStatus[allocationType].totalCyclesOfCriticalSections);
             fprintf(ProgramStatus::outputFile, "cycles per critical section in %s %20lu\n", allocationTypeOutputString[allocationType], criticalSectionStatus[allocationType].totalCyclesOfCriticalSections/criticalSectionStatus[allocationType].numOfCriticalSections);
-            fprintf(ProgramStatus::outputFile, "critical section cycles per %s    %20lu\n", allocationTypeOutputString[allocationType], criticalSectionStatus[allocationType].totalCyclesOfCriticalSections/numOfFunctions[allocationType]);
+            fprintf(ProgramStatus::outputFile, "critical section cycles per %s    %20lu\n", allocationTypeOutputString[allocationType], criticalSectionStatus[allocationType].totalCyclesOfCriticalSections/numOfSampledCountingFunctions[allocationType]);
             fprintf(ProgramStatus::outputFile, "\n");
         }
     }
@@ -171,10 +171,10 @@ void GlobalStatus::printSyscalls() {
         for(int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
             if(systemCallData[syscallType][allocationType].num > 0) {
                 fprintf(ProgramStatus::outputFile, "%s in %s                    %20lu\n", syscallTypeOutputString[syscallType], allocationTypeOutputString[allocationType], systemCallData[syscallType][allocationType].num);
-                fprintf(ProgramStatus::outputFile, "%s per %s                   %20.1lf\n", syscallTypeOutputString[syscallType], allocationTypeOutputString[allocationType], (double)systemCallData[syscallType][allocationType].num/(double)numOfFunctions[allocationType]);
+                fprintf(ProgramStatus::outputFile, "%s per %s                   %20.1lf\n", syscallTypeOutputString[syscallType], allocationTypeOutputString[allocationType], (double)systemCallData[syscallType][allocationType].num/(double)numOfSampledCountingFunctions[allocationType]);
                 fprintf(ProgramStatus::outputFile, "%s total cycles in %s       %20lu\n", syscallTypeOutputString[syscallType], allocationTypeOutputString[allocationType], systemCallData[syscallType][allocationType].cycles);
                 fprintf(ProgramStatus::outputFile, "cycles per %s in %s         %20lu\n", syscallTypeOutputString[syscallType], allocationTypeOutputString[allocationType], systemCallData[syscallType][allocationType].cycles/systemCallData[syscallType][allocationType].num);
-                fprintf(ProgramStatus::outputFile, "%s cycles per %s            %20lu\n", syscallTypeOutputString[syscallType], allocationTypeOutputString[allocationType], systemCallData[syscallType][allocationType].cycles/numOfFunctions[allocationType]);
+                fprintf(ProgramStatus::outputFile, "%s cycles per %s            %20lu\n", syscallTypeOutputString[syscallType], allocationTypeOutputString[allocationType], systemCallData[syscallType][allocationType].cycles/numOfSampledCountingFunctions[allocationType]);
                 fprintf(ProgramStatus::outputFile, "\n");
             }
         }
@@ -182,6 +182,7 @@ void GlobalStatus::printSyscalls() {
 }
 
 void GlobalStatus::printFriendliness() {
+#ifdef OPEN_SAMPLING_EVENT
     printTitle((char*)"FRIENDLINESS");
     fprintf(ProgramStatus::outputFile, "sampling access              %20lu\n", friendlinessStatus.numOfSampling);
     if(friendlinessStatus.numOfSampling / 100) {
@@ -200,6 +201,7 @@ void GlobalStatus::printFriendliness() {
             }
         }
     }
+#endif
 }
 
 void GlobalStatus::printOutput() {
@@ -249,14 +251,14 @@ void GlobalStatus::printForMatrix() {
         uint64_t totalCyclesFromLocks = 0;
         for(int lockType = 0; lockType < NUM_OF_LOCKTYPES; ++lockType) {
             if(overviewLockData[lockType].numOfLocks > 0 && overviewLockData[lockType].numOfCalls[allocationType] > 0) {
-                totalCyclesFromLocks += overviewLockData[lockType].totalCycles[allocationType]/numOfFunctions[allocationType];
+                totalCyclesFromLocks += overviewLockData[lockType].totalCycles[allocationType]/numOfSampledCountingFunctions[allocationType];
             }
         }
         fprintf(ProgramStatus::matrixFile, "%lu ", totalCyclesFromLocks);
         uint64_t totalCyclesFromSyscalls = 0;
         for(int syscallType = 0; syscallType < NUM_OF_SYSTEMCALLTYPES; ++syscallType) {
             if(systemCallData[syscallType][allocationType].num > 0) {
-                totalCyclesFromSyscalls += systemCallData[syscallType][allocationType].cycles/numOfFunctions[allocationType];
+                totalCyclesFromSyscalls += systemCallData[syscallType][allocationType].cycles/numOfSampledCountingFunctions[allocationType];
             }
         }
         fprintf(ProgramStatus::matrixFile, "%lu ", totalCyclesFromSyscalls);
