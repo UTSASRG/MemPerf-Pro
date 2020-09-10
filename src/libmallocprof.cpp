@@ -43,20 +43,14 @@ void exitHandler() {
 
 }
 
-uintptr_t retvals[1000] = {0};
-size_t lengths[1000] = {0};
-unsigned hugePageBeforeInit = 0;
-
 // MallocProf's main function
 int libmallocprof_main(int argc, char ** argv, char ** envp) {
     fprintf(stderr, "start of mmprof\n");
     initPMU();
     RealX::initializer();
     ShadowMemory::initialize();
-    for(unsigned i = 0; i < hugePageBeforeInit; ++i) {
-        ShadowMemory::setHugePages(retvals[i], lengths[i]);
-    }
-
+    ShadowMemory::setHugePagesInit();
+    ShadowMemory::setTransparentHugePagesInit();
     ThreadLocalStatus::addARunningThread();
     ThreadLocalStatus::getARunningThreadIndex();
 
@@ -285,9 +279,9 @@ void *yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offse
     if (ProgramStatus::profilerNotInitialized()) {
         void * retval =  RealX::mmap(addr, length, prot, flags, fd, offset);
         if(flags & MAP_HUGETLB) {
-            retvals[hugePageBeforeInit] = (uintptr_t)retval;
-            lengths[hugePageBeforeInit] = length;
-            hugePageBeforeInit++;
+            ShadowMemory::HPBeforeInit.add((uintptr_t)retval, length);
+        } else if((uint64_t)retval%(2*ONE_MB) == 0 && length >= 2*ONE_MB) {
+            ShadowMemory::THPBeforeInit.add((uintptr_t)retval, length);
         }
         return retval;
     }
@@ -296,7 +290,10 @@ void *yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offse
         void * retval = RealX::mmap(addr, length, prot, flags, fd, offset);
         if(flags & MAP_HUGETLB) {
             ShadowMemory::setHugePages((uintptr_t) retval, length);
+        } else if((uint64_t)retval%(2*ONE_MB) == 0 && length >= 2*ONE_MB) {
+            ShadowMemory::setTransparentHugePages((uintptr_t) retval, length);
         }
+
         return retval;
     }
 
@@ -306,6 +303,8 @@ void *yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offse
 
     if(flags & MAP_HUGETLB) {
         ShadowMemory::setHugePages((uintptr_t) retval, length);
+    } else if((uint64_t)retval%(2*ONE_MB) == 0 && length >= 2*ONE_MB) {
+        ShadowMemory::setTransparentHugePages((uintptr_t) retval, length);
     }
 
     AllocatingStatus::minusCycles(120);
@@ -325,12 +324,26 @@ int madvise(void *addr, size_t length, int advice) {
     }
 
     if (!AllocatingStatus::sampledForCountingEvent) {
-        return RealX::madvise(addr, length, advice);
+        int result = RealX::madvise(addr, length, advice);
+        if(advice == MADV_HUGEPAGE) {
+            ShadowMemory::setHugePages((uintptr_t) addr, length);
+        }
+        if(advice == MADV_NOHUGEPAGE) {
+            ShadowMemory::cancelHugePages((uintptr_t) addr, length);
+        }
+        return result;
     }
 
     uint64_t timeStart = rdtscp();
     int result = RealX::madvise(addr, length, advice);
     uint64_t timeStop = rdtscp();
+
+    if(advice == MADV_HUGEPAGE) {
+        ShadowMemory::setHugePages((uintptr_t) addr, length);
+    }
+    if(advice == MADV_NOHUGEPAGE) {
+        ShadowMemory::cancelHugePages((uintptr_t) addr, length);
+    }
 
     AllocatingStatus::minusCycles(120);
     AllocatingStatus::addOneSyscallToSyscallData(MADVISE, timeStop - timeStart);

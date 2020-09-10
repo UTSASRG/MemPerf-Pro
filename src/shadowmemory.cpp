@@ -19,6 +19,15 @@ CacheMapEntry * ShadowMemory::cache_map_bump_ptr = nullptr;
 spinlock ShadowMemory::cache_map_lock;
 spinlock ShadowMemory::mega_map_lock;
 bool ShadowMemory::isInitialized;
+RangeOfHugePages ShadowMemory::HPBeforeInit;
+RangeOfHugePages ShadowMemory::THPBeforeInit;
+
+void RangeOfHugePages::add(uintptr_t retval, size_t length) {
+    retvals[num] = retval;
+    lengths[num] = length;
+    num++;
+}
+
 
 bool ShadowMemory::initialize() {
 	if(isInitialized) {
@@ -166,6 +175,9 @@ unsigned ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_index,
 }
 
 void ShadowMemory::setHugePages(uintptr_t uintaddr, size_t length) {
+#ifndef ENABLE_HP
+    return;
+#endif
     // First compute the megabyte number of the given address.
     unsigned long mega_index = (uintaddr >> LOG2_MEGABYTE_SIZE);
     if (mega_index > NUM_MEGABYTE_MAP_ENTRIES) {
@@ -177,6 +189,51 @@ void ShadowMemory::setHugePages(uintptr_t uintaddr, size_t length) {
     for(unsigned long m = mega_index/2*2; m <= (mega_index+(length/ONE_MB)-1)/2*2+1; m+=2) {
         PageMapEntry * current = getPageMapEntry(m, 0);
         current->hugePage = true;
+    }
+}
+
+void ShadowMemory::cancelHugePages(uintptr_t uintaddr, size_t length) {
+#ifndef ENABLE_HP
+    return;
+#endif
+    // First compute the megabyte number of the given address.
+    unsigned long mega_index = (uintaddr >> LOG2_MEGABYTE_SIZE);
+    if (mega_index > NUM_MEGABYTE_MAP_ENTRIES) {
+        fprintf(stderr, "ERROR: mega index of 0x%lx too large: %lu > %u\n",
+                uintaddr, mega_index, NUM_MEGABYTE_MAP_ENTRIES);
+        abort();
+    }
+    length = alignup(length, PAGESIZE_HUGE);
+    for(unsigned long m = mega_index/2*2; m <= (mega_index+(length/ONE_MB)-1)/2*2+1; m+=2) {
+        PageMapEntry * current = getPageMapEntry(m, 0);
+        current->hugePage = false;
+    }
+}
+
+void ShadowMemory::setTransparentHugePages(uintptr_t uintaddr, size_t length) {
+#ifndef ENABLE_THP
+    return;
+#endif
+    // First compute the megabyte number of the given address.
+    unsigned long mega_index = (uintaddr >> LOG2_MEGABYTE_SIZE);
+    if (mega_index > NUM_MEGABYTE_MAP_ENTRIES) {
+        fprintf(stderr, "ERROR: mega index of 0x%lx too large: %lu > %u\n",
+                uintaddr, mega_index, NUM_MEGABYTE_MAP_ENTRIES);
+        abort();
+    }
+    size_t lengthForLoop = alignup(length, PAGESIZE_HUGE);
+    bool hugePageHeadCompleted = false;
+    for(unsigned long m = mega_index/2*2; m <= (mega_index+(lengthForLoop/ONE_MB)-1)/2*2+1; m+=2) {
+        PageMapEntry * current = getPageMapEntry(m, 0);
+        if(current->hugePage && !hugePageHeadCompleted) {
+            length -= 2*ONE_MB;
+        } else {
+            hugePageHeadCompleted = true;
+            if(length < 2*ONE_MB) {
+                return;
+            }
+            current->hugePage = true;
+        }
     }
 }
 
@@ -292,6 +349,24 @@ map_tuple ShadowMemory::getMapTupleByAddress(uintptr_t uintaddr) {
         cache_index = ((uintaddr & PAGESIZE_MASK) >> LOG2_CACHELINE_SIZE);
 
     return {mega_index, page_index, cache_index};
+}
+
+void ShadowMemory::setHugePagesInit() {
+#ifndef ENABLE_HP
+    return;
+#endif
+    for(unsigned n = 0; n < HPBeforeInit.num; ++n) {
+        setHugePages(HPBeforeInit.retvals[n], HPBeforeInit.lengths[n]);
+    }
+}
+
+void ShadowMemory::setTransparentHugePagesInit() {
+#ifndef ENABLE_THP
+    return;
+#endif
+    for(unsigned  n = 0; n < THPBeforeInit.num; ++n) {
+        setHugePages(THPBeforeInit.retvals[n], THPBeforeInit.lengths[n]);
+    }
 }
 
 void PageMapEntry::clear() {

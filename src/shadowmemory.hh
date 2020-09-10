@@ -79,6 +79,14 @@ inline void * alignupPointer(void * ptr, size_t alignto) {
   return ((intptr_t)ptr%alignto == 0) ? ptr : (void *)(((intptr_t)ptr + (alignto - 1)) & ~(alignto - 1));
 }
 
+struct RangeOfHugePages {
+    uintptr_t retvals[1000];
+    size_t lengths[1000];
+    unsigned num;
+    void add(uintptr_t retval, size_t length);
+};
+
+
 
 class CacheMapEntry {
 		private:
@@ -135,17 +143,22 @@ private:
 
 public:
     //static pthread_spinlock_t cache_map_lock;
+    static RangeOfHugePages HPBeforeInit, THPBeforeInit;
     static spinlock cache_map_lock;
     static void doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType);
     static bool initialize();
     static inline PageMapEntry ** getMegaMapEntry(unsigned long mega_index);
     static void setHugePages(uintptr_t uintaddr, size_t length);
+    static void cancelHugePages(uintptr_t uintaddr, size_t length);
+    static void setTransparentHugePages(uintptr_t uintaddr, size_t length);
     static size_t cleanupPages(uintptr_t uintaddr, size_t length);
     static CacheMapEntry * doCacheMapBumpPointer();
     static PageMapEntry * doPageMapBumpPointer();
     static PageMapEntry * getPageMapEntry(unsigned long mega_idx, unsigned page_idx);
     static size_t updateObject(void * address, size_t size, bool isFree);
     static map_tuple getMapTupleByAddress(uintptr_t uintaddr);
+    static void setHugePagesInit();
+    static void setTransparentHugePagesInit();
 };
 
 #endif // __SHADOWMAP_H__
