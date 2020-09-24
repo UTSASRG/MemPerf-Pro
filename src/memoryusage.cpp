@@ -3,14 +3,12 @@
 thread_local TotalMemoryUsage MemoryUsage::threadLocalMemoryUsage, MemoryUsage::maxThreadLocalMemoryUsage;
 TotalMemoryUsage MemoryUsage::globalThreadLocalMemoryUsage;
 TotalMemoryUsage MemoryUsage::globalMemoryUsage, MemoryUsage::maxGlobalMemoryUsage;
+int64_t MemoryUsage::maxRealMemoryUsage; ///Shows in total memory
 spinlock MemoryUsage::debugLock;
 
 void MemoryUsage::addToMemoryUsage(size_t size, size_t newTouchePageBytes) {
     threadLocalMemoryUsage.realMemoryUsage += size;
     threadLocalMemoryUsage.totalMemoryUsage += newTouchePageBytes;
-//    if(maxThreadLocalMemoryUsage.isLowerThan(threadLocalMemoryUsage, ONE_MB)) {
-//        maxThreadLocalMemoryUsage = threadLocalMemoryUsage;
-//    }
 
     if(maxThreadLocalMemoryUsage.isLowerThan(threadLocalMemoryUsage)) {
         maxThreadLocalMemoryUsage = threadLocalMemoryUsage;
@@ -19,14 +17,14 @@ void MemoryUsage::addToMemoryUsage(size_t size, size_t newTouchePageBytes) {
     __atomic_add_fetch(&globalMemoryUsage.realMemoryUsage, size, __ATOMIC_RELAXED);
     __atomic_add_fetch(&globalMemoryUsage.totalMemoryUsage, newTouchePageBytes, __ATOMIC_RELAXED);
 
-//    if(maxGlobalMemoryUsage.isLowerThan(globalMemoryUsage, ProgramStatus::getPageSize())) {
-//        maxGlobalMemoryUsage = globalMemoryUsage;
-//        MemoryWaste::compareMemoryUsageAndRecordStatus(maxGlobalMemoryUsage);
-//    }
-    if(maxGlobalMemoryUsage.isLowerThan(globalMemoryUsage)) {
-        maxGlobalMemoryUsage = globalMemoryUsage;
-        MemoryWaste::compareMemoryUsageAndRecordStatus(maxGlobalMemoryUsage);
-    }
+    stopIfMaxMemReached(88000);
+
+     if(maxGlobalMemoryUsage.isLowerThan(globalMemoryUsage)) {
+         maxGlobalMemoryUsage = globalMemoryUsage;
+         MemoryWaste::compareMemoryUsageAndRecordStatus(maxGlobalMemoryUsage);
+     }
+    maxRealMemoryUsage = MAX(maxRealMemoryUsage, globalMemoryUsage.realMemoryUsage);
+
 
 }
 
@@ -48,6 +46,18 @@ void MemoryUsage::printOutput() {
     GlobalStatus::printTitle((char*)"MEMORY USAGE");
     fprintf(ProgramStatus::outputFile, "thread local max real memory usage                %20ldK\n", globalThreadLocalMemoryUsage.realMemoryUsage/ONE_KB);
     fprintf(ProgramStatus::outputFile, "thread local max total memory usage               %20ldK\n", globalThreadLocalMemoryUsage.totalMemoryUsage/ONE_KB);
-    fprintf(ProgramStatus::outputFile, "global max real memory usage                      %20ldK\n", maxGlobalMemoryUsage.realMemoryUsage/ONE_KB);
+    fprintf(ProgramStatus::outputFile, "global max real memory usage                      %20ldK\n", maxRealMemoryUsage/ONE_KB);
     fprintf(ProgramStatus::outputFile, "global max total memory usage                     %20ldK\n", maxGlobalMemoryUsage.totalMemoryUsage/ONE_KB);
+}
+
+void MemoryUsage::stopIfMaxMemReached(size_t maxInKb) {
+    if(maxGlobalMemoryUsage.totalMemoryUsage/ONE_KB > maxInKb) {
+        debugLock.lock();
+        fprintf(stderr, "total memory = %ld\n", maxGlobalMemoryUsage.totalMemoryUsage/ONE_KB);
+        ShadowMemory::printAddressRange();
+        ShadowMemory::printAllPages();
+        fprintf(stderr, "finished\n");
+        abort();
+        debugLock.unlock();
+    }
 }

@@ -125,6 +125,9 @@ public:
     static unsigned int arrayIndex();
     static unsigned int arrayIndex(unsigned int classSizeIndex);
     static unsigned int arrayIndex(unsigned int threadIndex, unsigned int classSizeIndex);
+
+    static void changeBlowup(unsigned int classSizeIndex, int value);
+    static void changeFreelist(unsigned int classSizeIndex, int value);
 };
 
 #endif //MMPROF_MEMWASTE_H

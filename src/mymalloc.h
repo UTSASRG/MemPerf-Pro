@@ -5,6 +5,7 @@
 #define MMAP_PROFILER_MEMORY_SIZE 2*ONE_GB
 #define MMAP_PROFILER_HASH_MEMORY_SIZE 8*ONE_GB
 #define MMAP_PROFILER_XTHREAD_MEMORY_SIZE ONE_GB
+#define MMAP_PROFILER_SHADOW_MEMORY_SIZE ONE_GB
 
 #include "real.hh"
 #include "stdint.h"
@@ -56,9 +57,11 @@ private:
     static ProfilerMemory profilerMemory;
     static ProfilerMemory profilerHashMemory;
     static ProfilerMemory profilerXthreadMemory;
+    static ProfilerMemory profilerShadowMemory;
     static MMAPProfilerMemory threadLocalProfilerMemory[MAX_THREAD_NUMBER];
     static MMAPProfilerMemory threadLocalProfilerHashMemory[MAX_THREAD_NUMBER];
     static MMAPProfilerMemory threadLocalProfilerXthreadMemory[MAX_THREAD_NUMBER];
+    static MMAPProfilerMemory threadLocalProfilerShadowMemory[MAX_THREAD_NUMBER];
     static spinlock debugLock;
 
 public:
@@ -84,9 +87,18 @@ public:
     static void finalizeForThreadLocalXthreadMemory(unsigned int threadIndex);
     static bool threadLocalXthreadMemoryInitialized(unsigned int threadIndex);
 
+    static void initializeForThreadLocalShadowMemory();
+    static void finalizeForThreadLocalShadowMemory();
+    static bool threadLocalShadowMemoryInitialized();
+    static void initializeForThreadLocalShadowMemory(unsigned int threadIndex);
+    static void finalizeForThreadLocalShadowMemory(unsigned int threadIndex);
+    static bool threadLocalShadowMemoryInitialized(unsigned int threadIndex);
+
+
     static void * malloc(size_t size);
     static bool ifInProfilerMemoryThenFree(void * addr);
     static void * hashMalloc(size_t size);
     static void * xthreadMalloc(size_t size);
+    static void * shadowMalloc(size_t size);
 };
 #endif //MMPROF_MYMALLOC_H

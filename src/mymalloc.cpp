@@ -123,9 +123,12 @@ bool MMAPProfilerMemory::ifInProfilerMemoryThenFree(void * addr) {
 ProfilerMemory MyMalloc::profilerMemory;
 ProfilerMemory MyMalloc::profilerHashMemory;
 ProfilerMemory MyMalloc::profilerXthreadMemory;
+ProfilerMemory MyMalloc::profilerShadowMemory;
 MMAPProfilerMemory MyMalloc::threadLocalProfilerMemory[MAX_THREAD_NUMBER];
 MMAPProfilerMemory MyMalloc::threadLocalProfilerHashMemory[MAX_THREAD_NUMBER];
 MMAPProfilerMemory MyMalloc::threadLocalProfilerXthreadMemory[MAX_THREAD_NUMBER];
+MMAPProfilerMemory MyMalloc::threadLocalProfilerShadowMemory[MAX_THREAD_NUMBER];
+
 spinlock MyMalloc::debugLock;
 
 void MyMalloc::initializeForThreadLocalMemory() {
@@ -207,6 +210,31 @@ bool MyMalloc::threadLocalXthreadMemoryInitialized(unsigned int threadIndex) {
 }
 
 
+void MyMalloc::initializeForThreadLocalShadowMemory() {
+    threadLocalProfilerShadowMemory[ThreadLocalStatus::runningThreadIndex].initialize(MMAP_PROFILER_SHADOW_MEMORY_SIZE);
+}
+
+void MyMalloc::finalizeForThreadLocalShadowMemory() {
+    threadLocalProfilerShadowMemory[ThreadLocalStatus::runningThreadIndex].finalize();
+}
+
+bool MyMalloc::threadLocalShadowMemoryInitialized() {
+    return threadLocalProfilerShadowMemory[ThreadLocalStatus::runningThreadIndex].initialized;
+}
+
+void MyMalloc::initializeForThreadLocalShadowMemory(unsigned int threadIndex) {
+    threadLocalProfilerShadowMemory[threadIndex].initialize(MMAP_PROFILER_SHADOW_MEMORY_SIZE);
+}
+
+void MyMalloc::finalizeForThreadLocalShadowMemory(unsigned int threadIndex) {
+    threadLocalProfilerShadowMemory[threadIndex].finalize();
+}
+
+bool MyMalloc::threadLocalShadowMemoryInitialized(unsigned int threadIndex) {
+    return threadLocalProfilerShadowMemory[threadIndex].initialized;
+}
+
+
 void * MyMalloc::malloc(size_t size) {
     if(threadLocalMemoryInitialized()) {
         return threadLocalProfilerMemory[ThreadLocalStatus::runningThreadIndex].malloc(size);
@@ -246,6 +274,16 @@ void * MyMalloc::xthreadMalloc(size_t size) {
         object = threadLocalProfilerXthreadMemory[ThreadLocalStatus::runningThreadIndex].malloc(size);
     } else {
         object = profilerXthreadMemory.malloc(size);
+    }
+    return object;
+}
+
+void * MyMalloc::shadowMalloc(size_t size) {
+    void * object;
+    if(threadLocalShadowMemoryInitialized()) {
+        object = threadLocalProfilerShadowMemory[ThreadLocalStatus::runningThreadIndex].malloc(size);
+    } else {
+        object = profilerShadowMemory.malloc(size);
     }
     return object;
 }

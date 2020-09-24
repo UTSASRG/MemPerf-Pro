@@ -21,6 +21,9 @@ spinlock ShadowMemory::mega_map_lock;
 bool ShadowMemory::isInitialized;
 RangeOfHugePages ShadowMemory::HPBeforeInit;
 RangeOfHugePages ShadowMemory::THPBeforeInit;
+void * ShadowMemory::maxAddress;
+void * ShadowMemory::minAddress;
+
 
 void RangeOfHugePages::add(uintptr_t retval, size_t length) {
     retvals[num] = retval;
@@ -60,6 +63,9 @@ bool ShadowMemory::initialize() {
 	cache_map_end = cache_map_begin + MAX_CACHE_MAP_ENTRIES;
 	cache_map_bump_ptr = cache_map_begin;
 
+	minAddress = (void *)((uint64_t) 0 - (uint64_t)1);
+	maxAddress = 0;
+
 	isInitialized = true;
 
 	return true;
@@ -70,7 +76,9 @@ size_t ShadowMemory::updateObject(void * address, size_t size, bool isFree) {
         return 0;
     }
 
-    //unsigned classSize;
+    minAddress = MIN(minAddress, address);
+    maxAddress = MAX(maxAddress, (void *)((uint64_t)address+(uint64_t)size));
+
     uintptr_t uintaddr = (uintptr_t)address;
 
     // First compute the megabyte number of the given address.
@@ -104,7 +112,10 @@ unsigned ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_index,
     // increment the used bytes field of the first page separately.
 
     //Huge Page Check
-    bool hugePageTouched = getPageMapEntry(mega_index/2*2, 0)->hugePage;
+    bool hugePageTouched = false;
+
+#if (defined(ENABLE_HP) || defined(ENABLE_THP))
+    hugePageTouched = (getPageMapEntry(mega_index/2*2, 0)->hugePage) || inHPInitRange((void *)uintaddr);
     if(hugePageTouched) {
         for(unsigned long m = mega_index/2*2; m <= (mega_index+(alignup(size, PAGESIZE_HUGE)/ONE_MB)-1)/2*2+1; m+=2) {
             current = getPageMapEntry(m, 0);
@@ -117,6 +128,7 @@ unsigned ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_index,
             }
         }
     }
+#endif
 
     firstPageOffset = (uintaddr & PAGESIZE_MASK);
 
@@ -254,7 +266,12 @@ size_t ShadowMemory::cleanupPages(uintptr_t uintaddr, size_t length) {
 
     PageMapEntry * current;
 
-    bool hugePageTouched = getPageMapEntry(mega_index/2*2, 0)->hugePage;
+    bool hugePageTouched = false;
+
+#if (defined(ENABLE_HP) || defined(ENABLE_THP))
+    hugePageTouched = getPageMapEntry(mega_index/2*2, 0)->hugePage || inHPInitRange((void *)uintaddr);
+#endif
+
     if(hugePageTouched) {
         length = alignup(length, PAGESIZE_HUGE);
         for(unsigned long m = mega_index/2*2; m <= (mega_index+(length/ONE_MB)-1)/2*2+1; m+=2) {
@@ -294,7 +311,7 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType)
     }
     pme = (*mega_entry + tuple.page_index);
 
-    bool hugePageTouched = getPageMapEntry(tuple.mega_index/2*2, 0)->hugePage;
+    bool hugePageTouched = getPageMapEntry(tuple.mega_index/2*2, 0)->hugePage || inHPInitRange((void *)uintaddr);
 
     if(!pme->isTouched() && !hugePageTouched) {
         return;
@@ -380,6 +397,7 @@ void PageMapEntry::clear() {
     touched = false;
     num_used_bytes = 0;
     hugePage = false;
+    clearBlowup();
 
 }
 
@@ -413,6 +431,21 @@ bool PageMapEntry::isTouched() {
 void PageMapEntry::setTouched() {
 		touched = true;
 }
+
+
+PageMapEntry * ShadowMemory::getPageMapEntry(void * address) {
+    uintptr_t uintaddr = (uintptr_t)address;
+    unsigned long mega_idx = (uintaddr >> LOG2_MEGABYTE_SIZE);
+    if(mega_idx > NUM_MEGABYTE_MAP_ENTRIES) {
+        fprintf(stderr, "ERROR: mega index of 0x%lx too large: %lu > %u\n",
+                uintaddr, mega_idx, NUM_MEGABYTE_MAP_ENTRIES);
+        abort();
+    }
+    unsigned page_idx = ((uintaddr & MEGABYTE_MASK) >> LOG2_PAGESIZE);
+    PageMapEntry ** mega_entry = getMegaMapEntry(mega_idx);
+    return (*mega_entry + page_idx);
+}
+
 
 PageMapEntry * ShadowMemory::getPageMapEntry(unsigned long mega_idx, unsigned page_idx) {
 
@@ -468,6 +501,84 @@ PageMapEntry * ShadowMemory::doPageMapBumpPointer() {
     return curPtrValue;
 }
 
+bool ShadowMemory::inHPInitRange(void * address) {
+#ifdef ENABLE_HP
+    for(unsigned n = 0; n < HPBeforeInit.num; ++n) {
+        if((uint64_t)address >= HPBeforeInit.retvals[n] && (uint64_t)address <= HPBeforeInit.retvals[n] + HPBeforeInit.lengths[n]) {
+            return true;
+        }
+    }
+#endif
+#ifdef ENABLE_THP
+    for(unsigned n = 0; n < THPBeforeInit.num; ++n) {
+        if((uint64_t)address >= THPBeforeInit.retvals[n] && (uint64_t)address <= THPBeforeInit.retvals[n] + THPBeforeInit.lengths[n]) {
+            return true;
+        }
+    }
+#endif
+    return false;
+}
+
+void ShadowMemory::addBlowup(void *address, unsigned int classSizeIndex) {
+    ShadowMemory::getPageMapEntry(address)->addBlowup(classSizeIndex);
+}
+
+void ShadowMemory::subBlowup(void *address, unsigned int classSizeIndex) {
+    ShadowMemory::getPageMapEntry(address)->subBlowup(classSizeIndex);
+}
+
+void ShadowMemory::addFreeListNum(void *address, unsigned int classSizeIndex) {
+    ShadowMemory::getPageMapEntry(address)->addFreeListNum(classSizeIndex);
+}
+
+void ShadowMemory::subFreeListNum(void *address, unsigned int classSizeIndex) {
+    ShadowMemory::getPageMapEntry(address)->subFreeListNum(classSizeIndex);
+}
+
+void ShadowMemory::printAddressRange() {
+    fprintf(stderr, "min: %p\nmax: %p\n", (void*)((uint64_t)minAddress>>LOG2_PAGESIZE_HUGE<<LOG2_PAGESIZE_HUGE), maxAddress);
+}
+
+void ShadowMemory::printAllPages() {
+    uint64_t startPtr = (uint64_t)minAddress>>LOG2_PAGESIZE_HUGE<<LOG2_PAGESIZE_HUGE;
+    uint64_t  endPtr = (uint64_t)maxAddress;
+    uint64_t totalExFrag = 0;
+    while (startPtr <= endPtr) {
+        unsigned long mega_index = (startPtr >> LOG2_MEGABYTE_SIZE);
+        bool hugePageTouched = getPageMapEntry(mega_index/2*2, 0)->hugePage || inHPInitRange((void *)startPtr);
+        if(hugePageTouched) {
+            bool touched = getPageMapEntry(mega_index/2*2, 0)->isTouched();
+            if(touched) {
+                uint64_t totalUsedBytes = 0;
+                for(unsigned long m = mega_index/2*2; m <= mega_index/2*2+1; ++m) {
+                    for(unsigned p = 0; p < NUM_PAGES_PER_MEGABYTE; ++p) {
+                        PageMapEntry * current = getPageMapEntry(m, p);
+                        totalUsedBytes += current->getUsedBytes();
+                    }
+                }
+                if(PAGESIZE_HUGE-totalUsedBytes) {
+                    fprintf(stderr, "%p - %p, huge page, %lu\n", (void*)startPtr, (void*)((uint64_t)startPtr+PAGESIZE_HUGE), PAGESIZE_HUGE-totalUsedBytes);
+                    totalExFrag += PAGESIZE_HUGE-totalUsedBytes;
+                }
+            }
+            startPtr += PAGESIZE_HUGE;
+        } else {
+            unsigned pageIdx = ((startPtr & MEGABYTE_MASK) >> LOG2_PAGESIZE);
+            bool touched = getPageMapEntry(mega_index, pageIdx)->isTouched();
+            if(touched) {
+                PageMapEntry * current = getPageMapEntry(mega_index, pageIdx);
+                uint64_t totalUsedBytes = current->getUsedBytes();
+                if(PAGESIZE-totalUsedBytes) {
+                    fprintf(stderr, "%p - %p, %lu\n", (void*)startPtr, (void*)((uint64_t)startPtr+PAGESIZE), PAGESIZE-totalUsedBytes);
+                    totalExFrag += PAGESIZE_HUGE-totalUsedBytes;
+                }
+            }
+            startPtr += PAGESIZE;
+        }
+    }
+    fprintf(stderr, "totalExFrag = %luK\n", totalExFrag/ONE_KB);
+}
+
 // Accepts relative page and cache indices -- for example, mega_idx=n, page_idx=257, cache_idx=65 would
 // access mega_idx=n+1, page_idx=2, cache_idx=1.
 CacheMapEntry * PageMapEntry::getCacheMapEntry(unsigned long mega_idx, unsigned page_idx, unsigned cache_idx) {
@@ -513,22 +624,23 @@ bool PageMapEntry::updateCacheLines(uintptr_t uintaddr, unsigned long mega_index
     unsigned curCacheLineIdx;
     unsigned char curCacheLineBytes;
     int size_remain = size;
-    CacheMapEntry * current;
+    CacheMapEntry *current;
     curCacheLineIdx = firstCacheLineIdx;
-    if(firstCacheLineOffset) {
+    if (firstCacheLineOffset) {
         current = getCacheMapEntry(mega_index, page_index, curCacheLineIdx);
-        if(firstCacheLineOffset + size_remain >= CACHELINE_SIZE) {
+        if (firstCacheLineOffset + size_remain >= CACHELINE_SIZE) {
             curCacheLineBytes = CACHELINE_SIZE - firstCacheLineOffset;
         } else {
             curCacheLineBytes = size_remain;
         }
-        if(isFree) {
+        if (isFree) {
             current->subUsedBytes(curCacheLineBytes);
-            if(current->getUsedBytes() == 0) {
+            if (current->getUsedBytes() == 0) {
                 current->lastWriterThreadIndex = -1;
             }
-            if(current->falseSharingStatus != PASSIVE) {
-                if(current->lastFreeThreadIndex != ThreadLocalStatus::runningThreadIndex && current->lastFreeThreadIndex != -1) {
+            if (current->falseSharingStatus != PASSIVE) {
+                if (current->lastFreeThreadIndex != ThreadLocalStatus::runningThreadIndex &&
+                    current->lastFreeThreadIndex != -1) {
                     current->falseSharingStatus = PASSIVE;
                 }
                 current->lastAllocatingThreadIndex = -1;
@@ -536,8 +648,9 @@ bool PageMapEntry::updateCacheLines(uintptr_t uintaddr, unsigned long mega_index
             }
         } else {
             current->addUsedBytes(curCacheLineBytes);
-            if(current->falseSharingStatus != PASSIVE) {
-                if(current->lastAllocatingThreadIndex != ThreadLocalStatus::runningThreadIndex && current->lastAllocatingThreadIndex != -1) {
+            if (current->falseSharingStatus != PASSIVE) {
+                if (current->lastAllocatingThreadIndex != ThreadLocalStatus::runningThreadIndex &&
+                    current->lastAllocatingThreadIndex != -1) {
                     current->falseSharingStatus = ACTIVE;
                 }
                 current->lastFreeThreadIndex = -1;
@@ -549,7 +662,7 @@ bool PageMapEntry::updateCacheLines(uintptr_t uintaddr, unsigned long mega_index
         curCacheLineIdx++;
 
     }
-    while(size_remain > 0) {
+    while (size_remain > 0) {
         current = getCacheMapEntry(mega_index, page_index, curCacheLineIdx);
 
         if (size_remain >= CACHELINE_SIZE) {
@@ -568,20 +681,22 @@ bool PageMapEntry::updateCacheLines(uintptr_t uintaddr, unsigned long mega_index
         curCacheLineIdx++;
 
         if (size_remain <= 0) {
-            if(isFree) {
-                if(current->getUsedBytes() == 0) {
+            if (isFree) {
+                if (current->getUsedBytes() == 0) {
                     current->lastWriterThreadIndex = -1;
                 }
-                if(current->falseSharingStatus != PASSIVE) {
-                    if(current->lastFreeThreadIndex != ThreadLocalStatus::runningThreadIndex && current->lastFreeThreadIndex != -1) {
+                if (current->falseSharingStatus != PASSIVE) {
+                    if (current->lastFreeThreadIndex != ThreadLocalStatus::runningThreadIndex &&
+                        current->lastFreeThreadIndex != -1) {
                         current->falseSharingStatus = PASSIVE;
                     }
                     current->lastAllocatingThreadIndex = -1;
                     current->lastFreeThreadIndex = ThreadLocalStatus::runningThreadIndex;
                 }
             } else {
-                if(current->falseSharingStatus != PASSIVE) {
-                    if(current->lastAllocatingThreadIndex != ThreadLocalStatus::runningThreadIndex && current->lastAllocatingThreadIndex != -1) {
+                if (current->falseSharingStatus != PASSIVE) {
+                    if (current->lastAllocatingThreadIndex != ThreadLocalStatus::runningThreadIndex &&
+                        current->lastAllocatingThreadIndex != -1) {
                         current->falseSharingStatus = ACTIVE;
                     }
                     current->lastFreeThreadIndex = -1;
@@ -609,6 +724,123 @@ CacheMapEntry * PageMapEntry::getCacheMapEntry(bool mvBumpPtr) {
 
 
 		return cache_map_entry;
+}
+
+BlowupNode * PageMapEntry::newBlowup(unsigned int classSizeIndex) {
+    BlowupNode * newBlowupNode = (BlowupNode *)MyMalloc::shadowMalloc(sizeof(BlowupNode));
+    newBlowupNode->classSizeIndex = classSizeIndex;
+    newBlowupNode->blowupFlag = 0;
+    newBlowupNode->freelistNum = 0;
+    newBlowupNode->next = nullptr;
+    return newBlowupNode;
+}
+
+void PageMapEntry::addBlowup(unsigned int classSizeIndex) {
+    pagelock.lock();
+    if(blowupList == nullptr) {
+        blowupList = newBlowup(classSizeIndex);
+        blowupList->blowupFlag++;
+        pagelock.unlock();
+        return;
+    }
+    BlowupNode * prevNode;
+    BlowupNode * currentNode = blowupList;
+    do {
+        if(currentNode->classSizeIndex == classSizeIndex) {
+            currentNode->blowupFlag++;
+            pagelock.unlock();
+            return;
+        }
+        prevNode = currentNode;
+        currentNode = currentNode->next;
+    } while (currentNode);
+
+    prevNode->next = newBlowup(classSizeIndex);
+    prevNode->next->blowupFlag++;
+    pagelock.unlock();
+}
+
+void PageMapEntry::subBlowup(unsigned int classSizeIndex) {
+    pagelock.lock();
+    if(blowupList == nullptr) {
+        pagelock.unlock();
+        return;
+    }
+
+    BlowupNode * currentNode = blowupList;
+    do {
+        if(currentNode->classSizeIndex == classSizeIndex) {
+            currentNode->blowupFlag--;
+            pagelock.unlock();
+            return;
+        }
+        currentNode = currentNode->next;
+    } while (currentNode);
+    pagelock.unlock();
+}
+
+void PageMapEntry::addFreeListNum(unsigned int classSizeIndex)  {
+    pagelock.lock();
+    if(blowupList == nullptr) {
+        blowupList = newBlowup(classSizeIndex);
+        blowupList->freelistNum++;
+        pagelock.unlock();
+        return;
+    }
+    BlowupNode * prevNode;
+    BlowupNode * currentNode = blowupList;
+    do {
+        if(currentNode->classSizeIndex == classSizeIndex) {
+            currentNode->freelistNum++;
+            pagelock.unlock();
+            return;
+        }
+        prevNode = currentNode;
+        currentNode = currentNode->next;
+    } while (currentNode);
+
+    prevNode->next = newBlowup(classSizeIndex);
+    prevNode->next->freelistNum++;
+    pagelock.unlock();
+}
+
+void PageMapEntry::subFreeListNum(unsigned int classSizeIndex) {
+    pagelock.lock();
+    if(blowupList == nullptr) {
+        pagelock.unlock();
+        return;
+    }
+
+    BlowupNode * currentNode = blowupList;
+    do {
+        if(currentNode->classSizeIndex == classSizeIndex) {
+            currentNode->freelistNum--;
+            pagelock.unlock();
+            return;
+        }
+        currentNode = currentNode->next;
+    } while (currentNode);
+    pagelock.unlock();
+}
+
+void PageMapEntry::clearBlowup() {
+    pagelock.lock();
+    if(blowupList == nullptr) {
+        pagelock.unlock();
+        return;
+    }
+    BlowupNode * currentNode = blowupList;
+    do {
+        if(currentNode->blowupFlag) {
+            MemoryWaste::changeBlowup(currentNode->classSizeIndex, currentNode->blowupFlag);
+        }
+        if(currentNode->freelistNum) {
+            MemoryWaste::changeFreelist(currentNode->classSizeIndex, currentNode->freelistNum);
+        }
+        currentNode = currentNode->next;
+    } while (currentNode);
+    blowupList = nullptr;
+    pagelock.unlock();
 }
 
 bool CacheMapEntry::addUsedBytes(unsigned int num_bytes) {

@@ -57,6 +57,7 @@ void * xthreadx::startThread(void * arg) {
 
     MyMalloc::initializeForThreadLocalXthreadMemory(ThreadLocalStatus::runningThreadIndex);
     MyMalloc::initializeForThreadLocalHashMemory(ThreadLocalStatus::runningThreadIndex);
+    MyMalloc::initializeForThreadLocalShadowMemory(ThreadLocalStatus::runningThreadIndex);
     MyMalloc::initializeForThreadLocalMemory();
     lockUsage.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_LOCK_NUM);
     Predictor::threadInit();
@@ -82,6 +83,7 @@ void xthreadx::threadExit() {
 
     MyMalloc::finalizeForThreadLocalXthreadMemory(ThreadLocalStatus::runningThreadIndex);
     MyMalloc::finalizeForThreadLocalHashMemory(ThreadLocalStatus::runningThreadIndex);
+    MyMalloc::finalizeForThreadLocalShadowMemory(ThreadLocalStatus::runningThreadIndex);
     MyMalloc::finalizeForThreadLocalMemory();
 }
 

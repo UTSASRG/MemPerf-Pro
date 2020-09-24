@@ -1,8 +1,6 @@
 #include "libmallocprof.h"
 
 
-thread_local bool PMUinit = false;
-
 thread_local HashMap <void *, DetailLockData, PrivateHeap> lockUsage;
 HashMap <void *, DetailLockData, PrivateHeap> globalLockUsage;
 
@@ -45,12 +43,9 @@ void exitHandler() {
 
 // MallocProf's main function
 int libmallocprof_main(int argc, char ** argv, char ** envp) {
-    fprintf(stderr, "start of mmprof\n");
     initPMU();
     RealX::initializer();
     ShadowMemory::initialize();
-    ShadowMemory::setHugePagesInit();
-    ShadowMemory::setTransparentHugePagesInit();
     ThreadLocalStatus::addARunningThread();
     ThreadLocalStatus::getARunningThreadIndex();
 
@@ -75,6 +70,7 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
     MemoryWaste::initialize();
     MyMalloc::initializeForThreadLocalXthreadMemory(ThreadLocalStatus::runningThreadIndex);
     MyMalloc::initializeForThreadLocalHashMemory(ThreadLocalStatus::runningThreadIndex);
+    MyMalloc::initializeForThreadLocalShadowMemory(ThreadLocalStatus::runningThreadIndex);
     MyMalloc::initializeForThreadLocalMemory();
     Predictor::globalInit();
 
@@ -409,16 +405,15 @@ int munmap(void *addr, size_t length) {
 }
 
 void *mremap(void *old_address, size_t old_size, size_t new_size, int flags, ...) {
-
     if (!realInitialized) RealX::initializer();
-
     va_list ap;
     va_start(ap, flags);
     void *new_address = va_arg(ap, void * );
     va_end(ap);
 
     if (AllocatingStatus::outsideTrackedAllocation() || !AllocatingStatus::sampledForCountingEvent) {
-        return RealX::mremap(old_address, old_size, new_size, flags, new_address);
+        void* ret = RealX::mremap(old_address, old_size, new_size, flags, new_address);
+        return ret;
     }
 
     uint64_t timeStart = rdtscp();
@@ -427,6 +422,7 @@ void *mremap(void *old_address, size_t old_size, size_t new_size, int flags, ...
 
     AllocatingStatus::minusCycles(120);
     AllocatingStatus::addOneSyscallToSyscallData(MREMAP, timeStop - timeStart);
+
 
     return ret;
 }

@@ -260,21 +260,19 @@ AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(size_t size, void * ad
             }
         }
         currentStatus.numOfActiveObjects.numOfFreelistObjects[arrayIndex()]--;
+        ShadowMemory::subFreeListNum(address, currentSizeClassSizeAndIndex.classSize);
         currentStatus.numOfAccumulatedOperations.numOfReusedAllocations[arrayIndex()]++;
 
     }
     currentStatus.internalFragment[arrayIndex()] += (int64_t)status->internalFragment();
+
     hashLocksSet.unlock(address);
 
     currentStatus.numOfActiveObjects.numOfAllocatedObjects[arrayIndex()]++;
     if(currentStatus.blowupFlag[currentSizeClassSizeAndIndex.classSizeIndex] > 0 ) {
         currentStatus.blowupFlag[currentSizeClassSizeAndIndex.classSizeIndex]--;
+        ShadowMemory::subBlowup(address, currentSizeClassSizeAndIndex.classSizeIndex);
     }
-
-//    if(currentSizeClassSizeAndIndex.size == 390144) {
-//        fprintf(stderr, "alloc: size = %lu, addr = %p, reused = %d\n", size, address, reused);
-//        abort();
-//    }
 
     return AllocatingTypeGotFromMemoryWaste{reused, currentSizeClassSizeAndIndex.classSize, currentSizeClassSizeAndIndex.classSizeIndex};
 }
@@ -297,14 +295,10 @@ AllocatingTypeWithSizeGotFromMemoryWaste MemoryWaste::freeUpdate(void* address) 
     currentStatus.numOfAccumulatedOperations.numOfFree[arrayIndex()]++;
     currentStatus.numOfActiveObjects.numOfAllocatedObjects[arrayIndex()]--;
     currentStatus.numOfActiveObjects.numOfFreelistObjects[arrayIndex()]++;
-
+    ShadowMemory::addFreeListNum(address, currentSizeClassSizeAndIndex.classSizeIndex);
 
     currentStatus.blowupFlag[currentSizeClassSizeAndIndex.classSizeIndex]++;
-
-//    if(currentSizeClassSizeAndIndex.size == 390144) {
-//        fprintf(stderr, "free: size = %lu, addr = %p\n", currentSizeClassSizeAndIndex.size, address);
-//        abort();
-//    }
+    ShadowMemory::addBlowup(address, currentSizeClassSizeAndIndex.classSizeIndex);
 
     return AllocatingTypeWithSizeGotFromMemoryWaste{currentSizeClassSizeAndIndex.size,
                                                     AllocatingTypeGotFromMemoryWaste{false, currentSizeClassSizeAndIndex.classSize, currentSizeClassSizeAndIndex.classSizeIndex}};
@@ -394,4 +388,12 @@ unsigned int MemoryWaste::arrayIndex(unsigned int classSizeIndex) {
 
 unsigned int MemoryWaste::arrayIndex(unsigned int threadIndex, unsigned int classSizeIndex) {
     return MemoryWasteStatus::arrayIndex(threadIndex, classSizeIndex);
+}
+
+void MemoryWaste::changeBlowup(unsigned int classSizeIndex, int value) {
+    currentStatus.blowupFlag[classSizeIndex] -= value;
+}
+
+void MemoryWaste::changeFreelist(unsigned int classSizeIndex, int value) {
+    currentStatus.numOfActiveObjects.numOfFreelistObjects[classSizeIndex] -= value;
 }
