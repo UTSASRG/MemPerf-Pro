@@ -39,6 +39,7 @@ public:
 
     static void setRandomPeriodForAllocations(uint64_t randomPeriod);
     static bool randomProcessForCountingEvent();
+    static bool randomProcessForBackTrace(size_t size);
     static bool randomProcess(uint64_t randomPeriod);
 
 };

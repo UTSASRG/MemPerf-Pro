@@ -22,6 +22,7 @@ struct ObjectStatus{
     uint64_t proof;
     SizeClassSizeAndIndex sizeClassSizeAndIndex;
     size_t maxTouchedBytes = 0;
+    void * backtraceAddr;
 
     size_t internalFragment();
     static ObjectStatus newObjectStatus();
@@ -102,7 +103,7 @@ struct HashLocksSet {
 class MemoryWaste{
 private:
 //    static HashMap <void*, ObjectStatus, nolock, PrivateHeap> objStatusMap;
-    static HashMap <void*, ObjectStatus, PrivateHeap> objStatusMap;
+//    static HashMap <void*, ObjectStatus, PrivateHeap> objStatusMap;
     static thread_local SizeClassSizeAndIndex currentSizeClassSizeAndIndex;
     static MemoryWasteStatus currentStatus, recordStatus;
     static MemoryWasteGlobalStatus globalStatus;
@@ -115,7 +116,7 @@ public:
 
     static void initialize();
 
-    static AllocatingTypeGotFromMemoryWaste allocUpdate(size_t size, void * address);
+    static AllocatingTypeGotFromMemoryWaste allocUpdate(size_t size, void * address, void * backtraceAddr);
     static AllocatingTypeWithSizeGotFromMemoryWaste freeUpdate(void* address);
 
     static void compareMemoryUsageAndRecordStatus(TotalMemoryUsage newTotalMemoryUsage);

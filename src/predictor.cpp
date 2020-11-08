@@ -218,6 +218,7 @@ void Predictor::printOutput() {
     }
 
     fprintf(ProgramStatus::outputFile, "total cycles               %20lu\n", totalCycle);
+
 #ifdef OPEN_COUNTING_EVENT
     if(totalCycle/1000) {
         fprintf(ProgramStatus::outputFile, "faults                     %20lu    %20lu per 1k cycle\n",

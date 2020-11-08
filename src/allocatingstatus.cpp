@@ -5,6 +5,7 @@ thread_local AllocatingType AllocatingStatus::allocatingType;
 thread_local AllocationTypeForOutputData AllocatingStatus::allocationTypeForOutputData;
 thread_local AllocationTypeForOutputData AllocatingStatus::allocationTypeForPrediction;
 thread_local bool AllocatingStatus::sampledForCountingEvent;
+thread_local bool AllocatingStatus::sampledForBackTrace;
 thread_local uint64_t AllocatingStatus::cyclesBeforeRealFunction;
 thread_local uint64_t AllocatingStatus::cyclesAfterRealFunction;
 thread_local uint64_t AllocatingStatus::cyclesInRealFunction;
@@ -74,6 +75,7 @@ void AllocatingStatus::startCountCountingEvents() {
 void AllocatingStatus::updateAllocatingStatusBeforeRealFunction(AllocationFunction allocationFunction, size_t objectSize) {
     updateAllocatingTypeBeforeRealFunction(allocationFunction, objectSize);
     sampledForCountingEvent = ThreadLocalStatus::randomProcessForCountingEvent();
+    sampledForBackTrace = allocatingType.allocatingFunction == MALLOC && ThreadLocalStatus::randomProcessForBackTrace(allocatingType.objectSize);
     startCountCountingEvents();
 }
 
@@ -155,12 +157,12 @@ void AllocatingStatus::updateFreeingStatusAfterRealFunction() {
 }
 
 void AllocatingStatus::updateMemoryStatusAfterAllocation() {
-    allocatingType.allocatingTypeGotFromMemoryWaste = MemoryWaste::allocUpdate(allocatingType.objectSize, allocatingType.objectAddress);
+    void * backtraceAddr = nullptr;
+    if(sampledForBackTrace) {
+        backtraceAddr = Backtrace::doABackTrace(allocatingType.objectSize);
+    }
+    allocatingType.allocatingTypeGotFromMemoryWaste = MemoryWaste::allocUpdate(allocatingType.objectSize, allocatingType.objectAddress, backtraceAddr);
     allocatingType.allocatingTypeGotFromShadowMemory.objectNewTouchedPageSize = ShadowMemory::updateObject(allocatingType.objectAddress, allocatingType.objectSize, false);
-//    if(ThreadLocalStatus::runningThreadIndex == 1) {
-//        fprintf(stderr, "type = %u, addr = %p, size = %lu, pagesize = %lu\n",
-//                allocatingType.allocatingFunction, allocatingType.objectAddress, allocatingType.objectSize, allocatingType.allocatingTypeGotFromShadowMemory.objectNewTouchedPageSize);
-//    }
     MemoryUsage::addToMemoryUsage(allocatingType.objectSize, allocatingType.allocatingTypeGotFromShadowMemory.objectNewTouchedPageSize);
 }
 

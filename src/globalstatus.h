@@ -11,6 +11,7 @@
 #include "spinlock.hh"
 #include "threadlocalstatus.h"
 #include "programstatus.h"
+#include "backtrace.h"
 
 
 class GlobalStatus {

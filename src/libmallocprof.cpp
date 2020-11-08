@@ -3,6 +3,9 @@
 
 thread_local HashMap <void *, DetailLockData, PrivateHeap> lockUsage;
 HashMap <void *, DetailLockData, PrivateHeap> globalLockUsage;
+HashMap <void*, BackTraceMemory, PrivateHeap> BTMemMap;
+HashMap <void*, BackTraceMemory, PrivateHeap> BTMemMapRecord;
+HashMap <void*, ObjectStatus, PrivateHeap> objStatusMap;
 
 //// pre-init private allocator memory
 typedef int (*main_fn_t)(int, char **, char **);
@@ -68,6 +71,7 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
     lockUsage.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_LOCK_NUM);
     globalLockUsage.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_LOCK_NUM);
     MemoryWaste::initialize();
+    Backtrace::init();
     MyMalloc::initializeForThreadLocalXthreadMemory(ThreadLocalStatus::runningThreadIndex);
     MyMalloc::initializeForThreadLocalHashMemory(ThreadLocalStatus::runningThreadIndex);
     MyMalloc::initializeForThreadLocalShadowMemory(ThreadLocalStatus::runningThreadIndex);

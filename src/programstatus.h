@@ -16,7 +16,6 @@ private:
     static char matrixFileName[MAX_FILENAME_LEN];
     static char inputInfoFileName[MAX_FILENAME_LEN];
     static FILE * inputInfoFile;
-    static char outputFileName[MAX_FILENAME_LEN];
 
     static size_t middleObjectThreshold;
     static size_t largeObjectThreshold;
@@ -39,9 +38,11 @@ private:
 
 public:
 
+    static char programName[256];
     static bool matrixFileOpened;
     static FILE * matrixFile;
     static FILE * outputFile;
+    static char outputFileName[MAX_FILENAME_LEN];
     static bool allocatorStyleIsBibop;
 
     static unsigned int numberOfClassSizes;

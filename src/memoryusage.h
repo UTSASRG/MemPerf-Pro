@@ -26,7 +26,7 @@ public:
     static void subTotalSizeFromMemoryUsage(size_t size);
     static void globalize();
     static void printOutput();
-    static void stopIfMaxMemReached(size_t maxInKb);
+    static void stopIfMaxMemReached(int64_t maxInKb);
 
 };
 

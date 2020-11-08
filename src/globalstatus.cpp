@@ -218,6 +218,7 @@ void GlobalStatus::printOutput() {
     MemoryWaste::printOutput();
     printFriendliness();
     Predictor::printOutput();
+    Backtrace::printOutput();
     fflush(ProgramStatus::outputFile);
     fprintf(stderr, "writing completed\n");
 }

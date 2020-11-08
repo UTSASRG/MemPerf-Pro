@@ -7,6 +7,7 @@
 #include "threadlocalstatus.h"
 #include "structs.h"
 #include "predictor.h"
+#include "backtrace.h"
 
 
 class AllocatingStatus {
@@ -209,6 +210,7 @@ private:
 public:
 
     static thread_local bool sampledForCountingEvent;
+    static thread_local bool sampledForBackTrace;
 
     static bool isFirstFunction();
 

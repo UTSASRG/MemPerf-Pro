@@ -76,8 +76,10 @@ size_t ShadowMemory::updateObject(void * address, size_t size, bool isFree) {
         return 0;
     }
 
+#ifdef PRINT_MEM_DETAIL_THRESHOLD
     minAddress = MIN(minAddress, address);
     maxAddress = MAX(maxAddress, (void *)((uint64_t)address+(uint64_t)size));
+#endif
 
     uintptr_t uintaddr = (uintptr_t)address;
 
@@ -563,17 +565,23 @@ void ShadowMemory::printAllPages() {
             }
             startPtr += PAGESIZE_HUGE;
         } else {
-            unsigned pageIdx = ((startPtr & MEGABYTE_MASK) >> LOG2_PAGESIZE);
-            bool touched = getPageMapEntry(mega_index, pageIdx)->isTouched();
-            if(touched) {
-                PageMapEntry * current = getPageMapEntry(mega_index, pageIdx);
-                uint64_t totalUsedBytes = current->getUsedBytes();
-                if(PAGESIZE-totalUsedBytes) {
-                    fprintf(stderr, "%p - %p, %lu\n", (void*)startPtr, (void*)((uint64_t)startPtr+PAGESIZE), PAGESIZE-totalUsedBytes);
-                    totalExFrag += PAGESIZE_HUGE-totalUsedBytes;
+            uint64_t totalUsedBytesIn2Mb = 0;
+            for(unsigned pageIdx = 0; pageIdx < 512; ++pageIdx) {
+                bool touched = getPageMapEntry(mega_index, pageIdx)->isTouched();
+                if(touched) {
+                    PageMapEntry * current = getPageMapEntry(mega_index, pageIdx);
+                    uint64_t totalUsedBytes = current->getUsedBytes();
+                    if(PAGESIZE-totalUsedBytes) {
+                        fprintf(stderr, "%p - %p, %lu\n", (void*)startPtr, (void*)((uint64_t)startPtr+PAGESIZE), PAGESIZE-totalUsedBytes);
+                        totalExFrag += PAGESIZE-totalUsedBytes;
+                        totalUsedBytesIn2Mb += PAGESIZE-totalUsedBytes;
+                    }
                 }
+                startPtr += PAGESIZE;
             }
-            startPtr += PAGESIZE;
+            if(totalUsedBytesIn2Mb) {
+                fprintf(stderr, "-------%lu-------\n", totalUsedBytesIn2Mb);
+            }
         }
     }
     fprintf(stderr, "totalExFrag = %luK\n", totalExFrag/ONE_KB);
@@ -736,6 +744,9 @@ BlowupNode * PageMapEntry::newBlowup(unsigned int classSizeIndex) {
 }
 
 void PageMapEntry::addBlowup(unsigned int classSizeIndex) {
+#ifndef ENABLE_PRECISE_BLOWUP
+    return;
+#endif
     pagelock.lock();
     if(blowupList == nullptr) {
         blowupList = newBlowup(classSizeIndex);
@@ -761,6 +772,9 @@ void PageMapEntry::addBlowup(unsigned int classSizeIndex) {
 }
 
 void PageMapEntry::subBlowup(unsigned int classSizeIndex) {
+#ifndef ENABLE_PRECISE_BLOWUP
+    return;
+#endif
     pagelock.lock();
     if(blowupList == nullptr) {
         pagelock.unlock();
@@ -780,6 +794,9 @@ void PageMapEntry::subBlowup(unsigned int classSizeIndex) {
 }
 
 void PageMapEntry::addFreeListNum(unsigned int classSizeIndex)  {
+#ifndef ENABLE_PRECISE_BLOWUP
+    return;
+#endif
     pagelock.lock();
     if(blowupList == nullptr) {
         blowupList = newBlowup(classSizeIndex);
@@ -805,6 +822,9 @@ void PageMapEntry::addFreeListNum(unsigned int classSizeIndex)  {
 }
 
 void PageMapEntry::subFreeListNum(unsigned int classSizeIndex) {
+#ifndef ENABLE_PRECISE_BLOWUP
+    return;
+#endif
     pagelock.lock();
     if(blowupList == nullptr) {
         pagelock.unlock();
@@ -824,6 +844,9 @@ void PageMapEntry::subFreeListNum(unsigned int classSizeIndex) {
 }
 
 void PageMapEntry::clearBlowup() {
+#ifndef ENABLE_PRECISE_BLOWUP
+    return;
+#endif
     pagelock.lock();
     if(blowupList == nullptr) {
         pagelock.unlock();

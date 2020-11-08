@@ -1,7 +1,8 @@
 
 #include "memwaste.h"
 
-HashMap<void*, ObjectStatus, PrivateHeap> MemoryWaste::objStatusMap;
+//HashMap<void*, ObjectStatus, PrivateHeap> MemoryWaste::objStatusMap;
+extern HashMap<void*, ObjectStatus, PrivateHeap> objStatusMap;
 thread_local SizeClassSizeAndIndex MemoryWaste::currentSizeClassSizeAndIndex;
 MemoryWasteStatus MemoryWaste::currentStatus, MemoryWaste::recordStatus;
 MemoryWasteGlobalStatus MemoryWaste::globalStatus;
@@ -229,7 +230,7 @@ void MemoryWaste::initialize() {
 }
 
 
-AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(size_t size, void * address) {
+AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(size_t size, void * address, void * backtraceAddr) {
     bool reused;
     ObjectStatus * status;
 
@@ -242,6 +243,7 @@ AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(size_t size, void * ad
         status = objStatusMap.insert(address, sizeof(unsigned long), ObjectStatus::newObjectStatus(currentSizeClassSizeAndIndex, size));
         status->sizeClassSizeAndIndex = currentSizeClassSizeAndIndex;
         status->maxTouchedBytes = size;
+        status->backtraceAddr = backtraceAddr;
 
         currentStatus.numOfAccumulatedOperations.numOfNewAllocations[arrayIndex()]++;
     }
@@ -259,6 +261,7 @@ AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(size_t size, void * ad
                 status->maxTouchedBytes = size;
             }
         }
+        status->backtraceAddr = backtraceAddr;
         currentStatus.numOfActiveObjects.numOfFreelistObjects[arrayIndex()]--;
         ShadowMemory::subFreeListNum(address, currentSizeClassSizeAndIndex.classSize);
         currentStatus.numOfAccumulatedOperations.numOfReusedAllocations[arrayIndex()]++;
@@ -290,6 +293,12 @@ AllocatingTypeWithSizeGotFromMemoryWaste MemoryWaste::freeUpdate(void* address) 
     currentSizeClassSizeAndIndex = status->sizeClassSizeAndIndex;
 
     currentStatus.internalFragment[arrayIndex()] -= (int64_t)status->internalFragment();
+
+    if(status->backtraceAddr) {
+        Backtrace::subMem(status->backtraceAddr, status->sizeClassSizeAndIndex.size);
+        status->backtraceAddr = nullptr;
+    }
+
     hashLocksSet.unlock(address);
 
     currentStatus.numOfAccumulatedOperations.numOfFree[arrayIndex()]++;

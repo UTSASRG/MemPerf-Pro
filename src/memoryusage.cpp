@@ -17,10 +17,13 @@ void MemoryUsage::addToMemoryUsage(size_t size, size_t newTouchePageBytes) {
     __atomic_add_fetch(&globalMemoryUsage.realMemoryUsage, size, __ATOMIC_RELAXED);
     __atomic_add_fetch(&globalMemoryUsage.totalMemoryUsage, newTouchePageBytes, __ATOMIC_RELAXED);
 
-    stopIfMaxMemReached(88000);
+#ifdef PRINT_MEM_DETAIL_THRESHOLD
+    stopIfMaxMemReached(PRINT_MEM_DETAIL_THRESHOLD);
+#endif
 
-     if(maxGlobalMemoryUsage.isLowerThan(globalMemoryUsage)) {
+     if(maxGlobalMemoryUsage.isLowerThan(globalMemoryUsage, ONE_MB)) {
          maxGlobalMemoryUsage = globalMemoryUsage;
+         Backtrace::recordMem();
          MemoryWaste::compareMemoryUsageAndRecordStatus(maxGlobalMemoryUsage);
      }
     maxRealMemoryUsage = MAX(maxRealMemoryUsage, globalMemoryUsage.realMemoryUsage);
@@ -50,7 +53,7 @@ void MemoryUsage::printOutput() {
     fprintf(ProgramStatus::outputFile, "global max total memory usage                     %20ldK\n", maxGlobalMemoryUsage.totalMemoryUsage/ONE_KB);
 }
 
-void MemoryUsage::stopIfMaxMemReached(size_t maxInKb) {
+void MemoryUsage::stopIfMaxMemReached(int64_t maxInKb) {
     if(maxGlobalMemoryUsage.totalMemoryUsage/ONE_KB > maxInKb) {
         debugLock.lock();
         fprintf(stderr, "total memory = %ld\n", maxGlobalMemoryUsage.totalMemoryUsage/ONE_KB);

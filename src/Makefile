@@ -1,6 +1,7 @@
 SRCS = 	\
 		libmallocprof.cpp \
 		allocatingstatus.cpp \
+		backtrace.cpp \
 		globalstatus.cpp \
 		memoryusage.cpp \
 		memsample.c \
@@ -16,6 +17,7 @@ SRCS = 	\
 INCS = \
 		libmallocprof.h \
 		allocatingstatus.h \
+		backtrace.h \
 		definevalues.h \
 		globalstatus.h \
 		hashfuncs.hh \

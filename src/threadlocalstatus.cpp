@@ -19,6 +19,7 @@ thread_local std::random_device ThreadLocalStatus::randomDevice;
 thread_local uint64_t ThreadLocalStatus::randomPeriodForAllocations;
 thread_local bool ThreadLocalStatus::setSampleForCountingEvent;
 
+
 void ThreadLocalStatus::getARunningThreadIndex() {
     lock.lock();
     runningThreadIndex = totalNumOfThread++;
@@ -66,6 +67,17 @@ bool ThreadLocalStatus::randomProcessForCountingEvent() {
     }
 #endif
     return !setSampleForCountingEvent || randomDevice()%randomPeriodForAllocations == 0;
+}
+
+bool ThreadLocalStatus::randomProcessForBackTrace(size_t size) {
+#ifndef RANDOM_PERIOD_FOR_BACKTRACE
+    return false;
+#else
+    if (RANDOM_PERIOD_FOR_BACKTRACE == 1) {
+        return true;
+    }
+    return randomDevice()%MAX(1, RANDOM_PERIOD_FOR_BACKTRACE/size) == 0;
+#endif
 }
 
 bool ThreadLocalStatus::randomProcess(uint64_t randomPeriod) {
