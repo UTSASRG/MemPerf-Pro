@@ -7,6 +7,7 @@
 #include <string.h>
 #include <link.h>
 #include <algorithm>
+#include <string>
 #include "definevalues.h"
 #include "hashfuncs.hh"
 #include "spinlock.hh"
@@ -33,6 +34,7 @@ private:
     static spinlock recordLock;
     static bool compare(BTAddrMemPair a, BTAddrMemPair b);
     static size_t ConvertToVMA(size_t addr);
+    static void ssystem(char* command);
 public:
     static void debugPrintTrace();
     static void init();

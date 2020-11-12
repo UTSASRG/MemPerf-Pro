@@ -22,7 +22,8 @@ struct ObjectStatus{
     uint64_t proof;
     SizeClassSizeAndIndex sizeClassSizeAndIndex;
     size_t maxTouchedBytes = 0;
-    void * backtraceAddr;
+    void * backtraceAddr = nullptr;
+    bool allocated = false;
 
     size_t internalFragment();
     static ObjectStatus newObjectStatus();
@@ -129,6 +130,9 @@ public:
 
     static void changeBlowup(unsigned int classSizeIndex, int value);
     static void changeFreelist(unsigned int classSizeIndex, int value);
+
+    static void detectMemoryLeak();
+
 };
 
 #endif //MMPROF_MEMWASTE_H

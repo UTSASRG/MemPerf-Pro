@@ -20,8 +20,21 @@ size_t Backtrace::ConvertToVMA(size_t addr)
 {
     Dl_info info;
     link_map* link_map;
-    dladdr1((void*)addr,&info,(void**)&link_map,RTLD_DL_LINKMAP);
+    dladdr1((void*)addr, &info, (void**)&link_map, RTLD_DL_LINKMAP);
     return addr-link_map->l_addr;
+}
+
+void Backtrace::ssystem(char *command) {
+    char path[1035];
+    FILE * fp = popen(command, "r");
+    if (fp == nullptr) {
+        printf("Failed to run command\n" );
+        abort();
+    }
+    while (fgets(path, sizeof(path), fp)) {
+        fprintf(ProgramStatus::outputFile, "%s", path);
+    }
+    pclose(fp);
 }
 
 void Backtrace::debugPrintTrace() {
@@ -47,29 +60,28 @@ void Backtrace::init() {
 }
 
 void * Backtrace::doABackTrace(size_t size) {
+#ifdef RANDOM_PERIOD_FOR_BACKTRACE
     void * stackTop = &size;
-    void * BKAddr = (void*)*((uint64_t*)((uint64_t)stackTop+(uint64_t)0x140E0));
-//    lock.lock();
+    void * BKAddr = (void*)*((uint64_t*)((uint64_t)stackTop+(uint64_t)0x140F0));
     BackTraceMemory * status = BTMemMap.findOrAdd(BKAddr, sizeof(void*), BackTraceMemory::newBackTraceMemory());
-//    lock.unlock();
     status->memAllocated[ThreadLocalStatus::runningThreadIndex] += size;
     return BKAddr;
+#endif
 }
 
 void Backtrace::subMem(void *addr, size_t size) {
-//    lock.lock();
+#ifdef RANDOM_PERIOD_FOR_BACKTRACE
     BackTraceMemory * status = BTMemMap.find(addr, sizeof(void*));
-//    lock.unlock();
     if (status->memAllocated[ThreadLocalStatus::runningThreadIndex] >= size) {
         status->memAllocated[ThreadLocalStatus::runningThreadIndex] -= size;
     } else {
         status->memAllocated[ThreadLocalStatus::runningThreadIndex] = 0;
     }
+#endif
 }
 
 void Backtrace::recordMem() {
 #ifdef RANDOM_PERIOD_FOR_BACKTRACE
-//    recordLock.lock();
     for(auto entryInHashTable: BTMemMap) {
         void * addr = entryInHashTable.getKey();
         BackTraceMemory newStatus = *(entryInHashTable.getValue());
@@ -78,7 +90,6 @@ void Backtrace::recordMem() {
             memcpy(status->memAllocated, newStatus.memAllocated, sizeof(size_t) * ThreadLocalStatus::totalNumOfThread);
         }
     }
-//    recordLock.unlock();
 #endif
 }
 
@@ -97,20 +108,27 @@ void Backtrace::debugPrintOutput() {
     }
     std::sort(BTqueue, BTqueue+numOfBT, compare);
 
-    GlobalStatus::printTitle((char*)"BACKTRACE OF SOURCE CODES");
+    GlobalStatus::printTitle((char*)"MEMORY LEAK BACKTRACE AT END");
+    if(!numOfBT) {
+        return;
+    }
+
     for(unsigned int i = 0; i < MIN(5, numOfBT); ++i) {
         if(BTqueue[i].address && BTqueue[i].memory) {
-            fprintf(ProgramStatus::outputFile, "%zx, %s: %llu\n", ConvertToVMA((size_t)BTqueue[i].address), backtrace_symbols(&BTqueue[i].address, 1)[0], BTqueue[i].memory);
+            fprintf(ProgramStatus::outputFile, "%zx, %s: %luK\n", ConvertToVMA((size_t)BTqueue[i].address), backtrace_symbols(&BTqueue[i].address, 1)[0], BTqueue[i].memory/1024);
         }
     }
+
+    char command[512];
+    sprintf(command, "addr2line -e %s -Ci ", ProgramStatus::programName);
+    for(unsigned int i = 0; i < MIN(5, numOfBT); ++i) {
+        if(BTqueue[i].address && BTqueue[i].memory) {
+            sprintf(command+strlen(command), "%zx ", ConvertToVMA((size_t)BTqueue[i].address));
+        }
+    }
+    sprintf(command+strlen(command), "2>> %s\n", ProgramStatus::outputFileName);
     fflush(ProgramStatus::outputFile);
-    for(unsigned int i = 0; i < MIN(5, numOfBT); ++i) {
-        if(BTqueue[i].address && BTqueue[i].memory) {
-            char command[256];
-            snprintf(command, sizeof(command), "addr2line -e %s -Ci %zx >> %s\n", ProgramStatus::programName, ConvertToVMA((size_t)BTqueue[i].address), ProgramStatus::outputFileName);
-            system(command);
-        }
-    }
+    ssystem(command);
     fflush(ProgramStatus::outputFile);
 #endif
 }
@@ -130,7 +148,7 @@ void Backtrace::printOutput() {
     }
     std::sort(BTqueue, BTqueue+numOfBT, compare);
 
-    GlobalStatus::printTitle((char*)"BACKTRACE OF SOURCE CODES");
+    GlobalStatus::printTitle((char*)"MEMORY USAGE AT PEAK");
 
     if(!numOfBT) {
         return;
@@ -138,7 +156,7 @@ void Backtrace::printOutput() {
 
     for(unsigned int i = 0; i < MIN(5, numOfBT); ++i) {
         if(BTqueue[i].address && BTqueue[i].memory) {
-            fprintf(ProgramStatus::outputFile, "%zx, %s: %llu\n", ConvertToVMA((size_t)BTqueue[i].address), backtrace_symbols(&BTqueue[i].address, 1)[0], BTqueue[i].memory);
+            fprintf(ProgramStatus::outputFile, "%zx, %s: %luK\n", ConvertToVMA((size_t)BTqueue[i].address), backtrace_symbols(&BTqueue[i].address, 1)[0], BTqueue[i].memory/1024);
         }
     }
 
@@ -149,10 +167,9 @@ void Backtrace::printOutput() {
             sprintf(command+strlen(command), "%zx ", ConvertToVMA((size_t)BTqueue[i].address));
         }
     }
-    sprintf(command+strlen(command), ">> %s\n", ProgramStatus::outputFileName);
+    sprintf(command+strlen(command), "2>> %s\n", ProgramStatus::outputFileName);
     fflush(ProgramStatus::outputFile);
-    system(command);
+    ssystem(command);
     fflush(ProgramStatus::outputFile);
-//    fprintf(stderr, "%s\n", command);
 #endif
 }

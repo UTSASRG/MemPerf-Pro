@@ -46,7 +46,7 @@ void MemoryUsage::globalize() {
 }
 
 void MemoryUsage::printOutput() {
-    GlobalStatus::printTitle((char*)"MEMORY USAGE");
+    GlobalStatus::printTitle((char*)"MEMORY USAGE AT PEAK");
     fprintf(ProgramStatus::outputFile, "thread local max real memory usage                %20ldK\n", globalThreadLocalMemoryUsage.realMemoryUsage/ONE_KB);
     fprintf(ProgramStatus::outputFile, "thread local max total memory usage               %20ldK\n", globalThreadLocalMemoryUsage.totalMemoryUsage/ONE_KB);
     fprintf(ProgramStatus::outputFile, "global max real memory usage                      %20ldK\n", maxRealMemoryUsage/ONE_KB);

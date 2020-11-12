@@ -243,7 +243,6 @@ AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(size_t size, void * ad
         status = objStatusMap.insert(address, sizeof(unsigned long), ObjectStatus::newObjectStatus(currentSizeClassSizeAndIndex, size));
         status->sizeClassSizeAndIndex = currentSizeClassSizeAndIndex;
         status->maxTouchedBytes = size;
-        status->backtraceAddr = backtraceAddr;
 
         currentStatus.numOfAccumulatedOperations.numOfNewAllocations[arrayIndex()]++;
     }
@@ -261,13 +260,16 @@ AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(size_t size, void * ad
                 status->maxTouchedBytes = size;
             }
         }
-        status->backtraceAddr = backtraceAddr;
         currentStatus.numOfActiveObjects.numOfFreelistObjects[arrayIndex()]--;
         ShadowMemory::subFreeListNum(address, currentSizeClassSizeAndIndex.classSize);
         currentStatus.numOfAccumulatedOperations.numOfReusedAllocations[arrayIndex()]++;
 
     }
     currentStatus.internalFragment[arrayIndex()] += (int64_t)status->internalFragment();
+    if(backtraceAddr) {
+        status->backtraceAddr = backtraceAddr;
+        status->allocated = true;
+    }
 
     hashLocksSet.unlock(address);
 
@@ -298,6 +300,7 @@ AllocatingTypeWithSizeGotFromMemoryWaste MemoryWaste::freeUpdate(void* address) 
         Backtrace::subMem(status->backtraceAddr, status->sizeClassSizeAndIndex.size);
         status->backtraceAddr = nullptr;
     }
+    status->allocated = false;
 
     hashLocksSet.unlock(address);
 
@@ -331,7 +334,7 @@ void MemoryWaste::globalizeRecordAndGetTotalValues() {
 void MemoryWaste::printOutput() {
     globalizeRecordAndGetTotalValues();
 
-    GlobalStatus::printTitle((char*)"MEMORY WASTE");
+    GlobalStatus::printTitle((char*)"MEMORY WASTE AT PEAK");
 
     if(MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage) {
 
@@ -405,4 +408,14 @@ void MemoryWaste::changeBlowup(unsigned int classSizeIndex, int value) {
 
 void MemoryWaste::changeFreelist(unsigned int classSizeIndex, int value) {
     currentStatus.numOfActiveObjects.numOfFreelistObjects[classSizeIndex] -= value;
+}
+
+void MemoryWaste::detectMemoryLeak() {
+    GlobalStatus::printTitle((char*)"MEMORY LEAK OBJECTS AT END");
+    for(auto entryInHashTable: objStatusMap) {
+        ObjectStatus newStatus = *(entryInHashTable.getValue());
+        if(newStatus.allocated && newStatus.backtraceAddr) {
+            fprintf(ProgramStatus::outputFile, "Obj: %p\tCallsite: %p\tSize: %lu\n", entryInHashTable.getKey(), newStatus.backtraceAddr, newStatus.sizeClassSizeAndIndex.size);
+        }
+    }
 }

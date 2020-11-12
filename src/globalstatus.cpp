@@ -214,11 +214,13 @@ void GlobalStatus::printOutput() {
     printDetailLocks();
     printCriticalSections();
     printSyscalls();
-    MemoryUsage::printOutput();
-    MemoryWaste::printOutput();
     printFriendliness();
     Predictor::printOutput();
+    MemoryUsage::printOutput();
     Backtrace::printOutput();
+    MemoryWaste::printOutput();
+    Backtrace::debugPrintOutput();
+    MemoryWaste::detectMemoryLeak();
     fflush(ProgramStatus::outputFile);
     fprintf(stderr, "writing completed\n");
 }

@@ -210,7 +210,6 @@ private:
 public:
 
     static thread_local bool sampledForCountingEvent;
-    static thread_local bool sampledForBackTrace;
 
     static bool isFirstFunction();
 

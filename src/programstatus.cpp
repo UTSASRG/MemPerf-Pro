@@ -167,7 +167,6 @@ void ProgramStatus::openOutputFile() {
 //	snprintf(outputFileName, MAX_FILENAME_LEN, "%s_libmallocprof_%d_main_thread.txt", program_invocation_name, getpid());
     snprintf(outputFileName, MAX_FILENAME_LEN, "/home/jinzhou/parsec/records/%s_libmallocprof_%d_main_thread.txt", program_invocation_name, getpid());
     fprintf(stderr, "%s\n", outputFileName);
-
     outputFile = fopen(outputFileName, "w");
     if(outputFile == nullptr) {
         perror("error: unable to open output file to write");
