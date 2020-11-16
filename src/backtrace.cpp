@@ -29,12 +29,12 @@ void Backtrace::ssystem(char *command) {
     FILE * fp = popen(command, "r");
     if (fp == nullptr) {
         printf("Failed to run command\n" );
-        abort();
+    } else {
+        while (fgets(path, sizeof(path), fp)) {
+            fprintf(ProgramStatus::outputFile, "%s", path);
+        }
+        pclose(fp);
     }
-    while (fgets(path, sizeof(path), fp)) {
-        fprintf(ProgramStatus::outputFile, "%s", path);
-    }
-    pclose(fp);
 }
 
 void Backtrace::debugPrintTrace() {
@@ -109,12 +109,13 @@ void Backtrace::debugPrintOutput() {
     std::sort(BTqueue, BTqueue+numOfBT, compare);
 
     GlobalStatus::printTitle((char*)"MEMORY LEAK BACKTRACE AT END");
+
     if(!numOfBT) {
         return;
     }
 
     for(unsigned int i = 0; i < MIN(5, numOfBT); ++i) {
-        if(BTqueue[i].address && BTqueue[i].memory) {
+        if(BTqueue[i].address && BTqueue[i].memory/1024) {
             fprintf(ProgramStatus::outputFile, "%zx, %s: %luK\n", ConvertToVMA((size_t)BTqueue[i].address), backtrace_symbols(&BTqueue[i].address, 1)[0], BTqueue[i].memory/1024);
         }
     }
@@ -155,7 +156,7 @@ void Backtrace::printOutput() {
     }
 
     for(unsigned int i = 0; i < MIN(5, numOfBT); ++i) {
-        if(BTqueue[i].address && BTqueue[i].memory) {
+        if(BTqueue[i].address && BTqueue[i].memory/1024) {
             fprintf(ProgramStatus::outputFile, "%zx, %s: %luK\n", ConvertToVMA((size_t)BTqueue[i].address), backtrace_symbols(&BTqueue[i].address, 1)[0], BTqueue[i].memory/1024);
         }
     }

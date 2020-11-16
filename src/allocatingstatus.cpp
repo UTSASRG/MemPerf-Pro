@@ -156,9 +156,11 @@ void AllocatingStatus::updateFreeingStatusAfterRealFunction() {
 
 void AllocatingStatus::updateMemoryStatusAfterAllocation() {
     void * BKAddr = nullptr;
+#ifdef RANDOM_PERIOD_FOR_BACKTRACE
     if(allocatingType.allocatingFunction == MALLOC) {
         BKAddr = Backtrace::doABackTrace(allocatingType.objectSize);
     }
+#endif
     allocatingType.allocatingTypeGotFromMemoryWaste = MemoryWaste::allocUpdate(allocatingType.objectSize, allocatingType.objectAddress, BKAddr);
     allocatingType.allocatingTypeGotFromShadowMemory.objectNewTouchedPageSize = ShadowMemory::updateObject(allocatingType.objectAddress, allocatingType.objectSize, false);
     MemoryUsage::addToMemoryUsage(allocatingType.objectSize, allocatingType.allocatingTypeGotFromShadowMemory.objectNewTouchedPageSize);

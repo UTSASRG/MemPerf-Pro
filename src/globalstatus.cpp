@@ -220,8 +220,8 @@ void GlobalStatus::printOutput() {
     Backtrace::printOutput();
     MemoryWaste::printOutput();
     Backtrace::debugPrintOutput();
-    MemoryWaste::detectMemoryLeak();
-    fflush(ProgramStatus::outputFile);
+//    MemoryWaste::detectMemoryLeak();
+//    fflush(ProgramStatus::outputFile);
     fprintf(stderr, "writing completed\n");
 }
 

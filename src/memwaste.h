@@ -23,8 +23,9 @@ struct ObjectStatus{
     SizeClassSizeAndIndex sizeClassSizeAndIndex;
     size_t maxTouchedBytes = 0;
     void * backtraceAddr = nullptr;
+#ifdef PRINT_LEAK_OBJECTS
     bool allocated = false;
-
+#endif
     size_t internalFragment();
     static ObjectStatus newObjectStatus();
     static ObjectStatus newObjectStatus(SizeClassSizeAndIndex SizeClassSizeAndIndex, size_t maxTouchBytes);

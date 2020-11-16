@@ -266,11 +266,14 @@ AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(size_t size, void * ad
 
     }
     currentStatus.internalFragment[arrayIndex()] += (int64_t)status->internalFragment();
+#ifdef RANDOM_PERIOD_FOR_BACKTRACE
     if(backtraceAddr) {
         status->backtraceAddr = backtraceAddr;
+        #ifdef PRINT_LEAK_OBJECTS
         status->allocated = true;
+        #endif
     }
-
+#endif
     hashLocksSet.unlock(address);
 
     currentStatus.numOfActiveObjects.numOfAllocatedObjects[arrayIndex()]++;
@@ -295,13 +298,15 @@ AllocatingTypeWithSizeGotFromMemoryWaste MemoryWaste::freeUpdate(void* address) 
     currentSizeClassSizeAndIndex = status->sizeClassSizeAndIndex;
 
     currentStatus.internalFragment[arrayIndex()] -= (int64_t)status->internalFragment();
-
+#ifdef RANDOM_PERIOD_FOR_BACKTRACE
     if(status->backtraceAddr) {
         Backtrace::subMem(status->backtraceAddr, status->sizeClassSizeAndIndex.size);
         status->backtraceAddr = nullptr;
     }
+#ifdef PRINT_LEAK_OBJECTS
     status->allocated = false;
-
+#endif
+#endif
     hashLocksSet.unlock(address);
 
     currentStatus.numOfAccumulatedOperations.numOfFree[arrayIndex()]++;
@@ -411,6 +416,8 @@ void MemoryWaste::changeFreelist(unsigned int classSizeIndex, int value) {
 }
 
 void MemoryWaste::detectMemoryLeak() {
+#ifdef RANDOM_PERIOD_FOR_BACKTRACE
+    #ifdef PRINT_LEAK_OBJECTS
     GlobalStatus::printTitle((char*)"MEMORY LEAK OBJECTS AT END");
     for(auto entryInHashTable: objStatusMap) {
         ObjectStatus newStatus = *(entryInHashTable.getValue());
@@ -418,4 +425,6 @@ void MemoryWaste::detectMemoryLeak() {
             fprintf(ProgramStatus::outputFile, "Obj: %p\tCallsite: %p\tSize: %lu\n", entryInHashTable.getKey(), newStatus.backtraceAddr, newStatus.sizeClassSizeAndIndex.size);
         }
     }
+    #endif
+#endif
 }
