@@ -3,8 +3,9 @@
 
 thread_local HashMap <void *, DetailLockData, PrivateHeap> lockUsage;
 HashMap <void *, DetailLockData, PrivateHeap> globalLockUsage;
-HashMap <void*, BackTraceMemory, PrivateHeap> BTMemMap;
-HashMap <void*, BackTraceMemory, PrivateHeap> BTMemMapRecord;
+HashMap <uint64_t, BackTraceMemory, PrivateHeap> BTMemMap;
+HashMap <uint64_t, BackTraceMemory, PrivateHeap> BTMemMapRecord;
+//HashMap <uint64_t, BackTraceContent, PrivateHeap> BTCttMap;
 HashMap <void*, ObjectStatus, PrivateHeap> objStatusMap;
 
 //// pre-init private allocator memory
@@ -33,6 +34,7 @@ void exitHandler() {
     Predictor::outsideCyclesStop();
     Predictor::outsideCountingEventsStop();
     Predictor::stopSerial();
+//    MemoryUsage::endCheck();
 
 	stopSampling();
     stopCounting();
@@ -49,6 +51,7 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
     initPMU();
     RealX::initializer();
     ShadowMemory::initialize();
+    ThreadLocalStatus::setStackStartAddress(&argc);
     ThreadLocalStatus::addARunningThread();
     ThreadLocalStatus::getARunningThreadIndex();
 

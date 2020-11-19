@@ -18,12 +18,23 @@
 #include "libmallocprof.h"
 
 struct BackTraceMemory {
-    size_t memAllocated[MAX_THREAD_NUMBER];
+    size_t memAllocated;
+    void * frames[8];
+    int numberOfFrame;
     static BackTraceMemory newBackTraceMemory();
 };
 
+//struct BackTraceContent {
+//    size_t memAllocatedAtPeak;
+//    size_t memAllocatedAtEnd;
+//    void * frames[8];
+//    int numberOfFrame;
+//    static BackTraceContent newBackTraceContent();
+//};
+
 struct BTAddrMemPair {
-    void * address;
+    void * frames[8];
+    int numberOfFrame;
     size_t memory;
 };
 
@@ -33,13 +44,13 @@ private:
     static spinlock lock;
     static spinlock recordLock;
     static bool compare(BTAddrMemPair a, BTAddrMemPair b);
-    static size_t ConvertToVMA(size_t addr);
+    static void* ConvertToVMA(void* addr);
     static void ssystem(char* command);
 public:
     static void debugPrintTrace();
     static void init();
-    static void * doABackTrace(size_t size);
-    static void subMem(void * addr, size_t size);
+    static uint64_t doABackTrace(size_t size);
+    static void subMem(uint64_t callsiteKey, size_t size);
     static void recordMem();
     static void debugPrintOutput();
     static void printOutput();

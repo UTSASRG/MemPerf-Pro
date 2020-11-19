@@ -20,6 +20,7 @@
 #include "structs.h"
 #include "spinlock.hh"
 #include "shadowmemory.hh"
+#include "allocatingstatus.h"
 
 
 typedef struct {

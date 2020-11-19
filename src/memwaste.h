@@ -22,7 +22,7 @@ struct ObjectStatus{
     uint64_t proof;
     SizeClassSizeAndIndex sizeClassSizeAndIndex;
     size_t maxTouchedBytes = 0;
-    void * backtraceAddr = nullptr;
+    uint64_t callsiteKey = 0;
 #ifdef PRINT_LEAK_OBJECTS
     bool allocated = false;
 #endif
@@ -118,7 +118,7 @@ public:
 
     static void initialize();
 
-    static AllocatingTypeGotFromMemoryWaste allocUpdate(size_t size, void * address, void * backtraceAddr);
+    static AllocatingTypeGotFromMemoryWaste allocUpdate(size_t size, void * address, uint64_t callsiteKey);
     static AllocatingTypeWithSizeGotFromMemoryWaste freeUpdate(void* address);
 
     static void compareMemoryUsageAndRecordStatus(TotalMemoryUsage newTotalMemoryUsage);

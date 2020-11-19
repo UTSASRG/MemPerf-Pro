@@ -30,6 +30,8 @@ public:
     static thread_local uint64_t randomPeriodForAllocations;
     static thread_local bool setSampleForCountingEvent;
 
+    static thread_local void * stackStartAddress;
+
     static void getARunningThreadIndex();
     static void addARunningThread();
     static void subARunningThread();
@@ -40,6 +42,9 @@ public:
     static void setRandomPeriodForAllocations(uint64_t randomPeriod);
     static bool randomProcessForCountingEvent();
     static bool randomProcess(uint64_t randomPeriod);
+
+    static void setStackStartAddress(void * addr);
+    static uint64_t getStackOffset(void * addr);
 
 };
 

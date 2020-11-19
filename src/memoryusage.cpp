@@ -22,9 +22,9 @@ void MemoryUsage::addToMemoryUsage(size_t size, size_t newTouchePageBytes) {
 #endif
 
      if(maxGlobalMemoryUsage.isLowerThan(globalMemoryUsage, ONE_MB)) {
-         maxGlobalMemoryUsage = globalMemoryUsage;
-         Backtrace::recordMem();
-         MemoryWaste::compareMemoryUsageAndRecordStatus(maxGlobalMemoryUsage);
+                 maxGlobalMemoryUsage = globalMemoryUsage;
+                 Backtrace::recordMem();
+                 MemoryWaste::compareMemoryUsageAndRecordStatus(maxGlobalMemoryUsage);
      }
     maxRealMemoryUsage = MAX(maxRealMemoryUsage, globalMemoryUsage.realMemoryUsage);
 
@@ -62,5 +62,13 @@ void MemoryUsage::stopIfMaxMemReached(int64_t maxInKb) {
         fprintf(stderr, "finished\n");
         abort();
         debugLock.unlock();
+    }
+}
+
+void MemoryUsage::endCheck() {
+    if(maxGlobalMemoryUsage.isLowerThan(globalMemoryUsage)) {
+        maxGlobalMemoryUsage = globalMemoryUsage;
+        Backtrace::recordMem();
+        MemoryWaste::compareMemoryUsageAndRecordStatus(maxGlobalMemoryUsage);
     }
 }

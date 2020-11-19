@@ -38,6 +38,7 @@ void * xthreadx::startThread(void * arg) {
 
     initPMU();
 
+    ThreadLocalStatus::setStackStartAddress(&arg);
     ThreadLocalStatus::getARunningThreadIndex();
 
 #ifdef OPEN_SAMPLING_FOR_ALLOCS

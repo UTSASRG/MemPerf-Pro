@@ -27,6 +27,7 @@ public:
     static void globalize();
     static void printOutput();
     static void stopIfMaxMemReached(int64_t maxInKb);
+    static void endCheck();
 
 };
 

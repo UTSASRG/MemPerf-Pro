@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" serverName="Remote Host (db98acff-699a-4604-aa0a-7d288b64ec44)">
+  <component name="PublishConfigData" autoUpload="Always" serverName="lab">
     <serverData>
-      <paths name="Remote Host (db98acff-699a-4604-aa0a-7d288b64ec44)">
+      <paths name="lab">
         <serverdata>
           <mappings>
             <mapping deploy="/mmprof" local="$PROJECT_DIR$" web="/" />

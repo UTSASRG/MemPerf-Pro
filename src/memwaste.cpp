@@ -81,7 +81,7 @@ void MemoryWasteStatus::debugPrint() {
 }
 
 void MemoryWasteStatus::updateStatus(MemoryWasteStatus newStatus) {
-    lock.lock();
+//    lock.lock();
     newStatus.cleanAbnormalValues();
     size_t sizeOfCopiedArrays = ThreadLocalStatus::totalNumOfThread * ProgramStatus::numberOfClassSizes * sizeof(uint64_t);
     memcpy(this->internalFragment, newStatus.internalFragment, sizeOfCopiedArrays);
@@ -91,7 +91,7 @@ void MemoryWasteStatus::updateStatus(MemoryWasteStatus newStatus) {
     memcpy(this->numOfAccumulatedOperations.numOfReusedAllocations, newStatus.numOfAccumulatedOperations.numOfReusedAllocations, sizeOfCopiedArrays);
     memcpy(this->numOfAccumulatedOperations.numOfFree, newStatus.numOfAccumulatedOperations.numOfFree, sizeOfCopiedArrays);
     memcpy(this->blowupFlag, newStatus.blowupFlag, ProgramStatus::numberOfClassSizes * sizeof(uint64_t));
-    lock.unlock();
+//    lock.unlock();
 }
 
 void MemoryWasteStatus::cleanAbnormalValues() {
@@ -230,7 +230,7 @@ void MemoryWaste::initialize() {
 }
 
 
-AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(size_t size, void * address, void * backtraceAddr) {
+AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(size_t size, void * address, uint64_t callsiteKey) {
     bool reused;
     ObjectStatus * status;
 
@@ -267,8 +267,8 @@ AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(size_t size, void * ad
     }
     currentStatus.internalFragment[arrayIndex()] += (int64_t)status->internalFragment();
 #ifdef RANDOM_PERIOD_FOR_BACKTRACE
-    if(backtraceAddr) {
-        status->backtraceAddr = backtraceAddr;
+    if(callsiteKey) {
+        status->callsiteKey = callsiteKey;
         #ifdef PRINT_LEAK_OBJECTS
         status->allocated = true;
         #endif
@@ -299,9 +299,9 @@ AllocatingTypeWithSizeGotFromMemoryWaste MemoryWaste::freeUpdate(void* address) 
 
     currentStatus.internalFragment[arrayIndex()] -= (int64_t)status->internalFragment();
 #ifdef RANDOM_PERIOD_FOR_BACKTRACE
-    if(status->backtraceAddr) {
-        Backtrace::subMem(status->backtraceAddr, status->sizeClassSizeAndIndex.size);
-        status->backtraceAddr = nullptr;
+    if(status->callsiteKey) {
+        Backtrace::subMem(status->callsiteKey, status->sizeClassSizeAndIndex.size);
+        status->callsiteKey = 0;
     }
 #ifdef PRINT_LEAK_OBJECTS
     status->allocated = false;

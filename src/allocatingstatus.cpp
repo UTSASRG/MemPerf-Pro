@@ -88,7 +88,6 @@ void AllocatingStatus::updateFreeingStatusBeforeRealFunction(AllocationFunction 
 
 
 void AllocatingStatus::updateAllocatingTypeAfterRealFunction(void * objectAddress) {
-    allocatingType.doingAllocation = false;
     allocatingType.objectAddress = objectAddress;
 }
 
@@ -147,6 +146,7 @@ void AllocatingStatus::updateAllocatingStatusAfterRealFunction(void * objectAddr
     stopCountCountingEvents();
     updateAllocatingTypeAfterRealFunction(objectAddress);
     updateMemoryStatusAfterAllocation();
+    allocatingType.doingAllocation = false;
 }
 
 void AllocatingStatus::updateFreeingStatusAfterRealFunction() {
@@ -155,13 +155,13 @@ void AllocatingStatus::updateFreeingStatusAfterRealFunction() {
 }
 
 void AllocatingStatus::updateMemoryStatusAfterAllocation() {
-    void * BKAddr = nullptr;
+    uint64_t callsiteKey = 0;
 #ifdef RANDOM_PERIOD_FOR_BACKTRACE
     if(allocatingType.allocatingFunction == MALLOC) {
-        BKAddr = Backtrace::doABackTrace(allocatingType.objectSize);
+        callsiteKey = Backtrace::doABackTrace(allocatingType.objectSize);
     }
 #endif
-    allocatingType.allocatingTypeGotFromMemoryWaste = MemoryWaste::allocUpdate(allocatingType.objectSize, allocatingType.objectAddress, BKAddr);
+    allocatingType.allocatingTypeGotFromMemoryWaste = MemoryWaste::allocUpdate(allocatingType.objectSize, allocatingType.objectAddress, callsiteKey);
     allocatingType.allocatingTypeGotFromShadowMemory.objectNewTouchedPageSize = ShadowMemory::updateObject(allocatingType.objectAddress, allocatingType.objectSize, false);
     MemoryUsage::addToMemoryUsage(allocatingType.objectSize, allocatingType.allocatingTypeGotFromShadowMemory.objectNewTouchedPageSize);
 }

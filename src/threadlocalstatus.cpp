@@ -19,6 +19,8 @@ thread_local std::random_device ThreadLocalStatus::randomDevice;
 thread_local uint64_t ThreadLocalStatus::randomPeriodForAllocations;
 thread_local bool ThreadLocalStatus::setSampleForCountingEvent;
 
+thread_local void * ThreadLocalStatus::stackStartAddress;
+
 
 void ThreadLocalStatus::getARunningThreadIndex() {
     lock.lock();
@@ -71,5 +73,13 @@ bool ThreadLocalStatus::randomProcessForCountingEvent() {
 
 bool ThreadLocalStatus::randomProcess(uint64_t randomPeriod) {
     return randomDevice()%randomPeriod == 0;
+}
+
+void ThreadLocalStatus::setStackStartAddress(void *addr) {
+    stackStartAddress = addr;
+}
+
+uint64_t ThreadLocalStatus::getStackOffset(void *addr) {
+    return (uint64_t)stackStartAddress - (uint64_t)addr;
 }
 

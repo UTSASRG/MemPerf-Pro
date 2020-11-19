@@ -55,7 +55,7 @@
 
 #define MAX_THREAD_NUMBER 2048
 
-#define MAX_BT_ADDR_NUM 256
+#define MAX_BT_ADDR_NUM 4194304
 
 enum ObjectSizeType{
     SMALL,
