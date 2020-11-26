@@ -1,7 +1,7 @@
 #include "structs.h"
 #include "globalstatus.h"
 
-void SizeClassSizeAndIndex::updateValues(size_t size, size_t classSize, unsigned int classSizeIndex) {
+void SizeClassSizeAndIndex::updateValues(unsigned int size, unsigned int classSize, unsigned short classSizeIndex) {
     this->size = size;
     this->classSize = classSize;
     this->classSizeIndex = classSizeIndex;
@@ -29,28 +29,31 @@ void SystemCallData::cleanup() {
     this->cycles = 0;
 }
 
+#ifdef OPEN_DEBUG
 void SystemCallData::debugPrint() {
-    fprintf(stderr, "num = %lu, cycles = %lu\n", num, cycles);
+    fprintf(stderr, "num = %u, cycles = %lu\n", num, cycles);
 }
+#endif
 
 void OverviewLockData::add(OverviewLockData newOverviewLockData) {
     numOfLocks += newOverviewLockData.numOfLocks;
-    for(int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
+    for(unsigned short allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
         numOfCalls[allocationType] += newOverviewLockData.numOfCalls[allocationType];
         numOfCallsWithContentions[allocationType] += newOverviewLockData.numOfCallsWithContentions[allocationType];
         totalCycles[allocationType] += newOverviewLockData.totalCycles[allocationType];
     }
 }
 
+#ifdef OPEN_DEBUG
 void OverviewLockData::debugPrint() {
     fprintf(stderr, "num of locks = %u\n", numOfLocks);
-    for(unsigned int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
+    for(unsigned short allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
         fprintf(stderr, "num of calls = %u, num of calls with contentions = %u, total cycles = %lu\n",
                 numOfCalls[allocationType], numOfCallsWithContentions[allocationType], totalCycles[allocationType]);
     }
     fprintf(stderr, "\n");
 }
-
+#endif
 
 DetailLockData DetailLockData::newDetailLockData(LockTypes lockType) {
     return DetailLockData{lockType, {0}, {0}, 0, 0, 0};
@@ -69,7 +72,7 @@ void DetailLockData::quitFromContending() {
 }
 
 bool DetailLockData::isAnImportantLock() {
-    for(unsigned int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
+    for(unsigned short allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
         if(GlobalStatus::numOfSampledCountingFunctions[allocationType] && cycles[allocationType]/GlobalStatus::numOfSampledCountingFunctions[allocationType] > 500) {
             return true;
         }
@@ -79,7 +82,7 @@ bool DetailLockData::isAnImportantLock() {
 
 void DetailLockData::add(DetailLockData newDetailLockData) {
     lockType = newDetailLockData.lockType;
-    for(unsigned int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
+    for(unsigned short allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
         numOfCalls[allocationType] += newDetailLockData.numOfCalls[allocationType];
         numOfCallsWithContentions[allocationType] += newDetailLockData.numOfCallsWithContentions[allocationType];
         cycles[allocationType] += newDetailLockData.cycles[allocationType];
@@ -105,14 +108,15 @@ void FriendlinessStatus::add(FriendlinessStatus newFriendlinessStatus) {
     totalMemoryUsageOfSampledCacheLines += newFriendlinessStatus.totalMemoryUsageOfSampledCacheLines;
     numOfSampledStoringInstructions += newFriendlinessStatus.numOfSampledStoringInstructions;
     numOfSampledCacheLines += newFriendlinessStatus.numOfSampledCacheLines;
-    for(int falseSharingType = 0; falseSharingType < NUM_OF_FALSESHARINGTYPE; ++falseSharingType) {
+    for(unsigned short falseSharingType = 0; falseSharingType < NUM_OF_FALSESHARINGTYPE; ++falseSharingType) {
         numOfSampledFalseSharingInstructions[falseSharingType] += newFriendlinessStatus.numOfSampledFalseSharingInstructions[falseSharingType];
         numOfSampledFalseSharingCacheLines[falseSharingType] += newFriendlinessStatus.numOfSampledFalseSharingCacheLines[falseSharingType];
     }
 }
 
+#ifdef OPEN_DEBUG
 void FriendlinessStatus::debugPrint() {
-    fprintf(stderr, "numOfSampling = %lu\n", numOfSampling);
+    fprintf(stderr, "numOfSampling = %u\n", numOfSampling);
     if(numOfSampling / 100) {
         fprintf(stderr, "totalMemoryUsageOfSampledPages = %lu, avg = %3lu%%\n",
                 totalMemoryUsageOfSampledPages,
@@ -120,13 +124,14 @@ void FriendlinessStatus::debugPrint() {
         fprintf(stderr, "totalMemoryUsageOfSampledCacheLines = %lu, avg = %3lu%%\n",
                 totalMemoryUsageOfSampledCacheLines,
                 totalMemoryUsageOfSampledCacheLines/(numOfSampling/100*CACHELINE_SIZE));
-        fprintf(stderr, "numOfSampledStoringInstructions = %lu\n", numOfSampledStoringInstructions);
-        fprintf(stderr, "numOfSampledCacheLines = %lu\n", numOfSampledCacheLines);
+        fprintf(stderr, "numOfSampledStoringInstructions = %u\n", numOfSampledStoringInstructions);
+        fprintf(stderr, "numOfSampledCacheLines = %u\n", numOfSampledCacheLines);
         fprintf(stderr, "\n");
     }
 }
+#endif
 
-bool TotalMemoryUsage::isLowerThan(TotalMemoryUsage newTotalMemoryUsage, size_t interval) {
+bool TotalMemoryUsage::isLowerThan(TotalMemoryUsage newTotalMemoryUsage, unsigned int interval) {
     return this->totalMemoryUsage + (int64_t)interval < newTotalMemoryUsage.totalMemoryUsage;
 }
 
@@ -140,10 +145,11 @@ void TotalMemoryUsage::ifLowerThanReplace(TotalMemoryUsage newTotalMemoryUsage) 
     this->totalMemoryUsage = MAX(this->totalMemoryUsage, newTotalMemoryUsage.totalMemoryUsage);
 }
 
+#ifdef OPEN_DEBUG
 void TotalMemoryUsage::debugPrint() {
     fprintf(stderr, "real memory usage = %ld, total memory usage = %ld\n", realMemoryUsage, totalMemoryUsage);
 }
-
+#endif
 
 void PerfReadInfo::add(struct PerfReadInfo newPerfReadInfo) {
     faults += newPerfReadInfo.faults;
@@ -151,8 +157,9 @@ void PerfReadInfo::add(struct PerfReadInfo newPerfReadInfo) {
     instructions += newPerfReadInfo.instructions;
 }
 
-
+#ifdef OPEN_DEBUG
 void PerfReadInfo::debugPrint() {
-//    fprintf(stderr, "faults = %ld, l1cache_load = %lu, l1cache_load_miss = %lu, llc_load = %lu, llc_load_miss = %lu\n",
-//                    faults, l1cache_load, l1cache_load_miss, llc_load, llc_load_miss);
+    fprintf(stderr, "faults = %ld, l1cache_load = %lu, l1cache_load_miss = %lu, llc_load = %lu, llc_load_miss = %lu\n",
+                    faults, l1cache_load, l1cache_load_miss, llc_load, llc_load_miss);
 }
+#endif

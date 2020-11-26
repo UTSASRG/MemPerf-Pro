@@ -26,7 +26,7 @@ public:
 	}
 
 private:
-  int _lock;
+  bool _lock;
 };
 
 class nolock {

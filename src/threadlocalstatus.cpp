@@ -1,13 +1,13 @@
 #include "threadlocalstatus.h"
 
-unsigned int ThreadLocalStatus::totalNumOfThread;
-unsigned int ThreadLocalStatus::maxNumOfRunningThread = 0;
-unsigned int ThreadLocalStatus::totalNumOfRunningThread;
-thread_local int ThreadLocalStatus::runningThreadIndex;
+unsigned short ThreadLocalStatus::totalNumOfThread;
+unsigned short ThreadLocalStatus::maxNumOfRunningThread = 0;
+unsigned short ThreadLocalStatus::totalNumOfRunningThread;
+thread_local short ThreadLocalStatus::runningThreadIndex;
 spinlock ThreadLocalStatus::lock;
 
-thread_local uint64_t ThreadLocalStatus::numOfFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA] = {0};
-thread_local uint64_t ThreadLocalStatus::numOfSampledCountingFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA] = {0};
+thread_local unsigned int ThreadLocalStatus::numOfFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA] = {0};
+thread_local unsigned int ThreadLocalStatus::numOfSampledCountingFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA] = {0};
 thread_local PerfReadInfo ThreadLocalStatus::countingEvents[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
 thread_local uint64_t ThreadLocalStatus::cycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
 thread_local OverviewLockData ThreadLocalStatus::overviewLockData[NUM_OF_LOCKTYPES];
@@ -16,7 +16,7 @@ thread_local SystemCallData ThreadLocalStatus::systemCallData[NUM_OF_SYSTEMCALLT
 thread_local FriendlinessStatus ThreadLocalStatus::friendlinessStatus;
 
 thread_local std::random_device ThreadLocalStatus::randomDevice;
-thread_local uint64_t ThreadLocalStatus::randomPeriodForAllocations;
+thread_local unsigned short ThreadLocalStatus::randomPeriodForAllocations;
 thread_local bool ThreadLocalStatus::setSampleForCountingEvent;
 
 thread_local void * ThreadLocalStatus::stackStartAddress;
@@ -57,7 +57,7 @@ bool ThreadLocalStatus::fromParallelToSerial() {
     return totalNumOfRunningThread == 1;
 }
 
-void ThreadLocalStatus::setRandomPeriodForAllocations(uint64_t randomPeriod) {
+void ThreadLocalStatus::setRandomPeriodForAllocations(unsigned short randomPeriod) {
     randomPeriodForAllocations = randomPeriod;
     setSampleForCountingEvent = true;
 }
@@ -71,7 +71,7 @@ bool ThreadLocalStatus::randomProcessForCountingEvent() {
     return !setSampleForCountingEvent || randomDevice()%randomPeriodForAllocations == 0;
 }
 
-bool ThreadLocalStatus::randomProcess(uint64_t randomPeriod) {
+bool ThreadLocalStatus::randomProcess(unsigned short randomPeriod) {
     return randomDevice()%randomPeriod == 0;
 }
 

@@ -4,7 +4,6 @@
 #include <stdlib.h>
 
 typedef struct list {
-//    uint64_t proof[20];
   struct list* prev;
   struct list* next;
 } list_t;

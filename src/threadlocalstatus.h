@@ -11,14 +11,14 @@ extern thread_local bool isCountingInit;
 
 class ThreadLocalStatus {
 public:
-    static unsigned int totalNumOfThread;
-    static unsigned int maxNumOfRunningThread;
-    static unsigned int totalNumOfRunningThread;
-    static thread_local int runningThreadIndex;
+    static unsigned short totalNumOfThread;
+    static unsigned short maxNumOfRunningThread;
+    static unsigned short totalNumOfRunningThread;
+    static thread_local short runningThreadIndex;
     static spinlock lock;
 
-    static thread_local uint64_t numOfFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
-    static thread_local uint64_t numOfSampledCountingFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
+    static thread_local unsigned int numOfFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
+    static thread_local unsigned int numOfSampledCountingFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
     static thread_local PerfReadInfo countingEvents[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
     static thread_local uint64_t cycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
     static thread_local OverviewLockData overviewLockData[NUM_OF_LOCKTYPES];
@@ -27,7 +27,7 @@ public:
     static thread_local FriendlinessStatus friendlinessStatus;
 
     static thread_local std::random_device randomDevice;
-    static thread_local uint64_t randomPeriodForAllocations;
+    static thread_local unsigned short randomPeriodForAllocations;
     static thread_local bool setSampleForCountingEvent;
 
     static thread_local void * stackStartAddress;
@@ -39,9 +39,9 @@ public:
     static bool fromSerialToParallel();
     static bool fromParallelToSerial();
 
-    static void setRandomPeriodForAllocations(uint64_t randomPeriod);
+    static void setRandomPeriodForAllocations(unsigned short randomPeriod);
     static bool randomProcessForCountingEvent();
-    static bool randomProcess(uint64_t randomPeriod);
+    static bool randomProcess(unsigned short randomPeriod);
 
     static void setStackStartAddress(void * addr);
     static uint64_t getStackOffset(void * addr);

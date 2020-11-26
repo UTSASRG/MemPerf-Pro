@@ -5,8 +5,10 @@
 #define OPEN_SAMPLING_EVENT 1
 #define OPEN_SAMPLING_FOR_ALLOCS 1
 #define RANDOM_PERIOD_FOR_ALLOCS 100
-#define RANDOM_PERIOD_FOR_BACKTRACE 1
-//#define PRINT_LEAK_OBJECTS 1
+#define OPEN_BACKTRACE 1
+
+//#define OPEN_DEBUG 1
+#define PRINT_LEAK_OBJECTS 1
 //#define OPEN_CPU_BINDING 1
 //#define ENABLE_HP 1
 //#define ENABLE_THP 1
@@ -16,7 +18,6 @@
 #define LOAD_ACCESS 0x81d0
 #define STORE_ACCESS 0x82d0
 #define LAST_USER_ADDR 0x7fffffffffff
-#define MALLOC_HEADER_SIZE (sizeof(size_t))
 #define EIGHT_BYTES 8
 #define ONE_KB 1024l
 #define ONE_MB 1048576l
@@ -51,11 +52,17 @@
 
 #define ABNORMAL_VALUE 100000000l
 #define MAX_OBJ_NUM 4194304
+#define MAX_LEAK_NUM 1000000
+//#define MAX_OBJ_NUM 4000000
 #define MAX_LOCK_NUM 512
 
-#define MAX_THREAD_NUMBER 2048
+#define MAX_THREAD_NUMBER 1024
 
-#define MAX_BT_ADDR_NUM 4194304
+#define MAX_BT_ADDR_NUM 256
+
+#define MAX_REGION_NUM 256
+
+#define LEAST_TOUCHING_THREADS 15
 
 enum ObjectSizeType{
     SMALL,
@@ -142,6 +149,7 @@ enum eMemAccessType{
     E_MEM_EXEC,
     E_MEM_UNKNOWN,
 };
+
 inline unsigned long long rdtscp() {
     unsigned int lo, hi;
     asm volatile (

@@ -17,7 +17,9 @@ thread_local AllocatingStatus::QueueOfDetailLockDataInAllocatingStatus Allocatin
 thread_local AllocatingStatus::OverviewLockDataInAllocatingStatus AllocatingStatus::overviewLockData[NUM_OF_LOCKTYPES];
 thread_local AllocatingStatus::CriticalSectionStatusInAllocatingStatus AllocatingStatus::criticalSectionStatus;
 thread_local SystemCallData AllocatingStatus::systemCallData[NUM_OF_SYSTEMCALLTYPES];
+#ifdef OPEN_DEBUG
 spinlock AllocatingStatus::debugLock;
+#endif
 
 bool AllocatingStatus::isFirstFunction() {
     if(firstAllocation == false) {
@@ -42,7 +44,9 @@ void AllocatingStatus::QueueOfDetailLockDataInAllocatingStatus::writingNewDataIn
 
     queue[queueTail].lockTimeStamp = 0;
     queue[queueTail].unlockTimeStamp = 0;
+#ifdef OPEN_DEBUG
     queue[queueTail].debugMutexAddress = nullptr;
+#endif
 }
 
 void AllocatingStatus::QueueOfDetailLockDataInAllocatingStatus::cleanUpQueue() {
@@ -50,7 +54,7 @@ void AllocatingStatus::QueueOfDetailLockDataInAllocatingStatus::cleanUpQueue() {
 }
 
 
-void AllocatingStatus::updateAllocatingTypeBeforeRealFunction(AllocationFunction allocationFunction, size_t objectSize) {
+void AllocatingStatus::updateAllocatingTypeBeforeRealFunction(AllocationFunction allocationFunction, unsigned int objectSize) {
     allocatingType.allocatingFunction = allocationFunction;
     allocatingType.objectSize = objectSize;
     allocatingType.objectSizeType = ProgramStatus::getObjectSizeType(objectSize);
@@ -71,7 +75,7 @@ void AllocatingStatus::startCountCountingEvents() {
     cyclesBeforeRealFunction = rdtscp();
 }
 
-void AllocatingStatus::updateAllocatingStatusBeforeRealFunction(AllocationFunction allocationFunction, size_t objectSize) {
+void AllocatingStatus::updateAllocatingStatusBeforeRealFunction(AllocationFunction allocationFunction, unsigned int objectSize) {
     updateAllocatingTypeBeforeRealFunction(allocationFunction, objectSize);
     sampledForCountingEvent = ThreadLocalStatus::randomProcessForCountingEvent();
     startCountCountingEvents();
@@ -156,7 +160,7 @@ void AllocatingStatus::updateFreeingStatusAfterRealFunction() {
 
 void AllocatingStatus::updateMemoryStatusAfterAllocation() {
     uint64_t callsiteKey = 0;
-#ifdef RANDOM_PERIOD_FOR_BACKTRACE
+#ifdef OPEN_BACKTRACE
     if(allocatingType.allocatingFunction == MALLOC) {
         callsiteKey = Backtrace::doABackTrace(allocatingType.objectSize);
     }
@@ -477,6 +481,7 @@ void AllocatingStatus::recordLockCallAndCycles(unsigned int numOfCalls, uint64_t
     queueOfDetailLockData.addCallAndCycles(numOfCalls, cycles);
 }
 
+#ifdef OPEN_DEBUG
 void AllocatingStatus::debugRecordMutexAddress(uint64_t lockTimeStamp, pthread_mutex_t * mutex) {
     queueOfDetailLockData.debugAddMutexAddress(lockTimeStamp, mutex);
 }
@@ -488,6 +493,7 @@ void AllocatingStatus::debugRecordUnlockTimeStamp(uint64_t unlockTimeStamp, pthr
 bool AllocatingStatus::debugMutexAddressInTheQueue(pthread_mutex_t * mutex) {
     return queueOfDetailLockData.debugMutexAddressInTheQueue(mutex);
 }
+#endif
 
 void AllocatingStatus::checkAndStartRecordingACriticalSection() {
     criticalSectionStatus.checkAndStartRecordingACriticalSection();
@@ -497,6 +503,7 @@ void AllocatingStatus::checkAndStopRecordingACriticalSection() {
     criticalSectionStatus.checkAndStopRecordingACriticalSection();
 }
 
+#ifdef OPEN_DEBUG
 void AllocatingStatus::debugPrint() {
     fprintf(stderr, "allocating output type = %u\n", allocationTypeForOutputData);
     for(int lockType = 0; lockType < NUM_OF_LOCKTYPES; ++lockType) {
@@ -516,6 +523,7 @@ void AllocatingStatus::debugPrint() {
 size_t AllocatingStatus::debugReturnSize() {
     return(allocatingType.objectSize);
 }
+#endif
 
 void AllocatingStatus::minusCycles(uint64_t cycles) {
     cyclesMinus += cycles;

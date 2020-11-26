@@ -8,6 +8,8 @@ MemoryWasteStatus MemoryWaste::currentStatus, MemoryWaste::recordStatus;
 MemoryWasteGlobalStatus MemoryWaste::globalStatus;
 MemoryWasteTotalValue MemoryWaste::totalValue;
 HashLocksSet MemoryWaste::hashLocksSet;
+unsigned long MemoryWaste::minAddr = -1;
+unsigned long MemoryWaste::maxAddr = 0;
 
 size_t ObjectStatus::internalFragment() {
     size_t unusedPageSize = (sizeClassSizeAndIndex.classSize - maxTouchedBytes) / PAGESIZE * PAGESIZE;
@@ -19,7 +21,7 @@ ObjectStatus ObjectStatus::newObjectStatus() {
     return newObjectStatus;
 }
 
-ObjectStatus ObjectStatus::newObjectStatus(SizeClassSizeAndIndex sizeClassSizeAndIndex, size_t maxTouchBytes) {
+ObjectStatus ObjectStatus::newObjectStatus(SizeClassSizeAndIndex sizeClassSizeAndIndex, unsigned int maxTouchBytes) {
     ObjectStatus newObjectStatus;
     newObjectStatus.sizeClassSizeAndIndex = sizeClassSizeAndIndex;
     newObjectStatus.maxTouchedBytes = maxTouchBytes;
@@ -29,11 +31,11 @@ ObjectStatus ObjectStatus::newObjectStatus(SizeClassSizeAndIndex sizeClassSizeAn
 
 size_t MemoryWasteStatus::sizeOfArrays;
 
-unsigned int MemoryWasteStatus::arrayIndex(unsigned int classSizeIndex) {
+unsigned int MemoryWasteStatus::arrayIndex(unsigned short classSizeIndex) {
     return ThreadLocalStatus::runningThreadIndex * ProgramStatus::numberOfClassSizes + classSizeIndex;
 }
 
-unsigned int MemoryWasteStatus::arrayIndex(unsigned int threadIndex, unsigned int classSizeIndex) {
+unsigned int MemoryWasteStatus::arrayIndex(unsigned short threadIndex, unsigned short classSizeIndex) {
     return threadIndex * ProgramStatus::numberOfClassSizes + classSizeIndex;
 }
 
@@ -41,12 +43,12 @@ void MemoryWasteStatus::initialize() {
     sizeOfArrays = MAX_THREAD_NUMBER * ProgramStatus::numberOfClassSizes * sizeof(uint64_t);
 
     internalFragment = (int64_t*) RealX::mmap(NULL, sizeOfArrays, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    numOfActiveObjects.numOfAllocatedObjects = (int64_t*) RealX::mmap(NULL, sizeOfArrays, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    numOfActiveObjects.numOfFreelistObjects = (int64_t*) RealX::mmap(NULL, sizeOfArrays, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    numOfAccumulatedOperations.numOfNewAllocations = (uint64_t*) RealX::mmap(NULL, sizeOfArrays, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    numOfAccumulatedOperations.numOfReusedAllocations = (uint64_t*) RealX::mmap(NULL, sizeOfArrays, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    numOfAccumulatedOperations.numOfFree = (uint64_t*) RealX::mmap(NULL, sizeOfArrays, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    blowupFlag = (int64_t*) RealX::mmap(NULL, ProgramStatus::numberOfClassSizes * sizeof(uint64_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    numOfActiveObjects.numOfAllocatedObjects = (int*) RealX::mmap(NULL, sizeOfArrays/2, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    numOfActiveObjects.numOfFreelistObjects = (int*) RealX::mmap(NULL, sizeOfArrays/2, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    numOfAccumulatedOperations.numOfNewAllocations = (unsigned int*) RealX::mmap(NULL, sizeOfArrays/2, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    numOfAccumulatedOperations.numOfReusedAllocations = (unsigned int*) RealX::mmap(NULL, sizeOfArrays/2, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    numOfAccumulatedOperations.numOfFree = (unsigned int*) RealX::mmap(NULL, sizeOfArrays/2, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    blowupFlag = (int64_t*) RealX::mmap(NULL, ProgramStatus::numberOfClassSizes * sizeof(int64_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
 //    internalFragment = (int64_t*) MyMalloc::malloc(sizeOfArrays);
 //    numOfActiveObjects.numOfAllocatedObjects = (int64_t*) MyMalloc::malloc(sizeOfArrays);
@@ -68,6 +70,7 @@ void MemoryWasteStatus::initialize() {
     lock.init();
 }
 
+#ifdef OPEN_DEBUG
 void MemoryWasteStatus::debugPrint() {
     for(unsigned int threadIndex = 0; threadIndex < 40; ++threadIndex) {
         fprintf(stderr, "thread %d: ", threadIndex);
@@ -79,17 +82,18 @@ void MemoryWasteStatus::debugPrint() {
     }
     fprintf(stderr, "\n");
 }
+#endif
 
 void MemoryWasteStatus::updateStatus(MemoryWasteStatus newStatus) {
 //    lock.lock();
     newStatus.cleanAbnormalValues();
     size_t sizeOfCopiedArrays = ThreadLocalStatus::totalNumOfThread * ProgramStatus::numberOfClassSizes * sizeof(uint64_t);
     memcpy(this->internalFragment, newStatus.internalFragment, sizeOfCopiedArrays);
-    memcpy(this->numOfActiveObjects.numOfAllocatedObjects, newStatus.numOfActiveObjects.numOfAllocatedObjects, sizeOfCopiedArrays);
-    memcpy(this->numOfActiveObjects.numOfFreelistObjects, newStatus.numOfActiveObjects.numOfFreelistObjects, sizeOfCopiedArrays);
-    memcpy(this->numOfAccumulatedOperations.numOfNewAllocations, newStatus.numOfAccumulatedOperations.numOfNewAllocations, sizeOfCopiedArrays);
-    memcpy(this->numOfAccumulatedOperations.numOfReusedAllocations, newStatus.numOfAccumulatedOperations.numOfReusedAllocations, sizeOfCopiedArrays);
-    memcpy(this->numOfAccumulatedOperations.numOfFree, newStatus.numOfAccumulatedOperations.numOfFree, sizeOfCopiedArrays);
+    memcpy(this->numOfActiveObjects.numOfAllocatedObjects, newStatus.numOfActiveObjects.numOfAllocatedObjects, sizeOfCopiedArrays/2);
+    memcpy(this->numOfActiveObjects.numOfFreelistObjects, newStatus.numOfActiveObjects.numOfFreelistObjects, sizeOfCopiedArrays/2);
+    memcpy(this->numOfAccumulatedOperations.numOfNewAllocations, newStatus.numOfAccumulatedOperations.numOfNewAllocations, sizeOfCopiedArrays/2);
+    memcpy(this->numOfAccumulatedOperations.numOfReusedAllocations, newStatus.numOfAccumulatedOperations.numOfReusedAllocations, sizeOfCopiedArrays/2);
+    memcpy(this->numOfAccumulatedOperations.numOfFree, newStatus.numOfAccumulatedOperations.numOfFree, sizeOfCopiedArrays/2);
     memcpy(this->blowupFlag, newStatus.blowupFlag, ProgramStatus::numberOfClassSizes * sizeof(uint64_t));
 //    lock.unlock();
 }
@@ -114,11 +118,11 @@ void MemoryWasteGlobalStatus::initialize() {
     sizeOfArrays = ProgramStatus::numberOfClassSizes * sizeof(uint64_t);
 
     internalFragment = (int64_t*) RealX::mmap(NULL, sizeOfArrays, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    numOfActiveObjects.numOfAllocatedObjects = (int64_t*) RealX::mmap(NULL, sizeOfArrays, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    numOfActiveObjects.numOfFreelistObjects = (int64_t*) RealX::mmap(NULL, sizeOfArrays, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    numOfAccumulatedOperations.numOfNewAllocations = (uint64_t*) RealX::mmap(NULL, sizeOfArrays, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    numOfAccumulatedOperations.numOfReusedAllocations = (uint64_t*) RealX::mmap(NULL, sizeOfArrays, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    numOfAccumulatedOperations.numOfFree = (uint64_t*) RealX::mmap(NULL, sizeOfArrays, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    numOfActiveObjects.numOfAllocatedObjects = (int*) RealX::mmap(NULL, sizeOfArrays/2, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    numOfActiveObjects.numOfFreelistObjects = (int*) RealX::mmap(NULL, sizeOfArrays/2, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    numOfAccumulatedOperations.numOfNewAllocations = (unsigned int*) RealX::mmap(NULL, sizeOfArrays/2, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    numOfAccumulatedOperations.numOfReusedAllocations = (unsigned int*) RealX::mmap(NULL, sizeOfArrays/2, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    numOfAccumulatedOperations.numOfFree = (unsigned int*) RealX::mmap(NULL, sizeOfArrays, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     memoryBlowup = (int64_t*) RealX::mmap(NULL, sizeOfArrays, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
 //    internalFragment = (int64_t*) MyMalloc::malloc(sizeOfArrays);
@@ -141,8 +145,8 @@ void MemoryWasteGlobalStatus::initialize() {
 
 void MemoryWasteGlobalStatus::globalize(MemoryWasteStatus recordStatus) {
 //    recordStatus.debugPrint();
-    for (unsigned int threadIndex = 0; threadIndex < ThreadLocalStatus::totalNumOfThread; ++threadIndex) {
-        for (unsigned int classSizeIndex = 0; classSizeIndex < ProgramStatus::numberOfClassSizes; ++classSizeIndex) {
+    for (unsigned short threadIndex = 0; threadIndex < ThreadLocalStatus::totalNumOfThread; ++threadIndex) {
+        for (unsigned short classSizeIndex = 0; classSizeIndex < ProgramStatus::numberOfClassSizes; ++classSizeIndex) {
             internalFragment[classSizeIndex] += recordStatus.internalFragment[MemoryWaste::arrayIndex(threadIndex, classSizeIndex)];
 
             numOfActiveObjects.numOfAllocatedObjects[classSizeIndex] +=
@@ -163,14 +167,14 @@ void MemoryWasteGlobalStatus::globalize(MemoryWasteStatus recordStatus) {
 }
 
 void MemoryWasteGlobalStatus::calculateBlowup(MemoryWasteStatus recordStatus) {
-    for (unsigned int classSizeIndex = 0; classSizeIndex < ProgramStatus::numberOfClassSizes; ++classSizeIndex) {
+    for (unsigned short classSizeIndex = 0; classSizeIndex < ProgramStatus::numberOfClassSizes; ++classSizeIndex) {
         memoryBlowup[classSizeIndex] = ProgramStatus::classSizes[classSizeIndex] *
                                        (numOfActiveObjects.numOfFreelistObjects[classSizeIndex] - recordStatus.blowupFlag[classSizeIndex]);
     }
 }
 
 void MemoryWasteGlobalStatus::cleanAbnormalValues() {
-    for (unsigned int classSizeIndex = 0; classSizeIndex < ProgramStatus::numberOfClassSizes; ++classSizeIndex) {
+    for (unsigned short classSizeIndex = 0; classSizeIndex < ProgramStatus::numberOfClassSizes; ++classSizeIndex) {
         internalFragment[classSizeIndex] = MAX(internalFragment[classSizeIndex], 0);
         numOfActiveObjects.numOfAllocatedObjects[classSizeIndex] = MAX(numOfActiveObjects.numOfAllocatedObjects[classSizeIndex], 0);
         numOfActiveObjects.numOfFreelistObjects[classSizeIndex] = MAX(numOfActiveObjects.numOfFreelistObjects[classSizeIndex], 0);
@@ -180,7 +184,7 @@ void MemoryWasteGlobalStatus::cleanAbnormalValues() {
 
 
 void MemoryWasteTotalValue::getTotalValues(MemoryWasteGlobalStatus globalStatus) {
-    for (unsigned int classSizeIndex = 0; classSizeIndex < ProgramStatus::numberOfClassSizes; ++classSizeIndex) {
+    for (unsigned short classSizeIndex = 0; classSizeIndex < ProgramStatus::numberOfClassSizes; ++classSizeIndex) {
         internalFragment += globalStatus.internalFragment[classSizeIndex];
 
         numOfActiveObjects.numOfAllocatedObjects += globalStatus.numOfActiveObjects.numOfAllocatedObjects[classSizeIndex];
@@ -230,7 +234,7 @@ void MemoryWaste::initialize() {
 }
 
 
-AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(size_t size, void * address, uint64_t callsiteKey) {
+AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(unsigned int size, void * address, uint64_t callsiteKey) {
     bool reused;
     ObjectStatus * status;
 
@@ -245,6 +249,9 @@ AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(size_t size, void * ad
         status->maxTouchedBytes = size;
 
         currentStatus.numOfAccumulatedOperations.numOfNewAllocations[arrayIndex()]++;
+
+        minAddr = MIN(minAddr, (unsigned long)address);
+        maxAddr = MAX(maxAddr, (unsigned long)address);
     }
     else {
         reused = true;
@@ -261,12 +268,14 @@ AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(size_t size, void * ad
             }
         }
         currentStatus.numOfActiveObjects.numOfFreelistObjects[arrayIndex()]--;
+#ifdef ENABLE_PRECISE_BLOWUP
         ShadowMemory::subFreeListNum(address, currentSizeClassSizeAndIndex.classSize);
+#endif
         currentStatus.numOfAccumulatedOperations.numOfReusedAllocations[arrayIndex()]++;
 
     }
     currentStatus.internalFragment[arrayIndex()] += (int64_t)status->internalFragment();
-#ifdef RANDOM_PERIOD_FOR_BACKTRACE
+#ifdef OPEN_BACKTRACE
     if(callsiteKey) {
         status->callsiteKey = callsiteKey;
         #ifdef PRINT_LEAK_OBJECTS
@@ -274,12 +283,15 @@ AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(size_t size, void * ad
         #endif
     }
 #endif
+    status->tid = ThreadLocalStatus::runningThreadIndex;
     hashLocksSet.unlock(address);
 
     currentStatus.numOfActiveObjects.numOfAllocatedObjects[arrayIndex()]++;
     if(currentStatus.blowupFlag[currentSizeClassSizeAndIndex.classSizeIndex] > 0 ) {
         currentStatus.blowupFlag[currentSizeClassSizeAndIndex.classSizeIndex]--;
+#ifdef ENABLE_PRECISE_BLOWUP
         ShadowMemory::subBlowup(address, currentSizeClassSizeAndIndex.classSizeIndex);
+#endif
     }
 
     return AllocatingTypeGotFromMemoryWaste{reused, currentSizeClassSizeAndIndex.classSize, currentSizeClassSizeAndIndex.classSizeIndex};
@@ -298,7 +310,7 @@ AllocatingTypeWithSizeGotFromMemoryWaste MemoryWaste::freeUpdate(void* address) 
     currentSizeClassSizeAndIndex = status->sizeClassSizeAndIndex;
 
     currentStatus.internalFragment[arrayIndex()] -= (int64_t)status->internalFragment();
-#ifdef RANDOM_PERIOD_FOR_BACKTRACE
+#ifdef OPEN_BACKTRACE
     if(status->callsiteKey) {
         Backtrace::subMem(status->callsiteKey, status->sizeClassSizeAndIndex.size);
         status->callsiteKey = 0;
@@ -312,10 +324,14 @@ AllocatingTypeWithSizeGotFromMemoryWaste MemoryWaste::freeUpdate(void* address) 
     currentStatus.numOfAccumulatedOperations.numOfFree[arrayIndex()]++;
     currentStatus.numOfActiveObjects.numOfAllocatedObjects[arrayIndex()]--;
     currentStatus.numOfActiveObjects.numOfFreelistObjects[arrayIndex()]++;
+#ifdef ENABLE_PRECISE_BLOWUP
     ShadowMemory::addFreeListNum(address, currentSizeClassSizeAndIndex.classSizeIndex);
+#endif
 
     currentStatus.blowupFlag[currentSizeClassSizeAndIndex.classSizeIndex]++;
+#ifdef ENABLE_PRECISE_BLOWUP
     ShadowMemory::addBlowup(address, currentSizeClassSizeAndIndex.classSizeIndex);
+#endif
 
     return AllocatingTypeWithSizeGotFromMemoryWaste{currentSizeClassSizeAndIndex.size,
                                                     AllocatingTypeGotFromMemoryWaste{false, currentSizeClassSizeAndIndex.classSize, currentSizeClassSizeAndIndex.classSizeIndex}};
@@ -369,7 +385,7 @@ void MemoryWaste::printOutput() {
 
     fprintf(ProgramStatus::outputFile, "\n");
 
-    for (unsigned int classSizeIndex = 0; classSizeIndex < ProgramStatus::numberOfClassSizes; ++classSizeIndex) {
+    for (unsigned short classSizeIndex = 0; classSizeIndex < ProgramStatus::numberOfClassSizes; ++classSizeIndex) {
 
         if(globalStatus.internalFragment[classSizeIndex]/ONE_KB == 0 && globalStatus.memoryBlowup[classSizeIndex]/ONE_KB == 0) {
             continue;
@@ -399,32 +415,32 @@ unsigned int MemoryWaste::arrayIndex() {
     return MemoryWasteStatus::arrayIndex(currentSizeClassSizeAndIndex.classSizeIndex);
 }
 
-unsigned int MemoryWaste::arrayIndex(unsigned int classSizeIndex) {
+unsigned int MemoryWaste::arrayIndex(unsigned short classSizeIndex) {
     return MemoryWasteStatus::arrayIndex(classSizeIndex);
 }
 
-unsigned int MemoryWaste::arrayIndex(unsigned int threadIndex, unsigned int classSizeIndex) {
+unsigned int MemoryWaste::arrayIndex(unsigned short threadIndex, unsigned short classSizeIndex) {
     return MemoryWasteStatus::arrayIndex(threadIndex, classSizeIndex);
 }
 
-void MemoryWaste::changeBlowup(unsigned int classSizeIndex, int value) {
+void MemoryWaste::changeBlowup(unsigned short classSizeIndex, int value) {
     currentStatus.blowupFlag[classSizeIndex] -= value;
 }
 
-void MemoryWaste::changeFreelist(unsigned int classSizeIndex, int value) {
+void MemoryWaste::changeFreelist(unsigned short classSizeIndex, int value) {
     currentStatus.numOfActiveObjects.numOfFreelistObjects[classSizeIndex] -= value;
 }
 
-void MemoryWaste::detectMemoryLeak() {
-#ifdef RANDOM_PERIOD_FOR_BACKTRACE
-    #ifdef PRINT_LEAK_OBJECTS
-    GlobalStatus::printTitle((char*)"MEMORY LEAK OBJECTS AT END");
-    for(auto entryInHashTable: objStatusMap) {
-        ObjectStatus newStatus = *(entryInHashTable.getValue());
-        if(newStatus.allocated && newStatus.backtraceAddr) {
-            fprintf(ProgramStatus::outputFile, "Obj: %p\tCallsite: %p\tSize: %lu\n", entryInHashTable.getKey(), newStatus.backtraceAddr, newStatus.sizeClassSizeAndIndex.size);
-        }
-    }
-    #endif
-#endif
-}
+//void MemoryWaste::detectMemoryLeak() {
+//#ifdef OPEN_BACKTRACE
+//    #ifdef PRINT_LEAK_OBJECTS
+//    GlobalStatus::printTitle((char*)"MEMORY LEAK OBJECTS AT END");
+//    for(auto entryInHashTable: objStatusMap) {
+//        ObjectStatus newStatus = *(entryInHashTable.getValue());
+//        if(newStatus.allocated && newStatus.backtraceAddr) {
+//            fprintf(ProgramStatus::outputFile, "Obj: %p\tCallsite: %p\tSize: %lu\n", entryInHashTable.getKey(), newStatus.backtraceAddr, newStatus.sizeClassSizeAndIndex.size);
+//        }
+//    }
+//    #endif
+//#endif
+//}

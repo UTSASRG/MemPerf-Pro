@@ -66,9 +66,9 @@
 extern char * allocator_name;
 
 typedef struct {
-		unsigned long mega_index;
 		unsigned page_index;
 		unsigned cache_index;
+        unsigned long mega_index;
 } map_tuple;
 
 
@@ -80,37 +80,40 @@ inline void * alignupPointer(void * ptr, size_t alignto) {
   return ((intptr_t)ptr%alignto == 0) ? ptr : (void *)(((intptr_t)ptr + (alignto - 1)) & ~(alignto - 1));
 }
 
+#ifdef ENABLE_PRECISE_BLOWUP
 struct BlowupNode {
-    size_t classSizeIndex;
     short blowupFlag;
     short freelistNum;
+    unsigned short classSizeIndex;
     BlowupNode * next;
 };
+#endif
 
-
+#ifdef ENABLE_HP
 struct RangeOfHugePages {
+    unsigned num;
     uintptr_t retvals[1000];
     size_t lengths[1000];
-    unsigned num;
     void add(uintptr_t retval, size_t length);
 };
-
+#endif
 
 class CacheMapEntry {
-		private:
-                short num_used_bytes;
-
 		public:
-    FalseSharingType falseSharingStatus = OBJECT;
+
     bool falseSharingLineRecorded[NUM_OF_FALSESHARINGTYPE] = {false};
-    int lastWriterThreadIndex = -1;
-    int lastAllocatingThreadIndex = -1;
-    int lastFreeThreadIndex = -1;
     bool justFreedButRemainedSomeData = false;
     bool sampled = false;
-				unsigned int getUsedBytes();
-				bool addUsedBytes(unsigned int num_bytes);
-				bool subUsedBytes(unsigned int num_bytes);
+    FalseSharingType falseSharingStatus = OBJECT;
+    short lastWriterThreadIndex = -1;
+    short lastAllocatingThreadIndex = -1;
+    short lastFreeThreadIndex = -1;
+    short num_used_bytes;
+    unsigned short getUsedBytes();
+				void addUsedBytes(unsigned short num_bytes);
+				void subUsedBytes(unsigned short num_bytes);
+				void setFull();
+				void setEmpty();
 };
 
 class PageMapEntry {
@@ -118,29 +121,36 @@ private:
     bool touched;
     short num_used_bytes;
     CacheMapEntry * cache_map_entry;
+#ifdef ENABLE_PRECISE_BLOWUP
     BlowupNode * blowupList;
     spinlock pagelock;
+#endif
 
 public:
 
     bool donatedBySyscall;
+#ifdef ENABLE_HP
     bool hugePage;
-    static bool updateCacheLines(uintptr_t uintaddr, unsigned long mega_index, unsigned page_index, size_t size, bool isFree);
+#endif
+    static void updateCacheLines(uintptr_t uintaddr, unsigned long mega_index, unsigned page_index, size_t size, bool isFree);
     static CacheMapEntry * getCacheMapEntry(map_tuple tuple);
     static CacheMapEntry * getCacheMapEntry(unsigned long mega_idx, unsigned page_idx, unsigned cache_idx);
     CacheMapEntry * getCacheMapEntry(bool mvBumpPtr = true);
     void clear();
     bool isTouched();
     void setTouched();
-    unsigned int getUsedBytes();
-    bool addUsedBytes(unsigned int num_bytes);
-    bool subUsedBytes(unsigned int num_bytes);
+    unsigned short getUsedBytes();
+    void addUsedBytes(unsigned short num_bytes);
+    void subUsedBytes(unsigned short num_bytes);
+
+#ifdef ENABLE_PRECISE_BLOWUP
     BlowupNode * newBlowup(unsigned int classSizeIndex);
     void addBlowup(unsigned int classSizeIndex);
     void subBlowup(unsigned int classSizeIndex);
     void addFreeListNum(unsigned int classSizeIndex);
     void subFreeListNum(unsigned int classSizeIndex);
     void clearBlowup();
+#endif
 };
 
 class ShadowMemory {
@@ -156,18 +166,29 @@ private:
     static CacheMapEntry * cache_map_bump_ptr;
     static spinlock mega_map_lock;
     static bool isInitialized;
+#ifdef PRINT_MEM_DETAIL_THRESHOLD
     static void * maxAddress;
     static void * minAddress;
+#endif
 
 public:
-    static RangeOfHugePages HPBeforeInit, THPBeforeInit;
+#ifdef ENABLE_HP
+    static RangeOfHugePages HPBeforeInit;
+#ifdef ENABLE_THP
+    static RangeOfHugePages THPBeforeInit;
+#endif
+#endif
     static spinlock cache_map_lock;
     static void doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType);
     static bool initialize();
     static inline PageMapEntry ** getMegaMapEntry(unsigned long mega_index);
+#ifdef ENABLE_HP
     static void setHugePages(uintptr_t uintaddr, size_t length);
     static void cancelHugePages(uintptr_t uintaddr, size_t length);
+#ifdef ENABLE_THP
     static void setTransparentHugePages(uintptr_t uintaddr, size_t length);
+#endif
+#endif
     static size_t cleanupPages(uintptr_t uintaddr, size_t length);
     static CacheMapEntry * doCacheMapBumpPointer();
     static PageMapEntry * doPageMapBumpPointer();
@@ -175,15 +196,24 @@ public:
     static PageMapEntry * getPageMapEntry(unsigned long mega_idx, unsigned page_idx);
     static size_t updateObject(void * address, size_t size, bool isFree);
     static map_tuple getMapTupleByAddress(uintptr_t uintaddr);
+#ifdef ENABLE_HP
     static void setHugePagesInit();
+    #ifdef ENABLE_THP
     static void setTransparentHugePagesInit();
+    #endif
     static bool inHPInitRange(void * address);
+#endif
+
+#ifdef ENABLE_PRECISE_BLOWUP
     static void addBlowup(void * address, unsigned int classSizeIndex);
     static void subBlowup(void * address, unsigned int classSizeIndex);
     static void addFreeListNum(void *address, unsigned int classSizeIndex);
     static void subFreeListNum(void *address, unsigned int classSizeIndex);
+#endif
+#ifdef PRINT_MEM_DETAIL_THRESHOLD
     static void printAddressRange();
     static void printAllPages();
+#endif
 };
 
 #endif // __SHADOWMAP_H__

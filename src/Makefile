@@ -13,7 +13,10 @@ SRCS = 	\
 		shadowmemory.cpp \
 		structs.cpp \
 		threadlocalstatus.cpp \
-		xthreadx.cpp
+		xthreadx.cpp \
+		leakcheck.cpp \
+		selfmap.cpp
+
 INCS = \
 		libmallocprof.h \
 		allocatingstatus.h \
@@ -36,7 +39,9 @@ INCS = \
 		spinlock.hh \
 		structs.h \
 		threadlocalstatus.h \
-		xthreadx.hh
+		xthreadx.hh \
+		selfmap.hh \
+		leakcheck.hh
 
 DEPS = $(SRCS) $(INCS)
 

@@ -62,7 +62,9 @@ private:
     static MMAPProfilerMemory threadLocalProfilerHashMemory[MAX_THREAD_NUMBER];
     static MMAPProfilerMemory threadLocalProfilerXthreadMemory[MAX_THREAD_NUMBER];
     static MMAPProfilerMemory threadLocalProfilerShadowMemory[MAX_THREAD_NUMBER];
+#ifdef OPEN_DEBUG
     static spinlock debugLock;
+#endif
 
 public:
 

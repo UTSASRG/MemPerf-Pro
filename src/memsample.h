@@ -22,39 +22,23 @@
 #include "shadowmemory.hh"
 #include "allocatingstatus.h"
 
-
 typedef struct {
-    void * callsite1;
-    void * callsite2;
-    int numAllocs;
-    int numFrees;
-    long szFreed;
-    long szTotal;
-    long szUsed;
-    long numAccesses;
-} Tuple;
+    bool samplesLost;
+    bool initialized;
+    int perf_fd;
+    int perf_fd2;
+    int perf_fd_fault;
+    int perf_fd_cache;
+    int perf_fd_instr;
 
-
-typedef struct {
-  int perf_fd;
-  int perf_fd2;
-  uint64_t prev_head;
-	int perf_fd_fault;
-	int perf_fd_cache;
-	int perf_fd_instr;
-
-  char * data_buf_copy = NULL;
-  void * ring_buf = NULL;
-  void * ring_buf_data_start = NULL;
-  void * aux_buf = NULL;
-  bool samplesLost;
-  long numSampleHits;
-  uint64_t time_zero;
-  uint64_t time_mult;
-  uint64_t time_shift;
-  bool initialized;
-	pid_t tid;
+    uint64_t prev_head;
+    char * data_buf_copy = NULL;
+    void * ring_buf = NULL;
+    void * ring_buf_data_start = NULL;
+    void * aux_buf = NULL;
+    pid_t tid;
 } perf_info;
+
 
 void initPMU(void);
 void setupCounting(void);

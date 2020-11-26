@@ -129,7 +129,9 @@ MMAPProfilerMemory MyMalloc::threadLocalProfilerHashMemory[MAX_THREAD_NUMBER];
 MMAPProfilerMemory MyMalloc::threadLocalProfilerXthreadMemory[MAX_THREAD_NUMBER];
 MMAPProfilerMemory MyMalloc::threadLocalProfilerShadowMemory[MAX_THREAD_NUMBER];
 
+#ifdef OPEN_DEBUG
 spinlock MyMalloc::debugLock;
+#endif
 
 void MyMalloc::initializeForThreadLocalMemory() {
     threadLocalProfilerMemory[ThreadLocalStatus::runningThreadIndex].initialize(MMAP_PROFILER_MEMORY_SIZE);

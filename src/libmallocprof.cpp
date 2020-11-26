@@ -48,6 +48,7 @@ void exitHandler() {
 
 // MallocProf's main function
 int libmallocprof_main(int argc, char ** argv, char ** envp) {
+    selfmap::getInstance().getGlobalRegions();
     initPMU();
     RealX::initializer();
     ShadowMemory::initialize();
@@ -114,6 +115,8 @@ extern "C" {
         if(AllocatingStatus::isFirstFunction()) {
             setupCounting();
         }
+
+
         Predictor::outsideCyclesStop();
         AllocatingStatus::updateAllocatingStatusBeforeRealFunction(MALLOC, sz);
 //        if(ThreadLocalStatus::runningThreadIndex == 1) {
@@ -281,21 +284,31 @@ void *yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offse
     if (!realInitialized) RealX::initializer();
     if (ProgramStatus::profilerNotInitialized()) {
         void * retval =  RealX::mmap(addr, length, prot, flags, fd, offset);
+#ifdef ENABLE_HP
         if(flags & MAP_HUGETLB) {
             ShadowMemory::HPBeforeInit.add((uintptr_t)retval, length);
-        } else if((uint64_t)retval%(2*ONE_MB) == 0 && length >= 2*ONE_MB) {
+        }
+#ifdef ENABLE_THP
+        else if((uint64_t)retval%(2*ONE_MB) == 0 && length >= 2*ONE_MB) {
             ShadowMemory::THPBeforeInit.add((uintptr_t)retval, length);
         }
+#endif
+#endif
         return retval;
     }
 
     if(AllocatingStatus::outsideTrackedAllocation() || !AllocatingStatus::sampledForCountingEvent) {
         void * retval = RealX::mmap(addr, length, prot, flags, fd, offset);
+#ifdef ENABLE_HP
         if(flags & MAP_HUGETLB) {
             ShadowMemory::setHugePages((uintptr_t) retval, length);
-        } else if((uint64_t)retval%(2*ONE_MB) == 0 && length >= 2*ONE_MB) {
+        }
+#ifdef ENABLE_THP
+        else if((uint64_t)retval%(2*ONE_MB) == 0 && length >= 2*ONE_MB) {
             ShadowMemory::setTransparentHugePages((uintptr_t) retval, length);
         }
+#endif
+#endif
 
         return retval;
     }
@@ -303,12 +316,16 @@ void *yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offse
     uint64_t timeStart = rdtscp();
     void *retval = RealX::mmap(addr, length, prot, flags, fd, offset);
     uint64_t timeStop = rdtscp();
-
+#ifdef ENABLE_HP
     if(flags & MAP_HUGETLB) {
         ShadowMemory::setHugePages((uintptr_t) retval, length);
-    } else if((uint64_t)retval%(2*ONE_MB) == 0 && length >= 2*ONE_MB) {
+    }
+#ifdef ENABLE_THP
+    else if((uint64_t)retval%(2*ONE_MB) == 0 && length >= 2*ONE_MB) {
         ShadowMemory::setTransparentHugePages((uintptr_t) retval, length);
     }
+#endif
+#endif
 
     AllocatingStatus::minusCycles(120);
     AllocatingStatus::addOneSyscallToSyscallData(MMAP, timeStop - timeStart);
@@ -328,12 +345,14 @@ int madvise(void *addr, size_t length, int advice) {
 
     if (!AllocatingStatus::sampledForCountingEvent) {
         int result = RealX::madvise(addr, length, advice);
+#ifdef ENABLE_HP
         if(advice == MADV_HUGEPAGE) {
             ShadowMemory::setHugePages((uintptr_t) addr, length);
         }
         if(advice == MADV_NOHUGEPAGE) {
             ShadowMemory::cancelHugePages((uintptr_t) addr, length);
         }
+#endif
         return result;
     }
 
@@ -341,12 +360,14 @@ int madvise(void *addr, size_t length, int advice) {
     int result = RealX::madvise(addr, length, advice);
     uint64_t timeStop = rdtscp();
 
+#ifdef ENABLE_HP
     if(advice == MADV_HUGEPAGE) {
         ShadowMemory::setHugePages((uintptr_t) addr, length);
     }
     if(advice == MADV_NOHUGEPAGE) {
         ShadowMemory::cancelHugePages((uintptr_t) addr, length);
     }
+#endif
 
     AllocatingStatus::minusCycles(120);
     AllocatingStatus::addOneSyscallToSyscallData(MADVISE, timeStop - timeStart);

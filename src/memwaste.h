@@ -1,6 +1,3 @@
-//
-// Created by 86152 on 2020/2/22.
-//
 
 #ifndef MMPROF_MEMWASTE_H
 #define MMPROF_MEMWASTE_H
@@ -19,33 +16,36 @@
 class ProgramStatus;
 
 struct ObjectStatus{
-    uint64_t proof;
+    bool mark = false;
+    unsigned short tid;
     SizeClassSizeAndIndex sizeClassSizeAndIndex;
-    size_t maxTouchedBytes = 0;
+    unsigned int maxTouchedBytes = 0;
+#ifdef OPEN_BACKTRACE
     uint64_t callsiteKey = 0;
+#endif
 #ifdef PRINT_LEAK_OBJECTS
     bool allocated = false;
 #endif
     size_t internalFragment();
     static ObjectStatus newObjectStatus();
-    static ObjectStatus newObjectStatus(SizeClassSizeAndIndex SizeClassSizeAndIndex, size_t maxTouchBytes);
+    static ObjectStatus newObjectStatus(SizeClassSizeAndIndex SizeClassSizeAndIndex, unsigned int maxTouchBytes);
 };
 
 struct MemoryWasteStatus {
     int64_t * internalFragment;
     struct NumOfActiveObjects {
-        int64_t * numOfAllocatedObjects;
-        int64_t * numOfFreelistObjects;
+        int * numOfAllocatedObjects;
+        int * numOfFreelistObjects;
     } numOfActiveObjects;
     struct NumOfAccumulatedOperations {
-        uint64_t * numOfNewAllocations;
-        uint64_t * numOfReusedAllocations;
-        uint64_t * numOfFree;
+        unsigned int * numOfNewAllocations;
+        unsigned int * numOfReusedAllocations;
+        unsigned int * numOfFree;
     } numOfAccumulatedOperations;
     static size_t sizeOfArrays;
 
-    static unsigned int arrayIndex(unsigned int classSizeIndex);
-    static unsigned int arrayIndex(unsigned int threadIndex, unsigned int classSizeIndex);
+    static unsigned int arrayIndex(unsigned short classSizeIndex);
+    static unsigned int arrayIndex(unsigned short threadIndex, unsigned short classSizeIndex);
 
     int64_t * blowupFlag;
     spinlock lock;
@@ -59,13 +59,13 @@ struct MemoryWasteStatus {
 struct MemoryWasteGlobalStatus {
     int64_t * internalFragment;
     struct NumOfActiveObjects {
-        int64_t * numOfAllocatedObjects;
-        int64_t * numOfFreelistObjects;
+        int * numOfAllocatedObjects;
+        int * numOfFreelistObjects;
     } numOfActiveObjects;
     struct NumOfAccumulatedOperations {
-        uint64_t * numOfNewAllocations;
-        uint64_t * numOfReusedAllocations;
-        uint64_t * numOfFree;
+        unsigned int * numOfNewAllocations;
+        unsigned int * numOfReusedAllocations;
+        unsigned int * numOfFree;
     } numOfAccumulatedOperations;
     static size_t sizeOfArrays;
 
@@ -80,13 +80,13 @@ struct MemoryWasteGlobalStatus {
 struct MemoryWasteTotalValue {
     int64_t internalFragment = 0;
     struct NumOfActiveObjects {
-        int64_t numOfAllocatedObjects = 0;
-        int64_t numOfFreelistObjects = 0;
+        int numOfAllocatedObjects = 0;
+        int numOfFreelistObjects = 0;
     } numOfActiveObjects;
     struct NumOfAccumulatedOperations {
-        uint64_t numOfNewAllocations = 0;
-        uint64_t numOfReusedAllocations = 0;
-        uint64_t numOfFree = 0;
+        unsigned int numOfNewAllocations = 0;
+        unsigned int numOfReusedAllocations = 0;
+        unsigned int numOfFree = 0;
     } numOfAccumulatedOperations;
     int64_t externalFragment;
     int64_t memoryBlowup = 0;
@@ -109,16 +109,20 @@ private:
     static thread_local SizeClassSizeAndIndex currentSizeClassSizeAndIndex;
     static MemoryWasteStatus currentStatus, recordStatus;
     static MemoryWasteGlobalStatus globalStatus;
-    static HashLocksSet hashLocksSet;
 
 
 public:
+
+    static HashLocksSet hashLocksSet;
+
+    static unsigned long minAddr;
+    static unsigned long maxAddr;
 
     static MemoryWasteTotalValue totalValue;
 
     static void initialize();
 
-    static AllocatingTypeGotFromMemoryWaste allocUpdate(size_t size, void * address, uint64_t callsiteKey);
+    static AllocatingTypeGotFromMemoryWaste allocUpdate(unsigned int size, void * address, uint64_t callsiteKey);
     static AllocatingTypeWithSizeGotFromMemoryWaste freeUpdate(void* address);
 
     static void compareMemoryUsageAndRecordStatus(TotalMemoryUsage newTotalMemoryUsage);
@@ -126,13 +130,13 @@ public:
     static void printOutput();
 
     static unsigned int arrayIndex();
-    static unsigned int arrayIndex(unsigned int classSizeIndex);
-    static unsigned int arrayIndex(unsigned int threadIndex, unsigned int classSizeIndex);
+    static unsigned int arrayIndex(unsigned short classSizeIndex);
+    static unsigned int arrayIndex(unsigned short threadIndex, unsigned short classSizeIndex);
 
-    static void changeBlowup(unsigned int classSizeIndex, int value);
-    static void changeFreelist(unsigned int classSizeIndex, int value);
+    static void changeBlowup(unsigned short classSizeIndex, int value);
+    static void changeFreelist(unsigned short classSizeIndex, int value);
 
-    static void detectMemoryLeak();
+//    static void detectMemoryLeak();
 
 };
 

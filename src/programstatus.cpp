@@ -194,7 +194,7 @@ bool ProgramStatus::hasMiddleObjectThreshold() {
     return (0<middleObjectThreshold) && (middleObjectThreshold<largeObjectThreshold);
 }
 
-ObjectSizeType ProgramStatus::getObjectSizeType(size_t size) {
+ObjectSizeType ProgramStatus::getObjectSizeType(unsigned int size) {
     if(size > largeObjectThreshold) {
         return LARGE;
     }
@@ -204,23 +204,23 @@ ObjectSizeType ProgramStatus::getObjectSizeType(size_t size) {
     return SMALL;
 }
 
-SizeClassSizeAndIndex ProgramStatus::getClassSizeAndIndex(size_t size) {
+SizeClassSizeAndIndex ProgramStatus::getClassSizeAndIndex(unsigned int size) {
 
     if(size == cacheForGetClassSizeAndIndex.size) {
         return cacheForGetClassSizeAndIndex;
     }
 
-    size_t classSize = 0;
-    unsigned int classSizeIndex = 0;
+    unsigned int classSize = 0;
+    unsigned short classSizeIndex = 0;
 
     if(size > largeObjectThreshold) {
         classSize = (size/largeObjectAlignment)*largeObjectAlignment + ((bool)size%largeObjectAlignment)*largeObjectAlignment;
         classSizeIndex = numberOfClassSizes-1;
-        return SizeClassSizeAndIndex{size, classSize, classSizeIndex};
+        return SizeClassSizeAndIndex{classSizeIndex, size, classSize};
     }
 
     if(allocatorStyleIsBibop) {
-        for (unsigned int index = 0; index < numberOfClassSizes-1; index++) {
+        for (unsigned short index = 0; index < numberOfClassSizes-1; index++) {
             if (size <= classSizes[index]) {
                 classSize = classSizes[index];
                 classSizeIndex = index;

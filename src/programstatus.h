@@ -61,9 +61,9 @@ public:
     static void printOutput();
 
     static bool hasMiddleObjectThreshold();
-    static ObjectSizeType getObjectSizeType(size_t size);
+    static ObjectSizeType getObjectSizeType(unsigned int size);
 
-    static struct SizeClassSizeAndIndex getClassSizeAndIndex(size_t size);
+    static struct SizeClassSizeAndIndex getClassSizeAndIndex(unsigned int size);
 
 };
 

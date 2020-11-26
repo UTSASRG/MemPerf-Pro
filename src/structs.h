@@ -6,48 +6,50 @@
 #include "programstatus.h"
 
 struct SizeClassSizeAndIndex {
-    size_t size;
-    size_t classSize;
-    unsigned int classSizeIndex;
+    unsigned short classSizeIndex;
+    unsigned int size;
+    unsigned int classSize;
 
-    void updateValues(size_t size, size_t classSize, unsigned int classSizeIndex);
+    void updateValues(unsigned int size, unsigned int classSize, unsigned short classSizeIndex);
 };
 
 struct AllocatingTypeGotFromMemoryWaste {
     bool isReusedObject;
-    size_t objectClassSize;
-    uint64_t objectClassSizeIndex;
+    unsigned short objectClassSizeIndex;
+    unsigned int objectClassSize;
 };
 
 struct AllocatingTypeWithSizeGotFromMemoryWaste {
-    size_t objectSize;
+    unsigned int objectSize;
     AllocatingTypeGotFromMemoryWaste allocatingTypeGotByMemoryWaste;
 };
 
 struct AllocatingTypeGotFromShadowMemory {
-    size_t objectNewTouchedPageSize;
+    unsigned int objectNewTouchedPageSize;
 };
 
 struct AllocatingType {
-    AllocationFunction allocatingFunction;
-    size_t objectSize;
-    ObjectSizeType objectSizeType;
     bool doingAllocation = false;
+    ObjectSizeType objectSizeType;
+    AllocationFunction allocatingFunction;
+    unsigned int objectSize;
+    AllocatingTypeGotFromShadowMemory allocatingTypeGotFromShadowMemory;
     void * objectAddress;
     AllocatingTypeGotFromMemoryWaste allocatingTypeGotFromMemoryWaste;
-    AllocatingTypeGotFromShadowMemory allocatingTypeGotFromShadowMemory;
 
     void switchFreeingTypeGotFromMemoryWaste(AllocatingTypeWithSizeGotFromMemoryWaste allocatingTypeWithSizeGotFromMemoryWaste);
 };
 
 struct SystemCallData {
-    uint64_t num = 0;
+    unsigned int num = 0;
     uint64_t cycles = 0;
 
     void addOneSystemCall(uint64_t cycles);
     void add(SystemCallData newSystemCallData);
     void cleanup();
+#ifdef OPEN_DEBUG
     void debugPrint();
+#endif
 };
 
 struct OverviewLockData {
@@ -57,7 +59,9 @@ struct OverviewLockData {
     uint64_t totalCycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
 
     void add(OverviewLockData newOverviewLockData);
+#ifdef OPEN_DEBUG
     void debugPrint();
+#endif
 };
 
 struct DetailLockData {
@@ -84,26 +88,30 @@ struct CriticalSectionStatus {
 };
 
 struct FriendlinessStatus {
-    uint64_t numOfSampling;
+    unsigned int numOfSampling;
+    unsigned int numOfSampledStoringInstructions;
+    unsigned int numOfSampledCacheLines;
+    unsigned int numOfSampledFalseSharingInstructions[NUM_OF_FALSESHARINGTYPE];
+    unsigned int numOfSampledFalseSharingCacheLines[NUM_OF_FALSESHARINGTYPE];
     uint64_t totalMemoryUsageOfSampledPages;
     uint64_t totalMemoryUsageOfSampledCacheLines;
-    uint64_t numOfSampledStoringInstructions;
-    uint64_t numOfSampledCacheLines;
-    uint64_t numOfSampledFalseSharingInstructions[NUM_OF_FALSESHARINGTYPE];
-    uint64_t numOfSampledFalseSharingCacheLines[NUM_OF_FALSESHARINGTYPE];
 
     void recordANewSampling(uint64_t memoryUsageOfCacheLine, uint64_t memoryUsageOfPage);
     void add(FriendlinessStatus newFriendlinessStatus);
+#ifdef OPEN_DEBUG
     void debugPrint();
+#endif
 };
 
 struct TotalMemoryUsage {
     int64_t realMemoryUsage;
     int64_t totalMemoryUsage;
-    bool isLowerThan(TotalMemoryUsage newTotalMemoryUsage, size_t interval);
+    bool isLowerThan(TotalMemoryUsage newTotalMemoryUsage, unsigned int interval);
     bool isLowerThan(TotalMemoryUsage newTotalMemoryUsage);
     void ifLowerThanReplace(TotalMemoryUsage newTotalMemoryUsage);
+#ifdef OPEN_DEBUG
     void debugPrint();
+#endif
 };
 
 struct PerfReadInfo {
@@ -112,7 +120,9 @@ struct PerfReadInfo {
     uint64_t instructions = 0;
 
     void add(struct PerfReadInfo newPerfReadInfo);
+#ifdef OPEN_DEBUG
     void debugPrint();
+#endif
 };
 
 constexpr char * outputTitleNotificationString[2] = {

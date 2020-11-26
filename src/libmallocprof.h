@@ -26,5 +26,7 @@
 #include "shadowmemory.hh"
 #include "definevalues.h"
 #include "backtrace.h"
+#include "libmallocprof.h"
+#include "selfmap.hh"
 
 #endif /* end of include guard: __LIBMALLOCPROF_H__ */
