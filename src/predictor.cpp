@@ -183,7 +183,7 @@ void Predictor::stopParallel() {
 //    criticalReplacedStageCycle /= numOfActiveThreads;
 
     
-    for(unsigned int index = 0; index < ThreadLocalStatus::totalNumOfThread; ++index) {
+    for(unsigned short index = 0; index < ThreadLocalStatus::totalNumOfThread; ++index) {
         if(threadCycle[index] && threadReplacedCycle[index]) {
             totalCycle += threadCycle[index];
             criticalCountingEvent.add(threadCountingEvents[index]);

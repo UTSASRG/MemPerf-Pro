@@ -250,7 +250,7 @@ bool MyMalloc::ifInProfilerMemoryThenFree(void * addr) {
             return true;
         }
     }
-    for(unsigned int threadIndex = 0; threadIndex < ThreadLocalStatus::totalNumOfThread; ++threadIndex) {
+    for(unsigned short threadIndex = 0; threadIndex < ThreadLocalStatus::totalNumOfThread; ++threadIndex) {
         if(threadIndex != (unsigned int)ThreadLocalStatus::runningThreadIndex && threadLocalMemoryInitialized(threadIndex)) {
             if(threadLocalProfilerMemory[threadIndex].ifInProfilerMemoryThenFree(addr)) {
                 return true;

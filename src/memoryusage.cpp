@@ -35,7 +35,7 @@ void MemoryUsage::addToMemoryUsage(unsigned int size, unsigned int newTouchePage
 //        }
 //        helpMarked[ThreadLocalStatus::runningThreadIndex] = true;
 //    }
-     if(maxGlobalMemoryUsage.isLowerThan(globalMemoryUsage, ONE_MB) && time(NULL) > lastTimeUpdated
+     if(maxGlobalMemoryUsage.isLowerThan(globalMemoryUsage, ONE_MB) && time(NULL) > lastTimeUpdated + 1
      && mtx.try_lock()) {
          lastTimeUpdated = time(NULL);
          maxGlobalMemoryUsage = globalMemoryUsage;

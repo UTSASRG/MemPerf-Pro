@@ -60,10 +60,10 @@ void Backtrace::init() {
 #endif
 }
 
-//uint8_t numberOfCK = 0;
-uint8_t keys[MAX_BT_ADDR_NUM];
-uint8_t numkeys = 0;
-spinlock debuglock;
+uint8_t numberOfCK;
+uint8_t keys[MAX_THREAD_NUMBER][MAX_BT_ADDR_NUM];
+uint8_t numkeys[MAX_THREAD_NUMBER];
+//spinlock debuglock;
 
 //void * returnAddr = (void*)*((uint64_t*)((uint64_t)stackTop+(uint64_t)284));
 //void * returnAddr = (void*)*((uint64_t*)((uint64_t)stackTop+(uint64_t)252));
@@ -74,16 +74,13 @@ uint8_t Backtrace::doABackTrace(unsigned int size) {
     uint8_t callsiteKey = (uint8_t)(ThreadLocalStatus::getStackOffset(stackTop)+(uint64_t)returnAddr);
     BackTraceMemory * status = BTMemMap.find(callsiteKey, sizeof(uint8_t));
     if(status == nullptr) {
-//        lock.lock();
-
-        debuglock.lock();
-        keys[numkeys++] = callsiteKey;
-        debuglock.unlock();
+//        debuglock.lock();
+//        debuglock.unlock();
         status = BTMemMap.insert(callsiteKey, sizeof(uint8_t), BackTraceMemory::newBackTraceMemory());
-
-
         status->numberOfFrame = backtrace(status->frames, 7);
-//        numberOfCK++;
+        numberOfCK++;
+
+        keys[ThreadLocalStatus::runningThreadIndex][numkeys[ThreadLocalStatus::runningThreadIndex]++] = callsiteKey;
 
 //        fprintf(stderr, "%d new key: %llu, %p, %llu, %p, %d\n", numberOfCK, callsiteKey, stackTop, ThreadLocalStatus::getStackOffset(stackTop), returnAddr, ThreadLocalStatus::runningThreadIndex);
 //        for(int f = 4; f < status->numberOfFrame; ++f) {
@@ -132,22 +129,25 @@ void Backtrace::recordMem() {
 
 void Backtrace::debugPrintOutput() {
 #ifdef OPEN_BACKTRACE
-    fprintf(stderr, "numkeys = %d\n", numkeys);
+    fprintf(stderr, "numkeys = %d\n", numberOfCK);
     uint8_t numOfBT = 0;
     BTAddrMemPair BTqueue[MAX_BT_ADDR_NUM];
-    for(uint8_t i = 0; i < numkeys; ++i) {
-        BackTraceMemory * status = BTMemMap.find(keys[i], sizeof(uint8_t));
-        if(status->memAllocated/1024 && status->memAllocated < MemoryUsage::maxRealMemoryUsage) {
-            BTqueue[numOfBT].memory = status->memAllocated/1024;
-            memcpy(BTqueue[numOfBT].frames, status->frames, 7*(sizeof(void*)));
-            BTqueue[numOfBT].numberOfFrame = status->numberOfFrame;
-            numOfBT++;
-            if(numOfBT >= MAX_BT_ADDR_NUM) {
-                fprintf(stderr, "increase BTqueue length\n");
-                abort();
+    for(unsigned short t = 0; t < ThreadLocalStatus::totalNumOfThread; ++t) {
+        for(uint8_t i = 0; i < numkeys[t]; ++i) {
+            BackTraceMemory * status = BTMemMap.find(keys[t][i], sizeof(uint8_t));
+            if(status->memAllocated/1024 && status->memAllocated < MemoryUsage::maxRealMemoryUsage) {
+                BTqueue[numOfBT].memory = status->memAllocated/1024;
+                memcpy(BTqueue[numOfBT].frames, status->frames, 7*(sizeof(void*)));
+                BTqueue[numOfBT].numberOfFrame = status->numberOfFrame;
+                numOfBT++;
+                if(numOfBT >= MAX_BT_ADDR_NUM) {
+                    fprintf(stderr, "increase BTqueue length\n");
+                    abort();
+                }
             }
         }
     }
+
 
     std::sort(BTqueue, BTqueue+numOfBT, compare);
 
@@ -174,16 +174,18 @@ void Backtrace::printOutput() {
 #ifdef OPEN_BACKTRACE
     uint8_t numOfBT = 0;
     BTAddrMemPair BTqueue[MAX_BT_ADDR_NUM];
-    for(uint8_t i = 0; i < numkeys; ++i) {
-        BackTraceMemory * status = BTMemMap.find(keys[i], sizeof(uint8_t));
-        if(status && status->memAllocated/1024 && status->memAllocated < MemoryUsage::maxRealMemoryUsage) {
-            BTqueue[numOfBT].memory = status->memAllocated/1024;
-            memcpy(BTqueue[numOfBT].frames, status->frames, 7*(sizeof(void*)));
-            BTqueue[numOfBT].numberOfFrame = status->numberOfFrame;
-            numOfBT++;
-            if(numOfBT >= MAX_BT_ADDR_NUM) {
-                fprintf(stderr, "increase BTqueue length\n");
-                abort();
+    for(unsigned short t = 0; t < ThreadLocalStatus::totalNumOfThread; ++t) {
+        for (uint8_t i = 0; i < numkeys[t]; ++i) {
+            BackTraceMemory *status = BTMemMap.find(keys[t][i], sizeof(uint8_t));
+            if (status && status->memAllocated / 1024 && status->memAllocated < MemoryUsage::maxRealMemoryUsage) {
+                BTqueue[numOfBT].memory = status->memAllocated / 1024;
+                memcpy(BTqueue[numOfBT].frames, status->frames, 7 * (sizeof(void *)));
+                BTqueue[numOfBT].numberOfFrame = status->numberOfFrame;
+                numOfBT++;
+                if (numOfBT >= MAX_BT_ADDR_NUM) {
+                    fprintf(stderr, "increase BTqueue length\n");
+                    abort();
+                }
             }
         }
     }

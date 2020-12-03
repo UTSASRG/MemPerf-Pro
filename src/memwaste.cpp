@@ -99,7 +99,7 @@ void MemoryWasteStatus::updateStatus(MemoryWasteStatus newStatus) {
 }
 
 void MemoryWasteStatus::cleanAbnormalValues() {
-    for(unsigned int threadIndex = 0; threadIndex < (unsigned int)ThreadLocalStatus::totalNumOfThread; ++threadIndex) {
+    for(unsigned short threadIndex = 0; threadIndex < (unsigned int)ThreadLocalStatus::totalNumOfThread; ++threadIndex) {
         for(unsigned short classSizeIndex = 0; classSizeIndex < ProgramStatus::numberOfClassSizes; ++classSizeIndex) {
             if(internalFragment[arrayIndex(threadIndex, classSizeIndex)] > 0x1000000000) {
                 internalFragment[arrayIndex(threadIndex, classSizeIndex)] = 0;
