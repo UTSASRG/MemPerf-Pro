@@ -58,7 +58,7 @@
 
 #define MAX_THREAD_NUMBER 1024
 
-#define MAX_BT_ADDR_NUM 256
+#define MAX_BT_ADDR_NUM 160
 
 #define MAX_REGION_NUM 256
 

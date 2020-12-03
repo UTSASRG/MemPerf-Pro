@@ -13,12 +13,12 @@ thread_local PerfReadInfo Predictor::startCountingEvent;
 thread_local PerfReadInfo Predictor::stopCountingEvent;
 thread_local PerfReadInfo Predictor::countingEvent;
 
-thread_local uint64_t Predictor::numOfFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
+thread_local unsigned int Predictor::numOfFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
 thread_local uint64_t Predictor::functionCycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
 size_t Predictor::replacedFunctionCycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
 
-size_t Predictor::replacedMiddleObjectThreshold;
-size_t Predictor::replacedLargeObjectThreshold;
+unsigned short Predictor::replacedMiddleObjectThreshold;
+unsigned int Predictor::replacedLargeObjectThreshold;
 
 thread_local uint64_t Predictor::outsideStartCycle;
 thread_local uint64_t Predictor::outsideStopCycle;
@@ -39,7 +39,7 @@ void Predictor::globalInit() {
 
     memset(&countingEvent, 0, sizeof(PerfReadInfo));
 
-    memset(numOfFunctions, 0, sizeof(uint64_t) * NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA);
+    memset(numOfFunctions, 0, sizeof(unsigned int) * NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA);
     memset(functionCycles, 0, sizeof(uint64_t) * NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA);
 
     outsideCycle = 0;
@@ -49,7 +49,7 @@ void Predictor::globalInit() {
 void Predictor::threadInit() {
     memset(&countingEvent, 0, sizeof(PerfReadInfo));
 
-    memset(numOfFunctions, 0, sizeof(uint64_t) * NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA);
+    memset(numOfFunctions, 0, sizeof(unsigned int) * NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA);
     memset(functionCycles, 0, sizeof(uint64_t) * NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA);
 
     outsideCycle = 0;
@@ -63,7 +63,7 @@ void Predictor::cleanStageData() {
 
     memset(&countingEvent, 0, sizeof(PerfReadInfo));
 
-    memset(numOfFunctions, 0, sizeof(uint64_t) * NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA);
+    memset(numOfFunctions, 0, sizeof(unsigned int) * NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA);
     memset(functionCycles, 0, sizeof(uint64_t) * NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA);
 
     outsideCycle = 0;
@@ -243,7 +243,7 @@ void Predictor::fopenPredictorInfoFile() {
 
 void Predictor::readFunctionCyclesFromInfo(char*token) {
     if ((strcmp(token, "function_cycles")) == 0) {
-        for (unsigned int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; allocationType++) {
+        for (uint8_t allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; allocationType++) {
             token = strtok(NULL, " ");
             replacedFunctionCycles[allocationType] = (size_t) atoi(token);
         }
@@ -253,14 +253,14 @@ void Predictor::readFunctionCyclesFromInfo(char*token) {
 void Predictor::readMiddleObjectThresholdFromInfo(char*token) {
     if ((strcmp(token, "middle_object_threshold")) == 0) {
         token = strtok(NULL, " ");
-        replacedMiddleObjectThreshold = (size_t) atoi(token);
+        replacedMiddleObjectThreshold = (unsigned short) atoi(token);
     }
 }
 
 void Predictor::readLargeObjectThresholdFromInfo(char*token) {
     if ((strcmp(token, "large_object_threshold")) == 0) {
         token = strtok(NULL, " ");
-        replacedLargeObjectThreshold = (size_t) atoi(token);
+        replacedLargeObjectThreshold = (unsigned int) atoi(token);
     }
 }
 
@@ -290,4 +290,5 @@ void Predictor::readPredictorInfoFile() {
 void Predictor::openPredictorInfoFile() {
     fopenPredictorInfoFile();
     readPredictorInfoFile();
+    fclose(predictorInfoFile);
 }

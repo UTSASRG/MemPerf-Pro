@@ -17,9 +17,9 @@ private:
     static char inputInfoFileName[MAX_FILENAME_LEN];
     static FILE * inputInfoFile;
 
-    static size_t middleObjectThreshold;
-    static size_t largeObjectThreshold;
-    static size_t largeObjectAlignment;
+    static unsigned short middleObjectThreshold;
+    static unsigned int largeObjectThreshold;
+    static unsigned short largeObjectAlignment;
 
     static thread_local struct SizeClassSizeAndIndex cacheForGetClassSizeAndIndex;
 
@@ -45,8 +45,8 @@ public:
     static char outputFileName[MAX_FILENAME_LEN];
     static bool allocatorStyleIsBibop;
 
-    static unsigned int numberOfClassSizes;
-    static size_t classSizes[10000];
+    static unsigned short numberOfClassSizes;
+    static unsigned int classSizes[8270];
 
     static bool useHugePage;
 

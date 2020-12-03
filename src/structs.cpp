@@ -37,7 +37,7 @@ void SystemCallData::debugPrint() {
 
 void OverviewLockData::add(OverviewLockData newOverviewLockData) {
     numOfLocks += newOverviewLockData.numOfLocks;
-    for(unsigned short allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
+    for(uint8_t allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
         numOfCalls[allocationType] += newOverviewLockData.numOfCalls[allocationType];
         numOfCallsWithContentions[allocationType] += newOverviewLockData.numOfCallsWithContentions[allocationType];
         totalCycles[allocationType] += newOverviewLockData.totalCycles[allocationType];
@@ -47,7 +47,7 @@ void OverviewLockData::add(OverviewLockData newOverviewLockData) {
 #ifdef OPEN_DEBUG
 void OverviewLockData::debugPrint() {
     fprintf(stderr, "num of locks = %u\n", numOfLocks);
-    for(unsigned short allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
+    for(uint8_t allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
         fprintf(stderr, "num of calls = %u, num of calls with contentions = %u, total cycles = %lu\n",
                 numOfCalls[allocationType], numOfCallsWithContentions[allocationType], totalCycles[allocationType]);
     }
@@ -72,7 +72,7 @@ void DetailLockData::quitFromContending() {
 }
 
 bool DetailLockData::isAnImportantLock() {
-    for(unsigned short allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
+    for(uint8_t allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
         if(GlobalStatus::numOfSampledCountingFunctions[allocationType] && cycles[allocationType]/GlobalStatus::numOfSampledCountingFunctions[allocationType] > 500) {
             return true;
         }
@@ -82,7 +82,7 @@ bool DetailLockData::isAnImportantLock() {
 
 void DetailLockData::add(DetailLockData newDetailLockData) {
     lockType = newDetailLockData.lockType;
-    for(unsigned short allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
+    for(uint8_t allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
         numOfCalls[allocationType] += newDetailLockData.numOfCalls[allocationType];
         numOfCallsWithContentions[allocationType] += newDetailLockData.numOfCallsWithContentions[allocationType];
         cycles[allocationType] += newDetailLockData.cycles[allocationType];
@@ -108,7 +108,7 @@ void FriendlinessStatus::add(FriendlinessStatus newFriendlinessStatus) {
     totalMemoryUsageOfSampledCacheLines += newFriendlinessStatus.totalMemoryUsageOfSampledCacheLines;
     numOfSampledStoringInstructions += newFriendlinessStatus.numOfSampledStoringInstructions;
     numOfSampledCacheLines += newFriendlinessStatus.numOfSampledCacheLines;
-    for(unsigned short falseSharingType = 0; falseSharingType < NUM_OF_FALSESHARINGTYPE; ++falseSharingType) {
+    for(uint8_t falseSharingType = 0; falseSharingType < NUM_OF_FALSESHARINGTYPE; ++falseSharingType) {
         numOfSampledFalseSharingInstructions[falseSharingType] += newFriendlinessStatus.numOfSampledFalseSharingInstructions[falseSharingType];
         numOfSampledFalseSharingCacheLines[falseSharingType] += newFriendlinessStatus.numOfSampledFalseSharingCacheLines[falseSharingType];
     }

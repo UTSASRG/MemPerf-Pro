@@ -148,8 +148,10 @@ void AllocatingStatus::stopCountCountingEvents() {
 
 void AllocatingStatus::updateAllocatingStatusAfterRealFunction(void * objectAddress) {
     stopCountCountingEvents();
-    updateAllocatingTypeAfterRealFunction(objectAddress);
-    updateMemoryStatusAfterAllocation();
+    if(allocatingType.allocatingFunction == MALLOC || allocatingType.allocatingFunction == REALLOC) {
+        updateAllocatingTypeAfterRealFunction(objectAddress);
+        updateMemoryStatusAfterAllocation();
+    }
     allocatingType.doingAllocation = false;
 }
 
@@ -159,11 +161,10 @@ void AllocatingStatus::updateFreeingStatusAfterRealFunction() {
 }
 
 void AllocatingStatus::updateMemoryStatusAfterAllocation() {
-    uint64_t callsiteKey = 0;
+
+    uint8_t callsiteKey = 0;
 #ifdef OPEN_BACKTRACE
-    if(allocatingType.allocatingFunction == MALLOC) {
         callsiteKey = Backtrace::doABackTrace(allocatingType.objectSize);
-    }
 #endif
     allocatingType.allocatingTypeGotFromMemoryWaste = MemoryWaste::allocUpdate(allocatingType.objectSize, allocatingType.objectAddress, callsiteKey);
     allocatingType.allocatingTypeGotFromShadowMemory.objectNewTouchedPageSize = ShadowMemory::updateObject(allocatingType.objectAddress, allocatingType.objectSize, false);
@@ -172,8 +173,10 @@ void AllocatingStatus::updateMemoryStatusAfterAllocation() {
 
 void AllocatingStatus::updateMemoryStatusBeforeFree() {
     allocatingType.switchFreeingTypeGotFromMemoryWaste(MemoryWaste::freeUpdate(allocatingType.objectAddress));
-    allocatingType.allocatingTypeGotFromShadowMemory.objectNewTouchedPageSize = ShadowMemory::updateObject(allocatingType.objectAddress, allocatingType.objectSize, true);
-    MemoryUsage::subRealSizeFromMemoryUsage(allocatingType.objectSize);
+    if(allocatingType.objectSize) {
+        allocatingType.allocatingTypeGotFromShadowMemory.objectNewTouchedPageSize = ShadowMemory::updateObject(allocatingType.objectAddress, allocatingType.objectSize, true);
+        MemoryUsage::subRealSizeFromMemoryUsage(allocatingType.objectSize);
+    }
 }
 
 void AllocatingStatus::setAllocationTypeForOutputData() {

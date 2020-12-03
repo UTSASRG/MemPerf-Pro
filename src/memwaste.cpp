@@ -16,10 +16,10 @@ size_t ObjectStatus::internalFragment() {
     return sizeClassSizeAndIndex.classSize - unusedPageSize - sizeClassSizeAndIndex.size;
 }
 
-ObjectStatus ObjectStatus::newObjectStatus() {
-    ObjectStatus newObjectStatus;
-    return newObjectStatus;
-}
+//ObjectStatus ObjectStatus::newObjectStatus() {
+//    ObjectStatus newObjectStatus;
+//    return newObjectStatus;
+//}
 
 ObjectStatus ObjectStatus::newObjectStatus(SizeClassSizeAndIndex sizeClassSizeAndIndex, unsigned int maxTouchBytes) {
     ObjectStatus newObjectStatus;
@@ -74,7 +74,7 @@ void MemoryWasteStatus::initialize() {
 void MemoryWasteStatus::debugPrint() {
     for(unsigned int threadIndex = 0; threadIndex < 40; ++threadIndex) {
         fprintf(stderr, "thread %d: ", threadIndex);
-        for(unsigned int classSizeIndex = 0; classSizeIndex < ProgramStatus::numberOfClassSizes; ++classSizeIndex) {
+        for(unsigned short classSizeIndex = 0; classSizeIndex < ProgramStatus::numberOfClassSizes; ++classSizeIndex) {
             if(ProgramStatus::classSizes[classSizeIndex] == 1024)
             fprintf(stderr, "%ld ", internalFragment[arrayIndex(threadIndex, classSizeIndex)]);
         }
@@ -100,7 +100,7 @@ void MemoryWasteStatus::updateStatus(MemoryWasteStatus newStatus) {
 
 void MemoryWasteStatus::cleanAbnormalValues() {
     for(unsigned int threadIndex = 0; threadIndex < (unsigned int)ThreadLocalStatus::totalNumOfThread; ++threadIndex) {
-        for(unsigned int classSizeIndex = 0; classSizeIndex < ProgramStatus::numberOfClassSizes; ++classSizeIndex) {
+        for(unsigned short classSizeIndex = 0; classSizeIndex < ProgramStatus::numberOfClassSizes; ++classSizeIndex) {
             if(internalFragment[arrayIndex(threadIndex, classSizeIndex)] > 0x1000000000) {
                 internalFragment[arrayIndex(threadIndex, classSizeIndex)] = 0;
             }
@@ -234,7 +234,7 @@ void MemoryWaste::initialize() {
 }
 
 
-AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(unsigned int size, void * address, uint64_t callsiteKey) {
+AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(unsigned int size, void * address, uint8_t callsiteKey) {
     bool reused;
     ObjectStatus * status;
 
@@ -276,12 +276,12 @@ AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(unsigned int size, voi
     }
     currentStatus.internalFragment[arrayIndex()] += (int64_t)status->internalFragment();
 #ifdef OPEN_BACKTRACE
-    if(callsiteKey) {
+//    if(callsiteKey) {
         status->callsiteKey = callsiteKey;
         #ifdef PRINT_LEAK_OBJECTS
         status->allocated = true;
         #endif
-    }
+//    }
 #endif
     status->tid = ThreadLocalStatus::runningThreadIndex;
     hashLocksSet.unlock(address);
@@ -311,10 +311,10 @@ AllocatingTypeWithSizeGotFromMemoryWaste MemoryWaste::freeUpdate(void* address) 
 
     currentStatus.internalFragment[arrayIndex()] -= (int64_t)status->internalFragment();
 #ifdef OPEN_BACKTRACE
-    if(status->callsiteKey) {
+//    if(status->callsiteKey) {
         Backtrace::subMem(status->callsiteKey, status->sizeClassSizeAndIndex.size);
-        status->callsiteKey = 0;
-    }
+//        status->callsiteKey = 0;
+//    }
 #ifdef PRINT_LEAK_OBJECTS
     status->allocated = false;
 #endif
@@ -391,7 +391,7 @@ void MemoryWaste::printOutput() {
             continue;
         }
         if(classSizeIndex != ProgramStatus::numberOfClassSizes - 1) {
-            fprintf(ProgramStatus::outputFile, "size: %10lu\t\t\t", ProgramStatus::classSizes[classSizeIndex]);
+            fprintf(ProgramStatus::outputFile, "size: %10u\t\t\t", ProgramStatus::classSizes[classSizeIndex]);
         } else {
             fprintf(ProgramStatus::outputFile, "large object:   \t\t\t");
         }
@@ -423,6 +423,7 @@ unsigned int MemoryWaste::arrayIndex(unsigned short threadIndex, unsigned short 
     return MemoryWasteStatus::arrayIndex(threadIndex, classSizeIndex);
 }
 
+#ifdef ENABLE_PRECISE_BLOWUP
 void MemoryWaste::changeBlowup(unsigned short classSizeIndex, int value) {
     currentStatus.blowupFlag[classSizeIndex] -= value;
 }
@@ -430,7 +431,7 @@ void MemoryWaste::changeBlowup(unsigned short classSizeIndex, int value) {
 void MemoryWaste::changeFreelist(unsigned short classSizeIndex, int value) {
     currentStatus.numOfActiveObjects.numOfFreelistObjects[classSizeIndex] -= value;
 }
-
+#endif
 //void MemoryWaste::detectMemoryLeak() {
 //#ifdef OPEN_BACKTRACE
 //    #ifdef PRINT_LEAK_OBJECTS

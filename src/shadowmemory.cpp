@@ -378,7 +378,7 @@ map_tuple ShadowMemory::getMapTupleByAddress(uintptr_t uintaddr) {
         page_index = ((uintaddr & MEGABYTE_MASK) >> LOG2_PAGESIZE);
         cache_index = ((uintaddr & PAGESIZE_MASK) >> LOG2_CACHELINE_SIZE);
 
-    return {mega_index, page_index, cache_index};
+    return {page_index, cache_index, mega_index};
 }
 
 #ifdef ENABLE_HP
@@ -417,7 +417,7 @@ void PageMapEntry::clear() {
 
 }
 
-unsigned short CacheMapEntry::getUsedBytes() {
+uint8_t CacheMapEntry::getUsedBytes() {
     if(num_used_bytes > CACHELINE_SIZE) {
         return CACHELINE_SIZE;
     }
@@ -887,11 +887,11 @@ void PageMapEntry::clearBlowup() {
 
 #endif
 
-inline void CacheMapEntry::addUsedBytes(unsigned short num_bytes) {
+inline void CacheMapEntry::addUsedBytes(uint8_t num_bytes) {
     num_used_bytes += num_bytes;
 }
 
-inline void CacheMapEntry::subUsedBytes(unsigned short num_bytes) {
+inline void CacheMapEntry::subUsedBytes(uint8_t num_bytes) {
     num_used_bytes -= num_bytes;
 }
 

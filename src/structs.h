@@ -68,8 +68,8 @@ struct DetailLockData {
     LockTypes     lockType;  // What is the lock type
     unsigned int numOfCalls[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];        // How many invocations
     unsigned int numOfCallsWithContentions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA]; // How many of them have the contention
-    unsigned int numOfContendingThreads;    // How many are waiting
-    unsigned int maxNumOfContendingThreads; // How many threads are contending on this lock
+    unsigned short numOfContendingThreads;    // How many are waiting
+    unsigned short maxNumOfContendingThreads; // How many threads are contending on this lock
     uint64_t cycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA]; // Total cycles
 
     static DetailLockData newDetailLockData(LockTypes lockType);

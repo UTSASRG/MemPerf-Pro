@@ -4,8 +4,8 @@ extern thread_local HashMap <void *, DetailLockData, PrivateHeap> lockUsage;
 extern HashMap <void *, DetailLockData, PrivateHeap> globalLockUsage;
 
 spinlock GlobalStatus::lock;
-uint64_t GlobalStatus::numOfFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
-uint64_t GlobalStatus::numOfSampledCountingFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
+unsigned int GlobalStatus::numOfFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
+unsigned int GlobalStatus::numOfSampledCountingFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
 PerfReadInfo GlobalStatus::countingEvents[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
 uint64_t GlobalStatus::cycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
 OverviewLockData GlobalStatus::overviewLockData[NUM_OF_LOCKTYPES];
@@ -79,9 +79,9 @@ void GlobalStatus::printTitle(char *content, uint64_t commentNumber) {
 
 void GlobalStatus::printNumOfAllocations() {
     printTitle((char*)"ALLOCATION NUM");
-    for(int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
+    for(uint8_t allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
         if(numOfFunctions[allocationType]) {
-            fprintf(ProgramStatus::outputFile, "%s           %20lu\n", allocationTypeOutputString[allocationType], numOfFunctions[allocationType]);
+            fprintf(ProgramStatus::outputFile, "%s           %20u\n", allocationTypeOutputString[allocationType], numOfFunctions[allocationType]);
         }
     }
     countPotentialMemoryLeakFunctions();

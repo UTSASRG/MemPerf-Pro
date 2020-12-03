@@ -16,18 +16,18 @@
 class ProgramStatus;
 
 struct ObjectStatus{
-    bool mark = false;
-    unsigned short tid;
-    SizeClassSizeAndIndex sizeClassSizeAndIndex;
-    unsigned int maxTouchedBytes = 0;
-#ifdef OPEN_BACKTRACE
-    uint64_t callsiteKey = 0;
-#endif
 #ifdef PRINT_LEAK_OBJECTS
     bool allocated = false;
 #endif
+    bool mark = false;
+#ifdef OPEN_BACKTRACE
+    uint8_t callsiteKey = 0;
+#endif
+    unsigned short tid;
+    SizeClassSizeAndIndex sizeClassSizeAndIndex;
+    unsigned int maxTouchedBytes = 0;
     size_t internalFragment();
-    static ObjectStatus newObjectStatus();
+//    static ObjectStatus newObjectStatus();
     static ObjectStatus newObjectStatus(SizeClassSizeAndIndex SizeClassSizeAndIndex, unsigned int maxTouchBytes);
 };
 
@@ -122,7 +122,7 @@ public:
 
     static void initialize();
 
-    static AllocatingTypeGotFromMemoryWaste allocUpdate(unsigned int size, void * address, uint64_t callsiteKey);
+    static AllocatingTypeGotFromMemoryWaste allocUpdate(unsigned int size, void * address, uint8_t callsiteKey);
     static AllocatingTypeWithSizeGotFromMemoryWaste freeUpdate(void* address);
 
     static void compareMemoryUsageAndRecordStatus(TotalMemoryUsage newTotalMemoryUsage);
@@ -132,10 +132,10 @@ public:
     static unsigned int arrayIndex();
     static unsigned int arrayIndex(unsigned short classSizeIndex);
     static unsigned int arrayIndex(unsigned short threadIndex, unsigned short classSizeIndex);
-
+#ifdef ENABLE_PRECISE_BLOWUP
     static void changeBlowup(unsigned short classSizeIndex, int value);
     static void changeFreelist(unsigned short classSizeIndex, int value);
-
+#endif
 //    static void detectMemoryLeak();
 
 };

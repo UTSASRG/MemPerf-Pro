@@ -3,8 +3,8 @@
 
 thread_local HashMap <void *, DetailLockData, PrivateHeap> lockUsage;
 HashMap <void *, DetailLockData, PrivateHeap> globalLockUsage;
-HashMap <uint64_t, BackTraceMemory, PrivateHeap> BTMemMap;
-HashMap <uint64_t, BackTraceMemory, PrivateHeap> BTMemMapRecord;
+HashMap <uint8_t, BackTraceMemory, PrivateHeap> BTMemMap;
+HashMap <uint8_t, BackTraceMemory, PrivateHeap> BTMemMapRecord;
 //HashMap <uint64_t, BackTraceContent, PrivateHeap> BTCttMap;
 HashMap <void*, ObjectStatus, PrivateHeap> objStatusMap;
 

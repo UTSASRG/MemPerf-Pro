@@ -32,12 +32,14 @@ class HashMap {
 
   // Each entry has a lock.
   struct HashBucket {
+
     list_t   list;
 #if LOCK_PROTECTION
     // Each entry has a separate lock
     LockType lock;
 #endif
-    size_t   count; // How many _bucketsTotal in this list
+//    size_t   count; // How many _bucketsTotal in this list
+      unsigned short count;
 
     void initialize() {
       count = 0;
@@ -60,17 +62,15 @@ class HashMap {
   struct Entry {
     list_t list;
     KeyType key;
-    size_t keylen;
     ValueType value;
 
-    void initialize(KeyType ikey = 0, int ikeylen = 0, ValueType ivalue = 0) {
+    void initialize(KeyType ikey = 0, ValueType ivalue = 0) {
       listInit(&list);
       key = ikey;
-      keylen = ikeylen;
       value = ivalue;
     }
 
-    void erase() { listRemoveNode(&list); }
+//    void erase() { listRemoveNode(&list); }
 
     struct Entry* nextEntry() { return (struct Entry*)list.next; }
 
@@ -82,9 +82,9 @@ class HashMap {
   bool _initialized;
   struct HashBucket* _buckets;
   size_t _bucketsTotal;     // How many buckets in total
-  size_t _bucketsTotalUsed; // How many buckets in use
+//  size_t _bucketsTotalUsed; // How many buckets in use
 
-  size_t _totalEntry;
+//  size_t _totalEntry;
 
   typedef bool (*keycmpFuncPtr)(const KeyType, const KeyType, size_t);
   typedef size_t (*hashFuncPtr)(const KeyType, size_t);
@@ -106,9 +106,9 @@ public:
 
   void initialize(hashFuncPtr hfunc, keycmpFuncPtr kcmp, const size_t size = 4096) {
     _buckets = NULL;
-    _bucketsTotalUsed = 0;
+//    _bucketsTotalUsed = 0;
     _bucketsTotal = size;
-    _totalEntry = 0;
+//    _totalEntry = 0;
 
     if(hfunc == NULL || kcmp == NULL) {
       abort();
@@ -131,7 +131,7 @@ public:
 
     // Initialize all of these _buckets.
     struct HashBucket* bucket;
-    for(size_t i = 0; i < size; i++) {
+    for(unsigned int i = 0; i < size; i++) {
       bucket = getHashBucket(i);
       bucket->initialize();
     }
@@ -167,73 +167,73 @@ public:
     return ret;
   }
  
-  void * findEntry(const KeyType& key, size_t keylen) {
-    size_t hindex = hashIndex(key, keylen);
-    struct HashBucket* first = getHashBucket(hindex);
-#if LOCK_PROTECTION
-    first->Lock();
-#endif
-    struct Entry* entry = getEntry(first, key, keylen);
-#if LOCK_PROTECTION
-    first->Unlock();
-#endif
+//  void * findEntry(const KeyType& key, size_t keylen) {
+//    size_t hindex = hashIndex(key, keylen);
+//    struct HashBucket* first = getHashBucket(hindex);
+//#if LOCK_PROTECTION
+//    first->Lock();
+//#endif
+//    struct Entry* entry = getEntry(first, key, keylen);
+//#if LOCK_PROTECTION
+//    first->Unlock();
+//#endif
+//
+//    return entry;
+//  }
 
-    return entry;
-  }
-
-  ValueType * getValueFromEntry(void * ptr) {
-    struct Entry * entry = (struct Entry *)ptr;
-
-    if(entry) {
-      return &entry->value;
-    }
-
-    return NULL;
-  }
+//  ValueType * getValueFromEntry(void * ptr) {
+//    struct Entry * entry = (struct Entry *)ptr;
+//
+//    if(entry) {
+//      return &entry->value;
+//    }
+//
+//    return NULL;
+//  }
 
   // this function is customized for call stack array
-  ValueType* findOrAdd(const KeyType& key, size_t keylen, ValueType newval){
-    ValueType* ret = NULL;
-    size_t hindex = hashIndex(key, keylen);
-    struct HashBucket* first = getHashBucket(hindex);
-    struct Entry* entry = getEntry(first, key, keylen);
-
-#if LOCK_PROTECTION
-    first->Lock();
-#endif
-    // Check all _buckets with the same hindex.
-    if(entry == NULL) {
-     // fprintf(stderr, "entry not exists. Now add the current one to the map\n");
-      // insert new call stack into map 
-      entry = insertEntry(first, key, keylen, newval);
-    }
-
-    // return the actual call stack value
-    ret = &entry->value;
-      //fprintf(stderr, "entry exists. Now return. ret %p\n", ret);
-    
-#if LOCK_PROTECTION
-    first->Unlock();
-#endif
-
-    return ret;
-  }
+//  ValueType* findOrAdd(const KeyType& key, size_t keylen, ValueType newval){
+//    ValueType* ret = NULL;
+//    size_t hindex = hashIndex(key, keylen);
+//    struct HashBucket* first = getHashBucket(hindex);
+//    struct Entry* entry = getEntry(first, key, keylen);
+//
+//#if LOCK_PROTECTION
+//    first->Lock();
+//#endif
+//    // Check all _buckets with the same hindex.
+//    if(entry == NULL) {
+//     // fprintf(stderr, "entry not exists. Now add the current one to the map\n");
+//      // insert new call stack into map
+//      entry = insertEntry(first, key, keylen, newval);
+//    }
+//
+//    // return the actual call stack value
+//    ret = &entry->value;
+//      //fprintf(stderr, "entry exists. Now return. ret %p\n", ret);
+//
+//#if LOCK_PROTECTION
+//    first->Unlock();
+//#endif
+//
+//    return ret;
+//  }
 
   ValueType * insert(const KeyType& key, size_t keylen, ValueType value) {
     ValueType* ret = NULL;
     struct Entry * entry; 
-    if(_initialized != true) {
-      fprintf(stderr, "process %d: initialized at  %p hashmap is not true\n", getpid(), this);
-      abort();
-    }
+//    if(_initialized != true) {
+//      fprintf(stderr, "process %d: initialized at  %p hashmap is not true\n", getpid(), this);
+//      abort();
+//    }
 
-    assert(_initialized == true);
+//    assert(_initialized == true);
     size_t hindex = hashIndex(key, keylen);
     struct HashBucket* first = getHashBucket(hindex);
 #if LOCK_PROTECTION
     first->Lock();
 #endif
-    entry = insertEntry(first, key, keylen, value);
+    entry = insertEntry(first, key, value);
     ret = &entry->value;
 #if LOCK_PROTECTION
     first->Unlock();
@@ -243,101 +243,104 @@ public:
 
   // Insert a hash table entry if it is not existing.
   // If the entry is already existing, return true
-  bool insertIfAbsent(const KeyType& key, size_t keylen, ValueType value) {
-    assert(_initialized == true);
-    size_t hindex = hashIndex(key, keylen);
-    struct HashBucket* first = getHashBucket(hindex);
-    struct Entry* entry;
-    bool isFound = true;
-
-#if LOCK_PROTECTION
-    first->Lock();
-#endif
-
-    // Check all _buckets with the same hindex.
-    entry = getEntry(first, key, keylen);
-    if(!entry) {
-      isFound = false;
-      insertEntry(first, key, keylen, value);
-    }
-
-#if LOCK_PROTECTION
-    first->Unlock();
-#endif
-    return isFound;
-  }
+//  bool insertIfAbsent(const KeyType& key, size_t keylen, ValueType value) {
+//    assert(_initialized == true);
+//    size_t hindex = hashIndex(key, keylen);
+//    struct HashBucket* first = getHashBucket(hindex);
+//    struct Entry* entry;
+//    bool isFound = true;
+//
+//#if LOCK_PROTECTION
+//    first->Lock();
+//#endif
+//
+//    // Check all _buckets with the same hindex.
+//    entry = getEntry(first, key, keylen);
+//    if(!entry) {
+//      isFound = false;
+//      insertEntry(first, key, keylen, value);
+//    }
+//
+//#if LOCK_PROTECTION
+//    first->Unlock();
+//#endif
+//    return isFound;
+//  }
 
   // Free an entry with specified key
-  bool erase(const KeyType& key, size_t keylen) {
-    assert(_initialized == true);
-    size_t hindex = hashIndex(key, keylen);
-    struct HashBucket* first = getHashBucket(hindex);
-    struct Entry* entry;
-    bool isFound = false;
+//  bool erase(const KeyType& key, size_t keylen) {
+//    assert(_initialized == true);
+//    size_t hindex = hashIndex(key, keylen);
+//    struct HashBucket* first = getHashBucket(hindex);
+//    struct Entry* entry;
+//    bool isFound = false;
+//
+//#if LOCK_PROTECTION
+//    first->Lock();
+//#endif
+//
+//    entry = getEntry(first, key, keylen);
+//
+//    if(entry) {
+//      isFound = true;
+//
+//      // Check whether this entry is the first entry.
+//      // Remove this entry if existing.
+//      entry->erase();
+//
+//      SourceHeap::free(entry);
+//    }
+//
+//    first->count--;
+//
+//#if LOCK_PROTECTION
+//    first->Unlock();
+//#endif
+//    return isFound;
+//  }
 
-#if LOCK_PROTECTION
-    first->Lock();
-#endif
-
-    entry = getEntry(first, key, keylen);
-
-    if(entry) {
-      isFound = true;
-
-      // Check whether this entry is the first entry.
-      // Remove this entry if existing.
-      entry->erase();
-
-      SourceHeap::free(entry);
-    }
-
-    first->count--;
-
-#if LOCK_PROTECTION
-    first->Unlock();
-#endif
-    return isFound;
-  }
-
-  size_t getEntryNumber() { return _totalEntry; }
+//  size_t getEntryNumber() { return _totalEntry; }
 
   // Clear all _buckets
-  void clear() {}
+//  void clear() {}
 
 private:
 
   // Create a new Entry with specified key and value.
-  struct Entry* createNewEntry(const KeyType& key, size_t keylen, ValueType value) {
+  struct Entry* createNewEntry(const KeyType& key, ValueType value) {
       struct Entry* entry = (struct Entry*)MyMalloc::hashMalloc(sizeof(struct Entry));
-
     if(entry == NULL) {
       fprintf(stderr, "fail to create entry\n");
       exit(0);
     }
     // Initialize this new entry.
-    entry->initialize(key, keylen, value);
+    entry->initialize(key, value);
     return entry;
   }
 
-  struct Entry* insertEntry(struct HashBucket* head, const KeyType& key, size_t keylen, ValueType value) {
+  struct Entry* insertEntry(struct HashBucket* head, const KeyType& key, ValueType value) {
     // Check whether the first entry is empty or not.
     // Create an entry
-    struct Entry* entry = createNewEntry(key, keylen, value);
+    struct Entry* entry = createNewEntry(key, value);
     listInsertTail(&entry->list, &head->list);
+//      fprintf(stderr, "entry = %p, %p, %lu\n", entry, entry->nextEntry(), sizeof(Entry));
     head->count++;
     // increment total number
-    __atomic_add_fetch(&_totalEntry, 1, __ATOMIC_RELAXED);
+//    __atomic_add_fetch(&_totalEntry, 1, __ATOMIC_RELAXED);
     return entry;
   }
 
   // Search the entry in the corresponding list.
   struct Entry* getEntry(struct HashBucket* first, const KeyType& key, size_t keylen) {
     struct Entry* entry = (struct Entry*)first->getFirstEntry();
-    struct Entry* result = NULL;
-    // Check all _buckets with the same hindex.
-    int count = first->count;
-    while(count > 0) {
-      if(_keycmp(entry->key, key, keylen) && (entry->keylen == keylen)) {
+//      fprintf(stderr, "first = %p, entry = %p\n", first, entry);
+      struct Entry* result = NULL;
+      // Check all _buckets with the same hindex.
+      unsigned short count = first->count;
+      while(count > 0) {
+//      if(_keycmp(entry->key, key, keylen) && (entry->keylen == keylen)) {
+        if(_keycmp(entry->key, key, keylen)) {
+
         result = entry;
         break;
       }

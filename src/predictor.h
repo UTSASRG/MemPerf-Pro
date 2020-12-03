@@ -18,12 +18,12 @@ public:
     static thread_local PerfReadInfo startCountingEvent;
     static thread_local PerfReadInfo stopCountingEvent;
     static thread_local PerfReadInfo countingEvent;
-    static thread_local uint64_t numOfFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
+    static thread_local unsigned int numOfFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
     static thread_local uint64_t functionCycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
     static size_t replacedFunctionCycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];///avg
 
-    static size_t replacedMiddleObjectThreshold;
-    static size_t replacedLargeObjectThreshold;
+    static unsigned short replacedMiddleObjectThreshold;
+    static unsigned int replacedLargeObjectThreshold;
     static thread_local uint64_t outsideStartCycle;
     static thread_local uint64_t outsideStopCycle;
     static thread_local uint64_t outsideCycle;

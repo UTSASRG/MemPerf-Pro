@@ -263,8 +263,10 @@ bool MyMalloc::ifInProfilerMemoryThenFree(void * addr) {
 void * MyMalloc::hashMalloc(size_t size) {
     void * object;
     if(threadLocalHashMemoryInitialized()) {
+//        fprintf(stderr, "here");
         object = threadLocalProfilerHashMemory[ThreadLocalStatus::runningThreadIndex].malloc(size);
     } else {
+//        fprintf(stderr, "here2");
         object = profilerHashMemory.malloc(size);
     }
     return object;

@@ -105,13 +105,14 @@ class CacheMapEntry {
     bool justFreedButRemainedSomeData = false;
     bool sampled = false;
     FalseSharingType falseSharingStatus = OBJECT;
+    uint8_t num_used_bytes;
     short lastWriterThreadIndex = -1;
     short lastAllocatingThreadIndex = -1;
     short lastFreeThreadIndex = -1;
-    short num_used_bytes;
-    unsigned short getUsedBytes();
-				void addUsedBytes(unsigned short num_bytes);
-				void subUsedBytes(unsigned short num_bytes);
+//    uint8_t num_used_bytes;
+    uint8_t getUsedBytes();
+				void addUsedBytes(uint8_t num_bytes);
+				void subUsedBytes(uint8_t num_bytes);
 				void setFull();
 				void setEmpty();
 };

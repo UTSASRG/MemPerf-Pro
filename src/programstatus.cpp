@@ -6,9 +6,9 @@ char ProgramStatus::matrixFileName[MAX_FILENAME_LEN];
 char ProgramStatus::inputInfoFileName[MAX_FILENAME_LEN];
 FILE * ProgramStatus::inputInfoFile;
 char ProgramStatus::outputFileName[MAX_FILENAME_LEN];
-size_t ProgramStatus::middleObjectThreshold;
-size_t ProgramStatus::largeObjectThreshold;
-size_t ProgramStatus::largeObjectAlignment;
+unsigned short ProgramStatus::middleObjectThreshold;
+unsigned int ProgramStatus::largeObjectThreshold;
+unsigned short ProgramStatus::largeObjectAlignment;
 thread_local struct SizeClassSizeAndIndex ProgramStatus::cacheForGetClassSizeAndIndex;
 
 char ProgramStatus::programName[256];
@@ -16,8 +16,8 @@ bool ProgramStatus::matrixFileOpened;
 FILE * ProgramStatus::matrixFile;
 FILE * ProgramStatus::outputFile;
 bool ProgramStatus::allocatorStyleIsBibop;
-unsigned int ProgramStatus::numberOfClassSizes;
-size_t ProgramStatus::classSizes[10000];
+unsigned short ProgramStatus::numberOfClassSizes;
+unsigned int ProgramStatus::classSizes[8270];
 
 
 void ProgramStatus::setProfilerInitializedTrue() {
@@ -104,13 +104,14 @@ void ProgramStatus::readAllocatorClassSizesFromInfo(char * token) {
         numberOfClassSizes = atoi(token);
 
         if(allocatorStyleIsBibop) {
-            for (unsigned int i = 0; i < numberOfClassSizes; i++) {
+            for (unsigned short i = 0; i < numberOfClassSizes; i++) {
                 token = strtok(NULL, " ");
-                classSizes[i] = (size_t) atoi(token);
+                classSizes[i] = (unsigned int) atoi(token);
             }
         } else {
-            for (unsigned int i = 0; i < numberOfClassSizes; i++) {
-                classSizes[i] = (size_t) 24 + 16 * i;
+            classSizes[0] = 24;
+            for (unsigned short i = 1; i < numberOfClassSizes; i++) {
+                classSizes[i] = classSizes[i-1] + 16;
             }
         }
     }
@@ -120,21 +121,21 @@ void ProgramStatus::readAllocatorClassSizesFromInfo(char * token) {
 void ProgramStatus::readMiddleObjectThresholdFromInfo(char *token) {
     if ((strcmp(token, "middle_object_threshold")) == 0) {
         token = strtok(NULL, " ");
-        middleObjectThreshold = (size_t) atoi(token);
+        middleObjectThreshold = (unsigned short) atoi(token);
     }
 }
 
 void ProgramStatus::readLargeObjectThresholdFromInfo(char * token) {
     if ((strcmp(token, "large_object_threshold")) == 0) {
         token = strtok(NULL, " ");
-        largeObjectThreshold = (size_t) atoi(token);
+        largeObjectThreshold = (unsigned int) atoi(token);
     }
 }
 
 void ProgramStatus::readLargeObjectAlignmentFromInfo(char *token) {
     if ((strcmp(token, "large_object_alignment")) == 0) {
         token = strtok(NULL, " ");
-        largeObjectAlignment = (size_t) atoi(token);
+        largeObjectAlignment = (unsigned short) atoi(token);
     }
 }
 
@@ -160,6 +161,7 @@ void ProgramStatus::openInputInfoFile(char * runningApplicationName) {
     ProgramStatus::getInputInfoFileName(runningApplicationName);
     ProgramStatus::fopenInputInfoFile();
     ProgramStatus::readInputInfoFile();
+    fclose(inputInfoFile);
 }
 
 void ProgramStatus::openOutputFile() {
@@ -183,7 +185,7 @@ void ProgramStatus::initIO(char * runningApplicationName) {
 }
 
 void ProgramStatus::printLargeObjectThreshold() {
-    fprintf(outputFile, ">>> large_object_threshold                  %20zu\n", largeObjectThreshold);
+    fprintf(outputFile, ">>> large_object_threshold                  %20u\n", largeObjectThreshold);
 }
 
 void ProgramStatus::printOutput() {
@@ -202,6 +204,10 @@ ObjectSizeType ProgramStatus::getObjectSizeType(unsigned int size) {
         return MEDIUM;
     }
     return SMALL;
+}
+
+inline size_t alignup(size_t size, size_t alignto) {
+    return (size % alignto == 0) ? size : ((size + (alignto - 1)) & ~(alignto - 1));
 }
 
 SizeClassSizeAndIndex ProgramStatus::getClassSizeAndIndex(unsigned int size) {

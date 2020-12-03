@@ -26,7 +26,6 @@
 using namespace std;
 
 
-
 struct regioninfo {
   void* start;
   void* end;
@@ -55,10 +54,6 @@ public:
 	_file(file) {}
 
   bool valid() const { return _valid; }
-
-  bool isText() const { return _readable && !_writable && _executable; }
-
-  bool isStack() const { return _file == "[stack]"; }
 
   bool isGlobals(std::string mainfile) const {
     // global mappings are RW_P, and either the heap, or the mapping is backed
@@ -131,10 +126,8 @@ static std::ifstream& operator>>(std::ifstream& f, mapping& m) {
   return f;
 }
 
-extern mapping maps[MAX_REGION_NUM];
-extern unsigned short numOfMaps;
 extern regioninfo regions[MAX_REGION_NUM];
-extern unsigned short numOfRegion;
+extern uint8_t numOfRegion;
 
 class selfmap {
 public:
@@ -144,27 +137,32 @@ public:
     return *theOneTrueObject;
   }
 
-  /// Check whether an address is inside the DoubleTake library itself.
-  bool isDoubleTakeLibrary(void* pcaddr) {
-    return ((pcaddr >= _doubletakeStart) && (pcaddr <= _doubletakeEnd));
-  }
-
-  /// Check whether an address is inside the main application.
-  bool isApplication(void* pcaddr) {
-    return ((pcaddr >= _appTextStart) && (pcaddr <= _appTextEnd));
-  }
-
-  // Print out the code information about an eip address.
-  // Also try to print out the stack trace of given pcaddr.
-  void printCallStack();
-  void printCallStack(int depth, void** array);
-  static int getCallStack(void** array);
-
   /// Collect all global regions.
   void getGlobalRegions() {
+      mapping maps[MAX_REGION_NUM];
+      uint8_t numOfMaps;
+
+      bool gotMainExe = false;
+      ifstream maps_file("/proc/self/maps");
+      numOfMaps = 0;
+      while(maps_file.good() && !maps_file.eof()) {
+          mapping m;
+          maps_file >> m;
+          if(!gotMainExe) {
+              _main_exe = std::string(m.getFile());
+//				fprintf(stderr, "exe = %s\n", _main_exe.c_str());
+              gotMainExe = true;
+          }
+
+          if(m.valid()) {
+              maps[numOfMaps++] = m;
+          }
+      }
+
+
     size_t index = 0;
       numOfRegion = 0;
-    for(unsigned short i = 0; i < numOfMaps; ++i) {
+    for(uint8_t i = 0; i < numOfMaps; ++i) {
       mapping m = maps[i];
 
       if(m.isGlobals(_main_exe) && m.getFile().find("libmallocprof") == std::string::npos) {
@@ -175,31 +173,14 @@ public:
         index++;
       }
     }
+
+//    while(1) {;}
   }
 
   selfmap() {
-      bool gotMainExe = false;
-    ifstream maps_file("/proc/self/maps");
-    numOfMaps = 0;
-    while(maps_file.good() && !maps_file.eof()) {
-      mapping m;
-      maps_file >> m;
-			if(!gotMainExe) {
-				_main_exe = std::string(m.getFile());
-				gotMainExe = true;
-			} 
-
-      if(m.valid()) {
-          maps[numOfMaps++] = m;
-      }
-    }
   }
 
     std::string _main_exe;
-  void* _appTextStart;
-  void* _appTextEnd;
-  void* _doubletakeStart;
-  void* _doubletakeEnd;
 };
 
 

@@ -88,7 +88,7 @@ void leakcheck::sweep() {
 }
 
 void leakcheck::searchHeapPointersInsideGlobals() {
-    for(unsigned short i = 0; i < numOfRegion; ++i) {
+    for(uint8_t i = 0; i < numOfRegion; ++i) {
         regioninfo r = regions[i];
         searchHeapPointers((unsigned long)r.start, (unsigned long)r.end);
     }

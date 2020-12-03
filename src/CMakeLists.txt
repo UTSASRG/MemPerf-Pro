@@ -30,7 +30,6 @@ add_executable(mmprof
         hashmap.hh
         libmallocprof.cpp
         libmallocprof.h
-        list.hh
         memsample.c
         memsample.h
         real.cpp
