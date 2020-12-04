@@ -49,7 +49,7 @@ void exitHandler() {
 // MallocProf's main function
 int libmallocprof_main(int argc, char ** argv, char ** envp) {
     selfmap::getInstance().getGlobalRegions();
-    initPMU();
+//    initPMU();
     RealX::initializer();
     ShadowMemory::initialize();
     ThreadLocalStatus::setStackStartAddress(&argc);
@@ -88,6 +88,8 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
 
     atexit(exitHandler);
 
+    initPMU();
+
 	return real_main_mallocprof (argc, argv, envp);
 }
 
@@ -113,7 +115,9 @@ extern "C" {
             return RealX::malloc(sz);
         }
         if(AllocatingStatus::isFirstFunction()) {
+            pauseSampling();
             setupCounting();
+            restartSampling();
         }
 
 
@@ -167,7 +171,9 @@ extern "C" {
             return RealX::free(ptr);
         }
         if(AllocatingStatus::isFirstFunction()) {
+            pauseSampling();
             setupCounting();
+            restartSampling();
         }
         Predictor::outsideCyclesStop();
         AllocatingStatus::updateFreeingStatusBeforeRealFunction(FREE, ptr);

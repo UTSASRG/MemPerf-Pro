@@ -142,8 +142,9 @@ void ProgramStatus::readLargeObjectAlignmentFromInfo(char *token) {
 
 void ProgramStatus::readInputInfoFile() {
 
-    size_t bufferSize = 65535;
-    char * buffer = (char*)MyMalloc::malloc(bufferSize);
+    size_t bufferSize = 53248;
+//    char * buffer = (char*)MyMalloc::malloc(bufferSize);
+    char * buffer = (char*)RealX::mmap(NULL, bufferSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
     while (getline(&buffer, &bufferSize, ProgramStatus::inputInfoFile) > 0) {
         char *token = strtok(buffer, " ");
@@ -155,6 +156,8 @@ void ProgramStatus::readInputInfoFile() {
             readLargeObjectAlignmentFromInfo(token);
         }
     }
+
+    munmap(buffer, bufferSize);
 }
 
 void ProgramStatus::openInputInfoFile(char * runningApplicationName) {

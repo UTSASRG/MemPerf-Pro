@@ -36,8 +36,6 @@ void * xthreadx::startThread(void * arg) {
         abort();
     }
 
-    initPMU();
-
     ThreadLocalStatus::setStackStartAddress(&arg);
     ThreadLocalStatus::getARunningThreadIndex();
 
@@ -65,6 +63,9 @@ void * xthreadx::startThread(void * arg) {
     Predictor::outsideCountingEventsStart();
     Predictor::outsideCycleStart();
     ProgramStatus::setProfilerInitializedTrue();
+
+    initPMU();
+
     result = current->startRoutine(current->startArg);
     threadExit();
 

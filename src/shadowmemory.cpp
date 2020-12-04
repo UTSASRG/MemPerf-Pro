@@ -895,13 +895,13 @@ inline void CacheMapEntry::subUsedBytes(uint8_t num_bytes) {
     num_used_bytes -= num_bytes;
 }
 
-inline void CacheMapEntry::setFull() {
-    num_used_bytes = CACHELINE_SIZE;
-}
-
-inline void CacheMapEntry::setEmpty() {
-    num_used_bytes = 0;
-}
+//inline void CacheMapEntry::setFull() {
+//    num_used_bytes = CACHELINE_SIZE;
+//}
+//
+//inline void CacheMapEntry::setEmpty() {
+//    num_used_bytes = 0;
+//}
 
 const char * boolToStr(bool p) {
 		return (p ? "true" : "false");

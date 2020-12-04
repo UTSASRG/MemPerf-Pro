@@ -23,13 +23,13 @@
 #define ONE_MB 1048576l
 #define ONE_GB 1073741824l
 #define MAX_FILENAME_LEN 256
-#define TEMP_BUF_SIZE 8*ONE_MB
 
 #define CACHELINE_SIZE 64
 #define PAGESIZE 4096
 #define PAGESIZE_HUGE 2*ONE_MB
 #define SAMPLING_PERIOD 10000
-#define MMAP_PAGES 257 // must be in the form of 2^N + 1
+//#define MMAP_PAGES 257 // must be in the form of 2^N + 1
+#define MMAP_PAGES 129 // must be in the form of 2^N + 1
 #define DATA_MMAP_PAGES (MMAP_PAGES - 1)
 #define MAPSIZE (MMAP_PAGES * PAGESIZE)
 #define DATA_MAPSIZE (DATA_MMAP_PAGES * PAGESIZE)
@@ -52,8 +52,6 @@
 
 #define ABNORMAL_VALUE 100000000l
 #define MAX_OBJ_NUM 4194304
-#define MAX_LEAK_NUM 1000000
-//#define MAX_OBJ_NUM 4000000
 #define MAX_LOCK_NUM 512
 
 #define MAX_THREAD_NUMBER 1024

@@ -113,8 +113,8 @@ class CacheMapEntry {
     uint8_t getUsedBytes();
 				void addUsedBytes(uint8_t num_bytes);
 				void subUsedBytes(uint8_t num_bytes);
-				void setFull();
-				void setEmpty();
+//				void setFull();
+//				void setEmpty();
 };
 
 class PageMapEntry {

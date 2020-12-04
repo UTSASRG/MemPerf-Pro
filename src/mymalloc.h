@@ -14,12 +14,12 @@
 
 struct ProfilerMemory {
 
-   char startPointer[PROFILER_MEMORY_SIZE];
-    void * endPointer;
-    void * overheadPointer;
-    uint64_t objectNum = 0;
     spinlock lock;
     bool initialized = false;
+   char startPointer[PROFILER_MEMORY_SIZE];
+    unsigned int objectNum = 0;
+    void * endPointer;
+    void * overheadPointer;
 
     void initialize();
     void checkAndInitialize();
@@ -34,12 +34,13 @@ struct ProfilerMemory {
 
 struct MMAPProfilerMemory {
 
+    bool initialized = false;
+    unsigned int objectNum = 0;
     void * startPointer;
     void * endPointer;
     void * overheadPointer;
-    uint64_t objectNum = 0;
     size_t currentSize;
-    bool initialized = false;
+
 
     void initialize(size_t setSize);
     void finalize();

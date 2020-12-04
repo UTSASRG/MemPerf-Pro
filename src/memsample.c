@@ -148,7 +148,7 @@ void setupCounting(void) {
     perfInfo.perf_fd_instr = create_perf_event(&pe_instr, perfInfo.perf_fd_fault);
 
     if(!isCountingInit) {
-        fprintf(stderr, "Warning: Failed to open perf event %s\n", strerror(errno));
+//        fprintf(stderr, "Warning: Failed to open perf event %s\n", strerror(errno));
         close(perfInfo.perf_fd_fault);
         close(perfInfo.perf_fd_cache);
         close(perfInfo.perf_fd_instr);
@@ -360,6 +360,38 @@ void stopSampling(void) {
     }
     if(close(perfInfo.perf_fd2) == -1) {
         fprintf(stderr, "Unable to close perf_fd2 file descriptor: %s\n", strerror(errno));
+    }
+}
+
+void pauseSampling() {
+    if(!isSamplingInit) {
+        return;
+    }
+
+    isSamplingInit = false;
+
+    if(ioctl(perfInfo.perf_fd, PERF_EVENT_IOC_DISABLE, 0) == -1) {
+        fprintf(stderr, "Failed to disable perf event: %s\n", strerror(errno));
+    }
+    if(ioctl(perfInfo.perf_fd2, PERF_EVENT_IOC_DISABLE, 0) == -1) {
+        fprintf(stderr, "Failed to disable perf event: %s\n", strerror(errno));
+    }
+}
+
+void restartSampling() {
+    if(isSamplingInit) {
+        return;
+    }
+    isSamplingInit = true;
+    if(ioctl(perfInfo.perf_fd, PERF_EVENT_IOC_ENABLE, PERF_IOC_FLAG_GROUP) == -1) {
+        fprintf(stderr, "Failed to enable perf event w/ fd %d, line %d: %s\n",
+                perfInfo.perf_fd, __LINE__, strerror(errno));
+        abort();
+    }
+    if(ioctl(perfInfo.perf_fd2, PERF_EVENT_IOC_ENABLE, PERF_IOC_FLAG_GROUP) == -1) {
+        fprintf(stderr, "Failed to enable perf event w/ fd %d, line %d: %s\n",
+                perfInfo.perf_fd2, __LINE__, strerror(errno));
+        abort();
     }
 }
 

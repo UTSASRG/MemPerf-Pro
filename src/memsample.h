@@ -44,6 +44,8 @@ void initPMU(void);
 void setupCounting(void);
 void setupSampling(void);
 void stopSampling(void);
+void pauseSampling(void);
+void restartSampling(void);
 void stopCounting(void);
 void doSampleRead();
 void getPerfCounts(PerfReadInfo*);
