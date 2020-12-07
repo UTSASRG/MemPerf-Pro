@@ -67,6 +67,7 @@ void leakcheck::sweep() {
 //    for(unsigned int i = 0; i < MAX_OBJ_NUM; ++i) {
 //        MemoryWaste::hashLocksSet.locks[i].lock();
 //    }
+
     for(auto entryInHashTable: objStatusMap) {
         MemoryWaste::hashLocksSet.lock((void*)entryInHashTable.getKey());
         ObjectStatus* object = entryInHashTable.getValue();
@@ -76,6 +77,8 @@ void leakcheck::sweep() {
         } else if (object->allocated && object->tid == ThreadLocalStatus::runningThreadIndex) {
 //            fprintf(stderr, "leaked\n");
             _totalLeakageSize += object->sizeClassSizeAndIndex.size;
+//          fprintf(stderr, "%lu free: %p\n", ThreadLocalStatus::runningThreadIndex, entryInHashTable.getKey());
+//          RealX::free(entryInHashTable.getKey());
         } else {
 //            fprintf(stderr, "freed\n");
         }
@@ -128,6 +131,7 @@ void leakcheck::searchHeapPointers(ucontext_t* context) {
 
 void leakcheck::searchHeapPointersInsideStack(void* start) {
     void* stop = ThreadLocalStatus::stackStartAddress;
+//    fprintf(stderr, "%lu check stack range: %p - %p\n", ThreadLocalStatus::runningThreadIndex, start, stop);
     searchHeapPointers((unsigned long)start, (unsigned long)stop);
 }
 

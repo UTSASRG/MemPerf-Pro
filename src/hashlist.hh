@@ -81,7 +81,8 @@ inline void listRemoveNodeOnly(list_t* node) {
 }
 
 // Check whether current node is the tail of a list
-inline bool isListTail(list_t* list, list_t* node) { return (list->next == node); }
+//inline bool isListTail(list_t* list, list_t* node) { return (list->next == node); }
+inline bool isListTail(list_t* list, list_t* node) { return (list->prev == node); }
 
 // Retrieve the first item form a list
 // Then this item will be removed from the list.

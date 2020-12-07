@@ -82,13 +82,13 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
     MyMalloc::initializeForThreadLocalMemory();
     Predictor::globalInit();
 
+    initPMU();
+
     Predictor::outsideCountingEventsStart();
     Predictor::outsideCycleStart();
     ProgramStatus::setProfilerInitializedTrue();
 
     atexit(exitHandler);
-
-    initPMU();
 
 	return real_main_mallocprof (argc, argv, envp);
 }
@@ -131,6 +131,7 @@ extern "C" {
         AllocatingStatus::updateAllocatingInfoToThreadLocalData();
         AllocatingStatus::updateAllocatingInfoToPredictor();
         Predictor::outsideCycleStart();
+//        fprintf(stderr, "%lu allocate object %p\n", ThreadLocalStatus::runningThreadIndex, object);
         return object;
 
 	}
@@ -175,6 +176,7 @@ extern "C" {
             setupCounting();
             restartSampling();
         }
+//        fprintf(stderr, "%lu free object %p\n", ThreadLocalStatus::runningThreadIndex, ptr);
         Predictor::outsideCyclesStop();
         AllocatingStatus::updateFreeingStatusBeforeRealFunction(FREE, ptr);
         RealX::free(ptr);

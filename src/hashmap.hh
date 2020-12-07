@@ -323,7 +323,6 @@ private:
     // Create an entry
     struct Entry* entry = createNewEntry(key, value);
     listInsertTail(&entry->list, &head->list);
-//      fprintf(stderr, "entry = %p, %p, %lu\n", entry, entry->nextEntry(), sizeof(Entry));
     head->count++;
     // increment total number
 //    __atomic_add_fetch(&_totalEntry, 1, __ATOMIC_RELAXED);

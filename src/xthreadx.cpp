@@ -59,12 +59,14 @@ void * xthreadx::startThread(void * arg) {
     MyMalloc::initializeForThreadLocalShadowMemory(ThreadLocalStatus::runningThreadIndex);
     MyMalloc::initializeForThreadLocalMemory();
     lockUsage.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_LOCK_NUM);
+
     Predictor::threadInit();
+
+    initPMU();
+
     Predictor::outsideCountingEventsStart();
     Predictor::outsideCycleStart();
     ProgramStatus::setProfilerInitializedTrue();
-
-    initPMU();
 
     result = current->startRoutine(current->startArg);
     threadExit();
