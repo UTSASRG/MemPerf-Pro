@@ -40,13 +40,19 @@ typedef struct {
 } perf_info;
 
 
-void initPMU(void);
+#ifdef OPEN_COUNTING_EVENT
 void setupCounting(void);
+void stopCounting(void);
+void getPerfCounts(PerfReadInfo*);
+#endif
+#ifdef OPEN_SAMPLING_EVENT
+void initPMU(void);
+void sampleHandler(int signum, siginfo_t *info, void *p);
 void setupSampling(void);
 void stopSampling(void);
 void pauseSampling(void);
 void restartSampling(void);
-void stopCounting(void);
 void doSampleRead();
-void getPerfCounts(PerfReadInfo*);
+#endif
+
 #endif

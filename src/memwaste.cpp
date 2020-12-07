@@ -8,8 +8,10 @@ MemoryWasteStatus MemoryWaste::currentStatus, MemoryWaste::recordStatus;
 MemoryWasteGlobalStatus MemoryWaste::globalStatus;
 MemoryWasteTotalValue MemoryWaste::totalValue;
 HashLocksSet MemoryWaste::hashLocksSet;
+#ifdef PRINT_LEAK_OBJECTS
 unsigned long MemoryWaste::minAddr = -1;
 unsigned long MemoryWaste::maxAddr = 0;
+#endif
 
 size_t ObjectStatus::internalFragment() {
     size_t unusedPageSize = (sizeClassSizeAndIndex.classSize - maxTouchedBytes) / PAGESIZE * PAGESIZE;
@@ -249,9 +251,10 @@ AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(unsigned int size, voi
         status->maxTouchedBytes = size;
 
         currentStatus.numOfAccumulatedOperations.numOfNewAllocations[arrayIndex()]++;
-
+#ifdef PRINT_LEAK_OBJECTS
         minAddr = MIN(minAddr, (unsigned long)address);
         maxAddr = MAX(maxAddr, (unsigned long)address);
+#endif
     }
     else {
         reused = true;
@@ -294,7 +297,7 @@ AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(unsigned int size, voi
 #endif
     }
 
-    return AllocatingTypeGotFromMemoryWaste{reused, currentSizeClassSizeAndIndex.classSize, currentSizeClassSizeAndIndex.classSizeIndex};
+    return AllocatingTypeGotFromMemoryWaste{reused, currentSizeClassSizeAndIndex.classSizeIndex, currentSizeClassSizeAndIndex.classSize};
 }
 
 
@@ -334,7 +337,7 @@ AllocatingTypeWithSizeGotFromMemoryWaste MemoryWaste::freeUpdate(void* address) 
 #endif
 
     return AllocatingTypeWithSizeGotFromMemoryWaste{currentSizeClassSizeAndIndex.size,
-                                                    AllocatingTypeGotFromMemoryWaste{false, currentSizeClassSizeAndIndex.classSize, currentSizeClassSizeAndIndex.classSizeIndex}};
+                                                    AllocatingTypeGotFromMemoryWaste{false, currentSizeClassSizeAndIndex.classSizeIndex, currentSizeClassSizeAndIndex.classSize}};
 }
 
 void MemoryWaste::compareMemoryUsageAndRecordStatus(TotalMemoryUsage newTotalMemoryUsage) {
@@ -371,8 +374,8 @@ void MemoryWaste::printOutput() {
         fprintf(ProgramStatus::outputFile,
                 "total real using memory:     %10ldK(%3ld%%)\n\t\t\t\t\t\t\t\t\t\t\t\t\t"
                 "total using memory:          %10ldK\n"
-                "\ncurrent status:           active objects: %10lu     freelist objects: %10lu"
-                "\naccumulative results:     new allocated:  %10lu     reused allocated: %10lu     freed: %10lu\n",
+                "\ncurrent status:           active objects: %10d     freelist objects: %10d"
+                "\naccumulative results:     new allocated:  %10u     reused allocated: %10u     freed: %10u\n",
                 MemoryUsage::maxGlobalMemoryUsage.realMemoryUsage/ONE_KB,
                 100 - totalValue.internalFragment*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage
                 - totalValue.memoryBlowup*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage
@@ -397,8 +400,8 @@ void MemoryWaste::printOutput() {
         }
 
         fprintf(ProgramStatus::outputFile, "internal fragmentation: %10ldK\t\t\tmemory blowup: %10luK\t\t\t"
-                                           "active alloc: %10ld\t\t\tfreelist objects: %10ld\t\t\trecently freed objects: %10ld\t\t\t"
-                                           "new allocated: %10lu\t\t\treused allocated: %10lu\t\t\tfreed: %10lu\n",
+                                           "active alloc: %10d\t\t\tfreelist objects: %10d\t\t\trecently freed objects: %10ld\t\t\t"
+                                           "new allocated: %10u\t\t\treused allocated: %10u\t\t\tfreed: %10u\n",
                 globalStatus.internalFragment[classSizeIndex]/ONE_KB, globalStatus.memoryBlowup[classSizeIndex]/ONE_KB,
                 globalStatus.numOfActiveObjects.numOfAllocatedObjects[classSizeIndex],
                 globalStatus.numOfActiveObjects.numOfFreelistObjects[classSizeIndex],

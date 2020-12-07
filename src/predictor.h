@@ -11,13 +11,17 @@ public:
     static uint64_t totalCycle;
     static uint64_t criticalCycle;
     static uint64_t replacedCriticalCycle;
+#ifdef OPEN_COUNTING_EVENT
     static PerfReadInfo criticalCountingEvent;
+#endif
     static uint64_t threadCycle[MAX_THREAD_NUMBER];
     static uint64_t threadReplacedCycle[MAX_THREAD_NUMBER];
+#ifdef OPEN_COUNTING_EVENT
     static PerfReadInfo threadCountingEvents[MAX_THREAD_NUMBER];
     static thread_local PerfReadInfo startCountingEvent;
     static thread_local PerfReadInfo stopCountingEvent;
     static thread_local PerfReadInfo countingEvent;
+#endif
     static thread_local unsigned int numOfFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
     static thread_local uint64_t functionCycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
     static size_t replacedFunctionCycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];///avg

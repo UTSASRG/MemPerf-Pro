@@ -3,15 +3,19 @@
 uint64_t Predictor::totalCycle;
 uint64_t Predictor::criticalCycle;
 uint64_t Predictor::replacedCriticalCycle;
+#ifdef OPEN_COUNTING_EVENT
 PerfReadInfo Predictor::criticalCountingEvent;
+#endif
 
 uint64_t Predictor::threadCycle[MAX_THREAD_NUMBER];
 uint64_t Predictor::threadReplacedCycle[MAX_THREAD_NUMBER];
+#ifdef OPEN_COUNTING_EVENT
 PerfReadInfo Predictor::threadCountingEvents[MAX_THREAD_NUMBER];
 
 thread_local PerfReadInfo Predictor::startCountingEvent;
 thread_local PerfReadInfo Predictor::stopCountingEvent;
 thread_local PerfReadInfo Predictor::countingEvent;
+#endif
 
 thread_local unsigned int Predictor::numOfFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
 thread_local uint64_t Predictor::functionCycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
@@ -35,9 +39,11 @@ void Predictor::globalInit() {
     totalCycle = 0;
     criticalCycle = 0;
     replacedCriticalCycle = 0;
+#ifdef OPEN_COUNTING_EVENT
     memset(&criticalCountingEvent, 0, sizeof(PerfReadInfo));
 
     memset(&countingEvent, 0, sizeof(PerfReadInfo));
+#endif
 
     memset(numOfFunctions, 0, sizeof(unsigned int) * NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA);
     memset(functionCycles, 0, sizeof(uint64_t) * NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA);
@@ -47,7 +53,9 @@ void Predictor::globalInit() {
 }
 
 void Predictor::threadInit() {
+#ifdef OPEN_COUNTING_EVENT
     memset(&countingEvent, 0, sizeof(PerfReadInfo));
+#endif
 
     memset(numOfFunctions, 0, sizeof(unsigned int) * NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA);
     memset(functionCycles, 0, sizeof(uint64_t) * NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA);
@@ -59,9 +67,11 @@ void Predictor::threadInit() {
 void Predictor::cleanStageData() {
     memset(threadCycle, 0, sizeof(uint64_t) * ThreadLocalStatus::totalNumOfThread);
     memset(threadReplacedCycle, 0, sizeof(uint64_t) * ThreadLocalStatus::totalNumOfThread);
+#ifdef OPEN_COUNTING_EVENT
     memset(threadCountingEvents, 0, sizeof(PerfReadInfo) * ThreadLocalStatus::totalNumOfThread);
 
     memset(&countingEvent, 0, sizeof(PerfReadInfo));
+#endif
 
     memset(numOfFunctions, 0, sizeof(unsigned int) * NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA);
     memset(functionCycles, 0, sizeof(uint64_t) * NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA);
@@ -89,11 +99,15 @@ void Predictor::outsideCyclesStop() {
 }
 
 void Predictor::outsideCountingEventsStart() {
+#ifdef OPEN_COUNTING_EVENT
     getPerfCounts(&startCountingEvent);
+#endif
 }
 
 void Predictor::outsideCountingEventsStop() {
+#ifdef OPEN_COUNTING_EVENT
     getPerfCounts(&stopCountingEvent);
+
     if(stopCountingEvent.faults > startCountingEvent.faults) {
         countingEvent.faults += stopCountingEvent.faults - startCountingEvent.faults;
     }
@@ -103,6 +117,7 @@ void Predictor::outsideCountingEventsStop() {
     if(stopCountingEvent.instructions > startCountingEvent.instructions) {
         countingEvent.instructions += stopCountingEvent.instructions - startCountingEvent.instructions;
     }
+#endif
 }
 
 void Predictor::threadEnd() {
@@ -122,8 +137,9 @@ void Predictor::threadEnd() {
     } else {
         threadReplacedCycle[ThreadLocalStatus::runningThreadIndex] -= faultedPages * cyclePerPageFault;
     }
-
+#ifdef OPEN_COUNTING_EVENT
     threadCountingEvents[ThreadLocalStatus::runningThreadIndex].add(countingEvent);
+#endif
 //    fprintf(stderr, "thread end %lu %lu %lu %lu\n",
 //             threadCycle[ThreadLocalStatus::runningThreadIndex], threadReplacedCycle[ThreadLocalStatus::runningThreadIndex], outsideCycle, faultedPages * cyclePerPageFault);
 //    countingEvent.debugPrint();
@@ -148,8 +164,9 @@ void Predictor::stopSerial() {
     } else {
         replacedCriticalCycle -= faultedPages * cyclePerPageFault;
     }
-
+#ifdef OPEN_COUNTING_EVENT
     criticalCountingEvent.add(countingEvent);
+#endif
 //    fprintf(stderr, "start parallel %lu %lu %lu %lu\n", criticalCycle, replacedCriticalCycle, outsideCycle, faultedPages * cyclePerPageFault);
 //    criticalCountingEvent.debugPrint();
     cleanStageData();
@@ -159,8 +176,10 @@ void Predictor::stopParallel() {
     uint64_t criticalStageCycle = 0;
     uint64_t criticalReplacedStageCycle = 0;
 //    uint64_t numOfActiveThreads = 0;
+#ifdef OPEN_COUNTING_EVENT
     PerfReadInfo criticalStageCountingEvent;
     memset(&criticalStageCountingEvent, 0, sizeof(PerfReadInfo));
+#endif
 
 ///max
     for(unsigned int index = 1; index < ThreadLocalStatus::totalNumOfThread; ++index) {
@@ -186,7 +205,9 @@ void Predictor::stopParallel() {
     for(unsigned short index = 0; index < ThreadLocalStatus::totalNumOfThread; ++index) {
         if(threadCycle[index] && threadReplacedCycle[index]) {
             totalCycle += threadCycle[index];
+#ifdef OPEN_COUNTING_EVENT
             criticalCountingEvent.add(threadCountingEvents[index]);
+#endif
         }
     }
 

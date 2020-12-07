@@ -102,19 +102,18 @@ class CacheMapEntry {
 		public:
 
     bool falseSharingLineRecorded[NUM_OF_FALSESHARINGTYPE] = {false};
-    bool justFreedButRemainedSomeData = false;
     bool sampled = false;
+    bool allocated = false;
     FalseSharingType falseSharingStatus = OBJECT;
     uint8_t num_used_bytes;
     short lastWriterThreadIndex = -1;
-    short lastAllocatingThreadIndex = -1;
-    short lastFreeThreadIndex = -1;
-//    uint8_t num_used_bytes;
+    short lastAFThreadIndex = -1;
+
     uint8_t getUsedBytes();
-				void addUsedBytes(uint8_t num_bytes);
-				void subUsedBytes(uint8_t num_bytes);
-//				void setFull();
-//				void setEmpty();
+    void addUsedBytes(uint8_t num_bytes);
+    void subUsedBytes(uint8_t num_bytes);
+    void setFull();
+    void setEmpty();
 };
 
 class PageMapEntry {
@@ -133,7 +132,7 @@ public:
 #ifdef ENABLE_HP
     bool hugePage;
 #endif
-    static void updateCacheLines(uintptr_t uintaddr, unsigned long mega_index, unsigned page_index, size_t size, bool isFree);
+    static void updateCacheLines(uintptr_t uintaddr, unsigned long mega_index, unsigned page_index, unsigned int size, bool isFree);
     static CacheMapEntry * getCacheMapEntry(map_tuple tuple);
     static CacheMapEntry * getCacheMapEntry(unsigned long mega_idx, unsigned page_idx, unsigned cache_idx);
     CacheMapEntry * getCacheMapEntry(bool mvBumpPtr = true);
@@ -195,7 +194,7 @@ public:
     static PageMapEntry * doPageMapBumpPointer();
     static PageMapEntry * getPageMapEntry(void * address);
     static PageMapEntry * getPageMapEntry(unsigned long mega_idx, unsigned page_idx);
-    static size_t updateObject(void * address, size_t size, bool isFree);
+    static size_t updateObject(void * address, unsigned int size, bool isFree);
     static map_tuple getMapTupleByAddress(uintptr_t uintaddr);
 #ifdef ENABLE_HP
     static void setHugePagesInit();

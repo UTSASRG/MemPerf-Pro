@@ -151,6 +151,7 @@ void TotalMemoryUsage::debugPrint() {
 }
 #endif
 
+#ifdef OPEN_COUNTING_EVENT
 void PerfReadInfo::add(struct PerfReadInfo newPerfReadInfo) {
     faults += newPerfReadInfo.faults;
     cache += newPerfReadInfo.cache;
@@ -162,4 +163,5 @@ void PerfReadInfo::debugPrint() {
     fprintf(stderr, "faults = %ld, l1cache_load = %lu, l1cache_load_miss = %lu, llc_load = %lu, llc_load_miss = %lu\n",
                     faults, l1cache_load, l1cache_load_miss, llc_load, llc_load_miss);
 }
+#endif
 #endif

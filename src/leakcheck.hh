@@ -35,6 +35,8 @@
 #include "selfmap.hh"
 #include "threadlocalstatus.h"
 
+#ifdef PRINT_LEAK_OBJECTS
+
 inline size_t aligndown(size_t addr, size_t alignto) { return (addr & ~(alignto - 1)); }
 
 class leakcheck {
@@ -55,5 +57,8 @@ public:
     static unsigned long _heapBegin;
     static unsigned long _heapEnd;
 };
+
+
+#endif
 
 #endif

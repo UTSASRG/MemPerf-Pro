@@ -39,8 +39,8 @@ private:
 public:
 
     static char programName[256];
-    static bool matrixFileOpened;
-    static FILE * matrixFile;
+//    static bool matrixFileOpened;
+//    static FILE * matrixFile;
     static FILE * outputFile;
     static char outputFileName[MAX_FILENAME_LEN];
     static bool allocatorStyleIsBibop;

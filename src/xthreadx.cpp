@@ -62,7 +62,9 @@ void * xthreadx::startThread(void * arg) {
 
     Predictor::threadInit();
 
+#ifdef OPEN_SAMPLING_EVENT
     initPMU();
+#endif
 
     Predictor::outsideCountingEventsStart();
     Predictor::outsideCycleStart();
@@ -79,9 +81,12 @@ void xthreadx::threadExit() {
     Predictor::outsideCyclesStop();
     Predictor::outsideCountingEventsStop();
     Predictor::threadEnd();
-
+#ifdef OPEN_SAMPLING_EVENT
     stopSampling();
+#endif
+#ifdef OPEN_COUNTING_EVENT
     stopCounting();
+#endif
 
     GlobalStatus::globalize();
 

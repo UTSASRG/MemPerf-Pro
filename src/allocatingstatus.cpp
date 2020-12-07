@@ -9,9 +9,11 @@ thread_local uint64_t AllocatingStatus::cyclesBeforeRealFunction;
 thread_local uint64_t AllocatingStatus::cyclesAfterRealFunction;
 thread_local uint64_t AllocatingStatus::cyclesInRealFunction;
 thread_local uint64_t AllocatingStatus::cyclesMinus;
+#ifdef OPEN_COUNTING_EVENT
 thread_local PerfReadInfo AllocatingStatus::countingDataBeforeRealFunction;
 thread_local PerfReadInfo AllocatingStatus::countingDataAfterRealFunction;
 thread_local PerfReadInfo AllocatingStatus::countingDataInRealFunction;
+#endif
 thread_local LockTypes AllocatingStatus::nowRunningLockType;
 thread_local AllocatingStatus::QueueOfDetailLockDataInAllocatingStatus AllocatingStatus::queueOfDetailLockData;
 thread_local AllocatingStatus::OverviewLockDataInAllocatingStatus AllocatingStatus::overviewLockData[NUM_OF_LOCKTYPES];
@@ -69,9 +71,11 @@ void AllocatingStatus::updateFreeingTypeBeforeRealFunction(AllocationFunction al
 
 
 void AllocatingStatus::startCountCountingEvents() {
+#ifdef OPEN_COUNTING_EVENT
     if(sampledForCountingEvent) {
         getPerfCounts(&countingDataBeforeRealFunction);
     }
+#endif
     cyclesBeforeRealFunction = rdtscp();
 }
 
@@ -99,6 +103,7 @@ void AllocatingStatus::updateFreeingTypeAfterRealFunction() {
     allocatingType.doingAllocation = false;
 }
 
+#ifdef OPEN_COUNTING_EVENT
 void AllocatingStatus::calculateCountingDataInRealFunction() {
     countingDataInRealFunction.faults = countingDataAfterRealFunction.faults - countingDataBeforeRealFunction.faults;
     countingDataInRealFunction.cache = countingDataAfterRealFunction.cache - countingDataBeforeRealFunction.cache;
@@ -116,6 +121,7 @@ void AllocatingStatus::removeAbnormalCountingEventValues() {
         countingDataInRealFunction.instructions = 0;
     }
 }
+#endif
 
 void AllocatingStatus::calculateCycleInRealFunction() {
     cyclesInRealFunction = cyclesAfterRealFunction - cyclesBeforeRealFunction;
@@ -135,14 +141,18 @@ void AllocatingStatus::removeAbnormalCycleValues() {
 
 void AllocatingStatus::stopCountCountingEvents() {
     cyclesAfterRealFunction = rdtscp();
+#ifdef OPEN_COUNTING_EVENT
     if(sampledForCountingEvent) {
         getPerfCounts(&countingDataAfterRealFunction);
     }
+#endif
     calculateCycleInRealFunction();
     removeAbnormalCycleValues();
     if(sampledForCountingEvent) {
+#ifdef OPEN_COUNTING_EVENT
         calculateCountingDataInRealFunction();
         removeAbnormalCountingEventValues();
+#endif
     }
 }
 
@@ -168,14 +178,14 @@ void AllocatingStatus::updateMemoryStatusAfterAllocation() {
 #endif
     allocatingType.allocatingTypeGotFromMemoryWaste = MemoryWaste::allocUpdate(allocatingType.objectSize, allocatingType.objectAddress, callsiteKey);
     allocatingType.allocatingTypeGotFromShadowMemory.objectNewTouchedPageSize = ShadowMemory::updateObject(allocatingType.objectAddress, allocatingType.objectSize, false);
-    MemoryUsage::addToMemoryUsage(allocatingType.objectSize, allocatingType.allocatingTypeGotFromShadowMemory.objectNewTouchedPageSize);
+//    MemoryUsage::addToMemoryUsage(allocatingType.objectSize, allocatingType.allocatingTypeGotFromShadowMemory.objectNewTouchedPageSize);
 }
 
 void AllocatingStatus::updateMemoryStatusBeforeFree() {
     allocatingType.switchFreeingTypeGotFromMemoryWaste(MemoryWaste::freeUpdate(allocatingType.objectAddress));
     if(allocatingType.objectSize) {
         allocatingType.allocatingTypeGotFromShadowMemory.objectNewTouchedPageSize = ShadowMemory::updateObject(allocatingType.objectAddress, allocatingType.objectSize, true);
-        MemoryUsage::subRealSizeFromMemoryUsage(allocatingType.objectSize);
+//        MemoryUsage::subRealSizeFromMemoryUsage(allocatingType.objectSize);
     }
 }
 
@@ -454,7 +464,9 @@ void AllocatingStatus::updateAllocatingInfoToPredictor() {
 void AllocatingStatus::addUpCountingEventsToThreadLocalData() {
     ThreadLocalStatus::numOfSampledCountingFunctions[allocationTypeForOutputData]++;
     ThreadLocalStatus::cycles[allocationTypeForOutputData] += cyclesInRealFunction;
+#ifdef OPEN_COUNTING_EVENT
     ThreadLocalStatus::countingEvents[allocationTypeForOutputData].add(countingDataInRealFunction);
+#endif
 }
 
 bool AllocatingStatus::outsideTrackedAllocation() {

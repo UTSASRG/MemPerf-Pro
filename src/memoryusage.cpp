@@ -40,9 +40,12 @@ void MemoryUsage::addToMemoryUsage(unsigned int size, unsigned int newTouchePage
          lastTimeUpdated = time(NULL);
          maxGlobalMemoryUsage = globalMemoryUsage;
          updateTimes++;
+#ifdef OPEN_BACKTRACE
          Backtrace::recordMem();
+#endif
          MemoryWaste::compareMemoryUsageAndRecordStatus(maxGlobalMemoryUsage);
-         if(MemoryWaste::minAddr != -1 && MemoryWaste::maxAddr) {
+#ifdef PRINT_LEAK_OBJECTS
+         if(MemoryWaste::minAddr != (uint64_t)-1 && MemoryWaste::maxAddr) {
              if(updateTimes%5 == 0) {
 //                 memset(helpMarked, 0, ThreadLocalStatus::totalNumOfThread*sizeof(bool));
                  leakcheck::doSlowLeakCheck(MemoryWaste::minAddr, MemoryWaste::maxAddr);
@@ -50,6 +53,7 @@ void MemoryUsage::addToMemoryUsage(unsigned int size, unsigned int newTouchePage
                  fprintf(stderr, "leak = %luKb\n", leakcheck::_totalLeakageSize/ONE_KB);
              }
          }
+#endif
         mtx.unlock();
      }
 

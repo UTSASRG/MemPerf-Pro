@@ -17,6 +17,8 @@
 #include "globalstatus.h"
 #include "libmallocprof.h"
 
+#ifdef OPEN_BACKTRACE
+
 struct BackTraceMemory {
     uint8_t numberOfFrame;
 //    unsigned int memAllocated;
@@ -50,6 +52,8 @@ public:
     static void debugPrintOutput();
     static void printOutput();
 };
+
+#endif
 
 
 #endif //SRC_BACKTRACE_H

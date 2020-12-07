@@ -114,6 +114,7 @@ struct TotalMemoryUsage {
 #endif
 };
 
+#ifdef OPEN_COUNTING_EVENT
 struct PerfReadInfo {
     uint64_t faults = 0;
     uint64_t cache = 0;
@@ -124,6 +125,7 @@ struct PerfReadInfo {
     void debugPrint();
 #endif
 };
+#endif
 
 constexpr char * outputTitleNotificationString[2] = {
         (char*)"\n>>>>>>>>>>>>>>>",

@@ -6,9 +6,9 @@
 #define OPEN_SAMPLING_FOR_ALLOCS 1
 #define RANDOM_PERIOD_FOR_ALLOCS 100
 #define OPEN_BACKTRACE 1
+#define PRINT_LEAK_OBJECTS 1
 
 //#define OPEN_DEBUG 1
-#define PRINT_LEAK_OBJECTS 1
 //#define OPEN_CPU_BINDING 1
 //#define ENABLE_HP 1
 //#define ENABLE_THP 1
@@ -62,14 +62,14 @@
 
 #define LEAST_TOUCHING_THREADS 15
 
-enum ObjectSizeType{
+enum ObjectSizeType: unsigned char{
     SMALL,
     MEDIUM,
     LARGE,
     NUM_OF_OBJECTSIZETYPE
 };
 
-enum AllocationFunction{
+enum AllocationFunction: unsigned char{
     MALLOC,
     FREE,
     CALLOC,
@@ -79,7 +79,7 @@ enum AllocationFunction{
     NUM_OF_ALLOCATIONFUNCTION
 };
 
-enum AllocationTypeForOutputData{
+enum AllocationTypeForOutputData: unsigned char{
     SERIAL_SMALL_NEW_MALLOC,
     SERIAL_MEDIUM_NEW_MALLOC,
     SERIAL_SMALL_REUSED_MALLOC,
@@ -114,7 +114,7 @@ enum AllocationTypeForOutputData{
     NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA
 };
 
-enum LockTypes{
+enum LockTypes: unsigned char{
     MUTEX,
     SPIN,
     MUTEXTRY,
@@ -122,7 +122,7 @@ enum LockTypes{
     NUM_OF_LOCKTYPES
 };
 
-enum SystemCallTypes{
+enum SystemCallTypes: unsigned char{
     MMAP,
     MADVISE,
     SBRK,
@@ -132,14 +132,14 @@ enum SystemCallTypes{
     NUM_OF_SYSTEMCALLTYPES
 };
 
-enum FalseSharingType {
+enum FalseSharingType: unsigned char {
     OBJECT,
     ACTIVE,
     PASSIVE,
     NUM_OF_FALSESHARINGTYPE
 };
 
-enum eMemAccessType{
+enum eMemAccessType: unsigned char{
     E_MEM_NONE = 0,
     E_MEM_LOAD,
     E_MEM_STORE,

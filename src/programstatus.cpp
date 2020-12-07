@@ -12,8 +12,8 @@ unsigned short ProgramStatus::largeObjectAlignment;
 thread_local struct SizeClassSizeAndIndex ProgramStatus::cacheForGetClassSizeAndIndex;
 
 char ProgramStatus::programName[256];
-bool ProgramStatus::matrixFileOpened;
-FILE * ProgramStatus::matrixFile;
+//bool ProgramStatus::matrixFileOpened;
+//FILE * ProgramStatus::matrixFile;
 FILE * ProgramStatus::outputFile;
 bool ProgramStatus::allocatorStyleIsBibop;
 unsigned short ProgramStatus::numberOfClassSizes;
@@ -33,19 +33,19 @@ bool ProgramStatus::conclusionHasStarted() {
     return beginConclusion;
 }
 
-void ProgramStatus::openMatrixFile() {
-    extern char * program_invocation_name;
-//    snprintf(matrixFileName, MAX_FILENAME_LEN, "matrix.txt");
-    snprintf(matrixFileName, MAX_FILENAME_LEN, "/home/jinzhou/parsec/matrix/count.txt");
-    fprintf(stderr, "%s\n", matrixFileName);
-    matrixFile = fopen(matrixFileName, "a+");
-    if(matrixFile == nullptr) {
-        perror("error: unable to open matrix file to write");
-        abort();
-    }
-    matrixFileOpened = true;
-    fprintf(matrixFile, "%s ", program_invocation_name);
-}
+//void ProgramStatus::openMatrixFile() {
+//    extern char * program_invocation_name;
+////    snprintf(matrixFileName, MAX_FILENAME_LEN, "matrix.txt");
+//    snprintf(matrixFileName, MAX_FILENAME_LEN, "/home/jinzhou/parsec/matrix/count.txt");
+//    fprintf(stderr, "%s\n", matrixFileName);
+//    matrixFile = fopen(matrixFileName, "a+");
+//    if(matrixFile == nullptr) {
+//        perror("error: unable to open matrix file to write");
+//        abort();
+//    }
+//    matrixFileOpened = true;
+//    fprintf(matrixFile, "%s ", program_invocation_name);
+//}
 
 void ProgramStatus::getInputInfoFileName(char * runningApplicationName) {
     char * runningAllocatorName = strrchr(runningApplicationName, '-')+1;
@@ -70,9 +70,9 @@ void ProgramStatus::getInputInfoFileName(char * runningApplicationName) {
         abort();
     }
 
-    if(ProgramStatus::matrixFileOpened) {
-        fprintf(matrixFile, "%s ", runningAllocatorName);
-    }
+//    if(ProgramStatus::matrixFileOpened) {
+//        fprintf(matrixFile, "%s ", runningAllocatorName);
+//    }
 
 }
 

@@ -21,9 +21,11 @@ private:
     static thread_local uint64_t cyclesAfterRealFunction;
     static thread_local uint64_t cyclesInRealFunction;
     static thread_local uint64_t cyclesMinus;
+#ifdef OPEN_COUNTING_EVENT
     static thread_local PerfReadInfo countingDataBeforeRealFunction;
     static thread_local PerfReadInfo countingDataAfterRealFunction;
     static thread_local PerfReadInfo countingDataInRealFunction;
+#endif
 #ifdef OPEN_DEBUG
     static spinlock debugLock;
 #endif
@@ -196,9 +198,10 @@ private:
     static void addUpSyscallsInfoToThreadLocalData();
     static void addUpOtherFunctionsInfoToThreadLocalData();
     static void addUpCountingEventsToThreadLocalData();
-
+#ifdef OPEN_COUNTING_EVENT
     static void calculateCountingDataInRealFunction();
     static void removeAbnormalCountingEventValues();
+#endif
     static void calculateCycleInRealFunction();
     static void removeAbnormalCycleValues();
 

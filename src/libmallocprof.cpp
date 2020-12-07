@@ -3,9 +3,10 @@
 
 thread_local HashMap <void *, DetailLockData, PrivateHeap> lockUsage;
 HashMap <void *, DetailLockData, PrivateHeap> globalLockUsage;
+#ifdef OPEN_BACKTRACE
 HashMap <uint8_t, BackTraceMemory, PrivateHeap> BTMemMap;
 HashMap <uint8_t, BackTraceMemory, PrivateHeap> BTMemMapRecord;
-//HashMap <uint64_t, BackTraceContent, PrivateHeap> BTCttMap;
+#endif
 HashMap <void*, ObjectStatus, PrivateHeap> objStatusMap;
 
 //// pre-init private allocator memory
@@ -35,9 +36,12 @@ void exitHandler() {
     Predictor::outsideCountingEventsStop();
     Predictor::stopSerial();
 //    MemoryUsage::endCheck();
-
+#ifdef OPEN_SAMPLING_EVENT
 	stopSampling();
+#endif
+#ifdef OPEN_COUNTING_EVENT
     stopCounting();
+#endif
 
     GlobalStatus::globalize();
     GlobalStatus::printOutput();
@@ -48,8 +52,9 @@ void exitHandler() {
 
 // MallocProf's main function
 int libmallocprof_main(int argc, char ** argv, char ** envp) {
+#ifdef PRINT_LEAK_OBJECTS
     selfmap::getInstance().getGlobalRegions();
-//    initPMU();
+#endif
     RealX::initializer();
     ShadowMemory::initialize();
     ThreadLocalStatus::setStackStartAddress(&argc);
@@ -75,14 +80,17 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
     lockUsage.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_LOCK_NUM);
     globalLockUsage.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_LOCK_NUM);
     MemoryWaste::initialize();
+#ifdef OPEN_BACKTRACE
     Backtrace::init();
+#endif
     MyMalloc::initializeForThreadLocalXthreadMemory(ThreadLocalStatus::runningThreadIndex);
     MyMalloc::initializeForThreadLocalHashMemory(ThreadLocalStatus::runningThreadIndex);
     MyMalloc::initializeForThreadLocalShadowMemory(ThreadLocalStatus::runningThreadIndex);
     MyMalloc::initializeForThreadLocalMemory();
     Predictor::globalInit();
-
+#ifdef OPEN_SAMPLING_EVENT
     initPMU();
+#endif
 
     Predictor::outsideCountingEventsStart();
     Predictor::outsideCycleStart();
@@ -114,12 +122,17 @@ extern "C" {
         if(!AllocatingStatus::outsideTrackedAllocation() || ProgramStatus::conclusionHasStarted()) {
             return RealX::malloc(sz);
         }
+#ifdef OPEN_COUNTING_EVENT
         if(AllocatingStatus::isFirstFunction()) {
+#ifdef OPEN_SAMPLING_EVENT
             pauseSampling();
+#endif
             setupCounting();
+#ifdef OPEN_SAMPLING_EVENT
             restartSampling();
+#endif
         }
-
+#endif
 
         Predictor::outsideCyclesStop();
         AllocatingStatus::updateAllocatingStatusBeforeRealFunction(MALLOC, sz);
@@ -171,11 +184,17 @@ extern "C" {
         if(!AllocatingStatus::outsideTrackedAllocation() || ProgramStatus::conclusionHasStarted()) {
             return RealX::free(ptr);
         }
+#ifdef OPEN_COUNTING_EVENT
         if(AllocatingStatus::isFirstFunction()) {
+#ifdef OPEN_SAMPLING_EVENT
             pauseSampling();
+#endif
             setupCounting();
+#ifdef OPEN_SAMPLING_EVENT
             restartSampling();
+#endif
         }
+#endif
 //        fprintf(stderr, "%lu free object %p\n", ThreadLocalStatus::runningThreadIndex, ptr);
         Predictor::outsideCyclesStop();
         AllocatingStatus::updateFreeingStatusBeforeRealFunction(FREE, ptr);

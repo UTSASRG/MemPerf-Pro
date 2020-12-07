@@ -114,9 +114,10 @@ private:
 public:
 
     static HashLocksSet hashLocksSet;
-
+#ifdef PRINT_LEAK_OBJECTS
     static unsigned long minAddr;
     static unsigned long maxAddr;
+#endif
 
     static MemoryWasteTotalValue totalValue;
 

@@ -23,6 +23,8 @@
 
 #include "leakcheck.hh"
 
+#ifdef PRINT_LEAK_OBJECTS
+
 thread_local std::list<unsigned long> leakcheck::_unexploredObjects;
 size_t leakcheck::_totalLeakageSize;
 unsigned long leakcheck::_heapBegin;
@@ -142,3 +144,5 @@ void leakcheck::debugPrintQueue() {
         fprintf(stderr, "catch %lu\n", addr);
     }
 }
+
+#endif

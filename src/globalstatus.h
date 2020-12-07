@@ -20,7 +20,9 @@ public:
     static spinlock lock;
     static unsigned int numOfFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
     static unsigned int numOfSampledCountingFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
+#ifdef OPEN_COUNTING_EVENT
     static PerfReadInfo countingEvents[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
+#endif
     static uint64_t cycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
     static OverviewLockData overviewLockData[NUM_OF_LOCKTYPES];
     static CriticalSectionStatus criticalSectionStatus[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];

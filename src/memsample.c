@@ -29,13 +29,6 @@ struct read_format {
 	} values[PERF_GROUP_SIZE];
 };
 
-struct read_cache_misses_outside_format {
-    uint64_t nr;
-    struct {
-        uint64_t value;
-    } values[1];
-};
-
 inline void acquireGlobalPerfLock() {
     _perf_spin_lock.lock();
 }
@@ -52,6 +45,8 @@ inline int create_perf_event(perf_event_attr * attr, int group) {
 	return fd;
 }
 
+
+#ifdef OPEN_COUNTING_EVENT
 //get data from PMU and store it into the PerfReadInfo struct
 void getPerfCounts (PerfReadInfo * i) {
 
@@ -70,10 +65,6 @@ void getPerfCounts (PerfReadInfo * i) {
 }
 
 void setupCounting(void) {
-
-#ifndef OPEN_COUNTING_EVENT
-    return;
-#endif
 
 	if(isCountingInit) {
 			return;
@@ -156,6 +147,47 @@ void setupCounting(void) {
 
 }
 
+void stopCounting(void) {
+    if(!isCountingInit) {
+        return;
+    }
+
+    isCountingInit = false;
+
+    close(perfInfo.perf_fd_fault);
+    close(perfInfo.perf_fd_cache);
+    close(perfInfo.perf_fd_instr);
+}
+#endif
+
+#ifdef OPEN_SAMPLING_EVENT
+void initPMU(void) {
+    _perf_spin_lock.init();
+
+    perfInfo.tid = syscall(__NR_gettid);
+
+    struct sigaction sa;
+    sigemptyset(&sa.sa_mask);
+    sigaddset(&sa.sa_mask, SIGUSR2);
+    sigaddset(&sa.sa_mask, SIGRTMIN);
+    sa.sa_sigaction = sampleHandler;
+    sa.sa_flags = SA_SIGINFO;
+
+    if(sigaction(SIGIO, &sa, NULL) != 0) {
+        fprintf(stderr, "failed to set SIGIO handler: %s\n", strerror(errno));
+        abort();
+    }
+
+    perfInfo.data_buf_copy = (char *)mmap(NULL, DATA_MAPSIZE, PROT_READ | PROT_WRITE,
+                                          MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if(perfInfo.data_buf_copy == MAP_FAILED) {
+        fprintf(stderr, "mmap failed in %s\n", __FUNCTION__);
+        abort();
+    }
+
+    setupSampling();
+}
+
 void sampleHandler(int signum, siginfo_t *info, void *p) {
 
     if(!perfInfo.initialized || !isSamplingInit) {
@@ -176,9 +208,7 @@ void doSampleRead() {
 }
 
 void setupSampling() {
-#ifndef OPEN_SAMPLING_EVENT
-    return;
-#endif
+
 
     if(isSamplingInit) {
         return;
@@ -322,18 +352,6 @@ void setupSampling() {
 	}
 }
 
-void stopCounting(void) {
-    if(!isCountingInit) {
-        return;
-    }
-
-    isCountingInit = false;
-
-    close(perfInfo.perf_fd_fault);
-    close(perfInfo.perf_fd_cache);
-    close(perfInfo.perf_fd_instr);
-}
-
 void stopSampling(void) {
 
     if(!isSamplingInit) {
@@ -395,145 +413,119 @@ void restartSampling() {
     }
 }
 
-void initPMU(void) {
-
-    _perf_spin_lock.init();
-
-    perfInfo.tid = syscall(__NR_gettid);
-
-    struct sigaction sa;
-    sigemptyset(&sa.sa_mask);
-    sigaddset(&sa.sa_mask, SIGUSR2);
-    sigaddset(&sa.sa_mask, SIGRTMIN);
-    sa.sa_sigaction = sampleHandler;
-    sa.sa_flags = SA_SIGINFO;
-
-    if(sigaction(SIGIO, &sa, NULL) != 0) {
-        fprintf(stderr, "failed to set SIGIO handler: %s\n", strerror(errno));
-        abort();
-    }
-
-    perfInfo.data_buf_copy = (char *)mmap(NULL, DATA_MAPSIZE, PROT_READ | PROT_WRITE,
-                                          MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    if(perfInfo.data_buf_copy == MAP_FAILED) {
-        fprintf(stderr, "mmap failed in %s\n", __FUNCTION__);
-        abort();
-    }
-
-    setupSampling();
-}
-
 long long perf_mmap_read() {
-	struct perf_event_header *event;
-	struct perf_event_mmap_page *control_page =
-		(struct perf_event_mmap_page *)perfInfo.ring_buf;
-	uint64_t copy_amt, head, offset, prev_head_wrapped, size;
-	void * data_mmap = perfInfo.ring_buf_data_start;
-	char * use_data_buf = NULL;
+    struct perf_event_header *event;
+    struct perf_event_mmap_page *control_page =
+            (struct perf_event_mmap_page *)perfInfo.ring_buf;
+    uint64_t copy_amt, head, offset, prev_head_wrapped, size;
+    void * data_mmap = perfInfo.ring_buf_data_start;
+    char * use_data_buf = NULL;
 
-	if(control_page == NULL) {
-			fprintf(stderr, "control_page is NULL; ring_buf=%p, "
-							"data_mmap=%p\n", perfInfo.ring_buf, data_mmap);
-			abort();
-	}
+    if(control_page == NULL) {
+        fprintf(stderr, "control_page is NULL; ring_buf=%p, "
+                        "data_mmap=%p\n", perfInfo.ring_buf, data_mmap);
+        abort();
+    }
 
-	head = control_page->data_head;
-	size = head - perfInfo.prev_head;
+    head = control_page->data_head;
+    size = head - perfInfo.prev_head;
 
-	if(head < perfInfo.prev_head)
-		perfInfo.prev_head = 0;
+    if(head < perfInfo.prev_head)
+        perfInfo.prev_head = 0;
 
-	if((DATA_MAPSIZE - PAGESIZE) < (ssize_t)size) {
-		fprintf(stderr, "sample data size is dangerously close to buffer size; data loss is likely to occur\n");
-	}
-	prev_head_wrapped = perfInfo.prev_head % DATA_MAPSIZE;
+    if((DATA_MAPSIZE - PAGESIZE) < (ssize_t)size) {
+        fprintf(stderr, "sample data size is dangerously close to buffer size; data loss is likely to occur\n");
+    }
+    prev_head_wrapped = perfInfo.prev_head % DATA_MAPSIZE;
 
-	copy_amt = size;
+    copy_amt = size;
 
-	// If we have to wrap around to the beginning of the ring buffer in order
-	// to copy all of the new data, start by copying from prev_head_wrapped
-	// to the end of the buffer.
-	if(size > (DATA_MAPSIZE - prev_head_wrapped)) {
-			copy_amt = DATA_MAPSIZE - prev_head_wrapped;
+    // If we have to wrap around to the beginning of the ring buffer in order
+    // to copy all of the new data, start by copying from prev_head_wrapped
+    // to the end of the buffer.
+    if(size > (DATA_MAPSIZE - prev_head_wrapped)) {
+        copy_amt = DATA_MAPSIZE - prev_head_wrapped;
 
-			memcpy(perfInfo.data_buf_copy, ((char *)data_mmap + prev_head_wrapped), copy_amt);
+        memcpy(perfInfo.data_buf_copy, ((char *)data_mmap + prev_head_wrapped), copy_amt);
 
-			memcpy(perfInfo.data_buf_copy + copy_amt,
-							(char *)data_mmap, (size - copy_amt));
+        memcpy(perfInfo.data_buf_copy + copy_amt,
+               (char *)data_mmap, (size - copy_amt));
 
-			use_data_buf = perfInfo.data_buf_copy;
-	} else {
-			use_data_buf = (char *)data_mmap + prev_head_wrapped;
-	}
-	offset = 0;
-	while(offset < size) {
-		long long starting_offset = offset;
-		//uint64_t ip = 0;
-		uint64_t intpaddr = 0;
-		eMemAccessType accessType = E_MEM_UNKNOWN;
+        use_data_buf = perfInfo.data_buf_copy;
+    } else {
+        use_data_buf = (char *)data_mmap + prev_head_wrapped;
+    }
+    offset = 0;
+    while(offset < size) {
+        long long starting_offset = offset;
+        //uint64_t ip = 0;
+        uint64_t intpaddr = 0;
+        eMemAccessType accessType = E_MEM_UNKNOWN;
 
-		event = (struct perf_event_header *)&use_data_buf[offset];
+        event = (struct perf_event_header *)&use_data_buf[offset];
 
-		// move position past the header we just read above
-		offset += sizeof(struct perf_event_header); 
+        // move position past the header we just read above
+        offset += sizeof(struct perf_event_header);
 
-		// Sample data
-		if(event->type == PERF_RECORD_SAMPLE) {
-			if(sample_type & PERF_SAMPLE_IP) {
-				offset += sizeof(uint64_t);
-			}
+        // Sample data
+        if(event->type == PERF_RECORD_SAMPLE) {
+            if(sample_type & PERF_SAMPLE_IP) {
+                offset += sizeof(uint64_t);
+            }
 
-			if(sample_type & PERF_SAMPLE_TID) {
-				offset += 2 * sizeof(uint32_t);
-			}
+            if(sample_type & PERF_SAMPLE_TID) {
+                offset += 2 * sizeof(uint32_t);
+            }
 
-			if(sample_type & PERF_SAMPLE_TIME) {
-					offset += sizeof(uint64_t);
-			}
+            if(sample_type & PERF_SAMPLE_TIME) {
+                offset += sizeof(uint64_t);
+            }
 
-			if(sample_type & PERF_SAMPLE_ADDR) {
-					intpaddr = *(uint64_t *)(use_data_buf + offset);
-					offset += sizeof(uint64_t);
-			}
+            if(sample_type & PERF_SAMPLE_ADDR) {
+                intpaddr = *(uint64_t *)(use_data_buf + offset);
+                offset += sizeof(uint64_t);
+            }
 
-			if(sample_type & PERF_SAMPLE_DATA_SRC) {
-				uint64_t src = *(uint64_t *)(use_data_buf + offset);
-        offset += sizeof(uint64_t);
+            if(sample_type & PERF_SAMPLE_DATA_SRC) {
+                uint64_t src = *(uint64_t *)(use_data_buf + offset);
+                offset += sizeof(uint64_t);
 
-        if(src & (PERF_MEM_OP_LOAD))
-          accessType = E_MEM_LOAD;
-        else if(src & (PERF_MEM_OP_STORE))
-          accessType = E_MEM_STORE;
-        else if(src & (PERF_MEM_OP_PFETCH))
-          accessType = E_MEM_PFETCH;
-        else if(src & (PERF_MEM_OP_EXEC))
-          accessType = E_MEM_EXEC;
-        else
-          accessType = E_MEM_UNKNOWN;
-			}
-		} else if(event->type == PERF_RECORD_LOST) {
-				// If this is the first time we have lost sample data
-				// then emit a warning message
-				if(!perfInfo.samplesLost) {
-						fprintf(stderr, "perf sample data has been lost! "
-										"increase your buffer size or read sample data more "
-										"often\n");
-						perfInfo.samplesLost = true;
-				}
-		}
+                if(src & (PERF_MEM_OP_LOAD))
+                    accessType = E_MEM_LOAD;
+                else if(src & (PERF_MEM_OP_STORE))
+                    accessType = E_MEM_STORE;
+                else if(src & (PERF_MEM_OP_PFETCH))
+                    accessType = E_MEM_PFETCH;
+                else if(src & (PERF_MEM_OP_EXEC))
+                    accessType = E_MEM_EXEC;
+                else
+                    accessType = E_MEM_UNKNOWN;
+            }
+        } else if(event->type == PERF_RECORD_LOST) {
+            // If this is the first time we have lost sample data
+            // then emit a warning message
+            if(!perfInfo.samplesLost) {
+                fprintf(stderr, "perf sample data has been lost! "
+                                "increase your buffer size or read sample data more "
+                                "often\n");
+                perfInfo.samplesLost = true;
+            }
+        }
 
-		if((intpaddr > 0) && (intpaddr < LAST_USER_ADDR)) {
-				ShadowMemory::doMemoryAccess(intpaddr, accessType);
-		}
+        if((intpaddr > 0) && (intpaddr < LAST_USER_ADDR)) {
+            ShadowMemory::doMemoryAccess(intpaddr, accessType);
+        }
 
-		// Move the offset counter ahead by the size given in the event header.
-		offset = starting_offset + event->size;
-	}
-	//PRDBG("thread %d finished reading samples, size = %ld, offset = %ld", getThreadIndex(&size), size, offset);
+        // Move the offset counter ahead by the size given in the event header.
+        offset = starting_offset + event->size;
+    }
+    //PRDBG("thread %d finished reading samples, size = %ld, offset = %ld", getThreadIndex(&size), size, offset);
 
-	// Tell perf where we left off reading; this prevents
-	// perf from overwriting data we have not read yet.
-	control_page->data_tail = head;
+    // Tell perf where we left off reading; this prevents
+    // perf from overwriting data we have not read yet.
+    control_page->data_tail = head;
 
-	return head;
+    return head;
 }
+
+#endif

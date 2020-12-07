@@ -23,6 +23,8 @@
 
 #include "definevalues.h"
 
+#ifdef PRINT_LEAK_OBJECTS
+
 using namespace std;
 
 
@@ -159,6 +161,7 @@ public:
           }
       }
 
+      maps_file.close();
 
     size_t index = 0;
       numOfRegion = 0;
@@ -183,6 +186,6 @@ public:
     std::string _main_exe;
 };
 
-
+#endif
 
 #endif
