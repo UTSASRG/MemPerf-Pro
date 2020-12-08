@@ -133,9 +133,7 @@ public:
 #ifdef ENABLE_HP
     bool hugePage;
 #endif
-    static void updateCacheLines(uintptr_t uintaddr, unsigned long mega_index, unsigned page_index, unsigned int size, bool isFree);
-    static CacheMapEntry * getCacheMapEntry(map_tuple tuple);
-    static CacheMapEntry * getCacheMapEntry(unsigned long mega_idx, unsigned page_idx, unsigned cache_idx);
+    static void updateCacheLines(unsigned long mega_index, uint8_t page_index, uint8_t cache_index, uint8_t firstCacheLineOffset, unsigned int size, bool isFree);
     CacheMapEntry * getCacheMapEntry(bool mvBumpPtr = true);
     void clear();
     bool isTouched();
@@ -156,7 +154,7 @@ public:
 
 class ShadowMemory {
 private:
-    static unsigned updatePages(uintptr_t uintaddr, unsigned long mega_index, unsigned page_index, unsigned size, bool isFree);
+    static unsigned short updatePages(uintptr_t uintaddr, unsigned long mega_index, uint8_t page_index, unsigned int size, bool isFree);
 
     static PageMapEntry ** mega_map_begin;
     static PageMapEntry * page_map_begin;
