@@ -112,6 +112,7 @@ class CacheMapEntry {
     uint8_t getUsedBytes();
     void addUsedBytes(uint8_t num_bytes);
     void subUsedBytes(uint8_t num_bytes);
+    void updateCache(bool isFree, uint8_t num_bytes);
     void setFull();
     void setEmpty();
 };

@@ -616,20 +616,14 @@ void ShadowMemory::printAllPages() {
 // Accepts relative page and cache indices -- for example, mega_idx=n, page_idx=257, cache_idx=65 would
 // access mega_idx=n+1, page_idx=2, cache_idx=1.
 CacheMapEntry * PageMapEntry::getCacheMapEntry(unsigned long mega_idx, unsigned page_idx, unsigned cache_idx) {
-
-    unsigned target_cache_idx;
-    unsigned calc_overflow_pages;
-
-    target_cache_idx = cache_idx & CACHELINES_PER_PAGE_MASK;
-    calc_overflow_pages = cache_idx >> LOG2_NUM_CACHELINES_PER_PAGE;
+//fprintf(stderr, "unsigned long mega_idx = %lu, unsigned page_idx = %u, unsigned cache_idx = %u\n", mega_idx, page_idx, cache_idx);
+    unsigned target_cache_idx = cache_idx & CACHELINES_PER_PAGE_MASK;
+    unsigned calc_overflow_pages = cache_idx >> LOG2_NUM_CACHELINES_PER_PAGE;
 
     unsigned rel_page_idx = page_idx + calc_overflow_pages;
 
-    unsigned target_page_idx;
-    unsigned calc_overflow_megabytes;
-
-    target_page_idx = rel_page_idx & NUM_PAGES_PER_MEGABYTE_MASK;
-    calc_overflow_megabytes = rel_page_idx >> LOG2_NUM_PAGES_PER_MEGABYTE;
+    unsigned target_page_idx = rel_page_idx & NUM_PAGES_PER_MEGABYTE_MASK;
+    unsigned calc_overflow_megabytes = rel_page_idx >> LOG2_NUM_PAGES_PER_MEGABYTE;
 
     unsigned target_mega_idx = mega_idx + calc_overflow_megabytes;
 
@@ -662,23 +656,7 @@ void PageMapEntry::updateCacheLines(uintptr_t uintaddr, unsigned long mega_index
         } else {
             curCacheLineBytes = size_remain;
         }
-        if (isFree) {
-            current->subUsedBytes(curCacheLineBytes);
-            if (current->falseSharingStatus != PASSIVE) {
-                if (current->lastAFThreadIndex != ThreadLocalStatus::runningThreadIndex && current->allocated == false) {
-                    current->falseSharingStatus = PASSIVE;
-                }
-                current->lastAFThreadIndex = ThreadLocalStatus::runningThreadIndex;
-            }
-        } else {
-            current->addUsedBytes(curCacheLineBytes);
-            if (current->falseSharingStatus != PASSIVE) {
-                if (current->lastAFThreadIndex != ThreadLocalStatus::runningThreadIndex && current->allocated == true) {
-                    current->falseSharingStatus = ACTIVE;
-                }
-                current->lastAFThreadIndex = ThreadLocalStatus::runningThreadIndex;
-            }
-        }
+        current->updateCache(isFree, curCacheLineBytes);
         curCacheLineIdx++;
         size_remain -= curCacheLineBytes;
 
@@ -701,26 +679,7 @@ void PageMapEntry::updateCacheLines(uintptr_t uintaddr, unsigned long mega_index
     }
 
     current = getCacheMapEntry(mega_index, page_index, curCacheLineIdx++);
-
-    if (isFree) {
-        current->subUsedBytes(size_remain);
-        if (current->falseSharingStatus != PASSIVE) {
-            if (current->lastAFThreadIndex != ThreadLocalStatus::runningThreadIndex && current->allocated == false) {
-                current->falseSharingStatus = PASSIVE;
-            }
-            current->lastAFThreadIndex = ThreadLocalStatus::runningThreadIndex;
-            current->allocated = false;
-        }
-    } else {
-        current->addUsedBytes(size_remain);
-        if (current->falseSharingStatus != PASSIVE) {
-            if (current->lastAFThreadIndex != ThreadLocalStatus::runningThreadIndex && current->allocated == true) {
-                current->falseSharingStatus = ACTIVE;
-            }
-            current->lastAFThreadIndex = ThreadLocalStatus::runningThreadIndex;
-            current->allocated = true;
-        }
-    }
+    current->updateCache(isFree, size_remain);
 }
 
 inline CacheMapEntry * PageMapEntry::getCacheMapEntry(bool mvBumpPtr) {
@@ -872,6 +831,26 @@ inline void CacheMapEntry::addUsedBytes(uint8_t num_bytes) {
 
 inline void CacheMapEntry::subUsedBytes(uint8_t num_bytes) {
     num_used_bytes -= num_bytes;
+}
+
+void CacheMapEntry::updateCache(bool isFree, uint8_t num_bytes) {
+    if (isFree) {
+        subUsedBytes(num_bytes);
+        if (falseSharingStatus != PASSIVE) {
+            if (lastAFThreadIndex != ThreadLocalStatus::runningThreadIndex && allocated == false) {
+                falseSharingStatus = PASSIVE;
+            }
+            lastAFThreadIndex = ThreadLocalStatus::runningThreadIndex;
+        }
+    } else {
+        addUsedBytes(num_bytes);
+        if (falseSharingStatus != PASSIVE) {
+            if (lastAFThreadIndex != ThreadLocalStatus::runningThreadIndex && allocated == true) {
+                falseSharingStatus = ACTIVE;
+            }
+            lastAFThreadIndex = ThreadLocalStatus::runningThreadIndex;
+        }
+    }
 }
 
 inline void CacheMapEntry::setFull() {
