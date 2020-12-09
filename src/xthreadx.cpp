@@ -11,8 +11,8 @@ int xthreadx::thread_create(pthread_t * tid, const pthread_attr_t * attr, thread
         Predictor::outsideCountingEventsStart();
         Predictor::outsideCycleStart();
     }
-
     thread_t * children = (thread_t *) MyMalloc::xthreadMalloc(sizeof(thread_t));
+//    thread_t * children = (thread_t *) MyMalloc::malloc(sizeof(thread_t));
     children->thread = tid;
     children->startArg = arg;
     children->startRoutine = fn;
@@ -54,10 +54,12 @@ void * xthreadx::startThread(void * arg) {
     }
 #endif
 
-    MyMalloc::initializeForThreadLocalXthreadMemory(ThreadLocalStatus::runningThreadIndex);
+//    MyMalloc::initializeForThreadLocalXthreadMemory(ThreadLocalStatus::runningThreadIndex);
     MyMalloc::initializeForThreadLocalHashMemory(ThreadLocalStatus::runningThreadIndex);
+#ifdef ENABLE_PRECISE_BLOWUP
     MyMalloc::initializeForThreadLocalShadowMemory(ThreadLocalStatus::runningThreadIndex);
-    MyMalloc::initializeForThreadLocalMemory();
+#endif
+//    MyMalloc::initializeForThreadLocalMemory();
     lockUsage.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_LOCK_NUM);
 
     Predictor::threadInit();
@@ -90,10 +92,12 @@ void xthreadx::threadExit() {
 
     GlobalStatus::globalize();
 
-    MyMalloc::finalizeForThreadLocalXthreadMemory(ThreadLocalStatus::runningThreadIndex);
+//    MyMalloc::finalizeForThreadLocalXthreadMemory(ThreadLocalStatus::runningThreadIndex);
     MyMalloc::finalizeForThreadLocalHashMemory(ThreadLocalStatus::runningThreadIndex);
+#ifdef ENABLE_PRECISE_BLOWUP
     MyMalloc::finalizeForThreadLocalShadowMemory(ThreadLocalStatus::runningThreadIndex);
-    MyMalloc::finalizeForThreadLocalMemory();
+#endif
+//    MyMalloc::finalizeForThreadLocalMemory();
 }
 
 int xthreadx::thread_join(pthread_t thread, void ** retval) {

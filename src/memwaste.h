@@ -16,9 +16,7 @@
 class ProgramStatus;
 
 struct ObjectStatus{
-#ifdef PRINT_LEAK_OBJECTS
     bool allocated = false;
-#endif
     bool mark = false;
 #ifdef OPEN_BACKTRACE
     uint8_t callsiteKey = 0;

@@ -57,19 +57,19 @@ void Backtrace::init() {
     BTMemMapRecord.initialize(HashFuncs::hashCharInt, HashFuncs::compareCharInt, MAX_BT_ADDR_NUM);
 }
 
-uint8_t numberOfCK;
+//uint8_t numberOfCK;
 
 //void * returnAddr = (void*)*((uint64_t*)((uint64_t)stackTop+(uint64_t)284));
 //void * returnAddr = (void*)*((uint64_t*)((uint64_t)stackTop+(uint64_t)252));
 uint8_t Backtrace::doABackTrace(unsigned int size) {
     void * stackTop = &size;
     void * returnAddr = (void*)*((uint64_t*)((uint64_t)stackTop+(uint64_t)268));
-    uint8_t callsiteKey = (uint8_t)((ThreadLocalStatus::getStackOffset(stackTop)+(uint64_t)returnAddr)/16);
+    uint8_t callsiteKey = (uint8_t)((ThreadLocalStatus::getStackOffset(stackTop)+(uint64_t)returnAddr)>>4);
     BackTraceMemory * status = BTMemMap.find(callsiteKey, sizeof(uint8_t));
     if(status == nullptr) {
         status = BTMemMap.insert(callsiteKey, sizeof(uint8_t), BackTraceMemory::newBackTraceMemory());
         status->numberOfFrame = backtrace(status->frames, 7);
-        numberOfCK++;
+//        numberOfCK++;
 
 //        fprintf(stderr, "%d new key: %u, %p, %llu, %p, %d\n", numberOfCK, callsiteKey, stackTop, ThreadLocalStatus::getStackOffset(stackTop), returnAddr, ThreadLocalStatus::runningThreadIndex);
 //        for(int f = 4; f < status->numberOfFrame; ++f) {
@@ -77,6 +77,7 @@ uint8_t Backtrace::doABackTrace(unsigned int size) {
 //        }
 //        abort();
     }
+//    status->memAllocated += size;
     __atomic_add_fetch(&status->memAllocated, size, __ATOMIC_RELAXED);
     return callsiteKey;
 }
@@ -87,6 +88,7 @@ void Backtrace::subMem(uint8_t callsiteKey, unsigned int size) {
         return;
     }
     __atomic_sub_fetch(&status->memAllocated, size, __ATOMIC_RELAXED);
+//    fprintf(stderr, "key = %u, sub size = %u, size = %lu\n", callsiteKey, size, status->memAllocated);
 }
 
 void Backtrace::recordMem() {
@@ -94,13 +96,14 @@ void Backtrace::recordMem() {
 }
 
 void Backtrace::debugPrintOutput() {
-    fprintf(stderr, "numkeys = %d\n", numberOfCK);
+//    fprintf(stderr, "numkeys = %d\n", numberOfCK);
     uint8_t numOfBT = 0;
     BTAddrMemPair BTqueue[MAX_BT_ADDR_NUM];
 
     for(auto entryInHashTable: BTMemMap) {
         BackTraceMemory *status = entryInHashTable.getValue();
-        if (status->memAllocated / 1024) {
+//        if (status->memAllocated / 1024 && status->memAllocated / 1024 < ABNORMAL_VALUE) {
+        if (status->memAllocated / 1024 ) {
             BTqueue[numOfBT].memory = status->memAllocated / 1024;
             memcpy(BTqueue[numOfBT].frames, status->frames, 7 * (sizeof(void *)));
             BTqueue[numOfBT].numberOfFrame = status->numberOfFrame;
@@ -140,6 +143,7 @@ void Backtrace::printOutput() {
 
     for(auto entryInHashTable: BTMemMapRecord) {
         BackTraceMemory *status = entryInHashTable.getValue();
+//        if (status->memAllocated / 1024 && status->memAllocated / 1024 < ABNORMAL_VALUE) {
         if (status->memAllocated / 1024) {
             BTqueue[numOfBT].memory = status->memAllocated / 1024;
             memcpy(BTqueue[numOfBT].frames, status->frames, 7 * (sizeof(void *)));

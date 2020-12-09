@@ -190,13 +190,14 @@ void initPMU(void) {
 
 void sampleHandler(int signum, siginfo_t *info, void *p) {
 
-    if(!perfInfo.initialized || !isSamplingInit) {
+    if(!perfInfo.initialized || !isSamplingInit ) {
         return;
     }
 
     if(info->si_code == POLL_HUP) {
         Predictor::outsideCyclesStop();
 			doSampleRead();
+//			fprintf(stderr, "do a sample read, first allocation = %d, serial = %d\n", AllocatingStatus::firstAllocation, ThreadLocalStatus::totalNumOfThread);
 			ioctl(perfInfo.perf_fd, PERF_EVENT_IOC_REFRESH, OVERFLOW_INTERVAL);
 			ioctl(perfInfo.perf_fd2, PERF_EVENT_IOC_REFRESH, OVERFLOW_INTERVAL);
         Predictor::outsideCycleStart();

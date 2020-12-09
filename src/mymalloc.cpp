@@ -4,7 +4,7 @@
 void ProfilerMemory::initialize() {
     endPointer = (void *) ((uint64_t)startPointer + PROFILER_MEMORY_SIZE);
     overheadPointer = startPointer;
-    lock.init();
+//    lock.init();
     initialized = true;
 }
 
@@ -17,12 +17,12 @@ void ProfilerMemory::GetASpaceFromMemory(size_t size) {
     objectNum++;
 }
 
-void ProfilerMemory::checkIfMemoryOutOfBound() {
-    if(overheadPointer >= endPointer) {
-        fprintf(stderr, "out of profiler memory\n");
-        abort();
-    }
-}
+//void ProfilerMemory::checkIfMemoryOutOfBound() {
+//    if(overheadPointer >= endPointer) {
+//        fprintf(stderr, "out of profiler memory\n");
+//        abort();
+//    }
+//}
 
 void * ProfilerMemory::newObjectAddr(size_t size) {
     return (void *) ((uint64_t)overheadPointer - size);
@@ -32,21 +32,31 @@ void * ProfilerMemory::malloc(size_t size) {
     lock.lock();
     checkAndInitialize();
     GetASpaceFromMemory(size);
-    checkIfMemoryOutOfBound();
+//    checkIfMemoryOutOfBound();
     void * object = newObjectAddr(size);
     lock.unlock();
     return object;
 }
 
-void ProfilerMemory::free(void * addr) {
-    if(addr == nullptr) {
-        return;
-    }
-    objectNum--;
-    if(objectNum == 0) {
-        overheadPointer = startPointer;
-    }
+void * ProfilerMemory::mallocWithoutLock(size_t size) {
+//    lock.lock();
+    checkAndInitialize();
+    GetASpaceFromMemory(size);
+//    checkIfMemoryOutOfBound();
+    void * object = newObjectAddr(size);
+//    lock.unlock();
+    return object;
 }
+
+//void ProfilerMemory::free(void * addr) {
+//    if(addr == nullptr) {
+//        return;
+//    }
+//    objectNum--;
+//    if(objectNum == 0) {
+//        overheadPointer = startPointer;
+//    }
+//}
 
 bool ProfilerMemory::inMemory(void * addr) {
     return(addr >= startPointer && addr <= endPointer);
@@ -55,7 +65,7 @@ bool ProfilerMemory::inMemory(void * addr) {
 bool ProfilerMemory::ifInProfilerMemoryThenFree(void * addr) {
     checkAndInitialize();
     if(inMemory(addr)) {
-        free(addr);
+//        free(addr);
         return true;
     }
     return false;
@@ -80,12 +90,12 @@ void MMAPProfilerMemory::GetASpaceFromMemory(size_t size) {
     objectNum++;
 }
 
-void MMAPProfilerMemory::checkIfMemoryOutOfBound() {
-    if(overheadPointer >= endPointer) {
-        fprintf(stderr, "MMAPProfilerMemory used up\n");
-        abort();
-    }
-}
+//void MMAPProfilerMemory::checkIfMemoryOutOfBound() {
+//    if(overheadPointer >= endPointer) {
+//        fprintf(stderr, "MMAPProfilerMemory used up\n");
+//        abort();
+//    }
+//}
 
 void * MMAPProfilerMemory::newObjectAddr(size_t size) {
     return (void *) ((uint64_t)overheadPointer - size);
@@ -93,19 +103,19 @@ void * MMAPProfilerMemory::newObjectAddr(size_t size) {
 
 void * MMAPProfilerMemory::malloc(size_t size) {
     GetASpaceFromMemory(size);
-    checkIfMemoryOutOfBound();
+//    checkIfMemoryOutOfBound();
     return newObjectAddr(size);
 }
 
-void MMAPProfilerMemory::free(void * addr) {
-    if(addr == nullptr) {
-        return;
-    }
-    objectNum--;
-    if(objectNum == 0) {
-        overheadPointer = startPointer;
-    }
-}
+//void MMAPProfilerMemory::free(void * addr) {
+//    if(addr == nullptr) {
+//        return;
+//    }
+//    objectNum--;
+//    if(objectNum == 0) {
+//        overheadPointer = startPointer;
+//    }
+//}
 
 bool MMAPProfilerMemory::inMemory(void * addr) {
     return(addr >= startPointer && addr <= endPointer);
@@ -113,7 +123,7 @@ bool MMAPProfilerMemory::inMemory(void * addr) {
 
 bool MMAPProfilerMemory::ifInProfilerMemoryThenFree(void * addr) {
     if(inMemory(addr)) {
-        free(addr);
+//        free(addr);
         return true;
     }
     return false;
@@ -121,41 +131,45 @@ bool MMAPProfilerMemory::ifInProfilerMemoryThenFree(void * addr) {
 
 
 ProfilerMemory MyMalloc::profilerMemory;
-ProfilerMemory MyMalloc::profilerHashMemory;
+//ProfilerMemory MyMalloc::profilerHashMemory;
 ProfilerMemory MyMalloc::profilerXthreadMemory;
+#ifdef ENABLE_PRECISE_BLOWUP
 ProfilerMemory MyMalloc::profilerShadowMemory;
-MMAPProfilerMemory MyMalloc::threadLocalProfilerMemory[MAX_THREAD_NUMBER];
+#endif
+//MMAPProfilerMemory MyMalloc::threadLocalProfilerMemory[MAX_THREAD_NUMBER];
 MMAPProfilerMemory MyMalloc::threadLocalProfilerHashMemory[MAX_THREAD_NUMBER];
-MMAPProfilerMemory MyMalloc::threadLocalProfilerXthreadMemory[MAX_THREAD_NUMBER];
+//MMAPProfilerMemory MyMalloc::threadLocalProfilerXthreadMemory[MAX_THREAD_NUMBER];
+#ifdef ENABLE_PRECISE_BLOWUP
 MMAPProfilerMemory MyMalloc::threadLocalProfilerShadowMemory[MAX_THREAD_NUMBER];
+#endif
 
 #ifdef OPEN_DEBUG
 spinlock MyMalloc::debugLock;
 #endif
 
-void MyMalloc::initializeForThreadLocalMemory() {
-    threadLocalProfilerMemory[ThreadLocalStatus::runningThreadIndex].initialize(MMAP_PROFILER_MEMORY_SIZE);
-}
-
-void MyMalloc::finalizeForThreadLocalMemory() {
-    threadLocalProfilerMemory[ThreadLocalStatus::runningThreadIndex].finalize();
-}
-
-bool MyMalloc::threadLocalMemoryInitialized() {
-    return threadLocalProfilerMemory[ThreadLocalStatus::runningThreadIndex].initialized;
-}
-
-void MyMalloc::initializeForThreadLocalMemory(unsigned int threadIndex) {
-    threadLocalProfilerMemory[threadIndex].initialize(MMAP_PROFILER_MEMORY_SIZE);
-}
-
-void MyMalloc::finalizeForThreadLocalMemory(unsigned int threadIndex) {
-    threadLocalProfilerMemory[threadIndex].finalize();
-}
-
-bool MyMalloc::threadLocalMemoryInitialized(unsigned int threadIndex) {
-    return threadLocalProfilerMemory[threadIndex].initialized;
-}
+//void MyMalloc::initializeForThreadLocalMemory() {
+//    threadLocalProfilerMemory[ThreadLocalStatus::runningThreadIndex].initialize(MMAP_PROFILER_MEMORY_SIZE);
+//}
+//
+//void MyMalloc::finalizeForThreadLocalMemory() {
+//    threadLocalProfilerMemory[ThreadLocalStatus::runningThreadIndex].finalize();
+//}
+//
+//bool MyMalloc::threadLocalMemoryInitialized() {
+//    return threadLocalProfilerMemory[ThreadLocalStatus::runningThreadIndex].initialized;
+//}
+//
+//void MyMalloc::initializeForThreadLocalMemory(unsigned int threadIndex) {
+//    threadLocalProfilerMemory[threadIndex].initialize(MMAP_PROFILER_MEMORY_SIZE);
+//}
+//
+//void MyMalloc::finalizeForThreadLocalMemory(unsigned int threadIndex) {
+//    threadLocalProfilerMemory[threadIndex].finalize();
+//}
+//
+//bool MyMalloc::threadLocalMemoryInitialized(unsigned int threadIndex) {
+//    return threadLocalProfilerMemory[threadIndex].initialized;
+//}
 
 
 
@@ -184,34 +198,34 @@ void MyMalloc::finalizeForThreadLocalHashMemory(unsigned int threadIndex) {
 bool MyMalloc::threadLocalHashMemoryInitialized(unsigned int threadIndex) {
     return threadLocalProfilerHashMemory[threadIndex].initialized;
 }
+//
+//
+//
+//void MyMalloc::initializeForThreadLocalXthreadMemory() {
+//    threadLocalProfilerXthreadMemory[ThreadLocalStatus::runningThreadIndex].initialize(MMAP_PROFILER_XTHREAD_MEMORY_SIZE);
+//}
+//
+//void MyMalloc::finalizeForThreadLocalXthreadMemory() {
+//    threadLocalProfilerXthreadMemory[ThreadLocalStatus::runningThreadIndex].finalize();
+//}
 
+//bool MyMalloc::threadLocalXthreadMemoryInitialized() {
+//    return threadLocalProfilerXthreadMemory[ThreadLocalStatus::runningThreadIndex].initialized;
+//}
 
+//void MyMalloc::initializeForThreadLocalXthreadMemory(unsigned int threadIndex) {
+//    threadLocalProfilerXthreadMemory[threadIndex].initialize(MMAP_PROFILER_XTHREAD_MEMORY_SIZE);
+//}
+//
+//void MyMalloc::finalizeForThreadLocalXthreadMemory(unsigned int threadIndex) {
+//    threadLocalProfilerXthreadMemory[threadIndex].finalize();
+//}
 
-void MyMalloc::initializeForThreadLocalXthreadMemory() {
-    threadLocalProfilerXthreadMemory[ThreadLocalStatus::runningThreadIndex].initialize(MMAP_PROFILER_XTHREAD_MEMORY_SIZE);
-}
+//bool MyMalloc::threadLocalXthreadMemoryInitialized(unsigned int threadIndex) {
+//    return threadLocalProfilerXthreadMemory[threadIndex].initialized;
+//}
 
-void MyMalloc::finalizeForThreadLocalXthreadMemory() {
-    threadLocalProfilerXthreadMemory[ThreadLocalStatus::runningThreadIndex].finalize();
-}
-
-bool MyMalloc::threadLocalXthreadMemoryInitialized() {
-    return threadLocalProfilerXthreadMemory[ThreadLocalStatus::runningThreadIndex].initialized;
-}
-
-void MyMalloc::initializeForThreadLocalXthreadMemory(unsigned int threadIndex) {
-    threadLocalProfilerXthreadMemory[threadIndex].initialize(MMAP_PROFILER_XTHREAD_MEMORY_SIZE);
-}
-
-void MyMalloc::finalizeForThreadLocalXthreadMemory(unsigned int threadIndex) {
-    threadLocalProfilerXthreadMemory[threadIndex].finalize();
-}
-
-bool MyMalloc::threadLocalXthreadMemoryInitialized(unsigned int threadIndex) {
-    return threadLocalProfilerXthreadMemory[threadIndex].initialized;
-}
-
-
+#ifdef ENABLE_PRECISE_BLOWUP
 void MyMalloc::initializeForThreadLocalShadowMemory() {
     threadLocalProfilerShadowMemory[ThreadLocalStatus::runningThreadIndex].initialize(MMAP_PROFILER_SHADOW_MEMORY_SIZE);
 }
@@ -235,53 +249,54 @@ void MyMalloc::finalizeForThreadLocalShadowMemory(unsigned int threadIndex) {
 bool MyMalloc::threadLocalShadowMemoryInitialized(unsigned int threadIndex) {
     return threadLocalProfilerShadowMemory[threadIndex].initialized;
 }
-
+#endif
 
 void * MyMalloc::malloc(size_t size) {
-    if(threadLocalMemoryInitialized()) {
-        return threadLocalProfilerMemory[ThreadLocalStatus::runningThreadIndex].malloc(size);
-    }
-    return profilerMemory.malloc(size);
+//    if(threadLocalMemoryInitialized()) {
+//        return threadLocalProfilerMemory[ThreadLocalStatus::runningThreadIndex].malloc(size);
+//    }
+//    return profilerMemory.malloc(size);
+    return profilerMemory.mallocWithoutLock(size);
 }
 
 bool MyMalloc::ifInProfilerMemoryThenFree(void * addr) {
-    if(threadLocalMemoryInitialized()) {
-        if(threadLocalProfilerMemory[ThreadLocalStatus::runningThreadIndex].ifInProfilerMemoryThenFree(addr)) {
-            return true;
-        }
-    }
-    for(unsigned short threadIndex = 0; threadIndex < ThreadLocalStatus::totalNumOfThread; ++threadIndex) {
-        if(threadIndex != (unsigned int)ThreadLocalStatus::runningThreadIndex && threadLocalMemoryInitialized(threadIndex)) {
-            if(threadLocalProfilerMemory[threadIndex].ifInProfilerMemoryThenFree(addr)) {
-                return true;
-            }
-        }
-    }
+//    if(threadLocalMemoryInitialized()) {
+//        if(threadLocalProfilerMemory[ThreadLocalStatus::runningThreadIndex].ifInProfilerMemoryThenFree(addr)) {
+//            return true;
+//        }
+//    }
+//    for(unsigned short threadIndex = 0; threadIndex < ThreadLocalStatus::totalNumOfThread; ++threadIndex) {
+//        if(threadIndex != ThreadLocalStatus::runningThreadIndex && threadLocalMemoryInitialized(threadIndex)) {
+//            if(threadLocalProfilerMemory[threadIndex].ifInProfilerMemoryThenFree(addr)) {
+//                return true;
+//            }
+//        }
+//    }
     return profilerMemory.ifInProfilerMemoryThenFree(addr);
 }
 
 void * MyMalloc::hashMalloc(size_t size) {
     void * object;
-    if(threadLocalHashMemoryInitialized()) {
-//        fprintf(stderr, "here");
+//    if(threadLocalHashMemoryInitialized()) {
         object = threadLocalProfilerHashMemory[ThreadLocalStatus::runningThreadIndex].malloc(size);
-    } else {
-//        fprintf(stderr, "here2");
-        object = profilerHashMemory.malloc(size);
-    }
+//    } else {
+//        object = profilerHashMemory.malloc(size);
+//    }
     return object;
 }
 
 void * MyMalloc::xthreadMalloc(size_t size) {
     void * object;
-    if(threadLocalXthreadMemoryInitialized()) {
-        object = threadLocalProfilerXthreadMemory[ThreadLocalStatus::runningThreadIndex].malloc(size);
-    } else {
-        object = profilerXthreadMemory.malloc(size);
-    }
+//    if(threadLocalXthreadMemoryInitialized()) {
+//        object = threadLocalProfilerXthreadMemory[ThreadLocalStatus::runningThreadIndex].malloc(size);
+//    } else {
+        object = profilerXthreadMemory.mallocWithoutLock(size);
+//    object = profilerMemory.mallocWithoutLock(size);
+
+//    }
     return object;
 }
-
+#ifdef ENABLE_PRECISE_BLOWUP
 void * MyMalloc::shadowMalloc(size_t size) {
     void * object;
     if(threadLocalShadowMemoryInitialized()) {
@@ -291,3 +306,4 @@ void * MyMalloc::shadowMalloc(size_t size) {
     }
     return object;
 }
+#endif

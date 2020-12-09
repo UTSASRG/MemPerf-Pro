@@ -69,7 +69,7 @@ void MemoryWasteStatus::initialize() {
 //    memset(numOfAccumulatedOperations.numOfFree, 0, sizeOfArrays);
 //    memset(blowupFlag, 0, ProgramStatus::numberOfClassSizes * sizeof(uint64_t));
 
-    lock.init();
+//    lock.init();
 }
 
 #ifdef OPEN_DEBUG
@@ -281,11 +281,9 @@ AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(unsigned int size, voi
 #ifdef OPEN_BACKTRACE
 //    if(callsiteKey) {
         status->callsiteKey = callsiteKey;
-        #ifdef PRINT_LEAK_OBJECTS
-        status->allocated = true;
-        #endif
 //    }
 #endif
+    status->allocated = true;
     status->tid = ThreadLocalStatus::runningThreadIndex;
     hashLocksSet.unlock(address);
 
@@ -306,7 +304,7 @@ AllocatingTypeWithSizeGotFromMemoryWaste MemoryWaste::freeUpdate(void* address) 
     hashLocksSet.lock(address);
     /* Get old status */
     ObjectStatus* status = objStatusMap.find(address, sizeof(void *));
-    if(status == nullptr) {
+    if(status == nullptr || status->allocated == false) {
         hashLocksSet.unlock(address);
         return AllocatingTypeWithSizeGotFromMemoryWaste{0, AllocatingTypeGotFromMemoryWaste{false, 0, 0}};
     }
@@ -318,10 +316,8 @@ AllocatingTypeWithSizeGotFromMemoryWaste MemoryWaste::freeUpdate(void* address) 
         Backtrace::subMem(status->callsiteKey, status->sizeClassSizeAndIndex.size);
 //        status->callsiteKey = 0;
 //    }
-#ifdef PRINT_LEAK_OBJECTS
+#endif
     status->allocated = false;
-#endif
-#endif
     hashLocksSet.unlock(address);
 
     currentStatus.numOfAccumulatedOperations.numOfFree[arrayIndex()]++;

@@ -79,7 +79,7 @@ bool ShadowMemory::initialize() {
 	return true;
 }
 
-size_t ShadowMemory::updateObject(void * address, unsigned int size, bool isFree) {
+unsigned int ShadowMemory::updateObject(void * address, unsigned int size, bool isFree) {
     if(address == nullptr || size == 0) {
         return 0;
     }
@@ -101,19 +101,20 @@ size_t ShadowMemory::updateObject(void * address, unsigned int size, bool isFree
         abort();
     }
     uint8_t firstPageIdx = ((uintaddr & MEGABYTE_MASK) >> LOG2_PAGESIZE);
-    unsigned short numNewPagesTouched = updatePages(uintaddr, mega_index, firstPageIdx, size, isFree);
+    unsigned int numNewPagesTouched = updatePages(uintaddr, mega_index, firstPageIdx, size, isFree);
     uint8_t firstCacheLineOffset = (uintaddr & CACHELINE_SIZE_MASK);
     uint8_t curCacheLineIdx = ((uintaddr & PAGESIZE_MASK) >> LOG2_CACHELINE_SIZE);
     PageMapEntry::updateCacheLines(mega_index, firstPageIdx, curCacheLineIdx, firstCacheLineOffset, size, isFree);
+
     return numNewPagesTouched * PAGESIZE;
 }
 
-unsigned short ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_index, uint8_t page_index, unsigned int size, bool isFree) {
+unsigned int ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_index, uint8_t page_index, unsigned int size, bool isFree) {
 
     unsigned curPageIdx;
     unsigned firstPageOffset;
     unsigned int curPageBytes;
-    unsigned short numNewPagesTouched = 0;
+    unsigned int numNewPagesTouched = 0;
     int64_t size_remain = size;
     PageMapEntry * current;
 

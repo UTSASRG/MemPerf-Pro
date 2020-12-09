@@ -57,7 +57,6 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
 #endif
     RealX::initializer();
     ShadowMemory::initialize();
-    ThreadLocalStatus::setStackStartAddress(&argc);
     ThreadLocalStatus::addARunningThread();
     ThreadLocalStatus::getARunningThreadIndex();
 
@@ -83,14 +82,18 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
 #ifdef OPEN_BACKTRACE
     Backtrace::init();
 #endif
-    MyMalloc::initializeForThreadLocalXthreadMemory(ThreadLocalStatus::runningThreadIndex);
+//    MyMalloc::initializeForThreadLocalXthreadMemory(ThreadLocalStatus::runningThreadIndex);
     MyMalloc::initializeForThreadLocalHashMemory(ThreadLocalStatus::runningThreadIndex);
+#ifdef ENABLE_PRECISE_BLOWUP
     MyMalloc::initializeForThreadLocalShadowMemory(ThreadLocalStatus::runningThreadIndex);
-    MyMalloc::initializeForThreadLocalMemory();
-    Predictor::globalInit();
-#ifdef OPEN_SAMPLING_EVENT
-    initPMU();
 #endif
+//    MyMalloc::initializeForThreadLocalMemory();
+    Predictor::globalInit();
+//#ifdef OPEN_SAMPLING_EVENT
+//    initPMU();
+//#endif
+
+    ThreadLocalStatus::setStackStartAddress(&argc);
 
     Predictor::outsideCountingEventsStart();
     Predictor::outsideCycleStart();
@@ -100,6 +103,7 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
 
 	return real_main_mallocprof (argc, argv, envp);
 }
+
 
 extern "C" int __libc_start_main(main_fn_t, int, char **, void (*)(), void (*)(), void (*)(), void *) __attribute__((weak, alias("libmallocprof_libc_start_main")));
 
@@ -122,29 +126,49 @@ extern "C" {
         if(!AllocatingStatus::outsideTrackedAllocation() || ProgramStatus::conclusionHasStarted()) {
             return RealX::malloc(sz);
         }
-#ifdef OPEN_COUNTING_EVENT
+        void * object;
         if(AllocatingStatus::isFirstFunction()) {
+            if(ThreadLocalStatus::runningThreadIndex) {
+#ifdef OPEN_COUNTING_EVENT
 #ifdef OPEN_SAMPLING_EVENT
-            pauseSampling();
+                pauseSampling();
 #endif
-            setupCounting();
+                setupCounting();
 #ifdef OPEN_SAMPLING_EVENT
-            restartSampling();
+                restartSampling();
 #endif
+#endif
+                Predictor::outsideCyclesStop();
+                AllocatingStatus::updateAllocatingStatusBeforeRealFunction(MALLOC, sz);
+                object = RealX::malloc(sz);
+                AllocatingStatus::updateAllocatingStatusAfterRealFunction(object);
+                AllocatingStatus::updateAllocatingInfoToThreadLocalData();
+                AllocatingStatus::updateAllocatingInfoToPredictor();
+                Predictor::outsideCycleStart();
+            } else {
+#ifdef OPEN_COUNTING_EVENT
+                setupCounting();
+#endif
+                Predictor::outsideCyclesStop();
+                AllocatingStatus::updateAllocatingStatusBeforeRealFunction(MALLOC, sz);
+                object = RealX::malloc(sz);
+                AllocatingStatus::updateAllocatingStatusAfterRealFunction(object);
+                AllocatingStatus::updateAllocatingInfoToThreadLocalData();
+                AllocatingStatus::updateAllocatingInfoToPredictor();
+                Predictor::outsideCycleStart();
+#ifdef OPEN_SAMPLING_EVENT
+                initPMU();
+#endif
+            }
+        } else {
+            Predictor::outsideCyclesStop();
+            AllocatingStatus::updateAllocatingStatusBeforeRealFunction(MALLOC, sz);
+            object = RealX::malloc(sz);
+            AllocatingStatus::updateAllocatingStatusAfterRealFunction(object);
+            AllocatingStatus::updateAllocatingInfoToThreadLocalData();
+            AllocatingStatus::updateAllocatingInfoToPredictor();
+            Predictor::outsideCycleStart();
         }
-#endif
-
-        Predictor::outsideCyclesStop();
-        AllocatingStatus::updateAllocatingStatusBeforeRealFunction(MALLOC, sz);
-//        if(ThreadLocalStatus::runningThreadIndex == 1) {
-//            fprintf(stderr, "sz = %lu\n", sz);
-//        }
-		void * object = RealX::malloc(sz);
-        AllocatingStatus::updateAllocatingStatusAfterRealFunction(object);
-        AllocatingStatus::updateAllocatingInfoToThreadLocalData();
-        AllocatingStatus::updateAllocatingInfoToPredictor();
-        Predictor::outsideCycleStart();
-//        fprintf(stderr, "%lu allocate object %p\n", ThreadLocalStatus::runningThreadIndex, object);
         return object;
 
 	}
@@ -195,7 +219,7 @@ extern "C" {
 #endif
         }
 #endif
-//        fprintf(stderr, "%lu free object %p\n", ThreadLocalStatus::runningThreadIndex, ptr);
+//        fprintf(stderr, "free object %p\n", ptr);
         Predictor::outsideCyclesStop();
         AllocatingStatus::updateFreeingStatusBeforeRealFunction(FREE, ptr);
         RealX::free(ptr);

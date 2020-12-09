@@ -154,7 +154,7 @@ public:
 
 class ShadowMemory {
 private:
-    static unsigned short updatePages(uintptr_t uintaddr, unsigned long mega_index, uint8_t page_index, unsigned int size, bool isFree);
+    static unsigned int updatePages(uintptr_t uintaddr, unsigned long mega_index, uint8_t page_index, unsigned int size, bool isFree);
 
     static PageMapEntry ** mega_map_begin;
     static PageMapEntry * page_map_begin;
@@ -193,7 +193,7 @@ public:
     static PageMapEntry * doPageMapBumpPointer();
     static PageMapEntry * getPageMapEntry(void * address);
     static PageMapEntry * getPageMapEntry(unsigned long mega_idx, unsigned page_idx);
-    static size_t updateObject(void * address, unsigned int size, bool isFree);
+    static unsigned int updateObject(void * address, unsigned int size, bool isFree);
     static map_tuple getMapTupleByAddress(uintptr_t uintaddr);
 #ifdef ENABLE_HP
     static void setHugePagesInit();
