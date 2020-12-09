@@ -132,7 +132,7 @@ bool MMAPProfilerMemory::ifInProfilerMemoryThenFree(void * addr) {
 
 ProfilerMemory MyMalloc::profilerMemory;
 //ProfilerMemory MyMalloc::profilerHashMemory;
-ProfilerMemory MyMalloc::profilerXthreadMemory;
+//ProfilerMemory MyMalloc::profilerXthreadMemory;
 #ifdef ENABLE_PRECISE_BLOWUP
 ProfilerMemory MyMalloc::profilerShadowMemory;
 #endif
@@ -285,17 +285,17 @@ void * MyMalloc::hashMalloc(size_t size) {
     return object;
 }
 
-void * MyMalloc::xthreadMalloc(size_t size) {
-    void * object;
-//    if(threadLocalXthreadMemoryInitialized()) {
-//        object = threadLocalProfilerXthreadMemory[ThreadLocalStatus::runningThreadIndex].malloc(size);
-//    } else {
-        object = profilerXthreadMemory.mallocWithoutLock(size);
-//    object = profilerMemory.mallocWithoutLock(size);
-
-//    }
-    return object;
-}
+//void * MyMalloc::xthreadMalloc(size_t size) {
+//    void * object;
+////    if(threadLocalXthreadMemoryInitialized()) {
+////        object = threadLocalProfilerXthreadMemory[ThreadLocalStatus::runningThreadIndex].malloc(size);
+////    } else {
+//        object = profilerXthreadMemory.mallocWithoutLock(size);
+////    object = profilerMemory.mallocWithoutLock(size);
+//
+////    }
+//    return object;
+//}
 #ifdef ENABLE_PRECISE_BLOWUP
 void * MyMalloc::shadowMalloc(size_t size) {
     void * object;

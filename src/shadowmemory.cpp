@@ -109,23 +109,16 @@ unsigned int ShadowMemory::updateObject(void * address, unsigned int size, bool 
     return numNewPagesTouched * PAGESIZE;
 }
 
-unsigned int ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_index, uint8_t page_index, unsigned int size, bool isFree) {
+unsigned int ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_index, uint8_t page_index, int64_t size, bool isFree) {
 
-    unsigned curPageIdx;
-    unsigned firstPageOffset;
-    unsigned int curPageBytes;
     unsigned int numNewPagesTouched = 0;
-    int64_t size_remain = size;
-    PageMapEntry * current;
 
-    curPageIdx = page_index;
     // First test to determine whether this object begins on a page boundary. If not, then we must
     // increment the used bytes field of the first page separately.
 
+#if (defined(ENABLE_HP) || defined(ENABLE_THP))
     //Huge Page Check
     bool hugePageTouched = false;
-
-#if (defined(ENABLE_HP) || defined(ENABLE_THP))
     hugePageTouched = (getPageMapEntry(mega_index/2*2, 0)->hugePage) || inHPInitRange((void *)uintaddr);
     if(hugePageTouched) {
         for(unsigned long m = mega_index/2*2; m <= (mega_index+(alignup(size, PAGESIZE_HUGE)/ONE_MB)-1)/2*2+1; m+=2) {
@@ -141,48 +134,52 @@ unsigned int ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_in
     }
 #endif
 
-    firstPageOffset = (uintaddr & PAGESIZE_MASK);
+    unsigned firstPageOffset = uintaddr & PAGESIZE_MASK;
+    unsigned int curPageBytes = MIN(PAGESIZE - firstPageOffset, size);
+    PageMapEntry ** mega_entry = getMegaMapEntry(mega_index);
+    PageMapEntry * current = (*mega_entry + page_index);
+    if(isFree) {
+        current->subUsedBytes(curPageBytes);
+    } else {
+        current->addUsedBytes(curPageBytes);
 
-    if(firstPageOffset > 0) {
-        // Fetch the page map entry for the page located in the specified megabyte.
-        current = getPageMapEntry(mega_index, curPageIdx);
-        if(firstPageOffset + size_remain >= PAGESIZE) {
-            curPageBytes = PAGESIZE - firstPageOffset;
-        } else {
-            curPageBytes = size_remain;
-        }
-        if(isFree) {
-            current->subUsedBytes(curPageBytes);
-        } else {
-            current->addUsedBytes(curPageBytes);
-            if(!hugePageTouched && !current->isTouched()) {
-                current->setTouched();
-                numNewPagesTouched++;
-                if(current->donatedBySyscall) {
-                    Predictor::faultedPages++;
-                }
+#if (defined(ENABLE_HP) || defined(ENABLE_THP))
+        if(!hugePageTouched && !current->isTouched()) {
+#else
+        if(!current->isTouched()) {
+#endif
+            current->setTouched();
+            numNewPagesTouched++;
+            if(current->donatedBySyscall) {
+                Predictor::faultedPages++;
             }
         }
-        size_remain -= curPageBytes;
-        curPageIdx++;
     }
+    size -= curPageBytes;
+    page_index++;
+
     // Next, loop until we have accounted for all object bytes...
-    while(size_remain > 0) {
-        current = getPageMapEntry(mega_index, curPageIdx);
-        // If we still have at least a page of the object's size left to process, we can start
-        // setting the target pages' used bytes to PAGESIZE, as nothing else should be located
-        // there.
-        if((size_t)size_remain >= PAGESIZE) {
-            curPageBytes = PAGESIZE;
+    while(size >= PAGESIZE) {
+
+        if(page_index == NUM_PAGES_PER_MEGABYTE) {
+            mega_index++;
+            page_index = 0;
+            mega_entry = ShadowMemory::getMegaMapEntry(mega_index);
+            current = *mega_entry;
         } else {
-            curPageBytes = size_remain;
+            current++;
         }
 
+
         if(isFree) {
-            current->subUsedBytes(curPageBytes);
+            current->setEmpty();
         } else {
-            current->addUsedBytes(curPageBytes);
+            current->setFull();
+#if (defined(ENABLE_HP) || defined(ENABLE_THP))
             if(!hugePageTouched && !current->isTouched()) {
+#else
+            if(!current->isTouched()) {
+#endif
                 current->setTouched();
                 numNewPagesTouched++;
                 if(current->donatedBySyscall) {
@@ -190,8 +187,34 @@ unsigned int ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_in
                 }
             }
         }
-        size_remain -= curPageBytes;
-        curPageIdx++;
+        size -= PAGESIZE;
+        page_index++;
+    }
+
+    if(size > 0) {
+        if(page_index == NUM_PAGES_PER_MEGABYTE) {
+            mega_index++;
+            current = *(ShadowMemory::getMegaMapEntry(mega_index));
+        } else {
+            current++;
+        }
+
+        if(isFree) {
+            current->subUsedBytes(size);
+        } else {
+            current->addUsedBytes(size);
+#if (defined(ENABLE_HP) || defined(ENABLE_THP))
+            if(!hugePageTouched && !current->isTouched()) {
+#else
+            if(!current->isTouched()) {
+#endif
+                current->setTouched();
+                numNewPagesTouched++;
+                if(current->donatedBySyscall) {
+                    Predictor::faultedPages++;
+                }
+            }
+        }
     }
 
     return numNewPagesTouched;
@@ -624,19 +647,22 @@ void PageMapEntry::subUsedBytes(unsigned short num_bytes) {
     num_used_bytes -= num_bytes;
 }
 
+void PageMapEntry::setEmpty() {
+        num_used_bytes = 0;
+    }
+
+    void PageMapEntry::setFull() {
+        num_used_bytes = PAGESIZE;
+    }
+
 void PageMapEntry::updateCacheLines(unsigned long mega_index, uint8_t page_index, uint8_t cache_index, uint8_t firstCacheLineOffset, unsigned int size, bool isFree) {
     int64_t size_remain = size;
-    PageMapEntry * targetPage = ShadowMemory::getPageMapEntry(mega_index, page_index);
+    PageMapEntry ** mega_entry = ShadowMemory::getMegaMapEntry(mega_index);
+    PageMapEntry * targetPage = (*mega_entry + page_index);
     CacheMapEntry * current = targetPage->getCacheMapEntry(true);
 
     if (firstCacheLineOffset) {
-        uint8_t curCacheLineBytes;
-        if (firstCacheLineOffset + size_remain >= CACHELINE_SIZE) {
-            curCacheLineBytes = CACHELINE_SIZE - firstCacheLineOffset;
-        } else {
-            curCacheLineBytes = size_remain;
-        }
-
+        uint8_t curCacheLineBytes = MIN(CACHELINE_SIZE - firstCacheLineOffset, size_remain);
         current->updateCache(isFree, curCacheLineBytes);
         size_remain -= curCacheLineBytes;
     } else {
@@ -651,14 +677,17 @@ void PageMapEntry::updateCacheLines(unsigned long mega_index, uint8_t page_index
 
     while (size_remain >= CACHELINE_SIZE) {
 
-        if(page_index == NUM_PAGES_PER_MEGABYTE) {
-            page_index += cache_index >> LOG2_NUM_CACHELINES_PER_PAGE;
+        if(cache_index == NUM_CACHELINES_PER_PAGE) {
+            page_index++;
             cache_index = 0;
-            if(cache_index == NUM_CACHELINES_PER_PAGE) {
-                mega_index += page_index >> LOG2_NUM_PAGES_PER_MEGABYTE;
+            if(page_index == NUM_PAGES_PER_MEGABYTE) {
+                mega_index++;
                 page_index = 0;
+                mega_entry = ShadowMemory::getMegaMapEntry(mega_index);
+                targetPage = *mega_entry;
+            } else {
+                targetPage++;
             }
-            targetPage = ShadowMemory::getPageMapEntry(mega_index, page_index);
             current = targetPage->getCacheMapEntry(true);
         } else {
             current++;
@@ -675,23 +704,22 @@ void PageMapEntry::updateCacheLines(unsigned long mega_index, uint8_t page_index
         cache_index++;
     }
 
-    if(size_remain <= 0) {
-        return;
-    }
-
-    if(uint8_t calc_overflow_pages = cache_index >> LOG2_NUM_CACHELINES_PER_PAGE) {
-        page_index += calc_overflow_pages;
-        cache_index = 0;
-        if(bool calc_overflow_megabytes = page_index >> LOG2_NUM_PAGES_PER_MEGABYTE) {
-            mega_index += calc_overflow_megabytes;
-            page_index = 0;
+    if(size_remain > 0) {
+        if(cache_index == NUM_CACHELINES_PER_PAGE) {
+            page_index++;
+            cache_index = 0;
+            if(page_index == NUM_PAGES_PER_MEGABYTE) {
+                mega_index++;
+                targetPage = *(ShadowMemory::getMegaMapEntry(mega_index));
+            } else {
+                targetPage++;
+            }
+            current = targetPage->getCacheMapEntry(true);
+        } else {
+            current++;
         }
-        targetPage = ShadowMemory::getPageMapEntry(mega_index, page_index);
-        current = targetPage->getCacheMapEntry(true);
-    } else {
-        current++;
+        current->updateCache(isFree, size_remain);
     }
-    current->updateCache(isFree, size_remain);
 }
 
 inline CacheMapEntry * PageMapEntry::getCacheMapEntry(bool mvBumpPtr) {

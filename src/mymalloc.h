@@ -58,7 +58,7 @@ class MyMalloc{
 private:
     static ProfilerMemory profilerMemory;
 //    static ProfilerMemory profilerHashMemory;
-    static ProfilerMemory profilerXthreadMemory;
+//    static ProfilerMemory profilerXthreadMemory;
 #ifdef ENABLE_PRECISE_BLOWUP
     static ProfilerMemory profilerShadowMemory;
 #endif
@@ -106,7 +106,7 @@ public:
     static void * malloc(size_t size);
     static bool ifInProfilerMemoryThenFree(void * addr);
     static void * hashMalloc(size_t size);
-    static void * xthreadMalloc(size_t size);
+//    static void * xthreadMalloc(size_t size);
 #ifdef ENABLE_PRECISE_BLOWUP
     static void * shadowMalloc(size_t size);
 #endif

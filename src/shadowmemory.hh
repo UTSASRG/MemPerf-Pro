@@ -118,20 +118,18 @@ class CacheMapEntry {
 };
 
 class PageMapEntry {
-private:
+public:
+
+    bool donatedBySyscall;
+#ifdef ENABLE_HP
+    bool hugePage;
+#endif
     bool touched;
     short num_used_bytes;
     CacheMapEntry * cache_map_entry;
 #ifdef ENABLE_PRECISE_BLOWUP
     BlowupNode * blowupList;
     spinlock pagelock;
-#endif
-
-public:
-
-    bool donatedBySyscall;
-#ifdef ENABLE_HP
-    bool hugePage;
 #endif
     static void updateCacheLines(unsigned long mega_index, uint8_t page_index, uint8_t cache_index, uint8_t firstCacheLineOffset, unsigned int size, bool isFree);
     CacheMapEntry * getCacheMapEntry(bool mvBumpPtr = true);
@@ -141,6 +139,8 @@ public:
     unsigned short getUsedBytes();
     void addUsedBytes(unsigned short num_bytes);
     void subUsedBytes(unsigned short num_bytes);
+    void setEmpty();
+    void setFull();
 
 #ifdef ENABLE_PRECISE_BLOWUP
     BlowupNode * newBlowup(unsigned int classSizeIndex);
@@ -154,7 +154,7 @@ public:
 
 class ShadowMemory {
 private:
-    static unsigned int updatePages(uintptr_t uintaddr, unsigned long mega_index, uint8_t page_index, unsigned int size, bool isFree);
+    static unsigned int updatePages(uintptr_t uintaddr, unsigned long mega_index, uint8_t page_index, int64_t size, bool isFree);
 
     static PageMapEntry ** mega_map_begin;
     static PageMapEntry * page_map_begin;

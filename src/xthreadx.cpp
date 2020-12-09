@@ -11,8 +11,8 @@ int xthreadx::thread_create(pthread_t * tid, const pthread_attr_t * attr, thread
         Predictor::outsideCountingEventsStart();
         Predictor::outsideCycleStart();
     }
-    thread_t * children = (thread_t *) MyMalloc::xthreadMalloc(sizeof(thread_t));
-//    thread_t * children = (thread_t *) MyMalloc::malloc(sizeof(thread_t));
+//    thread_t * children = (thread_t *) MyMalloc::xthreadMalloc(sizeof(thread_t));
+    thread_t * children = (thread_t *) MyMalloc::malloc(sizeof(thread_t));
     children->thread = tid;
     children->startArg = arg;
     children->startRoutine = fn;
@@ -20,9 +20,9 @@ int xthreadx::thread_create(pthread_t * tid, const pthread_attr_t * attr, thread
 
     int result = RealX::pthread_create(tid, attr, xthreadx::startThread, (void *)children);
 
-    if(result) {
-        fprintf(stderr, "error: pthread_create failed: %s\n", strerror(errno));
-    }
+//    if(result) {
+//        fprintf(stderr, "error: pthread_create failed: %s\n", strerror(errno));
+//    }
 
     return result;
 }
