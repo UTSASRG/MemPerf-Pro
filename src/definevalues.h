@@ -28,6 +28,13 @@
 #define PAGESIZE 4096
 #define PAGESIZE_HUGE 2*ONE_MB
 #define SAMPLING_PERIOD 10000
+//#define SAMPLING_PERIOD 5000
+//#define SAMPLING_PERIOD 1000
+//#define SAMPLING_PERIOD 750
+//#define SAMPLING_PERIOD 500
+//#define SAMPLING_PERIOD 400
+//#define SAMPLING_PERIOD 300
+//#define SAMPLING_PERIOD 100
 //#define MMAP_PAGES 257 // must be in the form of 2^N + 1
 #define MMAP_PAGES 129 // must be in the form of 2^N + 1
 #define DATA_MMAP_PAGES (MMAP_PAGES - 1)

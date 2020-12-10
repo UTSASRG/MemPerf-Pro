@@ -66,6 +66,7 @@ void * xthreadx::startThread(void * arg) {
 
 #ifdef OPEN_SAMPLING_EVENT
     initPMU();
+//    setupSampling();
 #endif
 
     Predictor::outsideCountingEventsStart();

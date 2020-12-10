@@ -24,7 +24,7 @@
 
 typedef struct {
     bool samplesLost;
-    bool initialized;
+//    bool initialized;
     int perf_fd;
     int perf_fd2;
     int perf_fd_fault;
@@ -52,7 +52,7 @@ void setupSampling(void);
 void stopSampling(void);
 void pauseSampling(void);
 void restartSampling(void);
-void doSampleRead();
+//void doSampleRead();
 #endif
 
 #endif

@@ -12,7 +12,7 @@ long perf_event_open(struct perf_event_attr *hw_event, pid_t pid, int cpu, int g
 	return syscall(__NR_perf_event_open, hw_event, pid, cpu, group_fd, flags);
 }
 
-//pthread_spinlock_t _perf_spin_lock;
+
 spinlock _perf_spin_lock;
 thread_local perf_info perfInfo;
 thread_local bool isCountingInit = false;
@@ -162,7 +162,7 @@ void stopCounting(void) {
 
 #ifdef OPEN_SAMPLING_EVENT
 void initPMU(void) {
-    _perf_spin_lock.init();
+//    _perf_spin_lock.init();
 
     perfInfo.tid = syscall(__NR_gettid);
 
@@ -188,25 +188,33 @@ void initPMU(void) {
     setupSampling();
 }
 
+//spinlock lock;
+
 void sampleHandler(int signum, siginfo_t *info, void *p) {
 
-    if(!perfInfo.initialized || !isSamplingInit ) {
+    if(!isSamplingInit ) {
         return;
     }
+//    if(!perfInfo.initialized || !isSamplingInit ) {
+//        return;
+//    }
 
     if(info->si_code == POLL_HUP) {
         Predictor::outsideCyclesStop();
-			doSampleRead();
+//			doSampleRead();
+        perfInfo.prev_head = perf_mmap_read();
+//			lock.lock();
 //			fprintf(stderr, "do a sample read, first allocation = %d, serial = %d\n", AllocatingStatus::firstAllocation, ThreadLocalStatus::totalNumOfThread);
 			ioctl(perfInfo.perf_fd, PERF_EVENT_IOC_REFRESH, OVERFLOW_INTERVAL);
 			ioctl(perfInfo.perf_fd2, PERF_EVENT_IOC_REFRESH, OVERFLOW_INTERVAL);
+//			lock.unlock();
         Predictor::outsideCycleStart();
   }
 }
 
-void doSampleRead() {
-  perfInfo.prev_head = perf_mmap_read();
-}
+//void doSampleRead() {
+//    perfInfo.prev_head = perf_mmap_read();
+//}
 
 void setupSampling() {
 
@@ -228,7 +236,7 @@ void setupSampling() {
 	pe_load.size = sizeof(struct perf_event_attr);
 	pe_load.config = LOAD_ACCESS;
 
-	int sign = rand() % 2;
+	bool sign = rand() % 2;
 	int percent = rand() % 1001;  // generates between 0 and 1000, representing 0% to 10%, respectively
 	float fraction = percent / 10000.0;
 	if(sign) {
@@ -272,7 +280,7 @@ void setupSampling() {
 
 	memcpy(&pe_store, &pe_load, sizeof(struct perf_event_attr));
 	pe_store.config = STORE_ACCESS;
-	acquireGlobalPerfLock();
+//	acquireGlobalPerfLock();
 	perfInfo.perf_fd2 = perf_event_open(&pe_store, 0, -1, -1, 0);
 	if(perfInfo.perf_fd2 == -1) {
 			fprintf(stderr, "Failed to open perf event for pe_store\n");
@@ -283,7 +291,7 @@ void setupSampling() {
 			fprintf(stderr, "Failed to open perf event for pe_load\n");
 			abort();
 	}
-	releaseGlobalPerfLock();
+//	releaseGlobalPerfLock();
 
 	// Setting up memory to pass information about a trap
 
@@ -328,7 +336,7 @@ void setupSampling() {
 			abort();
 	}
 
-	perfInfo.initialized = true;
+//	perfInfo.initialized = true;
 
 	if(ioctl(perfInfo.perf_fd, PERF_EVENT_IOC_REFRESH, OVERFLOW_INTERVAL) == -1) {
 			fprintf(stderr, "Failed to refresh perf event w/ fd %d, line %d: %s\n",
@@ -368,8 +376,8 @@ void stopSampling(void) {
         fprintf(stderr, "Failed to disable perf event: %s\n", strerror(errno));
     }
     // process any sample data still remaining in the ring buffer
-    doSampleRead();
-
+//    doSampleRead();
+    perfInfo.prev_head = perf_mmap_read();
     // Relinquish our mmap'd memory and close perf file descriptors
     if(munmap(perfInfo.ring_buf, MAPSIZE)) {
         fprintf(stderr, "Unable to unmap perf ring buffer\n");
