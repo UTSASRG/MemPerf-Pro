@@ -12,7 +12,8 @@ int xthreadx::thread_create(pthread_t * tid, const pthread_attr_t * attr, thread
         Predictor::outsideCycleStart();
     }
 //    thread_t * children = (thread_t *) MyMalloc::xthreadMalloc(sizeof(thread_t));
-    thread_t * children = (thread_t *) MyMalloc::malloc(sizeof(thread_t));
+    thread_t * children = (thread_t *) MyMalloc::xthreadMalloc();
+//    thread_t * children = (thread_t *) MyMalloc::malloc(sizeof(thread_t));
     children->thread = tid;
     children->startArg = arg;
     children->startRoutine = fn;

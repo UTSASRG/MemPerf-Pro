@@ -11,6 +11,17 @@
 #include "stdint.h"
 #include "definevalues.h"
 #include "spinlock.hh"
+//#include <sys/syscall.h>
+//#include "xthreadx.hh"
+
+typedef void * threadFunction(void *);
+typedef struct thread {
+    pthread_t * thread;
+    pid_t tid;
+    threadFunction * startRoutine;
+    void * startArg;
+    void * result;
+} thread_t;
 
 struct ProfilerMemory {
 
@@ -31,6 +42,13 @@ struct ProfilerMemory {
 //    void free(void * addr);
     bool inMemory(void * addr);
     bool ifInProfilerMemoryThenFree(void * addr);
+};
+
+struct XThreadMemory {
+    unsigned short idx = 0;
+//    xthreadx::thread_t threads[MAX_THREAD_NUMBER];
+    thread_t threads[MAX_THREAD_NUMBER];
+    void * malloc();
 };
 
 struct MMAPProfilerMemory {
@@ -59,6 +77,7 @@ private:
     static ProfilerMemory profilerMemory;
 //    static ProfilerMemory profilerHashMemory;
 //    static ProfilerMemory profilerXthreadMemory;
+    static XThreadMemory profilerXthreadMemory;
 #ifdef ENABLE_PRECISE_BLOWUP
     static ProfilerMemory profilerShadowMemory;
 #endif
@@ -107,6 +126,7 @@ public:
     static bool ifInProfilerMemoryThenFree(void * addr);
     static void * hashMalloc(size_t size);
 //    static void * xthreadMalloc(size_t size);
+    static void * xthreadMalloc();
 #ifdef ENABLE_PRECISE_BLOWUP
     static void * shadowMalloc(size_t size);
 #endif

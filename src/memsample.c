@@ -280,7 +280,7 @@ void setupSampling() {
 
 	memcpy(&pe_store, &pe_load, sizeof(struct perf_event_attr));
 	pe_store.config = STORE_ACCESS;
-//	acquireGlobalPerfLock();
+	acquireGlobalPerfLock();
 	perfInfo.perf_fd2 = perf_event_open(&pe_store, 0, -1, -1, 0);
 	if(perfInfo.perf_fd2 == -1) {
 			fprintf(stderr, "Failed to open perf event for pe_store\n");
@@ -291,7 +291,7 @@ void setupSampling() {
 			fprintf(stderr, "Failed to open perf event for pe_load\n");
 			abort();
 	}
-//	releaseGlobalPerfLock();
+	releaseGlobalPerfLock();
 
 	// Setting up memory to pass information about a trap
 
