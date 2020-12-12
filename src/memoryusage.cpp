@@ -23,6 +23,11 @@ void MemoryUsage::addToMemoryUsage(unsigned int size, unsigned int newTouchePage
 
     __atomic_add_fetch(&globalMemoryUsage.realMemoryUsage, size, __ATOMIC_RELAXED);
     __atomic_add_fetch(&globalMemoryUsage.totalMemoryUsage, newTouchePageBytes, __ATOMIC_RELAXED);
+//    fprintf(stderr, "%u, %u, %lu, %lu\n",
+//            size, newTouchePageBytes, globalMemoryUsage.realMemoryUsage, globalMemoryUsage.totalMemoryUsage);
+//    if(globalMemoryUsage.realMemoryUsage > globalMemoryUsage.totalMemoryUsage) {
+//        abort();
+//    }
 
 #ifdef PRINT_MEM_DETAIL_THRESHOLD
     stopIfMaxMemReached(PRINT_MEM_DETAIL_THRESHOLD);

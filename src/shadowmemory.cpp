@@ -112,6 +112,9 @@ unsigned int ShadowMemory::updateObject(void * address, unsigned int size, bool 
 unsigned int ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_index, uint8_t page_index, int64_t size, bool isFree) {
 
     unsigned int numNewPagesTouched = 0;
+//    int64_t sizekeep = size;
+//    uint8_t page_indexkeep = page_index;
+//    unsigned long mega_indexkeep = mega_index;
 
     // First test to determine whether this object begins on a page boundary. If not, then we must
     // increment the used bytes field of the first page separately.
@@ -134,9 +137,10 @@ unsigned int ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_in
     }
 #endif
 
-    unsigned firstPageOffset = uintaddr & PAGESIZE_MASK;
+    unsigned short firstPageOffset = uintaddr & PAGESIZE_MASK;
     unsigned int curPageBytes = MIN(PAGESIZE - firstPageOffset, size);
     PageMapEntry ** mega_entry = getMegaMapEntry(mega_index);
+//    fprintf(stderr, "*mega_entry = %p\n", *mega_entry);
     PageMapEntry * current = (*mega_entry + page_index);
     if(isFree) {
         current->subUsedBytes(curPageBytes);
@@ -156,14 +160,15 @@ unsigned int ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_in
         }
     }
     size -= curPageBytes;
+//        fprintf(stderr, "size = %ld, curPageBytes = %u\n", size, curPageBytes);
     page_index++;
 
     // Next, loop until we have accounted for all object bytes...
     while(size >= PAGESIZE) {
-
-        if(page_index == NUM_PAGES_PER_MEGABYTE) {
+//        fprintf(stderr, "recur\n");
+        if(page_index == 0) {
             mega_index++;
-            page_index = 0;
+//            page_index = 0;
             mega_entry = ShadowMemory::getMegaMapEntry(mega_index);
             current = *mega_entry;
         } else {
@@ -180,11 +185,15 @@ unsigned int ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_in
 #else
             if(!current->isTouched()) {
 #endif
+//                fprintf(stderr, "setTouch %p: %lu, %u\n", current, mega_index, page_index);
                 current->setTouched();
                 numNewPagesTouched++;
                 if(current->donatedBySyscall) {
                     Predictor::faultedPages++;
                 }
+            } else {
+//                fprintf(stderr, "Touched %p\n", current);
+//                fprintf(stderr, "Touched %p: %lu, %u\n", current, mega_index, page_index);
             }
         }
         size -= PAGESIZE;
@@ -192,7 +201,7 @@ unsigned int ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_in
     }
 
     if(size > 0) {
-        if(page_index == NUM_PAGES_PER_MEGABYTE) {
+        if(page_index == 0) {
             mega_index++;
             current = *(ShadowMemory::getMegaMapEntry(mega_index));
         } else {
@@ -216,6 +225,9 @@ unsigned int ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_in
             }
         }
     }
+
+//        fprintf(stderr, "obj addr = %p, size = %ld, midx = %lu, pidx = %u, offset = %u, pages = %u\n",
+//                uintaddr, sizekeep, mega_indexkeep, page_indexkeep, firstPageOffset, numNewPagesTouched);
 
     return numNewPagesTouched;
 }
@@ -680,9 +692,9 @@ void PageMapEntry::updateCacheLines(unsigned long mega_index, uint8_t page_index
         if(cache_index == NUM_CACHELINES_PER_PAGE) {
             page_index++;
             cache_index = 0;
-            if(page_index == NUM_PAGES_PER_MEGABYTE) {
+            if(page_index == 0) {
                 mega_index++;
-                page_index = 0;
+//                page_index = 0;
                 mega_entry = ShadowMemory::getMegaMapEntry(mega_index);
                 targetPage = *mega_entry;
             } else {
@@ -708,7 +720,7 @@ void PageMapEntry::updateCacheLines(unsigned long mega_index, uint8_t page_index
         if(cache_index == NUM_CACHELINES_PER_PAGE) {
             page_index++;
             cache_index = 0;
-            if(page_index == NUM_PAGES_PER_MEGABYTE) {
+            if(page_index == 0) {
                 mega_index++;
                 targetPage = *(ShadowMemory::getMegaMapEntry(mega_index));
             } else {

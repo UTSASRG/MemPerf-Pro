@@ -79,6 +79,7 @@ uint8_t Backtrace::doABackTrace(unsigned int size) {
     }
 //    status->memAllocated += size;
     __atomic_add_fetch(&status->memAllocated, size, __ATOMIC_RELAXED);
+//    fprintf(stderr, "key = %u, add size = %u, size = %lu\n", callsiteKey, size, status->memAllocated);
     return callsiteKey;
 }
 
@@ -102,8 +103,10 @@ void Backtrace::debugPrintOutput() {
 
     for(auto entryInHashTable: BTMemMap) {
         BackTraceMemory *status = entryInHashTable.getValue();
+//        fprintf(stderr, "key = %u, mem = %lu\n", entryInHashTable.getKey(), status->memAllocated);
 //        if (status->memAllocated / 1024 && status->memAllocated / 1024 < ABNORMAL_VALUE) {
         if (status->memAllocated / 1024 ) {
+
             BTqueue[numOfBT].memory = status->memAllocated / 1024;
             memcpy(BTqueue[numOfBT].frames, status->frames, 7 * (sizeof(void *)));
             BTqueue[numOfBT].numberOfFrame = status->numberOfFrame;

@@ -32,10 +32,11 @@ extern "C" {
 void exitHandler() {
 
     ProgramStatus::setBeginConclusionTrue();
+
     Predictor::outsideCyclesStop();
     Predictor::outsideCountingEventsStop();
     Predictor::stopSerial();
-//    MemoryUsage::endCheck();
+
 #ifdef OPEN_SAMPLING_EVENT
 	stopSampling();
 #endif
@@ -82,16 +83,11 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
 #ifdef OPEN_BACKTRACE
     Backtrace::init();
 #endif
-//    MyMalloc::initializeForThreadLocalXthreadMemory(ThreadLocalStatus::runningThreadIndex);
     MyMalloc::initializeForThreadLocalHashMemory(ThreadLocalStatus::runningThreadIndex);
 #ifdef ENABLE_PRECISE_BLOWUP
     MyMalloc::initializeForThreadLocalShadowMemory(ThreadLocalStatus::runningThreadIndex);
 #endif
-//    MyMalloc::initializeForThreadLocalMemory();
     Predictor::globalInit();
-//#ifdef OPEN_SAMPLING_EVENT
-//    initPMU();
-//#endif
 
     ThreadLocalStatus::setStackStartAddress(&argc);
 
@@ -219,7 +215,7 @@ extern "C" {
 #endif
         }
 #endif
-//        fprintf(stderr, "free object %p\n", ptr);
+
         Predictor::outsideCyclesStop();
         AllocatingStatus::updateFreeingStatusBeforeRealFunction(FREE, ptr);
         RealX::free(ptr);

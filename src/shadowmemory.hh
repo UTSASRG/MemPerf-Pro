@@ -124,7 +124,7 @@ public:
 #ifdef ENABLE_HP
     bool hugePage;
 #endif
-    bool touched;
+    bool touched = false;
     short num_used_bytes;
     CacheMapEntry * cache_map_entry;
 #ifdef ENABLE_PRECISE_BLOWUP
