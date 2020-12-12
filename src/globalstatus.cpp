@@ -110,7 +110,7 @@ void GlobalStatus::printCountingEvents() {
 void GlobalStatus::printOverviewLocks() {
     printTitle((char*)"LOCK TOTALS");
     for(int lockType = 0; lockType < NUM_OF_LOCKTYPES; ++lockType) {
-        fprintf(ProgramStatus::outputFile, "%s num                          %20u\n\n", lockTypeOutputString[lockType], overviewLockData[lockType].numOfLocks);
+//        fprintf(ProgramStatus::outputFile, "%s num                          %20u\n\n", lockTypeOutputString[lockType], overviewLockData[lockType].numOfLocks);
         if(overviewLockData[lockType].numOfLocks > 0) {
             for(int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
                 if(overviewLockData[lockType].numOfCalls[allocationType] > 0) {

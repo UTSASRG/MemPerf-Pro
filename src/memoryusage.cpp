@@ -33,13 +33,7 @@ void MemoryUsage::addToMemoryUsage(unsigned int size, unsigned int newTouchePage
     stopIfMaxMemReached(PRINT_MEM_DETAIL_THRESHOLD);
 #endif
     maxRealMemoryUsage = MAX(maxRealMemoryUsage, globalMemoryUsage.realMemoryUsage);
-//    if(maxGlobalMemoryUsage.isLowerThan(globalMemoryUsage, ONE_MB) &&
-//    helpMarked[ThreadLocalStatus::runningThreadIndex] == false) {
-//        if(MemoryWaste::minAddr != -1 && MemoryWaste::maxAddr) {
-//            leakcheck::doSlowLeakCheck(MemoryWaste::minAddr, MemoryWaste::maxAddr);
-//        }
-//        helpMarked[ThreadLocalStatus::runningThreadIndex] = true;
-//    }
+
      if(maxGlobalMemoryUsage.isLowerThan(globalMemoryUsage, ONE_MB) && time(NULL) > lastTimeUpdated + 1
      && mtx.try_lock()) {
          lastTimeUpdated = time(NULL);
