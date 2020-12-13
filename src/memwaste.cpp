@@ -211,11 +211,11 @@ void MemoryWasteTotalValue::getExternalFragment() {
     externalFragment = MAX(externalFragment, 0);
 }
 
-void HashLocksSet::init() {
-    for(unsigned int hashKey = 0; hashKey < MAX_OBJ_NUM; ++hashKey) {
-        locks[hashKey].init();
-    }
-}
+//void HashLocksSet::init() {
+//    for(unsigned int hashKey = 0; hashKey < MAX_OBJ_NUM; ++hashKey) {
+//        locks[hashKey].init();
+//    }
+//}
 
 void HashLocksSet::lock(void *address) {
     size_t hashKey = HashFuncs::hashAddr(address, sizeof(void*)) & (MAX_OBJ_NUM-1);
@@ -232,7 +232,7 @@ void MemoryWaste::initialize() {
     currentStatus.initialize();
     recordStatus.initialize();
     globalStatus.initialize();
-    hashLocksSet.init();
+//    hashLocksSet.init();
 }
 
 

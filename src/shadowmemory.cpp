@@ -373,22 +373,22 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType)
 
     cme += tuple.cache_index;
 
+    if(cme->lastWriterThreadIndex == 0) {
+        ThreadLocalStatus::friendlinessStatus.numOfSampledCacheLines++;
+        cme->lastWriterThreadIndex = 1;
+    }
 
     ThreadLocalStatus::friendlinessStatus.recordANewSampling(cme->getUsedBytes(), pme->getUsedBytes());
     if(accessType == E_MEM_STORE) {
         ThreadLocalStatus::friendlinessStatus.numOfSampledStoringInstructions++;
-        if(cme->lastWriterThreadIndex != ThreadLocalStatus::runningThreadIndex && cme->getUsedBytes() == 0) {
-            ThreadLocalStatus::friendlinessStatus.numOfSampledFalseSharingInstructions[cme->falseSharingStatus]++;
-            if(!cme->falseSharingLineRecorded[cme->falseSharingStatus]) {
-                ThreadLocalStatus::friendlinessStatus.numOfSampledFalseSharingCacheLines[cme->falseSharingStatus]++;
-                cme->falseSharingLineRecorded[cme->falseSharingStatus] = true;
+        if(cme->lastWriterThreadIndex != (uint8_t)(ThreadLocalStatus::runningThreadIndex%100+100) && cme->lastWriterThreadIndex >= 100) {
+            ThreadLocalStatus::friendlinessStatus.numOfSampledFalseSharingInstructions[cme->getFS()]++;
+            if(!cme->falseSharingLineRecorded[cme->getFS()]) {
+                ThreadLocalStatus::friendlinessStatus.numOfSampledFalseSharingCacheLines[cme->getFS()]++;
+                cme->falseSharingLineRecorded[cme->getFS()] = true;
             }
         }
-        cme->lastWriterThreadIndex = ThreadLocalStatus::runningThreadIndex;
-    }
-    if(!cme->sampled) {
-        ThreadLocalStatus::friendlinessStatus.numOfSampledCacheLines++;
-        cme->sampled = true;
+        cme->lastWriterThreadIndex = (uint8_t)(ThreadLocalStatus::runningThreadIndex%100+100);
     }
 
 }
@@ -663,9 +663,9 @@ void PageMapEntry::setEmpty() {
         num_used_bytes = 0;
     }
 
-    void PageMapEntry::setFull() {
-        num_used_bytes = PAGESIZE;
-    }
+void PageMapEntry::setFull() {
+    num_used_bytes = PAGESIZE;
+}
 
 void PageMapEntry::updateCacheLines(unsigned long mega_index, uint8_t page_index, uint8_t cache_index, uint8_t firstCacheLineOffset, unsigned int size, bool isFree) {
     int64_t size_remain = size;
@@ -888,19 +888,19 @@ inline void CacheMapEntry::subUsedBytes(uint8_t num_bytes) {
 void CacheMapEntry::updateCache(bool isFree, uint8_t num_bytes) {
     if (isFree) {
         subUsedBytes(num_bytes);
-        if (falseSharingStatus != PASSIVE) {
-            if (lastAFThreadIndex != ThreadLocalStatus::runningThreadIndex && allocated == false) {
-                falseSharingStatus = PASSIVE;
+        if (getFS() == ACTIVE) {
+            if (lastAFThreadIndex != (uint8_t)(ThreadLocalStatus::runningThreadIndex%100+100) && lastAFThreadIndex >= 100) {
+                setFS(PASSIVE);
             }
-            lastAFThreadIndex = ThreadLocalStatus::runningThreadIndex;
+            lastAFThreadIndex = (uint8_t)(ThreadLocalStatus::runningThreadIndex%100+100);
         }
     } else {
         addUsedBytes(num_bytes);
-        if (falseSharingStatus != PASSIVE) {
-            if (lastAFThreadIndex != ThreadLocalStatus::runningThreadIndex && allocated == true) {
-                falseSharingStatus = ACTIVE;
+        if (getFS() == OBJECT) {
+            if (lastAFThreadIndex != (uint8_t)(ThreadLocalStatus::runningThreadIndex%100+100) && lastAFThreadIndex >= 100) {
+                setFS(ACTIVE);
             }
-            lastAFThreadIndex = ThreadLocalStatus::runningThreadIndex;
+            lastAFThreadIndex = (uint8_t)(ThreadLocalStatus::runningThreadIndex%100+100);
         }
     }
 }
@@ -911,6 +911,29 @@ inline void CacheMapEntry::setFull() {
 
 inline void CacheMapEntry::setEmpty() {
     num_used_bytes = 0;
+}
+
+inline void CacheMapEntry::setFS(FalseSharingType falseSharingType) {
+    if(falseSharingType == OBJECT) {
+        falseSharingStatus[0] = false;
+        falseSharingStatus[1] = false;
+    } else if(falseSharingType == ACTIVE) {
+        falseSharingStatus[0] = true;
+        falseSharingStatus[1] = false;
+    } else {
+        falseSharingStatus[0] = false;
+        falseSharingStatus[1] = true;
+    }
+}
+
+inline FalseSharingType CacheMapEntry::getFS() {
+        if(falseSharingStatus[0] == false && falseSharingStatus[1] == false) {
+            return OBJECT;
+        } else if(falseSharingStatus[0] == true && falseSharingStatus[1] == false) {
+            return ACTIVE;
+        } else {
+            return PASSIVE;
+        }
 }
 
 const char * boolToStr(bool p) {

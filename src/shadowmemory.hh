@@ -101,13 +101,16 @@ struct RangeOfHugePages {
 class CacheMapEntry {
 		public:
 
+//    bool sampled = false;
+//    bool allocated = false;
+    bool falseSharingStatus[2] = {false, false};
     bool falseSharingLineRecorded[NUM_OF_FALSESHARINGTYPE] = {false};
-    bool sampled = false;
-    bool allocated = false;
-    FalseSharingType falseSharingStatus = OBJECT;
-    uint8_t num_used_bytes;
-    short lastWriterThreadIndex = -1;
-    short lastAFThreadIndex = -1;
+//    FalseSharingType falseSharingStatus = OBJECT;
+    int8_t num_used_bytes;
+//    short lastWriterThreadIndex = -1;
+//    short lastAFThreadIndex = -1;
+    uint8_t lastWriterThreadIndex;
+    uint8_t lastAFThreadIndex;
 
     uint8_t getUsedBytes();
     void addUsedBytes(uint8_t num_bytes);
@@ -115,6 +118,9 @@ class CacheMapEntry {
     void updateCache(bool isFree, uint8_t num_bytes);
     void setFull();
     void setEmpty();
+
+    void setFS(FalseSharingType falseSharingType);
+    FalseSharingType getFS();
 };
 
 class PageMapEntry {

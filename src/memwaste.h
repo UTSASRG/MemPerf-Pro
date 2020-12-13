@@ -95,7 +95,7 @@ struct MemoryWasteTotalValue {
 
 struct HashLocksSet {
     spinlock locks[MAX_OBJ_NUM];
-    void init();
+//    void init();
     void lock(void * address);
     void unlock(void * address);
 };
