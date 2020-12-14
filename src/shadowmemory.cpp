@@ -381,14 +381,14 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType)
     ThreadLocalStatus::friendlinessStatus.recordANewSampling(cme->getUsedBytes(), pme->getUsedBytes());
     if(accessType == E_MEM_STORE) {
         ThreadLocalStatus::friendlinessStatus.numOfSampledStoringInstructions++;
-        if(cme->lastWriterThreadIndex != (uint8_t)(ThreadLocalStatus::runningThreadIndex%100+100) && cme->lastWriterThreadIndex >= 100) {
+        if(cme->lastWriterThreadIndex != cme->getThreadIndex() && cme->lastWriterThreadIndex >= 16) {
             ThreadLocalStatus::friendlinessStatus.numOfSampledFalseSharingInstructions[cme->getFS()]++;
             if(!cme->falseSharingLineRecorded[cme->getFS()]) {
                 ThreadLocalStatus::friendlinessStatus.numOfSampledFalseSharingCacheLines[cme->getFS()]++;
                 cme->falseSharingLineRecorded[cme->getFS()] = true;
             }
         }
-        cme->lastWriterThreadIndex = (uint8_t)(ThreadLocalStatus::runningThreadIndex%100+100);
+        cme->lastWriterThreadIndex = cme->getThreadIndex();
     }
 
 }
@@ -889,18 +889,18 @@ void CacheMapEntry::updateCache(bool isFree, uint8_t num_bytes) {
     if (isFree) {
         subUsedBytes(num_bytes);
         if (getFS() == ACTIVE) {
-            if (lastAFThreadIndex != (uint8_t)(ThreadLocalStatus::runningThreadIndex%100+100) && lastAFThreadIndex >= 100) {
+            if (lastAFThreadIndex != getThreadIndex() && lastAFThreadIndex >= 16) {
                 setFS(PASSIVE);
             }
-            lastAFThreadIndex = (uint8_t)(ThreadLocalStatus::runningThreadIndex%100+100);
+            lastAFThreadIndex = getThreadIndex();
         }
     } else {
         addUsedBytes(num_bytes);
         if (getFS() == OBJECT) {
-            if (lastAFThreadIndex != (uint8_t)(ThreadLocalStatus::runningThreadIndex%100+100) && lastAFThreadIndex >= 100) {
+            if (lastAFThreadIndex != getThreadIndex() && lastAFThreadIndex >= 16) {
                 setFS(ACTIVE);
             }
-            lastAFThreadIndex = (uint8_t)(ThreadLocalStatus::runningThreadIndex%100+100);
+            lastAFThreadIndex = getThreadIndex();
         }
     }
 }
@@ -936,6 +936,9 @@ inline FalseSharingType CacheMapEntry::getFS() {
         }
 }
 
+    inline uint8_t CacheMapEntry::getThreadIndex() {
+        return (uint8_t)((((uint16_t)ThreadLocalStatus::runningThreadIndex) & (uint16_t)15) | (uint16_t) 16);
+    }
 const char * boolToStr(bool p) {
 		return (p ? "true" : "false");
 }

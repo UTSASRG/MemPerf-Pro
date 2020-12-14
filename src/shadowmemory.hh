@@ -121,6 +121,7 @@ class CacheMapEntry {
 
     void setFS(FalseSharingType falseSharingType);
     FalseSharingType getFS();
+    static uint8_t getThreadIndex();
 };
 
 class PageMapEntry {
