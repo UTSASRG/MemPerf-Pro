@@ -1,0 +1,182 @@
+\section{Experimental Evaluation}
+\label{sec:evaluation}
+\begin{comment}
+This experimental evaluation will answer the following questions:
+\begin{itemize}
+\item What is the effectiveness of \MP{}? (Section~\ref{sec:effectiveness}) 	
+\item What is the performance overhead of \MP{}? (Section~\ref{sec:perf})
+\item What is the memory overhead of \MP{}? (Section~\ref{sec:memory})
+\end{itemize}
+\end{comment}
+
+Experiments were performed on a two-processor machine, where each processor is Intel(R) Xeon(R) Gold 6230 and each processor has 20 cores. We only utilize 16 hardware cores in node 0 for the evaluation by disabling other cores, in order to exclude the NUMA effect. This machine has 256GB of main memory, 20MB of L2 cache, and 1280KB L1 cache. 
+
+The underlying OS is Ubuntu 18.04.3 LTS, installed with the Linux-5.3.0-40. \MP{} were evaluated using PARSEC~\cite{parsec},  Phoenix~\cite{phoenix}, and two stress tests \texttt{cache-thrash} and \texttt{cache-scatch} from Hoard~\cite{Hoard}, with a total of 22 applications. Among them \texttt{cache-scratch} tests passive false sharing, and \texttt{cache-thrash} tests active false sharing. These applications were compiled using GCC-7.5.0, with \texttt{-O2} and \texttt{-g} flags. 
+
+We evaluated \MP{} with five widely-used allocators, including two versions of Linux allocators (glibc-2.28 and glibc-2.21), TcMalloc~\cite{tcmalloc}, \texttt{jemalloc}~\cite{jemalloc},  and Hoard~\cite{Hoard}, and  a secure allocator -- DieHarder~\cite{DieHarder}, same as those in Figure~\ref{fig:motivation}. Among them, TcMalloc is developed and widely-used inside Google, and \texttt{jemalloc} is designed by Facebook. Glibc-2.28 is the default allocator in our current machine. \MP{} does not need the change of allocators, if they are using standard synchronizations and system calls. Otherwise, \MP{} cannot report the information about synchronizations and system calls, but other data will still be valid. Since the Linux allocators utilize internal synchronizations and system calls that cannot be intercepted by \MP{}, they were changed and recompiled separately as a stand-alone library for the evaluation purpose. Hoard's synchronization were replaced with POSIX spinlocks to track its synchronization behavior, which has been confirmed that this change will introduce less than 1\% performance impact on average.  
+\input{effectiveness}
+
+\subsection{Overhead of \MP{}}
+
+\subsubsection{Performance Overhead}
+\label{sec:perf}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\columnwidth]{figures/mmprofPerformance}
+\caption{Performance overhead of \texttt{mmprof}, normalized to the runtime of default Linux allocator.\label{fig:overhead}}
+\end{figure}
+
+Applications that are running too short (e.g., less than 1 seconds) are excluded from the evaluation, such as \texttt{histogram}, \texttt{linear\_regression} and \texttt{string\_match}. 
+Since normal users and allocator designers would require different types of information, \MP{} supports two different modes with different execution overhead. By default, \MP{} will not collect hardware performance counters upon each allocation and deallocation. That is, it could not report the number of instructions, page faults, and cache misses for each memory management operation. In the other mode, \MP{} will collect PMU events with a sampling rate of 1\% in order to help diagnose allocator design issues. 
+The performance overhead of \MP{} can be seen in Figure~\ref{fig:overhead}, where all data are normalized to the data of the default allocator (glibc-2.28). The default mode of \MP{} introduces 35\% performance overhead, while collecting PMU events upon each memory management operation adds additional 48\% overhead (around 83\% slower than the default allocator for GEOMEAN). 
+
+For the default mode, only two applications imposes over 100\% performance overhead, including \texttt{reverse\_index} and \texttt{canneal}. \texttt{reverse\_index} is a short-running program that only runs 1.5 seconds, where the initialization overhead of \MP{} contributes to a higher ratio of the overhead. \texttt{canneal} is running slower due to excessive number of memory management operations, around 1.3 millions each second. As \texttt{canneal} has millions of objects, checking the hash table is the major source of overhead, since multiple entries are sharing the same bucket. 
+
+\MP{} with PMU events could bring two types of additional overhead. First, collecting more hardware events in the hardware level will interfere with the original execution. Second, upon every memory management operation, \MP{} invokes \texttt{read()} to read these events first and then analyzes these events later. Based on our evaluation, the first reason is the major source for the overhead. We have confirmed  \texttt{blackscholes}, \texttt{bodytrack}, \texttt{cache-thrash}, \texttt{facesim}, \texttt{vips}, and \texttt{x264} that their major overhead is coming from the interference caused by collecting events. 
+
+%The performance overhead can be seen in Fig.~\ref{fig:overhead}, which is the average runtime of ten executions. From this figure, we can see that \MP{} runs $2.6\times$ slower than the default allocator, where two applications (\texttt{histogram} and \texttt{threadtest}) impose over $5\times$ performance overhead. Based on our understanding, both the number of memory operations and the number of lock acquisitions can significantly impact the performance overhead. To help the explanation, we further collect the characteristics of these applications, as shown in Table~\ref{table:characteristics}.  
+
+%First, if an application invokes extensive applications and deallocations in a short period of time, then \MP{} may introduce a large performance overhead. For each memory operation, \MP{} invokes two RDTSC instructions to collect the runtime, updates multiple counters, and updates the state in the global hash table. Second, the number of lock acquisitions inside memory operations could also significantly affect the performance. Similarly, \MP{} also collects the runtime data of each lock acquisition via the RDTSC instruction, and update different counters. Since \texttt{canneal} invokes 11 million memory operations and 0.3 million locks acquisitions per second, and \texttt{threadtest} has 6 million memory operations and 33 lock acquisitions per second, that explains why these applications have a large overhead with \MP{}.  \texttt{histogram} and \texttt{linear\_regression} are two exceptions, since they have a small number of allocations. For these two applications, \texttt{histogram}'s execution time is 0.12 seconds and \texttt{linear\_regression} is 0.3 seconds. \MP{} has an initialization phase to perform the initialization, and an finalization phase to analyze the data and write out results to the external file, which may add more overhead than a program's execution time. 
+%For instance, \texttt{histogram} only takes 0.12 seconds to finish. Therefore, \MP{} adds more overhead than the program's execution time.  has the same issue, with the total execution time of 0.3 seconds.  
+%for some tiny applications like \texttt{histogram}, which only takes 0.1 second when running along, \MP{}'s initialization and conclusion would take more time than themselves. Thus, performance overhead ratios for tiny applications could be larger.
+%\texttt{threadtest} actually imposes more performance overhead, due to the reason that most memory opeations are actually 
+
+
+
+%some applications invoke allocations intensively and almost simultaneously from different threads, \MP{} may introduce more contention in the hash table when checking every object's status, and higher contention rates would cause programs' slowdown.
+\begin{comment}
+For example, according to \ref{sec:memory}, 
+canneal 2.86x   11438194.73 (alloc+free)/sec    42282925 alloc+free 311044.69 lockacqs/sec
+reverse_index 4.59x 973245.43 (alloc+free)/sec 40000387 alloc+free 120407.33 lockacqs/sec
+threadtest 7.21x 6 228 715.40 (alloc+free)/sec 256000203 alloc+free 33 239 532.98 lockacqs/sec
+
+
+
+For example, according to \ref{sec:memory}, 
+linear_regression 4.56x, 0.3s when running alone, 2 alloc+free
+word_count 4.26x, 1.71s when running alone, 481 alloc
+histogram 10.23x, 0.12s when running alone, 4 alloc+free
+
+Upon every allocation and deallocation, \MP{} collects the runtime and acquisition information.
+
+
+\begin{table}[h]
+  \centering
+  \caption{Characteristics of applications\label{table:characteristics}}
+  \footnotesize
+  \setlength{\tabcolsep}{0.2em}
+\begin{tabular}{l|c|r|r|r|r}
+\hline
+\multicolumn{1}{c|}{Application} & 
+\multicolumn{1}{c|}{Runtime}    & 
+\multicolumn{1}{c|}{New Alloc}     & 
+\multicolumn{1}{c|}{Reused Alloc}     & 
+\multicolumn{1} {c|}{Free}     & 
+\multicolumn{1}{c}{Lock Acqs} \\ \hline
+  blackscholes & 16.7 & 8 & 1 & 7 & 11 \\ \hline   
+  bodytrack & 8.5 & 20150 & 460616 & 480765 & 871397 \\ \hline    
+  cache-scratch & 3.0 & 44 & 400000 & 400043 & 47 \\ \hline    
+  cache-thrash  & 2.4 & 43 & 3999960 & 4000002 & 45\\ \hline  
+  canneal & 29.4 & 8756242 & 12385221 & 21141462 & 9144714 \\ \hline    
+  dedup & 12.7 & 3384984 & 683368 & 1750378 & 4864027 \\ \hline    
+  facesim & 159.2 & 953143 & 3955049 & 4094483 & 1678963 \\ \hline    
+  ferret & 25.3 & 149680 & 236867 & 415914 & 417370\\ \hline    
+  fluidanimate & 12.3 & 229912 & 1 & 229913 & 307124 \\ \hline    
+  freqmine & 20.2 & 1810 & 4 & 1070 & 15926 \\ \hline    
+  histogram & 0.12 & 2 & 0 & 2 & 3 \\ \hline    
+  kmeans & 16.4 & 200691 & 533 & 200579 & 303705 \\ \hline    
+  larson & 15.1 & 2408955 & 33726797 & 36095750 & 38088835 \\ \hline   
+  linear\_regression & 0.3 & 1 & 0 & 1 & 2 \\ \hline    
+  matrix\_multiply & 4.8 & 83 & 0 & 82 & 85 \\ \hline    
+  pca & 9.2 & 16131 & 29 & 72 & 16466 \\ \hline    
+  raytrace & 41.1 & 5000115 & 15000100 & 20000172 & 5000240 \\ \hline   
+  reverse\_index & 1.5 & 1632810 & 106173 & 1738982 & 1806110\\ \hline  
+  streamcluster & 23.5 & 47 & 8798 & 8844 & 17622\\ \hline    
+  string\_match & 0.6 & 8 & 0 & 7 & 10 \\ \hline    
+  swaptions & 14.5 & 2040 & 47999756 & 48000385 & 48002039\\ \hline    
+  threadtest & 7.7 & 1280122 & 126720000 & 128000081 & 255944404\\ \hline    
+  vips & 6.5 & 8128 & 1420072 & 1428019 & 1526404\\ \hline    
+  word\_count & 1.7 & 481 & 0 & 0 & 481\\ \hline   
+  x264 & 24.2 & 10 & 0 & 9 & 13\\     
+  \hline
+  \end{tabular}
+\end{table}
+\end{comment}
+
+
+\subsubsection{Memory Overhead}
+\label{sec:memory}
+\input{memory}
+
+
+\begin{comment}
+
+\subsection{Range of Allocator Metrics}
+We will provide the metrics to evaluate the allocators, based on the averaged value. 
+\todo{What types of metrics should we used? For instance, what type of policy should we used to exclude an allocator, and then get the value of the allocator. 20\%}
+We will provide a table that can be utilized to evaluate all future allocators. 
+
+
+%Jin
+
+
+\end{comment}
+
+\subsection{Quantitative Metrics of Different Allocators}
+
+%We will provide the important metrics of different allocators, and then have some big observations, especially on different metrics.
+
+
+%\subsubsection{Observations for Allocators:} 
+
+
+\begin{table}[htbp]
+  \centering
+ % \footnotesize
+%  \setlength{\tabcolsep}{0.2em}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{l|r|r|r|r|r|r|r|r|r|r}
+\hline
+\multirow{3}{*}{Allocator} & 
+\multicolumn{6}{c|}{Small Objects}    & 
+\multicolumn{4}{c}{Big Objects}     \\ \cline{2-11}
+& \multicolumn{2}{c|}{New Allocation} & \multicolumn{2}{c|} {Reused Allocation} & \multicolumn{2}{c|} {Free} & \multicolumn{2}{c|}{Allocation} & \multicolumn{2}{c} {Free} \\ \cline{2-11}
+& Ser & Par. & Ser & Par. & Ser & Par. & Ser & Par. & Ser & Par. \\ \hline
+Glibc-2.28 & 322 & 922 & 78 & 648 & 159 & 540 & 7985 & 21833 & 1202541 & 27406 \\ \hline
+Glibc-2.21 & 295 & 1281 & 202 & 669 & 134 & 575 & 7208 & 35399 & 1237736 & 44618 \\ \hline
+jemalloc &  135 & 331 & 69 & 312 & 161 & 361 & 5057 & 2015 & 2397 & 2183 \\ \hline
+TcMalloc & 154 & 327 & 66 & 212 & 106 & 210 & 6994 & 1588 & 19180 & 1967 \\ \hline
+Hoard & 111 & 495 & 79 & 106 & 185 & 108 & 8847 & 1564 & 7849 & 608\\ \hline
+%DieHarder & 474 & 71618 & 308 & 75765 & 1271 & 60373 & 18343 & 59604 & 34169 & 66806\\ \hline
+  \end{tabular}}
+  \caption{Average cycles of allocation/deallocation operation of different allocators\label{tbl:metrics}}
+\end{table}
+
+We evaluated allocators with 22 applications, and Table~\ref{tbl:metrics} listed the averaged cycles for each type of allocation and deallocation. We believe that such data could serve as a baseline for future allocator designers. Oberserved from the data, TcMalloc and \texttt{jemalloc} have faster implementation than other allocators, which also confirms their overall performance. Note that Hoard's data does not include medium-size objects, where new allocation, re-allocation, and free in parallel phase are 1293, 523, and 745 cycles separately. The data also shows that serial phase is faster than parallel phase for almost every allocator, since there is no lock in serial phase. But this rule is not valid for big objects. Based on our understanding, some applications may have very few allocations in serial phases, then the overhead caused by memory-related system calls will actually skewed the results.     
+
+
+
+%----------------
+
+%Note that Hoard's data does not include the runtime for medium-size objects, which is the major cause of its issues. For them, Hoard's average cycles for new allocation, re-allocation, and free in parallel phase are 1293, 523, and 745 cycles separately, which is much slower than those of TcMalloc and \texttt{jemalloc}.
+
+%class, where the performance slowdown is mainly caused by the management of medium-size objects.
+%DieHarder's data is omitted due to space limit, but its runtime of parallel allocations and deallocations is over 60 times of Hoard due to the contention of using a global lock. Notice that Hoard although has shown reasonable runtime for small objects and big objects in Table~\ref{tbl:metrics}. However, it actually has an additional medium class, where the performance slowdown is mainly caused by the management of medium-size objects. For instance, Hoard's average cycles for new allocation, re-allocation, and free in parallel phase are 1293, 523, and 745 cycles separately, which is much slower than small allocations of TcMalloc and \texttt{jemalloc}.     
+ 
+%We have some observations on commonalities of a performant allocator. 
+
+%\paragraph{Synchronization:} It is better to reduce lock usages for an allocator. For instance, TcMalloc and jemalloc utilize per-thread cache to store objects, so that there is no need to acquire a lock if an allocation can be satisfied from a per-thread heap. Hoard, although with its per-thread heap design, actually can be slowed down a lot via its hashing mechanism for medium-size objects. The other counterexample is DieHarder, which use the same lock to manage different size classes, which is the most important reason for its slowdown. 
+
+%\paragraph{Active/Passive False Sharing:} TcMalloc although with the good performance, but it has very serious both active and passive false sharing. This could significantly slowdown the performance, even if it has almost the fast allocation/deallocation speed.  
+
+%\paragraph{Cache Misses:} Some allocators, such as DieHarder, Hoard, and  OpenBSD, have multiple cache misses per operation. That could sometime be the reason for their slowdown. The opposite for them is TcMalloc and jemalloc that always have fewer cache misses. We believe that this issue can be reduced with a better design, such as with better metadata design.  
+
+%\paragraph{Kernel space synchronization:} Kernel contention is actually very common based on our evaluation. We could observe this from the runtime of memory related system calls.  However, it is sometimes difficult to evaluate its potential impact.
+
+%\paragraph{Fine-grained size:} The Linux allocator is the only allocator has very fine-grained size, where two continuous size classes only have the difference of 16 bytes. This mechanism may impose less internal fragmentation. However, it will has the issue of external fragmentation. Although the Linux allocator also can coalesce and split objects to reduce internal fragmentation, it will pay some additional performance cost. That is the reason why the Linux allocator is typically slower than TcMalloc for most applications.
+
+%\paragraph{Re-used allocations and deallocations of small objects:} Based on our observation these two aspects are the most important to the  performance of applications, due to its large number. This is also the fast path, which should have less conflicts and fewer instructions.  
+
+
+
