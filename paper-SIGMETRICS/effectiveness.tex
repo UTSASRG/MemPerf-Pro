@@ -65,7 +65,7 @@ Take \texttt{raytrace} as an example,  \texttt{jemalloc}'s memory consumption is
 
 For \texttt{vips}, \MP{} reveals different reasons of low memory utilization for \texttt{jemalloc} and TcMalloc. \texttt{jemalloc} has a major issue in memory blowup, while TcMalloc has external fragmentation and blowup.
 
-\MP{} also reports that the default Linux allocator also has some memory issues for some applications. For instance, when running \texttt{dedup}, it uses 91\% more memory than TcMalloc due to memory blowup. In fact, its memory blowup is around 52\% of its total memory consumption, which actually wastes more memory than real memory consumption. 
+\MP{} also reports that the default Linux allocator also has some memory issues for some applications. For instance, when running \texttt{dedup}, it uses 91\% more memory than TcMalloc due to memory blowup. In fact, its memory blowup is around 52\% of its total memory consumption, which actually waste more memory than real memory consumption.
 
 %In \texttt{vips}, \MP{} shows the size of objects only occupies 72\% of TcMalloc's memory consumption, and percentages of internal fragmentation, memory blowup and external fragmentation are 3\%, 12\% and 13\%.
 
