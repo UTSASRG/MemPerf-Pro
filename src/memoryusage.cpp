@@ -10,7 +10,6 @@ int64_t MemoryUsage::maxRealMemoryUsage; ///Shows in total memory
 #ifdef PRINT_MEM_DETAIL_THRESHOLD
 spinlock MemoryUsage::debugLock;
 #endif
-time_t MemoryUsage::lastTimeUpdated;
 //
 unsigned int updateTimes = 0;
 
@@ -34,9 +33,10 @@ void MemoryUsage::addToMemoryUsage(unsigned int size, unsigned int newTouchePage
 #endif
     maxRealMemoryUsage = MAX(maxRealMemoryUsage, globalMemoryUsage.realMemoryUsage);
 
-     if(maxGlobalMemoryUsage.isLowerThan(globalMemoryUsage, ONE_MB) && time(NULL) > lastTimeUpdated + 1
+     if(globalMemoryUsage.totalMemoryUsage >= 100*ONE_MB &&
+     (globalMemoryUsage.totalMemoryUsage > maxGlobalMemoryUsage.totalMemoryUsage + 400*ONE_MB
+     || globalMemoryUsage.totalMemoryUsage > maxGlobalMemoryUsage.totalMemoryUsage * 2)
      && mtx.try_lock()) {
-         lastTimeUpdated = time(NULL);
          maxGlobalMemoryUsage = globalMemoryUsage;
          updateTimes++;
 #ifdef OPEN_BACKTRACE
@@ -45,11 +45,16 @@ void MemoryUsage::addToMemoryUsage(unsigned int size, unsigned int newTouchePage
          MemoryWaste::compareMemoryUsageAndRecordStatus(maxGlobalMemoryUsage);
 #ifdef PRINT_LEAK_OBJECTS
          if(MemoryWaste::minAddr != (uint64_t)-1 && MemoryWaste::maxAddr) {
-             if(updateTimes%5 == 0) {
-//                 memset(helpMarked, 0, ThreadLocalStatus::totalNumOfThread*sizeof(bool));
+             if(ThreadLocalStatus::numOfFunctions[0] + ThreadLocalStatus::numOfFunctions[1] + ThreadLocalStatus::numOfFunctions[2] +
+             ThreadLocalStatus::numOfFunctions[3] +ThreadLocalStatus::numOfFunctions[4] +
+             ThreadLocalStatus::numOfFunctions[12] + ThreadLocalStatus::numOfFunctions[13] + ThreadLocalStatus::numOfFunctions[14] + ThreadLocalStatus::numOfFunctions[15] +
+             ThreadLocalStatus::numOfFunctions[16] <= 1000) {
+                 ;
+             }  else {
                  leakcheck::doSlowLeakCheck(MemoryWaste::minAddr, MemoryWaste::maxAddr);
                  leakcheck::sweep();
-                 fprintf(stderr, "leak = %luKb\n", leakcheck::_totalLeakageSize/ONE_KB);
+                 fprintf(stderr, "thread %d potential leak = %luKb\n", ThreadLocalStatus::runningThreadIndex, leakcheck::_totalLeakageSize/ONE_KB);
+//             }
              }
          }
 #endif

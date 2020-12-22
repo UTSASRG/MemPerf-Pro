@@ -64,6 +64,13 @@ public:
     // Actually, the mainfile can be longer if it has some parameters.
     return (_readable && _writable && !_executable && _copy_on_write) &&
       (_file.size() > 0 && (_file == mainfile ||  _file == "[heap]" || _file.find(".so") != std::string::npos));
+//      return (_readable && _writable && !_executable && _copy_on_write) &&
+//             (_file.size() > 0 && (_file == mainfile ||  _file == "[heap]" || _file == "[stack]" || _file.find(".so") != std::string::npos));
+//      return (_readable && _writable && !_executable && _copy_on_write);
+  }
+
+  bool isSilentGlobals(std::string mainfile) const {
+      return (_readable && _writable && !_executable && _copy_on_write) && (_file.length() == 0);
   }
 
   uintptr_t getBase() const { return _base; }
@@ -130,6 +137,9 @@ static std::ifstream& operator>>(std::ifstream& f, mapping& m) {
 
 extern regioninfo regions[MAX_REGION_NUM];
 extern uint8_t numOfRegion;
+extern regioninfo silentRegions[MAX_REGION_NUM];
+extern uint8_t numOfSilentRegions;
+extern bool selfmapInit;
 
 class selfmap {
 public:
@@ -141,6 +151,11 @@ public:
 
   /// Collect all global regions.
   void getGlobalRegions() {
+      if(selfmapInit) {
+          return;
+      }
+      selfmapInit = true;
+
       mapping maps[MAX_REGION_NUM];
       uint8_t numOfMaps;
 
@@ -163,17 +178,21 @@ public:
 
       maps_file.close();
 
-    size_t index = 0;
       numOfRegion = 0;
+      numOfSilentRegions = 0;
     for(uint8_t i = 0; i < numOfMaps; ++i) {
       mapping m = maps[i];
 
       if(m.isGlobals(_main_exe) && m.getFile().find("libmallocprof") == std::string::npos) {
-//        if(m.isGlobals(_main_exe) ) {
 //        fprintf(stderr, "getGlobalRegiions: m.getBase() %lx m.getLimit() %lx isglobals and added %s\n", m.getBase(), m.getLimit(), m.getFile().c_str());
-        regions[index].start = (void*)m.getBase();
-        regions[index].end = (void*)m.getLimit();
-        index++;
+        regions[numOfRegion].start = (void*)m.getBase();
+        regions[numOfRegion].end = (void*)m.getLimit();
+        numOfRegion++;
+      } else if(m.isSilentGlobals(_main_exe)) {
+          silentRegions[numOfSilentRegions].start = (void*)m.getBase();
+          silentRegions[numOfSilentRegions].end = (void*)m.getLimit();
+          numOfSilentRegions++;
+//          fprintf(stderr, "find a silent region from %p to %p\n", (void*)m.getBase(), (void*)m.getLimit());
       }
     }
 

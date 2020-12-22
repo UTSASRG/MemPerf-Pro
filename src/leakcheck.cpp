@@ -37,21 +37,30 @@ void leakcheck::doSlowLeakCheck(unsigned long begin, unsigned long end) {
     _heapEnd = end;
     ucontext_t context;
     getcontext(&context);
+//    fprintf(stderr, "heap pointers\n");
     searchHeapPointers(&context);
+//    fprintf(stderr, "stack\n");
+//fprintf(stderr, "thread stack from %p to %p\n", ThreadLocalStatus::stackStartAddress, &context);
     searchHeapPointersInsideStack(&context);
-    mark();
+//    mark();
 //    sweep();
 }
 
 void leakcheck::exploreHeapObject(unsigned long addr) {
-    MemoryWaste::hashLocksSet.lock((void*)addr);
+//    fprintf(stderr, "to get lock\n");
+//    MemoryWaste::hashLocksSet.lock((void*)addr);
+//    fprintf(stderr, "get lock\n");
     ObjectStatus* object = objStatusMap.find((void*)addr, sizeof(void*));
     if(object && !object->mark && object->allocated) {
         unsigned long end = addr + object->sizeClassSizeAndIndex.size;
-        searchHeapPointers((unsigned long)addr, (unsigned long)end);
         object->mark = true;
+//        MemoryWaste::hashLocksSet.unlock((void*)addr);
+        searchHeapPointers((unsigned long)addr, (unsigned long)end);
     }
-    MemoryWaste::hashLocksSet.unlock((void*)addr);
+    else {
+//        MemoryWaste::hashLocksSet.unlock((void*)addr);
+    }
+
 }
 
 void leakcheck::mark() {
@@ -59,37 +68,45 @@ void leakcheck::mark() {
         unsigned long addr = _unexploredObjects.front();
         _unexploredObjects.pop_front();
         exploreHeapObject(addr);
+//        fprintf(stderr, "here\n");
     }
 }
 
 void leakcheck::sweep() {
+//    fprintf(stderr, "globals\n");
+    selfmap::getInstance().getGlobalRegions();
     searchHeapPointersInsideGlobals();
+//    fprintf(stderr, "Going to mark...\n");
     mark();
+//    fprintf(stderr, "Mark done. Do sweep...\n");
     _totalLeakageSize = 0;
 //    for(unsigned int i = 0; i < MAX_OBJ_NUM; ++i) {
 //        MemoryWaste::hashLocksSet.locks[i].lock();
 //    }
 
     for(auto entryInHashTable: objStatusMap) {
-        MemoryWaste::hashLocksSet.lock((void*)entryInHashTable.getKey());
+//        if(MemoryWaste::hashLocksSet.locks[(uint64_t)entryInHashTable.getKey()]._lock) {
+//            continue;
+//        }
+//        MemoryWaste::hashLocksSet.lock((void*)entryInHashTable.getKey());
         ObjectStatus* object = entryInHashTable.getValue();
+//        fprintf(stderr, "%lu: %p, sz = %u\n", ThreadLocalStatus::runningThreadIndex, entryInHashTable.getKey(), object->sizeClassSizeAndIndex.size);
         if(object->mark) {
 //            fprintf(stderr, "marked\n");
             object->mark = false;
-        } else if (object->allocated && object->tid == ThreadLocalStatus::runningThreadIndex) {
-//            fprintf(stderr, "leaked\n");
-            _totalLeakageSize += object->sizeClassSizeAndIndex.size;
-//          fprintf(stderr, "%lu free: %p\n", ThreadLocalStatus::runningThreadIndex, entryInHashTable.getKey());
+        } else if (object->allocated && object->tid == ThreadLocalStatus::runningThreadIndex && entryInHashTable.getKey() != AllocatingStatus::allocatingType.objectAddress) {
+
+                //            fprintf(stderr, "leaked\n");
+                _totalLeakageSize += object->sizeClassSizeAndIndex.size;
+//          fprintf(stderr, "%lu free: %p, sz = %u\n", ThreadLocalStatus::runningThreadIndex, entryInHashTable.getKey(), object->sizeClassSizeAndIndex.size);
 //          RealX::free(entryInHashTable.getKey());
-        } else {
-//            fprintf(stderr, "freed\n");
         }
-        MemoryWaste::hashLocksSet.unlock((void*)entryInHashTable.getKey());
+//        MemoryWaste::hashLocksSet.unlock((void*)entryInHashTable.getKey());
     }
 //    for(unsigned int i = 0; i < MAX_OBJ_NUM; ++i) {
 //        MemoryWaste::hashLocksSet.locks[i].unlock();
 //    }
-
+//    fprintf(stderr, "Sweep done...\n");
 }
 
 void leakcheck::searchHeapPointersInsideGlobals() {
@@ -97,11 +114,17 @@ void leakcheck::searchHeapPointersInsideGlobals() {
         regioninfo r = regions[i];
         searchHeapPointers((unsigned long)r.start, (unsigned long)r.end);
     }
+    for(uint8_t i = 1; i < 2; ++i) {
+        regioninfo r = silentRegions[i];
+//        fprintf(stderr, "search silent heap %u\n", i);
+        searchHeapPointers((unsigned long)r.start, (unsigned long)r.end);
+    }
 }
 
 bool leakcheck::isPossibleHeapPointer(unsigned long addr) {
     if (addr > _heapBegin && addr < _heapEnd) {
-        if(objStatusMap.find((void*)addr, sizeof(void*))) {
+        if(ObjectStatus * status = objStatusMap.find((void*)addr, sizeof(void*))) {
+            if(!status->mark)
             return true;
         }
     }
@@ -118,6 +141,7 @@ void leakcheck::searchHeapPointers(unsigned long start, unsigned long end) {
     assert(((intptr_t)start) % sizeof(unsigned long) == 0);
     unsigned long* stop = (unsigned long*)aligndown(end, sizeof(void*));
     unsigned long* ptr = (unsigned long*)start;
+//    fprintf(stderr, "search from %p to %p\n", (void *)start, (void *)end);
     while(ptr < stop) {
         checkInsertUnexploredList(*ptr);
         ptr++;
@@ -142,6 +166,18 @@ void leakcheck::debugPrintQueue() {
         unsigned long addr = _unexploredObjects.front();
         _unexploredObjects.pop_front();
         fprintf(stderr, "catch %lu\n", addr);
+    }
+}
+
+void leakcheck::handler(int signo) {
+    fprintf(stderr, "%d receive signal %d...checking memory leaking\n", ThreadLocalStatus::runningThreadIndex, signo);
+
+    if(MemoryWaste::minAddr != (uint64_t)-1 && MemoryWaste::maxAddr) {
+        leakcheck::doSlowLeakCheck(MemoryWaste::minAddr, MemoryWaste::maxAddr);
+        leakcheck::sweep();
+        fprintf(stderr, "leak = %luKb\n", leakcheck::_totalLeakageSize / ONE_KB);
+    } else {
+        fprintf(stderr, "leak = 0Kb\n");
     }
 }
 

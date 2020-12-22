@@ -84,7 +84,7 @@ class HashMap {
   size_t _bucketsTotal;     // How many buckets in total
 //  size_t _bucketsTotalUsed; // How many buckets in use
 
-//  size_t _totalEntry;
+  size_t _totalEntry;
 
   typedef bool (*keycmpFuncPtr)(const KeyType, const KeyType, size_t);
   typedef size_t (*hashFuncPtr)(const KeyType, size_t);
@@ -108,7 +108,7 @@ public:
     _buckets = NULL;
 //    _bucketsTotalUsed = 0;
     _bucketsTotal = size;
-//    _totalEntry = 0;
+    _totalEntry = 0;
 
     if(hfunc == NULL || kcmp == NULL) {
       abort();
@@ -299,7 +299,7 @@ public:
 //    return isFound;
 //  }
 
-//  size_t getEntryNumber() { return _totalEntry; }
+  size_t getEntryNumber() { return _totalEntry; }
 
   // Clear all _buckets
 //  void clear() {}
@@ -325,7 +325,7 @@ private:
     listInsertTail(&entry->list, &head->list);
     head->count++;
     // increment total number
-//    __atomic_add_fetch(&_totalEntry, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&_totalEntry, 1, __ATOMIC_RELAXED);
     return entry;
   }
 

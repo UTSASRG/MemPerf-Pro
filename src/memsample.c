@@ -188,6 +188,18 @@ void initPMU(void) {
     setupSampling();
 }
 
+void initPMU2(void) {
+    perfInfo.tid = syscall(__NR_gettid);
+
+    perfInfo.data_buf_copy = (char *)mmap(NULL, DATA_MAPSIZE, PROT_READ | PROT_WRITE,
+                                          MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if(perfInfo.data_buf_copy == MAP_FAILED) {
+        fprintf(stderr, "mmap failed in %s\n", __FUNCTION__);
+        abort();
+    }
+
+    setupSampling();
+}
 //spinlock lock;
 
 void sampleHandler(int signum, siginfo_t *info, void *p) {

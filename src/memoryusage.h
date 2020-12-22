@@ -24,7 +24,6 @@ public:
 #ifdef PRINT_MEM_DETAIL_THRESHOLD
     static spinlock debugLock;
 #endif
-    static time_t lastTimeUpdated;
     static void addToMemoryUsage(unsigned int size, unsigned int newTouchePageBytes);
     static void subRealSizeFromMemoryUsage(unsigned int size);
     static void subTotalSizeFromMemoryUsage(unsigned int size);

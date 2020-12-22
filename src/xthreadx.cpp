@@ -65,11 +65,17 @@ void * xthreadx::startThread(void * arg) {
 
     Predictor::threadInit();
 
-#ifdef OPEN_SAMPLING_EVENT
-    initPMU();
-//    setupSampling();
-#endif
+//    if (signal(SIGUSR1, leakcheck::handler) == SIG_ERR) {
+//        fprintf(stderr, "can not set handler\n");
+//    } else {
+//        fprintf(stderr, "set signal successfully\n");
+//    }
 
+#ifdef OPEN_SAMPLING_EVENT
+    //    initPMU();
+        initPMU2();
+
+#endif
     Predictor::outsideCountingEventsStart();
     Predictor::outsideCycleStart();
     ProgramStatus::setProfilerInitializedTrue();

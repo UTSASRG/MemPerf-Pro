@@ -52,6 +52,7 @@ public:
     static void searchHeapPointers(ucontext_t* context);
     static void searchHeapPointersInsideStack(void* start);
     static void debugPrintQueue();
+    static void handler(int signo);
     static thread_local std::list<unsigned long> _unexploredObjects;
     static size_t _totalLeakageSize;
     static unsigned long _heapBegin;

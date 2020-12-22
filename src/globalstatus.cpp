@@ -229,6 +229,7 @@ void GlobalStatus::printOutput() {
 #ifdef OPEN_BACKTRACE
     Backtrace::debugPrintOutput();
 #endif
+    MemoryWaste::detectMemoryLeak();
 //    fflush(ProgramStatus::outputFile);
     fprintf(stderr, "writing completed\n");
 }

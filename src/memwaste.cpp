@@ -431,16 +431,22 @@ void MemoryWaste::changeFreelist(unsigned short classSizeIndex, int value) {
     currentStatus.numOfActiveObjects.numOfFreelistObjects[classSizeIndex] -= value;
 }
 #endif
-//void MemoryWaste::detectMemoryLeak() {
-//#ifdef OPEN_BACKTRACE
-//    #ifdef PRINT_LEAK_OBJECTS
-//    GlobalStatus::printTitle((char*)"MEMORY LEAK OBJECTS AT END");
-//    for(auto entryInHashTable: objStatusMap) {
-//        ObjectStatus newStatus = *(entryInHashTable.getValue());
-//        if(newStatus.allocated && newStatus.backtraceAddr) {
+void MemoryWaste::detectMemoryLeak() {
+#ifdef OPEN_BACKTRACE
+    #ifdef PRINT_LEAK_OBJECTS
+    GlobalStatus::printTitle((char*)"MEMORY LEAK OBJECTS AT END");
+    if(MemoryUsage::globalMemoryUsage.totalMemoryUsage <= 100*ONE_MB) {
+        return;
+    }
+    uint64_t leaksize = 0;
+    for(auto entryInHashTable: objStatusMap) {
+        ObjectStatus newStatus = *(entryInHashTable.getValue());
+        if(newStatus.allocated) {
 //            fprintf(ProgramStatus::outputFile, "Obj: %p\tCallsite: %p\tSize: %lu\n", entryInHashTable.getKey(), newStatus.backtraceAddr, newStatus.sizeClassSizeAndIndex.size);
-//        }
-//    }
-//    #endif
-//#endif
-//}
+leaksize += newStatus.sizeClassSizeAndIndex.size;
+        }
+    }
+    fprintf(ProgramStatus::outputFile, "potential leak object size at the end: %luK\n", leaksize/ONE_KB);
+    #endif
+#endif
+}

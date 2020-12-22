@@ -53,9 +53,9 @@ void exitHandler() {
 
 // MallocProf's main function
 int libmallocprof_main(int argc, char ** argv, char ** envp) {
-#ifdef PRINT_LEAK_OBJECTS
-    selfmap::getInstance().getGlobalRegions();
-#endif
+//#ifdef PRINT_LEAK_OBJECTS
+//    selfmap::getInstance().getGlobalRegions();
+//#endif
     RealX::initializer();
     ShadowMemory::initialize();
     ThreadLocalStatus::addARunningThread();
@@ -90,7 +90,9 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
     Predictor::globalInit();
 
     ThreadLocalStatus::setStackStartAddress(&argc);
-
+#ifdef PRINT_LEAK_OBJECTS
+    signal(SIGUSR1, leakcheck::handler);
+#endif
     Predictor::outsideCountingEventsStart();
     Predictor::outsideCycleStart();
     ProgramStatus::setProfilerInitializedTrue();
@@ -165,6 +167,10 @@ extern "C" {
             AllocatingStatus::updateAllocatingInfoToPredictor();
             Predictor::outsideCycleStart();
         }
+
+//        fprintf(stderr, "%d malloc object %u at %p, total = %d\n", ThreadLocalStatus::runningThreadIndex, sz, object, objStatusMap.getEntryNumber());
+
+
         return object;
 
 	}
@@ -251,6 +257,7 @@ extern "C" {
         AllocatingStatus::updateAllocatingInfoToThreadLocalData();
         AllocatingStatus::updateAllocatingInfoToPredictor();
         Predictor::outsideCycleStart();
+//        fprintf(stderr, "%d realloc object %u at %p\n", ThreadLocalStatus::runningThreadIndex, sz, object);
         return object;
 	}
 

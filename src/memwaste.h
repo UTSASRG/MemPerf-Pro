@@ -135,7 +135,7 @@ public:
     static void changeBlowup(unsigned short classSizeIndex, int value);
     static void changeFreelist(unsigned short classSizeIndex, int value);
 #endif
-//    static void detectMemoryLeak();
+    static void detectMemoryLeak();
 
 };
 

@@ -13,7 +13,6 @@
 class AllocatingStatus {
 
 private:
-    static thread_local AllocatingType allocatingType;
     static thread_local AllocationTypeForOutputData allocationTypeForOutputData;
     static thread_local AllocationTypeForOutputData allocationTypeForPrediction;
     static thread_local uint64_t cyclesBeforeRealFunction;
@@ -216,6 +215,8 @@ private:
     static void cleanSyscallsInfoInAllocatingStatus();
 
 public:
+
+    static thread_local AllocatingType allocatingType;
 
     static thread_local bool firstAllocation;
     static thread_local bool sampledForCountingEvent;

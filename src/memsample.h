@@ -47,6 +47,7 @@ void getPerfCounts(PerfReadInfo*);
 #endif
 #ifdef OPEN_SAMPLING_EVENT
 void initPMU(void);
+void initPMU2(void);
 void sampleHandler(int signum, siginfo_t *info, void *p);
 void setupSampling(void);
 void stopSampling(void);
