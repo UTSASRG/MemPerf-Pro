@@ -371,6 +371,10 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType)
             return;
         }
 
+    if(cme->getUsedBytes() == 0 || pme->getUsedBytes() == 0) {
+        return;
+    }
+
     cme += tuple.cache_index;
 
     if(cme->lastWriterThreadIndex == 0) {
@@ -671,7 +675,7 @@ void PageMapEntry::updateCacheLines(unsigned long mega_index, uint8_t page_index
     int64_t size_remain = size;
     PageMapEntry ** mega_entry = ShadowMemory::getMegaMapEntry(mega_index);
     PageMapEntry * targetPage = (*mega_entry + page_index);
-    CacheMapEntry * current = targetPage->getCacheMapEntry(true);
+    CacheMapEntry * current = targetPage->getCacheMapEntry(true) + cache_index;
 
     if (firstCacheLineOffset) {
         uint8_t curCacheLineBytes = MIN(CACHELINE_SIZE - firstCacheLineOffset, size_remain);
@@ -888,7 +892,7 @@ inline void CacheMapEntry::subUsedBytes(uint8_t num_bytes) {
 void CacheMapEntry::updateCache(bool isFree, uint8_t num_bytes) {
     if (isFree) {
         subUsedBytes(num_bytes);
-        if (getFS() == ACTIVE) {
+        if (getFS() == ACTIVE || getFS() == OBJECT) {
             if (lastAFThreadIndex != getThreadIndex() && lastAFThreadIndex >= 16) {
                 setFS(PASSIVE);
             }

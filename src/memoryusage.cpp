@@ -33,8 +33,8 @@ void MemoryUsage::addToMemoryUsage(unsigned int size, unsigned int newTouchePage
 #endif
     maxRealMemoryUsage = MAX(maxRealMemoryUsage, globalMemoryUsage.realMemoryUsage);
 
-     if(globalMemoryUsage.totalMemoryUsage >= 100*ONE_MB &&
-     (globalMemoryUsage.totalMemoryUsage > maxGlobalMemoryUsage.totalMemoryUsage + 400*ONE_MB
+     if(globalMemoryUsage.totalMemoryUsage >= 10*ONE_MB &&
+     (globalMemoryUsage.totalMemoryUsage > maxGlobalMemoryUsage.totalMemoryUsage + 200*ONE_MB
      || globalMemoryUsage.totalMemoryUsage > maxGlobalMemoryUsage.totalMemoryUsage * 2)
      && mtx.try_lock()) {
          maxGlobalMemoryUsage = globalMemoryUsage;
