@@ -112,6 +112,7 @@ int xthreadx::thread_join(pthread_t thread, void ** retval) {
     int result = RealX::pthread_join (thread, retval);
     ThreadLocalStatus::subARunningThread();
     if(ThreadLocalStatus::fromParallelToSerial()) {
+//    if(ThreadLocalStatus::totalNumOfRunningThread == 2) {
         Predictor::outsideCyclesStop();
         Predictor::outsideCountingEventsStop();
         Predictor::threadEnd();

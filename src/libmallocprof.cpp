@@ -127,6 +127,7 @@ extern "C" {
         void * object;
         if(AllocatingStatus::isFirstFunction()) {
             if(ThreadLocalStatus::runningThreadIndex) {
+                Predictor::outsideCyclesStop();
 #ifdef OPEN_COUNTING_EVENT
 #ifdef OPEN_SAMPLING_EVENT
                 pauseSampling();
@@ -136,7 +137,6 @@ extern "C" {
                 restartSampling();
 #endif
 #endif
-                Predictor::outsideCyclesStop();
                 AllocatingStatus::updateAllocatingStatusBeforeRealFunction(MALLOC, sz);
                 object = RealX::malloc(sz);
                 AllocatingStatus::updateAllocatingStatusAfterRealFunction(object);
@@ -144,19 +144,19 @@ extern "C" {
                 AllocatingStatus::updateAllocatingInfoToPredictor();
                 Predictor::outsideCycleStart();
             } else {
+                Predictor::outsideCyclesStop();
 #ifdef OPEN_COUNTING_EVENT
                 setupCounting();
 #endif
-                Predictor::outsideCyclesStop();
                 AllocatingStatus::updateAllocatingStatusBeforeRealFunction(MALLOC, sz);
                 object = RealX::malloc(sz);
                 AllocatingStatus::updateAllocatingStatusAfterRealFunction(object);
                 AllocatingStatus::updateAllocatingInfoToThreadLocalData();
                 AllocatingStatus::updateAllocatingInfoToPredictor();
-                Predictor::outsideCycleStart();
 #ifdef OPEN_SAMPLING_EVENT
                 initPMU();
 #endif
+                Predictor::outsideCycleStart();
             }
         } else {
             Predictor::outsideCyclesStop();
@@ -167,8 +167,11 @@ extern "C" {
             AllocatingStatus::updateAllocatingInfoToPredictor();
             Predictor::outsideCycleStart();
         }
-
-//        fprintf(stderr, "%d malloc object %u at %p, total = %d\n", ThreadLocalStatus::runningThreadIndex, sz, object, objStatusMap.getEntryNumber());
+//if(sz != 57)
+//        fprintf(stderr, "malloc object %lu at %p\n", sz, object);
+//if(sz != 57 && sz <= 100) {
+//    fprintf(stderr, "malloc object %lu, %p, %u, %u\n", sz, object, (uint64_t) object & CACHELINE_SIZE_MASK, (uint64_t) object & PAGESIZE_MASK);
+//}
 
 
         return object;
@@ -210,6 +213,9 @@ extern "C" {
         if(!AllocatingStatus::outsideTrackedAllocation() || ProgramStatus::conclusionHasStarted()) {
             return RealX::free(ptr);
         }
+
+        Predictor::outsideCyclesStop();
+
 #ifdef OPEN_COUNTING_EVENT
         if(AllocatingStatus::isFirstFunction()) {
 #ifdef OPEN_SAMPLING_EVENT
@@ -221,14 +227,16 @@ extern "C" {
 #endif
         }
 #endif
-
-        Predictor::outsideCyclesStop();
         AllocatingStatus::updateFreeingStatusBeforeRealFunction(FREE, ptr);
         RealX::free(ptr);
         AllocatingStatus::updateFreeingStatusAfterRealFunction();
         AllocatingStatus::updateAllocatingInfoToThreadLocalData();
         AllocatingStatus::updateAllocatingInfoToPredictor();
         Predictor::outsideCycleStart();
+
+//        fprintf(stderr, "free obj at %p\n", ptr);
+//        fprintf(stderr, "free obj\n");
+
     }
 
 
@@ -257,6 +265,7 @@ extern "C" {
         AllocatingStatus::updateAllocatingInfoToThreadLocalData();
         AllocatingStatus::updateAllocatingInfoToPredictor();
         Predictor::outsideCycleStart();
+//        fprintf(stderr, "realloc %lu: %p -> %p\n", sz, ptr, object);
 //        fprintf(stderr, "%d realloc object %u at %p\n", ThreadLocalStatus::runningThreadIndex, sz, object);
         return object;
 	}
@@ -409,7 +418,6 @@ int madvise(void *addr, size_t length, int advice) {
 #endif
         return result;
     }
-
     uint64_t timeStart = rdtscp();
     int result = RealX::madvise(addr, length, advice);
     uint64_t timeStop = rdtscp();
@@ -487,6 +495,8 @@ int munmap(void *addr, size_t length) {
 }
 
 void *mremap(void *old_address, size_t old_size, size_t new_size, int flags, ...) {
+
+    fprintf(stderr, "mremap %lu -> %lu\n", old_size, new_size);
     if (!realInitialized) RealX::initializer();
     va_list ap;
     va_start(ap, flags);

@@ -26,9 +26,9 @@ typedef struct thread {
 struct ProfilerMemory {
 
     spinlock lock;
-    bool initialized = false;
+    bool initialized;
    char startPointer[PROFILER_MEMORY_SIZE];
-    unsigned int objectNum = 0;
+    unsigned int objectNum;
     void * endPointer;
     void * overheadPointer;
 

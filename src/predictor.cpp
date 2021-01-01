@@ -150,7 +150,7 @@ void Predictor::stopSerial() {
     criticalCycle += outsideCycle;
     replacedCriticalCycle += outsideCycle;
     for(unsigned int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
-        outsideCycle += functionCycles[allocationType];
+//        outsideCycle += functionCycles[allocationType];
         criticalCycle += functionCycles[allocationType];
         if(replacedFunctionCycles[allocationType] == 0) {
             replacedCriticalCycle += functionCycles[allocationType];
@@ -167,7 +167,7 @@ void Predictor::stopSerial() {
 #ifdef OPEN_COUNTING_EVENT
     criticalCountingEvent.add(countingEvent);
 #endif
-//    fprintf(stderr, "start parallel %lu %lu %lu %lu\n", criticalCycle, replacedCriticalCycle, outsideCycle, faultedPages * cyclePerPageFault);
+//    fprintf(stderr, "***stop serial %lu %lu %lu %lu\n", criticalCycle, replacedCriticalCycle, outsideCycle, faultedPages * cyclePerPageFault);
 //    criticalCountingEvent.debugPrint();
     cleanStageData();
 }
@@ -184,6 +184,7 @@ void Predictor::stopParallel() {
 ///max
     for(unsigned int index = 1; index < ThreadLocalStatus::totalNumOfThread; ++index) {
         if(threadCycle[index] && threadReplacedCycle[index]) {
+//            fprintf(stderr, "***cycle = %lu, replacedCycle = %lu\n", threadCycle[index], threadReplacedCycle[index]);
             criticalStageCycle = MAX(criticalStageCycle, threadCycle[index]);
             criticalReplacedStageCycle = MAX(criticalReplacedStageCycle, threadReplacedCycle[index]);
         }
@@ -213,7 +214,7 @@ void Predictor::stopParallel() {
 
     criticalCycle += criticalStageCycle;
     replacedCriticalCycle += criticalReplacedStageCycle;
-//    fprintf(stderr, "stop parallel %lu %lu\n", criticalCycle, replacedCriticalCycle);
+//    fprintf(stderr, "***stop parallel %lu %lu\n", criticalCycle, replacedCriticalCycle);
 //    criticalCountingEvent.debugPrint();
     cleanStageData();
 }
@@ -228,7 +229,7 @@ void Predictor::printOutput() {
     fprintf(ProgramStatus::outputFile, "original critical cycle %20lu\n", criticalCycle);
     fprintf(ProgramStatus::outputFile, "predicted critical cycle%20lu\n", replacedCriticalCycle);
     if(replacedCriticalCycle) {
-        fprintf(ProgramStatus::outputFile, "ratio %3lu%%\n", replacedCriticalCycle*100/criticalCycle);
+        fprintf(ProgramStatus::outputFile, "ratio %3lu%%\n", criticalCycle*100/replacedCriticalCycle);
     } else {
         fprintf(ProgramStatus::outputFile, "ratio 100%%\n");
     }
@@ -269,6 +270,9 @@ void Predictor::readFunctionCyclesFromInfo(char*token) {
             replacedFunctionCycles[allocationType] = (size_t) atoi(token);
         }
     }
+//    replacedFunctionCycles[SERIAL_SMALL_NEW_MALLOC] = 110;
+//    replacedFunctionCycles[SERIAL_SMALL_REUSED_MALLOC] = 54;
+//    replacedFunctionCycles[SERIAL_SMALL_FREE] = 64;
 }
 
 void Predictor::readMiddleObjectThresholdFromInfo(char*token) {

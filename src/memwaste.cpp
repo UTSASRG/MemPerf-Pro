@@ -239,7 +239,7 @@ void MemoryWaste::initialize() {
 AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(unsigned int size, void * address, uint8_t callsiteKey) {
     bool reused;
     ObjectStatus * status;
-
+ 
     hashLocksSet.lock(address);
     status = objStatusMap.find(address, sizeof(unsigned long));
     if(!status) {
@@ -286,6 +286,10 @@ AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(unsigned int size, voi
     status->allocated = true;
     status->tid = ThreadLocalStatus::runningThreadIndex;
     hashLocksSet.unlock(address);
+
+//    if(size > 5000) {
+//        fprintf(stderr, "reused = %u\n", reused);
+//    }
 
     currentStatus.numOfActiveObjects.numOfAllocatedObjects[arrayIndex()]++;
     if(currentStatus.blowupFlag[currentSizeClassSizeAndIndex.classSizeIndex] > 0 ) {

@@ -130,6 +130,7 @@ unsigned int ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_in
                 current->setTouched();
                 numNewPagesTouched += 512;
                 if(current->donatedBySyscall) {
+                    current->donatedBySyscall = false;
                     Predictor::faultedPages++;
                 }
             }
@@ -138,6 +139,11 @@ unsigned int ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_in
 #endif
 
     unsigned short firstPageOffset = uintaddr & PAGESIZE_MASK;
+
+//    if(size != 57) {
+//        fprintf(stderr, "size = %lu at %u\n", size, firstPageOffset);
+//    }
+
     unsigned int curPageBytes = MIN(PAGESIZE - firstPageOffset, size);
     PageMapEntry ** mega_entry = getMegaMapEntry(mega_index);
 //    fprintf(stderr, "*mega_entry = %p\n", *mega_entry);
@@ -153,10 +159,15 @@ unsigned int ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_in
         if(!current->isTouched()) {
 #endif
             current->setTouched();
+//            fprintf(stderr, "touch a new page, %lu, %lu, %u, %u\n", size, mega_index, page_index, firstPageOffset);
             numNewPagesTouched++;
             if(current->donatedBySyscall) {
+                current->donatedBySyscall = false;
                 Predictor::faultedPages++;
             }
+        }
+        else {
+//            fprintf(stderr, "touch an old page, %lu, %lu, %u, %u\n", size, mega_index, page_index, firstPageOffset);
         }
     }
     size -= curPageBytes;
@@ -187,11 +198,14 @@ unsigned int ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_in
 #endif
 //                fprintf(stderr, "setTouch %p: %lu, %u\n", current, mega_index, page_index);
                 current->setTouched();
+//                fprintf(stderr, "touch a new page, %lu, %lu, %u\n", size, mega_index, page_index);
                 numNewPagesTouched++;
                 if(current->donatedBySyscall) {
+                    current->donatedBySyscall = false;
                     Predictor::faultedPages++;
                 }
             } else {
+//                fprintf(stderr, "touch an old page, %lu, %lu, %u\n", size, mega_index, page_index);
 //                fprintf(stderr, "Touched %p\n", current);
 //                fprintf(stderr, "Touched %p: %lu, %u\n", current, mega_index, page_index);
             }
@@ -218,11 +232,16 @@ unsigned int ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_in
             if(!current->isTouched()) {
 #endif
                 current->setTouched();
+//                fprintf(stderr, "touch a new page, %lu, %lu, %u\n", size, mega_index, page_index);
                 numNewPagesTouched++;
                 if(current->donatedBySyscall) {
+                    current->donatedBySyscall = false;
                     Predictor::faultedPages++;
                 }
             }
+//            else {
+//                fprintf(stderr, "touched an old page, %lu, %lu, %u\n", size, mega_index, page_index);
+//            }
         }
     }
 
@@ -294,28 +313,25 @@ void ShadowMemory::setTransparentHugePages(uintptr_t uintaddr, size_t length) {
 #endif
 
 size_t ShadowMemory::cleanupPages(uintptr_t uintaddr, size_t length) {
+//        fprintf(stderr, "cleanupPages %p, %lu\n", uintaddr, length);
     unsigned numTouchedPages = 0;
 
     // First compute the megabyte number of the given address.
-    unsigned long mega_index;
-    unsigned firstPageIdx;
+    unsigned long mega_index = (uintaddr >> LOG2_MEGABYTE_SIZE);
+    unsigned pageIdx = ((uintaddr & MEGABYTE_MASK) >> LOG2_PAGESIZE);
+//    unsigned firstPageIdx = ((uintaddr & MEGABYTE_MASK) >> LOG2_PAGESIZE);
 
-    mega_index = (uintaddr >> LOG2_MEGABYTE_SIZE);
+
+    /*
     if (mega_index > NUM_MEGABYTE_MAP_ENTRIES) {
         fprintf(stderr, "ERROR: mega index of 0x%lx too large: %lu > %u\n",
                 uintaddr, mega_index, NUM_MEGABYTE_MAP_ENTRIES);
         abort();
-    }
-    firstPageIdx = ((uintaddr & MEGABYTE_MASK) >> LOG2_PAGESIZE);
-
-    PageMapEntry * current;
-
-    bool hugePageTouched = false;
+    } */
 
 #if (defined(ENABLE_HP) || defined(ENABLE_THP))
+    bool hugePageTouched = false;
     hugePageTouched = getPageMapEntry(mega_index/2*2, 0)->hugePage || inHPInitRange((void *)uintaddr);
-#endif
-
     if(hugePageTouched) {
         length = alignup(length, PAGESIZE_HUGE);
         for(unsigned long m = mega_index/2*2; m <= (mega_index+(length/ONE_MB)-1)/2*2+1; m+=2) {
@@ -325,21 +341,50 @@ size_t ShadowMemory::cleanupPages(uintptr_t uintaddr, size_t length) {
             }
         }
     } else {
+#endif
         length = alignup(length, PAGESIZE);
+#if (defined(ENABLE_HP) || defined(ENABLE_THP))
     }
+#endif
 
-    unsigned curPageIdx;
-    unsigned numPages = length >> LOG2_PAGESIZE;
+//    unsigned curPageIdx;
+//    unsigned numPages = length >> LOG2_PAGESIZE;
+    PageMapEntry * current =  *ShadowMemory::getMegaMapEntry(mega_index)+pageIdx;
+//    PageMapEntry * current;
 
+    while(length) {
+        if(current->isTouched()) {
+#if (defined(ENABLE_HP) || defined(ENABLE_THP))
+            if(!hugePageTouched) {
+#endif
+                numTouchedPages++;
+#if (defined(ENABLE_HP) || defined(ENABLE_THP))
+            }
+#endif
+            current->clear();
+        }
+        pageIdx++;
+        if(pageIdx == 0) {
+            current = *ShadowMemory::getMegaMapEntry(++mega_index);
+        } else {
+            current++;
+        }
+        length -= PAGESIZE;
+    }
+/*
     for(curPageIdx = firstPageIdx; curPageIdx < firstPageIdx + numPages; curPageIdx++) {
         current = getPageMapEntry(mega_index, curPageIdx);
         if(current->isTouched()) {
+#if (defined(ENABLE_HP) || defined(ENABLE_THP))
             if(!hugePageTouched) {
-                numTouchedPages++;
+#endif
+            numTouchedPages++;
+#if (defined(ENABLE_HP) || defined(ENABLE_THP))
             }
+#endif
             current->clear();
         }
-    }
+    } */
     return numTouchedPages*PAGESIZE;
 }
 
@@ -371,11 +416,17 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType)
             return;
         }
 
-    if(cme->getUsedBytes() == 0 || pme->getUsedBytes() == 0) {
+    if(pme->getUsedBytes() == 0) {
         return;
     }
 
     cme += tuple.cache_index;
+
+    if(cme->getUsedBytes() == 0) {
+        return;
+    }
+
+//    fprintf(stderr, "hit cache %lu, %u, %u, %u at %p: %u\n", tuple.mega_index, tuple.page_index, tuple.cache_index, uintaddr & CACHELINE_SIZE_MASK, cme, cme->getUsedBytes());
 
     if(cme->lastWriterThreadIndex == 0) {
         ThreadLocalStatus::friendlinessStatus.numOfSampledCacheLines++;
@@ -486,6 +537,7 @@ bool PageMapEntry::isTouched() {
 }
 
 void PageMapEntry::setTouched() {
+
 		touched = true;
 }
 
@@ -677,18 +729,31 @@ void PageMapEntry::updateCacheLines(unsigned long mega_index, uint8_t page_index
     PageMapEntry * targetPage = (*mega_entry + page_index);
     CacheMapEntry * current = targetPage->getCacheMapEntry(true) + cache_index;
 
-    if (firstCacheLineOffset) {
+//    if(size == 48) {
+//        if(isFree) {
+//            fprintf(stderr, "free object %u\n", size);
+//        } else {
+//            fprintf(stderr, "alloc object %u\n", size);
+//        }
+//    }
+
+//    if (firstCacheLineOffset) {
         uint8_t curCacheLineBytes = MIN(CACHELINE_SIZE - firstCacheLineOffset, size_remain);
         current->updateCache(isFree, curCacheLineBytes);
         size_remain -= curCacheLineBytes;
-    } else {
-        if (isFree) {
-            current->setEmpty();
-        } else {
-            current->setFull();
-        }
-        size_remain -= CACHELINE_SIZE;
-    }
+//    } else {
+//        if (isFree) {
+//            current->setEmpty();
+//        } else {
+//            current->setFull();
+//        }
+//        size_remain -= CACHELINE_SIZE;
+//    }
+//
+//if(size == 48) {
+//    fprintf(stderr, "first cache = %lu, %u, %u, %u at %p: %u\n", mega_index, page_index, cache_index, firstCacheLineOffset, current, current->getUsedBytes());
+//}
+
     cache_index++;
 
     while (size_remain >= CACHELINE_SIZE) {
@@ -716,6 +781,11 @@ void PageMapEntry::updateCacheLines(unsigned long mega_index, uint8_t page_index
             current->setFull();
         }
 
+//        if(size == 48) {
+//            fprintf(stderr, "middle cache = %lu, %u, %u at %p: %u\n", mega_index, page_index, cache_index, current,
+//                    current->getUsedBytes());
+//        }
+
         size_remain -= CACHELINE_SIZE;
         cache_index++;
     }
@@ -734,7 +804,12 @@ void PageMapEntry::updateCacheLines(unsigned long mega_index, uint8_t page_index
         } else {
             current++;
         }
+
         current->updateCache(isFree, size_remain);
+//        if(size == 48) {
+//            fprintf(stderr, "last cache = %lu, %u, %u, %u at %p: %u\n", mega_index, page_index, cache_index,
+//                    size_remain, current, current->getUsedBytes());
+//        }
     }
 }
 
