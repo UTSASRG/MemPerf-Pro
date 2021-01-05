@@ -239,7 +239,7 @@ void MemoryWaste::initialize() {
 AllocatingTypeGotFromMemoryWaste MemoryWaste::allocUpdate(unsigned int size, void * address, uint8_t callsiteKey) {
     bool reused;
     ObjectStatus * status;
- 
+
     hashLocksSet.lock(address);
     status = objStatusMap.find(address, sizeof(unsigned long));
     if(!status) {

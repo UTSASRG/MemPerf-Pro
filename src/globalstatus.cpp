@@ -205,6 +205,7 @@ void GlobalStatus::printFriendliness() {
             }
         }
     }
+    friendlinessStatus.cacheConflictDetector.print(friendlinessStatus.numOfSampling);
 #endif
 }
 

@@ -3,6 +3,8 @@
 uint64_t Predictor::totalCycle;
 uint64_t Predictor::criticalCycle;
 uint64_t Predictor::replacedCriticalCycle;
+uint64_t Predictor::criticalCycleDepend;
+uint64_t Predictor::replacedCriticalCycleDepend;
 #ifdef OPEN_COUNTING_EVENT
 PerfReadInfo Predictor::criticalCountingEvent;
 #endif
@@ -34,11 +36,16 @@ uint64_t Predictor::cyclePerPageFault;
 
 FILE * Predictor::predictorInfoFile;
 
+bool Predictor::lastThreadDepend;
+unsigned short Predictor::lastThreadIndex;
+
 void Predictor::globalInit() {
     openPredictorInfoFile();
     totalCycle = 0;
     criticalCycle = 0;
     replacedCriticalCycle = 0;
+    criticalCycleDepend = 0;
+    replacedCriticalCycleDepend = 0;
 #ifdef OPEN_COUNTING_EVENT
     memset(&criticalCountingEvent, 0, sizeof(PerfReadInfo));
 
@@ -140,8 +147,18 @@ void Predictor::threadEnd() {
 #ifdef OPEN_COUNTING_EVENT
     threadCountingEvents[ThreadLocalStatus::runningThreadIndex].add(countingEvent);
 #endif
-//    fprintf(stderr, "thread end %lu %lu %lu %lu\n",
-//             threadCycle[ThreadLocalStatus::runningThreadIndex], threadReplacedCycle[ThreadLocalStatus::runningThreadIndex], outsideCycle, faultedPages * cyclePerPageFault);
+
+    if(ThreadLocalStatus::runningThreadIndex) {
+        lastThreadDepend = false;
+        if(outsideCycle * 100 / threadCycle[ThreadLocalStatus::runningThreadIndex] >= 98) {
+            lastThreadIndex = ThreadLocalStatus::runningThreadIndex;
+            lastThreadDepend = true;
+        }
+//        fprintf(stderr, "lastThreadDepend = %u at %u\n", lastThreadDepend, lastThreadIndex);
+//        fprintf(stderr, "thread end %lu %lu %lu %lu\n",
+//                threadCycle[ThreadLocalStatus::runningThreadIndex], threadReplacedCycle[ThreadLocalStatus::runningThreadIndex], outsideCycle, faultedPages * cyclePerPageFault);
+    }
+
 //    countingEvent.debugPrint();
 }
 
@@ -149,13 +166,18 @@ void Predictor::stopSerial() {
     totalCycle += outsideCycle;
     criticalCycle += outsideCycle;
     replacedCriticalCycle += outsideCycle;
+    criticalCycleDepend += outsideCycle;
+    replacedCriticalCycleDepend += outsideCycle;
+
     for(unsigned int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
-//        outsideCycle += functionCycles[allocationType];
         criticalCycle += functionCycles[allocationType];
+        criticalCycleDepend += functionCycles[allocationType];
         if(replacedFunctionCycles[allocationType] == 0) {
             replacedCriticalCycle += functionCycles[allocationType];
+            replacedCriticalCycleDepend += functionCycles[allocationType];
         } else {
             replacedCriticalCycle += numOfFunctions[allocationType] * replacedFunctionCycles[allocationType];
+            replacedCriticalCycleDepend += numOfFunctions[allocationType] * replacedFunctionCycles[allocationType];
         }
     }
 
@@ -164,10 +186,16 @@ void Predictor::stopSerial() {
     } else {
         replacedCriticalCycle -= faultedPages * cyclePerPageFault;
     }
+
+    if(replacedCriticalCycleDepend < faultedPages * cyclePerPageFault) {
+        replacedCriticalCycleDepend = 0;
+    } else {
+        replacedCriticalCycleDepend -= faultedPages * cyclePerPageFault;
+    }
 #ifdef OPEN_COUNTING_EVENT
     criticalCountingEvent.add(countingEvent);
 #endif
-//    fprintf(stderr, "***stop serial %lu %lu %lu %lu\n", criticalCycle, replacedCriticalCycle, outsideCycle, faultedPages * cyclePerPageFault);
+//    fprintf(stderr, "***stop serial %lu %lu %lu %lu\n", criticalCycle, replacedCriticalCycle, criticalCycleDepend, replacedCriticalCycleDepend);
 //    criticalCountingEvent.debugPrint();
     cleanStageData();
 }
@@ -175,20 +203,34 @@ void Predictor::stopSerial() {
 void Predictor::stopParallel() {
     uint64_t criticalStageCycle = 0;
     uint64_t criticalReplacedStageCycle = 0;
+    uint64_t criticalStageCycleDepend = 0;
+    uint64_t criticalReplacedStageCycleDepend = 0;
 //    uint64_t numOfActiveThreads = 0;
 #ifdef OPEN_COUNTING_EVENT
     PerfReadInfo criticalStageCountingEvent;
     memset(&criticalStageCountingEvent, 0, sizeof(PerfReadInfo));
 #endif
 
+
+//    fprintf(stderr, "***stop parallel %lu %lu %lu %lu\n", criticalCycle, replacedCriticalCycle, criticalCycleDepend, replacedCriticalCycleDepend);
+
 ///max
+//fprintf(stderr, "lastThreadIndex = %u\n", lastThreadIndex);
+
     for(unsigned int index = 1; index < ThreadLocalStatus::totalNumOfThread; ++index) {
         if(threadCycle[index] && threadReplacedCycle[index]) {
 //            fprintf(stderr, "***cycle = %lu, replacedCycle = %lu\n", threadCycle[index], threadReplacedCycle[index]);
             criticalStageCycle = MAX(criticalStageCycle, threadCycle[index]);
             criticalReplacedStageCycle = MAX(criticalReplacedStageCycle, threadReplacedCycle[index]);
+            if(lastThreadDepend && index != lastThreadIndex) {
+                    criticalStageCycleDepend = MAX(criticalStageCycleDepend, threadCycle[index]);
+                    criticalReplacedStageCycleDepend = MAX(criticalReplacedStageCycleDepend, threadReplacedCycle[index]);
+            }
         }
     }
+
+//    fprintf(stderr, "stage %lu %lu %lu\n", criticalStageCycleDepend, criticalReplacedStageCycleDepend, threadCycle[lastThreadIndex]);
+//    fprintf(stderr, "***stop parallel %lu %lu %lu %lu\n", criticalCycle, replacedCriticalCycle, criticalCycleDepend, replacedCriticalCycleDepend);
 
 
 ///avg
@@ -214,7 +256,12 @@ void Predictor::stopParallel() {
 
     criticalCycle += criticalStageCycle;
     replacedCriticalCycle += criticalReplacedStageCycle;
-//    fprintf(stderr, "***stop parallel %lu %lu\n", criticalCycle, replacedCriticalCycle);
+//    criticalCycleDepend += criticalStageCycleDepend + threadCycle[lastThreadIndex];
+//    replacedCriticalCycleDepend += criticalReplacedStageCycleDepend + threadReplacedCycle[lastThreadIndex];
+    criticalCycleDepend += criticalStageCycleDepend;
+    replacedCriticalCycleDepend += criticalReplacedStageCycleDepend;
+
+//    fprintf(stderr, "***stop parallel %lu %lu %lu %lu\n", criticalCycle, replacedCriticalCycle, criticalCycleDepend, replacedCriticalCycleDepend);
 //    criticalCountingEvent.debugPrint();
     cleanStageData();
 }
@@ -228,8 +275,17 @@ void Predictor::printOutput() {
     }
     fprintf(ProgramStatus::outputFile, "original critical cycle %20lu\n", criticalCycle);
     fprintf(ProgramStatus::outputFile, "predicted critical cycle%20lu\n", replacedCriticalCycle);
+    if(lastThreadDepend) {
+        fprintf(ProgramStatus::outputFile, "original critical cycle if children threads are depended %20lu\n", criticalCycleDepend);
+        fprintf(ProgramStatus::outputFile, "predicted critical cycle if children threads are depended %20lu\n", replacedCriticalCycleDepend);
+    }
     if(replacedCriticalCycle) {
-        fprintf(ProgramStatus::outputFile, "ratio %3lu%%\n", criticalCycle*100/replacedCriticalCycle);
+        fprintf(ProgramStatus::outputFile, "ratio %3lu%%", criticalCycle*100/replacedCriticalCycle);
+        if(lastThreadDepend && replacedCriticalCycleDepend) {
+            fprintf(ProgramStatus::outputFile, " ~ %3lu%%\n", criticalCycleDepend*100/replacedCriticalCycleDepend);
+        } else {
+            fprintf(ProgramStatus::outputFile, "\n");
+        }
     } else {
         fprintf(ProgramStatus::outputFile, "ratio 100%%\n");
     }

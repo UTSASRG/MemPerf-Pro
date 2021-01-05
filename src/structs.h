@@ -87,6 +87,19 @@ struct CriticalSectionStatus {
     void add(CriticalSectionStatus newCriticalSectionStatus);
 };
 
+struct CacheConflictDetector {
+    uint32_t numOfHitForCaches[NUM_CACHELINES_PER_PAGE];
+    uint32_t numOfDifferentHitForCaches[NUM_CACHELINES_PER_PAGE];
+    uint32_t totalHitIntervalForCaches[NUM_CACHELINES_PER_PAGE];
+    uint32_t lastHitTimeForCaches[NUM_CACHELINES_PER_PAGE];
+    unsigned long lastHitMegaIndex[NUM_CACHELINES_PER_PAGE];
+    uint8_t lastHitPageIndex[NUM_CACHELINES_PER_PAGE];
+
+    void add(CacheConflictDetector newCacheConflictDetector);
+    void hit(unsigned long mega_index, uint8_t page_index, uint8_t cache_index, unsigned int time);
+    void print(unsigned int totalHit);
+};
+
 struct FriendlinessStatus {
     unsigned int numOfSampling;
     unsigned int numOfSampledStoringInstructions;
@@ -95,6 +108,7 @@ struct FriendlinessStatus {
     unsigned int numOfSampledFalseSharingCacheLines[NUM_OF_FALSESHARINGTYPE];
     uint64_t totalMemoryUsageOfSampledPages;
     uint64_t totalMemoryUsageOfSampledCacheLines;
+    CacheConflictDetector cacheConflictDetector;
 
     void recordANewSampling(uint64_t memoryUsageOfCacheLine, uint64_t memoryUsageOfPage);
     void add(FriendlinessStatus newFriendlinessStatus);

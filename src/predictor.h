@@ -11,6 +11,8 @@ public:
     static uint64_t totalCycle;
     static uint64_t criticalCycle;
     static uint64_t replacedCriticalCycle;
+    static uint64_t criticalCycleDepend;
+    static uint64_t replacedCriticalCycleDepend;
 #ifdef OPEN_COUNTING_EVENT
     static PerfReadInfo criticalCountingEvent;
 #endif
@@ -37,6 +39,9 @@ public:
     static uint64_t cyclePerPageFault;
 
     static FILE * predictorInfoFile;
+
+    static bool lastThreadDepend;
+    static unsigned short lastThreadIndex;
 
     static void globalInit();
     static void threadInit();

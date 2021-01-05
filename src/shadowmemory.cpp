@@ -412,13 +412,10 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType)
     }
 #endif
 
-    if((cme = pme->getCacheMapEntry(false)) == nullptr) {
+
+    if((cme = pme->getCacheMapEntry(false)) == nullptr || pme->getUsedBytes() == 0) {
             return;
         }
-
-    if(pme->getUsedBytes() == 0) {
-        return;
-    }
 
     cme += tuple.cache_index;
 
@@ -426,7 +423,12 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType)
         return;
     }
 
-//    fprintf(stderr, "hit cache %lu, %u, %u, %u at %p: %u\n", tuple.mega_index, tuple.page_index, tuple.cache_index, uintaddr & CACHELINE_SIZE_MASK, cme, cme->getUsedBytes());
+    ThreadLocalStatus::friendlinessStatus.cacheConflictDetector.hit(tuple.mega_index, tuple.page_index, tuple.cache_index, ThreadLocalStatus::friendlinessStatus.numOfSampling);
+
+
+
+//    fprintf(stderr, "hit %p cache %lu, %u, %u, %u, %u at %p: %u\n",
+//            uintaddr, tuple.mega_index, tuple.page_index, tuple.cache_index, uintaddr & PAGESIZE_MASK, uintaddr & CACHELINE_SIZE_MASK, cme, cme->getUsedBytes());
 
     if(cme->lastWriterThreadIndex == 0) {
         ThreadLocalStatus::friendlinessStatus.numOfSampledCacheLines++;

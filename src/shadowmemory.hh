@@ -12,7 +12,6 @@
 #include "memsample.h"
 #include "definevalues.h"
 
-#define NUM_CACHELINES_PER_PAGE 64
 #define NUM_CACHELINES_PER_PAGE_HUGE 32768
 
 #define NUM_PAGES_PER_MEGABYTE 256

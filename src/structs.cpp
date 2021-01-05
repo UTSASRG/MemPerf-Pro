@@ -95,6 +95,38 @@ void CriticalSectionStatus::add(CriticalSectionStatus newCriticalSectionStatus) 
     totalCyclesOfCriticalSections += newCriticalSectionStatus.totalCyclesOfCriticalSections;
 }
 
+void CacheConflictDetector::add(CacheConflictDetector newCacheConflictDetector) {
+    for(uint8_t cacheIndex = 0; cacheIndex < NUM_CACHELINES_PER_PAGE; ++cacheIndex) {
+        numOfHitForCaches[cacheIndex] += newCacheConflictDetector.numOfHitForCaches[cacheIndex];
+        numOfDifferentHitForCaches[cacheIndex] += newCacheConflictDetector.numOfDifferentHitForCaches[cacheIndex];
+        totalHitIntervalForCaches[cacheIndex] += newCacheConflictDetector.totalHitIntervalForCaches[cacheIndex];
+    }
+}
+
+void CacheConflictDetector::hit(unsigned long mega_index, uint8_t page_index, uint8_t cache_index, unsigned int time) {
+    numOfHitForCaches[cache_index]++;
+    if(lastHitMegaIndex[cache_index] != mega_index || lastHitPageIndex[cache_index] != page_index) {
+        if(lastHitMegaIndex[cache_index] || lastHitPageIndex[cache_index]) {
+            numOfDifferentHitForCaches[cache_index]++;
+            totalHitIntervalForCaches[cache_index] += time - lastHitTimeForCaches[cache_index];
+        }
+        lastHitMegaIndex[cache_index] = mega_index;
+        lastHitPageIndex[cache_index] = page_index;
+    }
+    lastHitTimeForCaches[cache_index] = time;
+}
+
+void CacheConflictDetector::print(unsigned int totalHit) {
+    for(uint8_t cacheIndex = 0; cacheIndex < NUM_CACHELINES_PER_PAGE; ++cacheIndex) {
+        unsigned int RCD = totalHitIntervalForCaches[cacheIndex] / numOfDifferentHitForCaches[cacheIndex];
+        uint8_t hitRate = numOfHitForCaches[cacheIndex]*100 / totalHit;
+        uint8_t score = hitRate / RCD;
+//        fprintf(stderr, "%u: %u\n", cacheIndex, score);
+        if(score) {
+            fprintf(ProgramStatus::outputFile, "conflict cache misses score: %u\n", score);
+        }
+    }
+}
 
 void FriendlinessStatus::recordANewSampling(uint64_t memoryUsageOfCacheLine, uint64_t memoryUsageOfPage) {
     numOfSampling++;
@@ -112,6 +144,7 @@ void FriendlinessStatus::add(FriendlinessStatus newFriendlinessStatus) {
         numOfSampledFalseSharingInstructions[falseSharingType] += newFriendlinessStatus.numOfSampledFalseSharingInstructions[falseSharingType];
         numOfSampledFalseSharingCacheLines[falseSharingType] += newFriendlinessStatus.numOfSampledFalseSharingCacheLines[falseSharingType];
     }
+    cacheConflictDetector.add(newFriendlinessStatus.cacheConflictDetector);
 }
 
 #ifdef OPEN_DEBUG

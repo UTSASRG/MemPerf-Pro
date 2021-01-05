@@ -111,6 +111,9 @@ extern "C" int libmallocprof_libc_start_main(main_fn_t main_fn, int argc, char *
 	return real_libc_start_main(libmallocprof_main, argc, argv, init, fini, rtld_fini, stack_end);
 }
 
+void * obj57;
+void * lastObj48;
+
 
 //// Memory management functions
 extern "C" {
@@ -167,10 +170,24 @@ extern "C" {
             AllocatingStatus::updateAllocatingInfoToPredictor();
             Predictor::outsideCycleStart();
         }
-//if(sz != 57)
-//        fprintf(stderr, "malloc object %lu at %p\n", sz, object);
+
 //if(sz != 57 && sz <= 100) {
-//    fprintf(stderr, "malloc object %lu, %p, %u, %u\n", sz, object, (uint64_t) object & CACHELINE_SIZE_MASK, (uint64_t) object & PAGESIZE_MASK);
+//    fprintf(stderr, "malloc object %lu, %p, %u, %u\n", sz, object, (uint64_t) object & PAGESIZE_MASK, (uint64_t) object & CACHELINE_SIZE_MASK);
+//}
+//if(sz == 48) {
+//    if(lastObj48) {
+//        if((uint64_t)object > (uint64_t)lastObj48) {
+//            if((uint64_t)object - (uint64_t)lastObj48 != 48) {
+//                fprintf(stderr, "go ahead %lu\n", (uint64_t)object - (uint64_t)lastObj48);
+//            }
+//        } else {
+//            fprintf(stderr, "go back %lu\n", (uint64_t)lastObj48 - (uint64_t)object);
+//        }
+//    }
+//    lastObj48 = object;
+//}
+//if(sz == 57) {
+//    obj57 = object;
 //}
 
 
