@@ -126,7 +126,7 @@ class CacheMapEntry {
 class PageMapEntry {
 public:
 
-    bool donatedBySyscall;
+//    bool donatedBySyscall;
 #ifdef ENABLE_HP
     bool hugePage;
 #endif

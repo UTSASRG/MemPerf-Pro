@@ -117,15 +117,17 @@ void CacheConflictDetector::hit(unsigned long mega_index, uint8_t page_index, ui
 }
 
 void CacheConflictDetector::print(unsigned int totalHit) {
+    double standardScore = (double)100 / (double)64 / (double)64;
+    double maxScore = 0;
     for(uint8_t cacheIndex = 0; cacheIndex < NUM_CACHELINES_PER_PAGE; ++cacheIndex) {
-        unsigned int RCD = totalHitIntervalForCaches[cacheIndex] / numOfDifferentHitForCaches[cacheIndex];
-        uint8_t hitRate = numOfHitForCaches[cacheIndex]*100 / totalHit;
-        uint8_t score = hitRate / RCD;
-//        fprintf(stderr, "%u: %u\n", cacheIndex, score);
-        if(score) {
-            fprintf(ProgramStatus::outputFile, "conflict cache misses score: %u\n", score);
-        }
+        double RCD = (double)totalHitIntervalForCaches[cacheIndex] / (double)numOfDifferentHitForCaches[cacheIndex];
+        double hitRate = (double)numOfHitForCaches[cacheIndex]*100 / (double)totalHit;
+        double score = hitRate / RCD;
+        double relativeScore = score / standardScore;
+//        fprintf(stderr, "score = %lf, standardScore = %lf\n", score, standardScore);
+        maxScore = MAX(maxScore, relativeScore);
     }
+    fprintf(ProgramStatus::outputFile, "conflict miss score: %lf\n", maxScore);
 }
 
 void FriendlinessStatus::recordANewSampling(uint64_t memoryUsageOfCacheLine, uint64_t memoryUsageOfPage) {

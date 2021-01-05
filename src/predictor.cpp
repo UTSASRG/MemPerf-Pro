@@ -31,8 +31,8 @@ thread_local uint64_t Predictor::outsideStopCycle;
 thread_local uint64_t Predictor::outsideCycle;
 thread_local uint64_t Predictor::outsideCycleMinus;
 
-thread_local uint64_t Predictor::faultedPages;
-uint64_t Predictor::cyclePerPageFault;
+//thread_local uint64_t Predictor::faultedPages;
+//uint64_t Predictor::cyclePerPageFault;
 
 FILE * Predictor::predictorInfoFile;
 
@@ -56,7 +56,7 @@ void Predictor::globalInit() {
     memset(functionCycles, 0, sizeof(uint64_t) * NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA);
 
     outsideCycle = 0;
-    faultedPages = 0;
+//    faultedPages = 0;
 }
 
 void Predictor::threadInit() {
@@ -68,7 +68,7 @@ void Predictor::threadInit() {
     memset(functionCycles, 0, sizeof(uint64_t) * NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA);
 
     outsideCycle = 0;
-    faultedPages = 0;
+//    faultedPages = 0;
 }
 
 void Predictor::cleanStageData() {
@@ -84,7 +84,7 @@ void Predictor::cleanStageData() {
     memset(functionCycles, 0, sizeof(uint64_t) * NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA);
 
     outsideCycle = 0;
-    faultedPages = 0;
+//    faultedPages = 0;
 
 }
 
@@ -139,11 +139,11 @@ void Predictor::threadEnd() {
         }
     }
 
-    if(threadReplacedCycle[ThreadLocalStatus::runningThreadIndex] < faultedPages * cyclePerPageFault) {
-        threadReplacedCycle[ThreadLocalStatus::runningThreadIndex] = 0;
-    } else {
-        threadReplacedCycle[ThreadLocalStatus::runningThreadIndex] -= faultedPages * cyclePerPageFault;
-    }
+//    if(threadReplacedCycle[ThreadLocalStatus::runningThreadIndex] < faultedPages * cyclePerPageFault) {
+//        threadReplacedCycle[ThreadLocalStatus::runningThreadIndex] = 0;
+//    } else {
+//        threadReplacedCycle[ThreadLocalStatus::runningThreadIndex] -= faultedPages * cyclePerPageFault;
+//    }
 #ifdef OPEN_COUNTING_EVENT
     threadCountingEvents[ThreadLocalStatus::runningThreadIndex].add(countingEvent);
 #endif
@@ -155,8 +155,8 @@ void Predictor::threadEnd() {
             lastThreadDepend = true;
         }
 //        fprintf(stderr, "lastThreadDepend = %u at %u\n", lastThreadDepend, lastThreadIndex);
-//        fprintf(stderr, "thread end %lu %lu %lu %lu\n",
-//                threadCycle[ThreadLocalStatus::runningThreadIndex], threadReplacedCycle[ThreadLocalStatus::runningThreadIndex], outsideCycle, faultedPages * cyclePerPageFault);
+        fprintf(stderr, "thread end %lu %lu %lu\n",
+                threadCycle[ThreadLocalStatus::runningThreadIndex], threadReplacedCycle[ThreadLocalStatus::runningThreadIndex], outsideCycle);
     }
 
 //    countingEvent.debugPrint();
@@ -181,21 +181,21 @@ void Predictor::stopSerial() {
         }
     }
 
-    if(replacedCriticalCycle < faultedPages * cyclePerPageFault) {
-        replacedCriticalCycle = 0;
-    } else {
-        replacedCriticalCycle -= faultedPages * cyclePerPageFault;
-    }
-
-    if(replacedCriticalCycleDepend < faultedPages * cyclePerPageFault) {
-        replacedCriticalCycleDepend = 0;
-    } else {
-        replacedCriticalCycleDepend -= faultedPages * cyclePerPageFault;
-    }
+//    if(replacedCriticalCycle < faultedPages * cyclePerPageFault) {
+//        replacedCriticalCycle = 0;
+//    } else {
+//        replacedCriticalCycle -= faultedPages * cyclePerPageFault;
+//    }
+//
+//    if(replacedCriticalCycleDepend < faultedPages * cyclePerPageFault) {
+//        replacedCriticalCycleDepend = 0;
+//    } else {
+//        replacedCriticalCycleDepend -= faultedPages * cyclePerPageFault;
+//    }
 #ifdef OPEN_COUNTING_EVENT
     criticalCountingEvent.add(countingEvent);
 #endif
-//    fprintf(stderr, "***stop serial %lu %lu %lu %lu\n", criticalCycle, replacedCriticalCycle, criticalCycleDepend, replacedCriticalCycleDepend);
+    fprintf(stderr, "***stop serial %lu %lu\n", criticalCycle, replacedCriticalCycle);
 //    criticalCountingEvent.debugPrint();
     cleanStageData();
 }
@@ -261,7 +261,7 @@ void Predictor::stopParallel() {
     criticalCycleDepend += criticalStageCycleDepend;
     replacedCriticalCycleDepend += criticalReplacedStageCycleDepend;
 
-//    fprintf(stderr, "***stop parallel %lu %lu %lu %lu\n", criticalCycle, replacedCriticalCycle, criticalCycleDepend, replacedCriticalCycleDepend);
+    fprintf(stderr, "***stop parallel %lu %lu\n", criticalCycle, replacedCriticalCycle);
 //    criticalCountingEvent.debugPrint();
     cleanStageData();
 }
@@ -326,9 +326,11 @@ void Predictor::readFunctionCyclesFromInfo(char*token) {
             replacedFunctionCycles[allocationType] = (size_t) atoi(token);
         }
     }
-//    replacedFunctionCycles[SERIAL_SMALL_NEW_MALLOC] = 110;
-//    replacedFunctionCycles[SERIAL_SMALL_REUSED_MALLOC] = 54;
-//    replacedFunctionCycles[SERIAL_SMALL_FREE] = 64;
+//    replacedFunctionCycles[SERIAL_SMALL_NEW_MALLOC] = 118;
+//    replacedFunctionCycles[SERIAL_SMALL_FREE] = 326;
+//    replacedFunctionCycles[PARALLEL_SMALL_NEW_MALLOC] = 6919;
+//    replacedFunctionCycles[PARALLEL_SMALL_REUSED_MALLOC] = 125;
+//    replacedFunctionCycles[PARALLEL_SMALL_FREE] = 92;
 }
 
 void Predictor::readMiddleObjectThresholdFromInfo(char*token) {
@@ -348,7 +350,7 @@ void Predictor::readLargeObjectThresholdFromInfo(char*token) {
 void Predictor::readPageFaultCycleFromInfo(char*token) {
     if ((strcmp(token, "cycle_page_fault")) == 0) {
         token = strtok(NULL, " ");
-        cyclePerPageFault = (size_t) atoi(token);
+//        cyclePerPageFault = (size_t) atoi(token);
     }
 }
 

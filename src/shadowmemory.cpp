@@ -129,10 +129,10 @@ unsigned int ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_in
             if(!current->isTouched()) {
                 current->setTouched();
                 numNewPagesTouched += 512;
-                if(current->donatedBySyscall) {
-                    current->donatedBySyscall = false;
-                    Predictor::faultedPages++;
-                }
+//                if(current->donatedBySyscall) {
+//                    current->donatedBySyscall = false;
+//                    Predictor::faultedPages++;
+//                }
             }
         }
     }
@@ -161,10 +161,10 @@ unsigned int ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_in
             current->setTouched();
 //            fprintf(stderr, "touch a new page, %lu, %lu, %u, %u\n", size, mega_index, page_index, firstPageOffset);
             numNewPagesTouched++;
-            if(current->donatedBySyscall) {
-                current->donatedBySyscall = false;
-                Predictor::faultedPages++;
-            }
+//            if(current->donatedBySyscall) {
+//                current->donatedBySyscall = false;
+//                Predictor::faultedPages++;
+//            }
         }
         else {
 //            fprintf(stderr, "touch an old page, %lu, %lu, %u, %u\n", size, mega_index, page_index, firstPageOffset);
@@ -200,10 +200,10 @@ unsigned int ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_in
                 current->setTouched();
 //                fprintf(stderr, "touch a new page, %lu, %lu, %u\n", size, mega_index, page_index);
                 numNewPagesTouched++;
-                if(current->donatedBySyscall) {
-                    current->donatedBySyscall = false;
-                    Predictor::faultedPages++;
-                }
+//                if(current->donatedBySyscall) {
+//                    current->donatedBySyscall = false;
+//                    Predictor::faultedPages++;
+//                }
             } else {
 //                fprintf(stderr, "touch an old page, %lu, %lu, %u\n", size, mega_index, page_index);
 //                fprintf(stderr, "Touched %p\n", current);
@@ -234,10 +234,10 @@ unsigned int ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_in
                 current->setTouched();
 //                fprintf(stderr, "touch a new page, %lu, %lu, %u\n", size, mega_index, page_index);
                 numNewPagesTouched++;
-                if(current->donatedBySyscall) {
-                    current->donatedBySyscall = false;
-                    Predictor::faultedPages++;
-                }
+//                if(current->donatedBySyscall) {
+//                    current->donatedBySyscall = false;
+//                    Predictor::faultedPages++;
+//                }
             }
 //            else {
 //                fprintf(stderr, "touched an old page, %lu, %lu, %u\n", size, mega_index, page_index);
@@ -499,7 +499,7 @@ void PageMapEntry::clear() {
         memset(cache_map_entry, 0, cache_entries_size);
     }
 
-    donatedBySyscall = true;
+//    donatedBySyscall = true;
     touched = false;
     num_used_bytes = 0;
 #ifdef ENABLE_HP

@@ -35,8 +35,8 @@ public:
     static thread_local uint64_t outsideCycle;
     static thread_local uint64_t outsideCycleMinus;
 
-    static thread_local uint64_t faultedPages;
-    static uint64_t cyclePerPageFault;
+//    static thread_local uint64_t faultedPages;
+//    static uint64_t cyclePerPageFault;
 
     static FILE * predictorInfoFile;
 
