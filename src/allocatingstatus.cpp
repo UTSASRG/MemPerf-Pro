@@ -81,7 +81,11 @@ void AllocatingStatus::startCountCountingEvents() {
 
 void AllocatingStatus::updateAllocatingStatusBeforeRealFunction(AllocationFunction allocationFunction, unsigned int objectSize) {
     updateAllocatingTypeBeforeRealFunction(allocationFunction, objectSize);
-    sampledForCountingEvent = ThreadLocalStatus::randomProcessForCountingEvent();
+    if(objectSize < 64*ONE_KB) {
+        sampledForCountingEvent = ThreadLocalStatus::randomProcessForCountingEvent();
+    } else {
+        sampledForCountingEvent = ThreadLocalStatus::randomProcessForLargeCountingEvent();
+    }
     startCountCountingEvents();
 }
 
@@ -89,7 +93,11 @@ void AllocatingStatus::updateFreeingStatusBeforeRealFunction(AllocationFunction 
     updateFreeingTypeBeforeRealFunction(allocationFunction, objectAddress);
     AllocatingStatus::updateMemoryStatusBeforeFree();
     if(allocationFunction == FREE) {
-        sampledForCountingEvent = ThreadLocalStatus::randomProcessForCountingEvent();
+        if(allocatingType.objectSize < 64*ONE_KB) {
+            sampledForCountingEvent = ThreadLocalStatus::randomProcessForCountingEvent();
+        } else {
+            sampledForCountingEvent = ThreadLocalStatus::randomProcessForLargeCountingEvent();
+        }
         startCountCountingEvents();
     }
 }
@@ -447,8 +455,15 @@ void AllocatingStatus::updateAllocatingInfoToThreadLocalData() {
     setAllocationTypeForOutputData();
     ThreadLocalStatus::numOfFunctions[allocationTypeForOutputData]++;
     if(sampledForCountingEvent) {
-        addUpOtherFunctionsInfoToThreadLocalData();
-        addUpCountingEventsToThreadLocalData();
+        if(allocatingType.objectSize < 64*ONE_KB) {
+            for(uint8_t i = 0; i < 20; ++i) {
+                addUpOtherFunctionsInfoToThreadLocalData();
+                addUpCountingEventsToThreadLocalData();
+            }
+        } else {
+            addUpOtherFunctionsInfoToThreadLocalData();
+            addUpCountingEventsToThreadLocalData();
+        }
         cleanLockFunctionsInfoInAllocatingStatus();
         cleanSyscallsInfoInAllocatingStatus();
     }

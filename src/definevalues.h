@@ -28,11 +28,9 @@
 #define PAGESIZE 4096
 #define PAGESIZE_HUGE 2*ONE_MB
 #define NUM_CACHELINES_PER_PAGE 64
-//#define SAMPLING_PERIOD 1000000
+//#define SAMPLING_PERIOD 5000000
 #define SAMPLING_PERIOD 500000
-//#define SAMPLING_PERIOD 200000
-//#define SAMPLING_PERIOD 100000
-//#define SAMPLING_PERIOD 100000
+//#define SAMPLING_PERIOD 50000
 
 //#define MMAP_PAGES 257 // must be in the form of 2^N + 1
 #define MMAP_PAGES 129 // must be in the form of 2^N + 1

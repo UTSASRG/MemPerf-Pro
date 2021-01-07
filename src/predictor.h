@@ -58,7 +58,7 @@ public:
     static void readFunctionCyclesFromInfo(char*token);
     static void readMiddleObjectThresholdFromInfo(char*token);
     static void readLargeObjectThresholdFromInfo(char*token);
-    static void readPageFaultCycleFromInfo(char*token);
+//    static void readPageFaultCycleFromInfo(char*token);
     static void fopenPredictorInfoFile();
     static void readPredictorInfoFile();
     static void openPredictorInfoFile();

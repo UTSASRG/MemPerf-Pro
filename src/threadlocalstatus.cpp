@@ -73,6 +73,15 @@ bool ThreadLocalStatus::randomProcessForCountingEvent() {
     return !setSampleForCountingEvent || randomDevice()%randomPeriodForAllocations == 0;
 }
 
+bool ThreadLocalStatus::randomProcessForLargeCountingEvent() {
+#ifdef OPEN_COUNTING_EVENT
+    if(!isCountingInit) {
+        return false;
+    }
+#endif
+    return !setSampleForCountingEvent || randomDevice()%5 == 0;
+}
+
 bool ThreadLocalStatus::randomProcess(unsigned short randomPeriod) {
     return randomDevice()%randomPeriod == 0;
 }

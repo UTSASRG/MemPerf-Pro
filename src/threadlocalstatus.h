@@ -43,6 +43,7 @@ public:
 
     static void setRandomPeriodForAllocations(unsigned short randomPeriod);
     static bool randomProcessForCountingEvent();
+    static bool randomProcessForLargeCountingEvent();
     static bool randomProcess(unsigned short randomPeriod);
 
     static void setStackStartAddress(void * addr);

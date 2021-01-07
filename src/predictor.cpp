@@ -155,8 +155,8 @@ void Predictor::threadEnd() {
             lastThreadDepend = true;
         }
 //        fprintf(stderr, "lastThreadDepend = %u at %u\n", lastThreadDepend, lastThreadIndex);
-        fprintf(stderr, "thread end %lu %lu %lu\n",
-                threadCycle[ThreadLocalStatus::runningThreadIndex], threadReplacedCycle[ThreadLocalStatus::runningThreadIndex], outsideCycle);
+//        fprintf(stderr, "thread end %lu %lu %lu\n",
+//                threadCycle[ThreadLocalStatus::runningThreadIndex], threadReplacedCycle[ThreadLocalStatus::runningThreadIndex], outsideCycle);
     }
 
 //    countingEvent.debugPrint();
@@ -195,7 +195,7 @@ void Predictor::stopSerial() {
 #ifdef OPEN_COUNTING_EVENT
     criticalCountingEvent.add(countingEvent);
 #endif
-    fprintf(stderr, "***stop serial %lu %lu\n", criticalCycle, replacedCriticalCycle);
+//    fprintf(stderr, "***stop serial %lu %lu\n", criticalCycle, replacedCriticalCycle);
 //    criticalCountingEvent.debugPrint();
     cleanStageData();
 }
@@ -261,7 +261,7 @@ void Predictor::stopParallel() {
     criticalCycleDepend += criticalStageCycleDepend;
     replacedCriticalCycleDepend += criticalReplacedStageCycleDepend;
 
-    fprintf(stderr, "***stop parallel %lu %lu\n", criticalCycle, replacedCriticalCycle);
+//    fprintf(stderr, "***stop parallel %lu %lu\n", criticalCycle, replacedCriticalCycle);
 //    criticalCountingEvent.debugPrint();
     cleanStageData();
 }
@@ -347,12 +347,12 @@ void Predictor::readLargeObjectThresholdFromInfo(char*token) {
     }
 }
 
-void Predictor::readPageFaultCycleFromInfo(char*token) {
-    if ((strcmp(token, "cycle_page_fault")) == 0) {
-        token = strtok(NULL, " ");
-//        cyclePerPageFault = (size_t) atoi(token);
-    }
-}
+//void Predictor::readPageFaultCycleFromInfo(char*token) {
+//    if ((strcmp(token, "cycle_page_fault")) == 0) {
+//        token = strtok(NULL, " ");
+////        cyclePerPageFault = (size_t) atoi(token);
+//    }
+//}
 
 
 void Predictor::readPredictorInfoFile() {
@@ -365,7 +365,7 @@ void Predictor::readPredictorInfoFile() {
             readFunctionCyclesFromInfo(token);
             readMiddleObjectThresholdFromInfo(token);
             readLargeObjectThresholdFromInfo(token);
-            readPageFaultCycleFromInfo(token);
+//            readPageFaultCycleFromInfo(token);
         }
     }
 }
