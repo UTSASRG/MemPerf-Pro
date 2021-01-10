@@ -102,9 +102,11 @@ unsigned int ShadowMemory::updateObject(void * address, unsigned int size, bool 
     }
     uint8_t firstPageIdx = ((uintaddr & MEGABYTE_MASK) >> LOG2_PAGESIZE);
     unsigned int numNewPagesTouched = updatePages(uintaddr, mega_index, firstPageIdx, size, isFree);
+#ifdef OPEN_SAMPLING_EVENT
     uint8_t firstCacheLineOffset = (uintaddr & CACHELINE_SIZE_MASK);
     uint8_t curCacheLineIdx = ((uintaddr & PAGESIZE_MASK) >> LOG2_CACHELINE_SIZE);
     PageMapEntry::updateCacheLines(mega_index, firstPageIdx, curCacheLineIdx, firstCacheLineOffset, size, isFree);
+#endif
 
     return numNewPagesTouched * PAGESIZE;
 }
