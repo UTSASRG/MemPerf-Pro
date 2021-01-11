@@ -17,8 +17,8 @@ spinlock _perf_spin_lock;
 thread_local perf_info perfInfo;
 thread_local bool isCountingInit = false;
 thread_local bool isSamplingInit = false;
-int sample_type = PERF_SAMPLE_IP | PERF_SAMPLE_TIME | PERF_SAMPLE_TID |
-									PERF_SAMPLE_ADDR | PERF_SAMPLE_DATA_SRC;
+//int sample_type = PERF_SAMPLE_IP | PERF_SAMPLE_TIME | PERF_SAMPLE_TID |
+int sample_type = PERF_SAMPLE_ADDR | PERF_SAMPLE_DATA_SRC;
 
 int read_format = PERF_FORMAT_GROUP;
 
@@ -490,17 +490,17 @@ long long perf_mmap_read() {
 
         // Sample data
         if(event->type == PERF_RECORD_SAMPLE) {
-            if(sample_type & PERF_SAMPLE_IP) {
-                offset += sizeof(uint64_t);
-            }
-
-            if(sample_type & PERF_SAMPLE_TID) {
-                offset += 2 * sizeof(uint32_t);
-            }
-
-            if(sample_type & PERF_SAMPLE_TIME) {
-                offset += sizeof(uint64_t);
-            }
+//            if(sample_type & PERF_SAMPLE_IP) {
+//                offset += sizeof(uint64_t);
+//            }
+//
+//            if(sample_type & PERF_SAMPLE_TID) {
+//                offset += 2 * sizeof(uint32_t);
+//            }
+//
+//            if(sample_type & PERF_SAMPLE_TIME) {
+//                offset += sizeof(uint64_t);
+//            }
 
             if(sample_type & PERF_SAMPLE_ADDR) {
                 intpaddr = *(uint64_t *)(use_data_buf + offset);
