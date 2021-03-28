@@ -228,7 +228,7 @@ void sampleHandler(int signum, siginfo_t *info, void *p) {
 //    perfInfo.prev_head = perf_mmap_read();
 //}
 
-void setupSampling() {
+    void setupSampling() {
 
 
     if(isSamplingInit) {
