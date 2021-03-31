@@ -20,6 +20,8 @@ void MemoryWaste::initialize() {
 
 
 bool MemoryWaste::allocUpdate(unsigned int size, void * address) {
+//    return false;
+
     bool reused;
 
 //    hashLocksSet.lock(address);
@@ -42,6 +44,8 @@ bool MemoryWaste::allocUpdate(unsigned int size, void * address) {
 
 
 uint32_t MemoryWaste::freeUpdate(void* address) {
+
+//    return 8;
 
 //    hashLocksSet.lock(address);
     uint32_t * status = objStatusMap.find(address, sizeof(void *));

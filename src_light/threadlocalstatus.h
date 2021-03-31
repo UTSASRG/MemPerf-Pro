@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include <time.h>
+#include<random>
 
 #include "memsample.h"
 #include "allocatingstatus.h"
@@ -26,11 +27,8 @@ public:
     static thread_local CriticalSectionStatus criticalSectionStatus[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
     static thread_local SystemCallData systemCallData[NUM_OF_SYSTEMCALLTYPES][NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
     static thread_local FriendlinessStatus friendlinessStatus;
-
-    static thread_local unsigned short randomPeriodForAllocations;
-    static thread_local bool setSampleForCountingEvent;
-
-    static thread_local void * stackStartAddress;
+    static thread_local std::default_random_engine random;
+    static thread_local std::uniform_int_distribution<int> dis;
 
     static void getARunningThreadIndex();
     static void addARunningThread();
@@ -39,7 +37,7 @@ public:
     static bool fromSerialToParallel();
     static bool fromParallelToSerial();
 
-    static void setRandomPeriodForAllocations(unsigned short randomPeriod);
+    static void setRandomPeriodForAllocations();
     static bool randomProcessForCountingEvent();
     static bool randomProcessForLargeCountingEvent();
     static bool randomProcess(unsigned short randomPeriod);

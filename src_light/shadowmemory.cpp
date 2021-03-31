@@ -109,7 +109,6 @@ void ShadowMemory::updatePages(uintptr_t uintaddr, unsigned long mega_index, uin
             current++;
         }
 
-
         if(isFree) {
             current->setEmpty();
         } else {

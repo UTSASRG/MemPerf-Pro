@@ -36,7 +36,7 @@ void * xthreadx::startThread(void * arg) {
     ThreadLocalStatus::getARunningThreadIndex();
 
 #ifdef OPEN_SAMPLING_FOR_ALLOCS
-    ThreadLocalStatus::setRandomPeriodForAllocations(RANDOM_PERIOD_FOR_ALLOCS);
+    ThreadLocalStatus::setRandomPeriodForAllocations();
 #endif
 
 #ifdef OPEN_CPU_BINDING

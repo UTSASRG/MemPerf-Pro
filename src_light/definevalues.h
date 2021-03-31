@@ -4,6 +4,7 @@
 #define OPEN_SAMPLING_EVENT 1
 #define OPEN_SAMPLING_FOR_ALLOCS 1
 #define RANDOM_PERIOD_FOR_ALLOCS 100
+//#define CACHE_UTIL 1
 
 //#define OPEN_DEBUG 1
 //#define OPEN_CPU_BINDING 1
@@ -24,7 +25,7 @@
 //#define SAMPLING_PERIOD 5000000
 #define SAMPLING_PERIOD 500000
 //#define SAMPLING_PERIOD 50000
-//#define CACHE_UTIL 1
+
 
 //#define MMAP_PAGES 257 // must be in the form of 2^N + 1
 #define MMAP_PAGES 129 // must be in the form of 2^N + 1

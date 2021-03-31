@@ -65,7 +65,11 @@ void AllocatingStatus::startCountCountingEvents() {
 
 void AllocatingStatus::updateAllocatingStatusBeforeRealFunction(AllocationFunction allocationFunction, unsigned int objectSize) {
     updateAllocatingTypeBeforeRealFunction(allocationFunction, objectSize);
+#ifdef OPEN_SAMPLING_FOR_ALLOCS
     sampledForCountingEvent = ThreadLocalStatus::randomProcessForCountingEvent();
+#else
+    sampledForCountingEvent = true;
+#endif
     startCountCountingEvents();
 }
 
@@ -73,7 +77,11 @@ void AllocatingStatus::updateFreeingStatusBeforeRealFunction(AllocationFunction 
     updateFreeingTypeBeforeRealFunction(allocationFunction, objectAddress);
     AllocatingStatus::updateMemoryStatusBeforeFree();
     if(allocationFunction == FREE) {
+#ifdef OPEN_SAMPLING_FOR_ALLOCS
         sampledForCountingEvent = ThreadLocalStatus::randomProcessForCountingEvent();
+#else
+        sampledForCountingEvent = true;
+#endif
         startCountCountingEvents();
     }
 }

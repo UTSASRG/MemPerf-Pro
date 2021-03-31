@@ -13,12 +13,8 @@ thread_local OverviewLockData ThreadLocalStatus::overviewLockData[NUM_OF_LOCKTYP
 thread_local CriticalSectionStatus ThreadLocalStatus::criticalSectionStatus[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
 thread_local SystemCallData ThreadLocalStatus::systemCallData[NUM_OF_SYSTEMCALLTYPES][NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
 thread_local FriendlinessStatus ThreadLocalStatus::friendlinessStatus;
-
-thread_local unsigned short ThreadLocalStatus::randomPeriodForAllocations;
-thread_local bool ThreadLocalStatus::setSampleForCountingEvent;
-
-thread_local void * ThreadLocalStatus::stackStartAddress;
-
+thread_local std::default_random_engine ThreadLocalStatus::random(time(NULL));
+thread_local std::uniform_int_distribution<int> ThreadLocalStatus::dis(0, RANDOM_PERIOD_FOR_ALLOCS-1);
 
 void ThreadLocalStatus::getARunningThreadIndex() {
     lock.lock();
@@ -55,17 +51,15 @@ bool ThreadLocalStatus::fromParallelToSerial() {
     return totalNumOfRunningThread == 1;
 }
 
-void ThreadLocalStatus::setRandomPeriodForAllocations(unsigned short randomPeriod) {
+void ThreadLocalStatus::setRandomPeriodForAllocations() {
     srand((unsigned)time(NULL));
-    randomPeriodForAllocations = randomPeriod;
-    setSampleForCountingEvent = true;
 }
 
 bool ThreadLocalStatus::randomProcessForCountingEvent() {
-    return !setSampleForCountingEvent || rand()%randomPeriodForAllocations == 0;
+    return dis(random) == 0;
 }
 
 bool ThreadLocalStatus::randomProcess(unsigned short randomPeriod) {
-    return rand()%randomPeriod == 0;
+    return rand() % randomPeriod == 0;
 }
 
