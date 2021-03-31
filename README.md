@@ -18,4 +18,4 @@ Todo lists:
 2. No differentiation of passive and positive false sharing 
 3. We can differentiate false sharing from true shairng. For false sharing, we can know whether this is caused by allocator or not. The starting address of an object will affect the false effect (performance). Please refer to Predator. 
 4. For cache level, using the hash table. Maybe we don't need to care about the false positives caused by the accumulated effect of multiple allocations. 
-5. Object table (hash table), have lots of conflict. You need to confirm whether this is the bottleneck. If it is bottleneck, check the corresponding implementation. 
+5. Object table (hash table), have lots of conflict. You need to confirm whether this is the bottleneck. If it is bottleneck, check the corresponding implementation of CachePerf. such as ChunkTable. 
