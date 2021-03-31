@@ -180,8 +180,12 @@ void GlobalStatus::printFriendliness() {
     if(friendlinessStatus.numOfSampling / 100) {
         fprintf(ProgramStatus::outputFile, "page utilization                             %3lu%%\n",
                 friendlinessStatus.totalMemoryUsageOfSampledPages*100/friendlinessStatus.numOfSampling/PAGESIZE);
+
+#ifdef CACHE_UTIL
         fprintf(ProgramStatus::outputFile, "cache utilization                            %3lu%%\n",
                 friendlinessStatus.totalMemoryUsageOfSampledCacheLines*100/friendlinessStatus.numOfSampling/CACHELINE_SIZE);
+#endif
+
         fprintf(ProgramStatus::outputFile, "accessed store instructions  %20u\n", friendlinessStatus.numOfSampledStoringInstructions);
         fprintf(ProgramStatus::outputFile, "accessed cache lines         %20u\n", friendlinessStatus.numOfSampledCacheLines);
         fprintf(ProgramStatus::outputFile, "\n");

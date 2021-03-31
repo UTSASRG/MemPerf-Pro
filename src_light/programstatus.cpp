@@ -8,7 +8,6 @@ FILE * ProgramStatus::inputInfoFile;
 char ProgramStatus::outputFileName[MAX_FILENAME_LEN];
 unsigned short ProgramStatus::middleObjectThreshold;
 unsigned int ProgramStatus::largeObjectThreshold;
-unsigned short ProgramStatus::largeObjectAlignment;
 
 char ProgramStatus::programName[256];
 //bool ProgramStatus::matrixFileOpened;
@@ -47,20 +46,28 @@ void ProgramStatus::getInputInfoFileName(char * runningApplicationName) {
     char * runningAllocatorName = strrchr(runningApplicationName, '-')+1;
     if(strcmp(runningAllocatorName, "libc228") == 0) {
         strcpy(inputInfoFileName, "/home/jinzhou/mmprof/info/libc228.info");
+//        strcpy(inputInfoFileName, "/media/umass/datasystem/steven/mmproftesting/mmprof/info/libc228.info");
     } else if(strcmp(runningAllocatorName, "libc221") == 0) {
         strcpy(inputInfoFileName, "/home/jinzhou/mmprof/info/libc221.info");
+//        strcpy(inputInfoFileName, "/media/umass/datasystem/steven/mmproftesting/mmprof/info/libc221.info");
     } else if(strcmp(runningAllocatorName, "hoard") == 0) {
         strcpy(inputInfoFileName, "/home/jinzhou/mmprof/info/libhoard.info");
+//        strcpy(inputInfoFileName, "/media/umass/datasystem/steven/mmproftesting/mmprof/info/libhoard.info");
     } else if(strcmp(runningAllocatorName, "jemalloc") == 0) {
         strcpy(inputInfoFileName, "/home/jinzhou/mmprof/info/libjemalloc.info");
+//        strcpy(inputInfoFileName, "/media/umass/datasystem/steven/mmproftesting/mmprof/info/libjemalloc.info");
     } else if(strcmp(runningAllocatorName, "tcmalloc") == 0) {
         strcpy(inputInfoFileName, "/home/jinzhou/mmprof/info/libtcmalloc.info");
+//        strcpy(inputInfoFileName, "/media/umass/datasystem/steven/mmproftesting/mmprof/info/libtcmalloc.info");
     } else if(strcmp(runningAllocatorName, "dieharder") == 0) {
         strcpy(inputInfoFileName, "/home/jinzhou/mmprof/info/libdieharder.info");
+//        strcpy(inputInfoFileName, "/media/umass/datasystem/steven/mmproftesting/mmprof/info/libdieharder.info");
     } else if(strcmp(runningAllocatorName, "omalloc") == 0) {
         strcpy(inputInfoFileName, "/home/jinzhou/mmprof/info/libomalloc.info");
+//        strcpy(inputInfoFileName, "/media/umass/datasystem/steven/mmproftesting/mmprof/info/libomalloc.info");
     } else if (strcmp(runningAllocatorName, "numalloc") == 0) {
         strcpy(inputInfoFileName, "/home/jinzhou/mmprof/info/libnumalloc.info");
+//        strcpy(inputInfoFileName, "/media/umass/datasystem/steven/mmproftesting/mmprof/info/libnumalloc.info");
     } else {
         fprintf(stderr, "Info File Location Unknown\n");
         abort();
@@ -94,14 +101,6 @@ void ProgramStatus::readLargeObjectThresholdFromInfo(char * token) {
     }
 }
 
-void ProgramStatus::readLargeObjectAlignmentFromInfo(char *token) {
-    if ((strcmp(token, "large_object_alignment")) == 0) {
-        token = strtok(NULL, " ");
-        largeObjectAlignment = (unsigned short) atoi(token);
-    }
-}
-
-
 void ProgramStatus::readInputInfoFile() {
 
     size_t bufferSize = 53248;
@@ -112,7 +111,6 @@ void ProgramStatus::readInputInfoFile() {
         if(token) {
             readMiddleObjectThresholdFromInfo(token);
             readLargeObjectThresholdFromInfo(token);
-            readLargeObjectAlignmentFromInfo(token);
         }
     }
 

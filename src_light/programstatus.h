@@ -19,14 +19,12 @@ private:
 
     static unsigned short middleObjectThreshold;
     static unsigned int largeObjectThreshold;
-    static unsigned short largeObjectAlignment;
 
     static void openMatrixFile();
     static void getInputInfoFileName(char * runningApplicationName);
     static void fopenInputInfoFile();
     static void readMiddleObjectThresholdFromInfo(char*token);
     static void readLargeObjectThresholdFromInfo(char*token);
-    static void readLargeObjectAlignmentFromInfo(char*token);
     static void readInputInfoFile();
     static void openInputInfoFile(char * runningApplicationName);
     static void openOutputFile();

@@ -191,33 +191,26 @@ public:
 //    return NULL;
 //  }
 
-  // this function is customized for call stack array
-//  ValueType* findOrAdd(const KeyType& key, size_t keylen, ValueType newval){
-//    ValueType* ret = NULL;
-//    size_t hindex = hashIndex(key, keylen);
-//    struct HashBucket* first = getHashBucket(hindex);
-//    struct Entry* entry = getEntry(first, key, keylen);
-//
-//#if LOCK_PROTECTION
-//    first->Lock();
-//#endif
-//    // Check all _buckets with the same hindex.
-//    if(entry == NULL) {
-//     // fprintf(stderr, "entry not exists. Now add the current one to the map\n");
-//      // insert new call stack into map
-//      entry = insertEntry(first, key, keylen, newval);
-//    }
-//
-//    // return the actual call stack value
-//    ret = &entry->value;
-//      //fprintf(stderr, "entry exists. Now return. ret %p\n", ret);
-//
-//#if LOCK_PROTECTION
-//    first->Unlock();
-//#endif
-//
-//    return ret;
-//  }
+  ValueType* findOrAdd(const KeyType& key, size_t keylen){
+    ValueType* ret = NULL;
+    size_t hindex = hashIndex(key, keylen);
+    struct HashBucket* first = getHashBucket(hindex);
+    struct Entry* entry = getEntry(first, key, keylen);
+
+#if LOCK_PROTECTION
+    first->Lock();
+#endif
+    if(entry == NULL) {
+      entry = insertEntry(first, key, keylen);
+    }
+    ret = &entry->value;
+
+#if LOCK_PROTECTION
+    first->Unlock();
+#endif
+
+    return ret;
+  }
 
   ValueType * insert(const KeyType& key, size_t keylen, ValueType value) {
     ValueType* ret = NULL;
@@ -336,15 +329,17 @@ private:
       struct Entry* result = NULL;
       // Check all _buckets with the same hindex.
       unsigned short count = first->count;
+//      if(count > 0) {
+//          fprintf(stderr, "count = %u, first = %p, key = %p\n", count, first, key);
+//      }
       while(count > 0) {
-//      if(_keycmp(entry->key, key, keylen) && (entry->keylen == keylen)) {
-        if(_keycmp(entry->key, key, keylen)) {
+          if(_keycmp(entry->key, key, keylen)) {
 
-        result = entry;
-        break;
-      }
-      entry = entry->nextEntry();
-      count--;
+              result = entry;
+              break;
+          }
+          entry = entry->nextEntry();
+          count--;
     }
 
     return result;

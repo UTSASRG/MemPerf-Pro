@@ -87,14 +87,20 @@ struct FriendlinessStatus {
     unsigned int numOfSampledFalseSharingInstructions[NUM_OF_FALSESHARINGTYPE];
     unsigned int numOfSampledFalseSharingCacheLines[NUM_OF_FALSESHARINGTYPE];
     uint64_t totalMemoryUsageOfSampledPages;
+
+#ifdef CACHE_UTIL
     uint64_t totalMemoryUsageOfSampledCacheLines;
+#endif
+
     CacheConflictDetector cacheConflictDetector;
 
+#ifdef CACHE_UTIL
     void recordANewSampling(uint64_t memoryUsageOfCacheLine, uint64_t memoryUsageOfPage);
-    void add(FriendlinessStatus newFriendlinessStatus);
-#ifdef OPEN_DEBUG
-    void debugPrint();
+#else
+    void recordANewSampling(uint64_t memoryUsageOfPage);
 #endif
+
+    void add(FriendlinessStatus newFriendlinessStatus);
 };
 
 constexpr char * outputTitleNotificationString[2] = {

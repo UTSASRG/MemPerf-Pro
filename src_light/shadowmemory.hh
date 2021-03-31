@@ -84,16 +84,27 @@ class CacheMapEntry {
 
     bool falseSharingStatus[2] = {false, false};
     bool falseSharingLineRecorded[NUM_OF_FALSESHARINGTYPE] = {false};
+
+#ifdef CACHE_UTIL
     int8_t num_used_bytes;
+#endif
+
     uint8_t lastWriterThreadIndex;
     uint8_t lastAFThreadIndex;
 
-    uint8_t getUsedBytes();
+#ifdef CACHE_UTIL
     void addUsedBytes(uint8_t num_bytes);
     void subUsedBytes(uint8_t num_bytes);
-    void updateCache(bool isFree, uint8_t num_bytes);
     void setFull();
     void setEmpty();
+    uint8_t getUsedBytes();
+#endif
+
+#ifdef CACHE_UTIL
+    void updateCache(bool isFree, uint8_t num_bytes);
+#else
+    void updateCache(bool isFree);
+#endif
 
     void setFS(FalseSharingType falseSharingType);
     FalseSharingType getFS();

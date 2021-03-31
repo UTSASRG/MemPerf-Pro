@@ -100,16 +100,27 @@ void CacheConflictDetector::print(unsigned int totalHit) {
     fprintf(ProgramStatus::outputFile, "conflict miss score: %lf\n", maxScore);
 }
 
+#ifdef CACHE_UTIL
 void FriendlinessStatus::recordANewSampling(uint64_t memoryUsageOfCacheLine, uint64_t memoryUsageOfPage) {
     numOfSampling++;
     totalMemoryUsageOfSampledCacheLines += memoryUsageOfCacheLine;
     totalMemoryUsageOfSampledPages += memoryUsageOfPage;
 }
+#else
+void FriendlinessStatus::recordANewSampling(uint64_t memoryUsageOfPage) {
+    numOfSampling++;
+    totalMemoryUsageOfSampledPages += memoryUsageOfPage;
+}
+#endif
 
 void FriendlinessStatus::add(FriendlinessStatus newFriendlinessStatus) {
     numOfSampling += newFriendlinessStatus.numOfSampling;
     totalMemoryUsageOfSampledPages += newFriendlinessStatus.totalMemoryUsageOfSampledPages;
+
+#ifdef CACHE_UTIL
     totalMemoryUsageOfSampledCacheLines += newFriendlinessStatus.totalMemoryUsageOfSampledCacheLines;
+#endif
+
     numOfSampledStoringInstructions += newFriendlinessStatus.numOfSampledStoringInstructions;
     numOfSampledCacheLines += newFriendlinessStatus.numOfSampledCacheLines;
     for(uint8_t falseSharingType = 0; falseSharingType < NUM_OF_FALSESHARINGTYPE; ++falseSharingType) {
@@ -118,20 +129,3 @@ void FriendlinessStatus::add(FriendlinessStatus newFriendlinessStatus) {
     }
     cacheConflictDetector.add(newFriendlinessStatus.cacheConflictDetector);
 }
-
-#ifdef OPEN_DEBUG
-void FriendlinessStatus::debugPrint() {
-    fprintf(stderr, "numOfSampling = %u\n", numOfSampling);
-    if(numOfSampling / 100) {
-        fprintf(stderr, "totalMemoryUsageOfSampledPages = %lu, avg = %3lu%%\n",
-                totalMemoryUsageOfSampledPages,
-                totalMemoryUsageOfSampledPages/(numOfSampling/100*PAGESIZE));
-        fprintf(stderr, "totalMemoryUsageOfSampledCacheLines = %lu, avg = %3lu%%\n",
-                totalMemoryUsageOfSampledCacheLines,
-                totalMemoryUsageOfSampledCacheLines/(numOfSampling/100*CACHELINE_SIZE));
-        fprintf(stderr, "numOfSampledStoringInstructions = %u\n", numOfSampledStoringInstructions);
-        fprintf(stderr, "numOfSampledCacheLines = %u\n", numOfSampledCacheLines);
-        fprintf(stderr, "\n");
-    }
-}
-#endif

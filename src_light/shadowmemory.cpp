@@ -176,20 +176,23 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType)
     }
     pme = (*mega_entry + tuple.page_index);
 
-    if(!pme->isTouched()) {
+    if(!pme->isTouched() || pme->getUsedBytes() == 0) {
         return;
     }
 
-
-    if((cme = pme->getCacheMapEntry(false)) == nullptr || pme->getUsedBytes() == 0) {
+    if((cme = pme->getCacheMapEntry(false)) == nullptr) {
             return;
         }
 
     cme += tuple.cache_index;
 
+#ifdef CACHE_UTIL
+
     if(cme->getUsedBytes() == 0) {
         return;
     }
+
+#endif
 
     ThreadLocalStatus::friendlinessStatus.cacheConflictDetector.hit(tuple.mega_index, tuple.page_index, tuple.cache_index, ThreadLocalStatus::friendlinessStatus.numOfSampling);
 
@@ -198,7 +201,12 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType)
         cme->lastWriterThreadIndex = 1;
     }
 
+#ifdef CACHE_UTIL
     ThreadLocalStatus::friendlinessStatus.recordANewSampling(cme->getUsedBytes(), pme->getUsedBytes());
+#else
+    ThreadLocalStatus::friendlinessStatus.recordANewSampling(pme->getUsedBytes());
+#endif
+
     if(accessType == E_MEM_STORE) {
         ThreadLocalStatus::friendlinessStatus.numOfSampledStoringInstructions++;
         if(cme->lastWriterThreadIndex != cme->getThreadIndex() && cme->lastWriterThreadIndex >= 16) {
@@ -249,16 +257,7 @@ void PageMapEntry::clear() {
     num_used_bytes = 0;
 }
 
-uint8_t CacheMapEntry::getUsedBytes() {
-    if(num_used_bytes > CACHELINE_SIZE) {
-        return CACHELINE_SIZE;
-    }
-    if(num_used_bytes < 0) {
-        return 0;
-    }
-    return num_used_bytes;
 
-}
 
 unsigned short PageMapEntry::getUsedBytes() {
 
@@ -373,12 +372,18 @@ void PageMapEntry::updateCacheLines(unsigned long mega_index, uint8_t page_index
     PageMapEntry * targetPage = (*mega_entry + page_index);
     CacheMapEntry * current = targetPage->getCacheMapEntry(true) + cache_index;
 
-        uint8_t curCacheLineBytes = MIN(CACHELINE_SIZE - firstCacheLineOffset, size_remain);
-        current->updateCache(isFree, curCacheLineBytes);
-        size_remain -= curCacheLineBytes;
+    uint8_t curCacheLineBytes = MIN(CACHELINE_SIZE - firstCacheLineOffset, size_remain);
 
+#ifdef CACHE_UTIL
+    current->updateCache(isFree, curCacheLineBytes);
+#else
+    current->updateCache(isFree);
+#endif
+
+    size_remain -= curCacheLineBytes;
     cache_index++;
 
+#ifdef CACHE_UTIL
     while (size_remain >= CACHELINE_SIZE) {
 
         if(cache_index == NUM_CACHELINES_PER_PAGE) {
@@ -386,7 +391,6 @@ void PageMapEntry::updateCacheLines(unsigned long mega_index, uint8_t page_index
             cache_index = 0;
             if(page_index == 0) {
                 mega_index++;
-//                page_index = 0;
                 mega_entry = ShadowMemory::getMegaMapEntry(mega_index);
                 targetPage = *mega_entry;
             } else {
@@ -397,17 +401,15 @@ void PageMapEntry::updateCacheLines(unsigned long mega_index, uint8_t page_index
             current++;
         }
 
-
         if (isFree) {
             current->setEmpty();
         } else {
             current->setFull();
         }
-
         size_remain -= CACHELINE_SIZE;
         cache_index++;
-    }
 
+    }
     if(size_remain > 0) {
         if(cache_index == NUM_CACHELINES_PER_PAGE) {
             page_index++;
@@ -422,9 +424,23 @@ void PageMapEntry::updateCacheLines(unsigned long mega_index, uint8_t page_index
         } else {
             current++;
         }
-
         current->updateCache(isFree, size_remain);
     }
+#else
+    if(size_remain > 0 && size_remain % CACHELINE_SIZE) {
+        uint64_t c = cache_index + size_remain / (CACHELINE_SIZE + 1);
+        cache_index = c % NUM_CACHELINES_PER_PAGE;
+        uint64_t p = page_index + c / NUM_CACHELINES_PER_PAGE;
+        page_index = p % NUM_PAGES_PER_MEGABYTE;
+        mega_index += p / NUM_PAGES_PER_MEGABYTE;
+
+        mega_entry = ShadowMemory::getMegaMapEntry(mega_index);
+        targetPage = (*mega_entry + page_index);
+        current = targetPage->getCacheMapEntry(true) + cache_index;
+        current->updateCache(isFree);
+    }
+#endif
+
 }
 
 inline CacheMapEntry * PageMapEntry::getCacheMapEntry(bool mvBumpPtr) {
@@ -444,6 +460,7 @@ inline CacheMapEntry * PageMapEntry::getCacheMapEntry(bool mvBumpPtr) {
     return cache_map_entry;
 }
 
+#ifdef CACHE_UTIL
 inline void CacheMapEntry::addUsedBytes(uint8_t num_bytes) {
     num_used_bytes += num_bytes;
 }
@@ -452,6 +469,27 @@ inline void CacheMapEntry::subUsedBytes(uint8_t num_bytes) {
     num_used_bytes -= num_bytes;
 }
 
+inline void CacheMapEntry::setFull() {
+    num_used_bytes = CACHELINE_SIZE;
+}
+
+inline void CacheMapEntry::setEmpty() {
+    num_used_bytes = 0;
+}
+
+uint8_t CacheMapEntry::getUsedBytes() {
+    if(num_used_bytes > CACHELINE_SIZE) {
+        return CACHELINE_SIZE;
+    }
+    if(num_used_bytes < 0) {
+        return 0;
+    }
+    return num_used_bytes;
+
+}
+#endif
+
+#ifdef CACHE_UTIL
 void CacheMapEntry::updateCache(bool isFree, uint8_t num_bytes) {
     if (isFree) {
         subUsedBytes(num_bytes);
@@ -471,14 +509,25 @@ void CacheMapEntry::updateCache(bool isFree, uint8_t num_bytes) {
         }
     }
 }
-
-inline void CacheMapEntry::setFull() {
-    num_used_bytes = CACHELINE_SIZE;
+#else
+void CacheMapEntry::updateCache(bool isFree) {
+    if (isFree) {
+        if (getFS() == ACTIVE || getFS() == OBJECT) {
+            if (lastAFThreadIndex != getThreadIndex() && lastAFThreadIndex >= 16) {
+                setFS(PASSIVE);
+            }
+            lastAFThreadIndex = getThreadIndex();
+        }
+    } else {
+        if (getFS() == OBJECT) {
+            if (lastAFThreadIndex != getThreadIndex() && lastAFThreadIndex >= 16) {
+                setFS(ACTIVE);
+            }
+            lastAFThreadIndex = getThreadIndex();
+        }
+    }
 }
-
-inline void CacheMapEntry::setEmpty() {
-    num_used_bytes = 0;
-}
+#endif
 
 inline void CacheMapEntry::setFS(FalseSharingType falseSharingType) {
     if(falseSharingType == OBJECT) {

@@ -24,6 +24,7 @@
 //#define SAMPLING_PERIOD 5000000
 #define SAMPLING_PERIOD 500000
 //#define SAMPLING_PERIOD 50000
+//#define CACHE_UTIL 1
 
 //#define MMAP_PAGES 257 // must be in the form of 2^N + 1
 #define MMAP_PAGES 129 // must be in the form of 2^N + 1
@@ -48,7 +49,7 @@
 #define MY_METADATA_SIZE 4
 
 #define ABNORMAL_VALUE 100000000l
-#define MAX_OBJ_NUM 4194304
+#define MAX_OBJ_NUM 4194304*3
 #define MAX_LOCK_NUM 512
 
 #define MAX_THREAD_NUMBER 1024

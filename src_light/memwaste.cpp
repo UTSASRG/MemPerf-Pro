@@ -21,16 +21,19 @@ void MemoryWaste::initialize() {
 
 bool MemoryWaste::allocUpdate(unsigned int size, void * address) {
     bool reused;
-    hashLocksSet.lock(address);
+
+//    hashLocksSet.lock(address);
     uint32_t * status = objStatusMap.find(address, sizeof(unsigned long));
     if(!status) {
-        status = objStatusMap.insert(address, sizeof(unsigned long), size);
+        hashLocksSet.lock(address);
+        status = objStatusMap.findOrAdd(address, sizeof(unsigned long));
         hashLocksSet.unlock(address);
+        *status = size;
         reused = false;
     }
     else {
+//        hashLocksSet.unlock(address);
         *status = size;
-        hashLocksSet.unlock(address);
         reused = true;
     }
 
@@ -40,12 +43,12 @@ bool MemoryWaste::allocUpdate(unsigned int size, void * address) {
 
 uint32_t MemoryWaste::freeUpdate(void* address) {
 
-    hashLocksSet.lock(address);
+//    hashLocksSet.lock(address);
     uint32_t * status = objStatusMap.find(address, sizeof(void *));
     if(status == nullptr) {
-        hashLocksSet.unlock(address);
+//        hashLocksSet.unlock(address);
         return 0;
     }
-    hashLocksSet.unlock(address);
+//    hashLocksSet.unlock(address);
     return *status;
 }
