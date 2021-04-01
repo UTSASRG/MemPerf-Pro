@@ -6,7 +6,7 @@
 #include "programstatus.h"
 
 
-struct AllocatingTypeWithSizeGotFromMemoryWaste {
+struct AllocatingTypeWithSizeGotFromObjTable {
     bool isReuse;
     unsigned int objectSize;
 };
@@ -73,10 +73,10 @@ struct CacheConflictDetector {
     uint32_t totalHitIntervalForCaches[NUM_CACHELINES_PER_PAGE];
     uint32_t lastHitTimeForCaches[NUM_CACHELINES_PER_PAGE];
     unsigned long lastHitMegaIndex[NUM_CACHELINES_PER_PAGE];
-    uint8_t lastHitPageIndex[NUM_CACHELINES_PER_PAGE];
+    uint64_t lastHitPageIndex[NUM_CACHELINES_PER_PAGE];
 
     void add(CacheConflictDetector newCacheConflictDetector);
-    void hit(unsigned long mega_index, uint8_t page_index, uint8_t cache_index, unsigned int time);
+    void hit(uint64_t page_index, uint8_t cache_index, unsigned int time);
     void print(unsigned int totalHit);
 };
 

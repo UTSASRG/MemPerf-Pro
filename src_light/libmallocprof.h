@@ -20,7 +20,7 @@
 #include "real.hh"
 #include "spinlock.hh"
 #include "xthreadx.hh"
-#include "memwaste.h"
+#include "objTable.h"
 #include "globalstatus.h"
 #include "memsample.h"
 #include "shadowmemory.hh"

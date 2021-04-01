@@ -29,8 +29,10 @@ void exitHandler() {
 
     ProgramStatus::setBeginConclusionTrue();
 
+#ifdef PREDICTION
     Predictor::outsideCyclesStop();
     Predictor::stopSerial();
+#endif
 
 #ifdef OPEN_SAMPLING_EVENT
 	stopSampling();
@@ -68,11 +70,14 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
     ProgramStatus::initIO(argv[0]);
     lockUsage.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_LOCK_NUM);
     globalLockUsage.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_LOCK_NUM);
-    MemoryWaste::initialize();
+    ObjTable::initialize();
     MyMalloc::initializeForThreadLocalHashMemory(ThreadLocalStatus::runningThreadIndex);
-    Predictor::globalInit();
 
+#ifdef PREDICTION
+    Predictor::globalInit();
     Predictor::outsideCycleStart();
+#endif
+
     ProgramStatus::setProfilerInitializedTrue();
 
     atexit(exitHandler);
@@ -104,33 +109,61 @@ extern "C" {
         void * object;
         if(AllocatingStatus::isFirstFunction()) {
             if(ThreadLocalStatus::runningThreadIndex) {
+
+#ifdef PREDICTION
                 Predictor::outsideCyclesStop();
+#endif
+
                 AllocatingStatus::updateAllocatingStatusBeforeRealFunction(MALLOC, sz);
                 object = RealX::malloc(sz);
                 AllocatingStatus::updateAllocatingStatusAfterRealFunction(object);
-                AllocatingStatus::updateAllocatingInfoToThreadLocalData();
+//                AllocatingStatus::updateAllocatingInfoToThreadLocalData();
+
+#ifdef PREDICTION
                 AllocatingStatus::updateAllocatingInfoToPredictor();
                 Predictor::outsideCycleStart();
+#endif
+
             } else {
+
+#ifdef PREDICTION
                 Predictor::outsideCyclesStop();
+#endif
+
                 AllocatingStatus::updateAllocatingStatusBeforeRealFunction(MALLOC, sz);
                 object = RealX::malloc(sz);
                 AllocatingStatus::updateAllocatingStatusAfterRealFunction(object);
-                AllocatingStatus::updateAllocatingInfoToThreadLocalData();
+//                AllocatingStatus::updateAllocatingInfoToThreadLocalData();
+
+#ifdef PREDICTION
                 AllocatingStatus::updateAllocatingInfoToPredictor();
+#endif
+
 #ifdef OPEN_SAMPLING_EVENT
                 initPMU();
 #endif
+
+#ifdef PREDICTION
                 Predictor::outsideCycleStart();
+#endif
+
             }
         } else {
+
+#ifdef PREDICTION
             Predictor::outsideCyclesStop();
+#endif
+
             AllocatingStatus::updateAllocatingStatusBeforeRealFunction(MALLOC, sz);
             object = RealX::malloc(sz);
             AllocatingStatus::updateAllocatingStatusAfterRealFunction(object);
-            AllocatingStatus::updateAllocatingInfoToThreadLocalData();
+//            AllocatingStatus::updateAllocatingInfoToThreadLocalData();
+
+#ifdef PREDICTION
             AllocatingStatus::updateAllocatingInfoToPredictor();
             Predictor::outsideCycleStart();
+#endif
+
         }
 
         return object;
@@ -151,13 +184,20 @@ extern "C" {
             return RealX::calloc(nelem, elsize);
         }
 
+#ifdef PREDICTION
         Predictor::outsideCyclesStop();
+#endif
+
         AllocatingStatus::updateAllocatingStatusBeforeRealFunction(CALLOC, nelem*elsize);
         void * object = RealX::calloc(nelem, elsize);
         AllocatingStatus::updateAllocatingStatusAfterRealFunction(object);
         AllocatingStatus::updateAllocatingInfoToThreadLocalData();
+
+#ifdef PREDICTION
         AllocatingStatus::updateAllocatingInfoToPredictor();
         Predictor::outsideCycleStart();
+#endif
+
 		return object;
 	}
 
@@ -173,16 +213,19 @@ extern "C" {
             return RealX::free(ptr);
         }
 
+#ifdef PREDICTION
         Predictor::outsideCyclesStop();
+#endif
+
         AllocatingStatus::updateFreeingStatusBeforeRealFunction(FREE, ptr);
         RealX::free(ptr);
         AllocatingStatus::updateFreeingStatusAfterRealFunction();
         AllocatingStatus::updateAllocatingInfoToThreadLocalData();
+
+#ifdef PREDICTION
         AllocatingStatus::updateAllocatingInfoToPredictor();
         Predictor::outsideCycleStart();
-
-//        fprintf(stderr, "free obj at %p\n", ptr);
-//        fprintf(stderr, "free obj\n");
+#endif
 
     }
 
@@ -202,7 +245,10 @@ extern "C" {
             return RealX::realloc(ptr, sz);
         }
 
+#ifdef PREDICTION
         Predictor::outsideCyclesStop();
+#endif
+
 		if(ptr) {
             AllocatingStatus::updateFreeingStatusBeforeRealFunction(REALLOC, ptr);
         }
@@ -210,8 +256,12 @@ extern "C" {
         void * object = RealX::realloc(ptr, sz);
         AllocatingStatus::updateAllocatingStatusAfterRealFunction(object);
         AllocatingStatus::updateAllocatingInfoToThreadLocalData();
+
+#ifdef PREDICTION
         AllocatingStatus::updateAllocatingInfoToPredictor();
         Predictor::outsideCycleStart();
+#endif
+
         return object;
 	}
 
@@ -225,13 +275,20 @@ extern "C" {
             return RealX::posix_memalign(memptr, alignment, size);
         }
 
+#ifdef PREDICTION
         Predictor::outsideCyclesStop();
+#endif
+
         AllocatingStatus::updateAllocatingStatusBeforeRealFunction(POSIX_MEMALIGN, size);
         int retval = RealX::posix_memalign(memptr, alignment, size);
         AllocatingStatus::updateAllocatingStatusAfterRealFunction(*memptr);
         AllocatingStatus::updateAllocatingInfoToThreadLocalData();
+
+#ifdef PREDICTION
         AllocatingStatus::updateAllocatingInfoToPredictor();
         Predictor::outsideCycleStart();
+#endif
+
         return retval;
 
 	}
@@ -250,13 +307,20 @@ extern "C" {
          return RealX::memalign(alignment, size);
      }
 
+#ifdef PREDICTION
      Predictor::outsideCyclesStop();
+#endif
+
      AllocatingStatus::updateAllocatingStatusBeforeRealFunction(MEMALIGN, size);
      void * object = RealX::memalign(alignment, size);
      AllocatingStatus::updateAllocatingStatusAfterRealFunction(object);
      AllocatingStatus::updateAllocatingInfoToThreadLocalData();
+
+#ifdef PREDICTION
      AllocatingStatus::updateAllocatingInfoToPredictor();
      Predictor::outsideCycleStart();
+#endif
+
      return object;
 	}
 }

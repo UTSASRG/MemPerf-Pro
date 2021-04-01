@@ -73,14 +73,13 @@ void CacheConflictDetector::add(CacheConflictDetector newCacheConflictDetector) 
     }
 }
 
-void CacheConflictDetector::hit(unsigned long mega_index, uint8_t page_index, uint8_t cache_index, unsigned int time) {
+void CacheConflictDetector::hit(uint64_t page_index, uint8_t cache_index, unsigned int time) {
     numOfHitForCaches[cache_index]++;
-    if(lastHitMegaIndex[cache_index] != mega_index || lastHitPageIndex[cache_index] != page_index) {
+    if(lastHitPageIndex[cache_index] != page_index) {
         if(lastHitMegaIndex[cache_index] || lastHitPageIndex[cache_index]) {
             numOfDifferentHitForCaches[cache_index]++;
             totalHitIntervalForCaches[cache_index] += time - lastHitTimeForCaches[cache_index];
         }
-        lastHitMegaIndex[cache_index] = mega_index;
         lastHitPageIndex[cache_index] = page_index;
     }
     lastHitTimeForCaches[cache_index] = time;

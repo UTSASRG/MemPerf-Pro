@@ -14,9 +14,9 @@
 class HashFuncs {
 public:
 
-  static size_t hashCharInt(uint8_t x, size_t) { return x; }
-
-  static size_t hashUnsignedlong(unsigned long x, size_t) { return x; }
+  static size_t hash8Int(uint8_t x, size_t) { return x; }
+    static size_t hash32Int(uint32_t x, size_t) { return x; }
+  static size_t hash64Int(uint64_t x, size_t) { return x; }
 
   static size_t hashAddr(void* addr, size_t) {
     unsigned long key = (unsigned long)addr >> 3;
@@ -29,11 +29,11 @@ public:
     return key;
   }
 
-  static bool compareCharInt(uint8_t var1, uint8_t var2, size_t) { return var1 == var2; }
+  static bool compare8Int(uint8_t var1, uint8_t var2, size_t) { return var1 == var2; }
+    static bool compare32Int(uint32_t var1, uint32_t var2, size_t) { return var1 == var2; }
+    static bool compare64Int(uint64_t var1, uint64_t var2, size_t) { return var1 == var2; }
 
   static bool compareAddr(void* addr1, void* addr2, size_t) { return addr1 == addr2; }
-
-    static bool compareUnsignedlong(unsigned long var1, unsigned long var2, size_t) { return var1 == var2; }
 };
 
 #endif

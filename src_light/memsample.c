@@ -96,14 +96,21 @@ void sampleHandler(int signum, siginfo_t *info, void *p) {
 //    }
 
     if(info->si_code == POLL_HUP) {
+
+#ifdef PREDICTION
         Predictor::outsideCyclesStop();
-//			doSampleRead();
+#endif
+
         perfInfo.prev_head = perf_mmap_read();
 //			lock.lock();
 			ioctl(perfInfo.perf_fd, PERF_EVENT_IOC_REFRESH, OVERFLOW_INTERVAL);
 			ioctl(perfInfo.perf_fd2, PERF_EVENT_IOC_REFRESH, OVERFLOW_INTERVAL);
 //			lock.unlock();
+
+#ifdef PREDICTION
         Predictor::outsideCycleStart();
+#endif
+
   }
 }
 

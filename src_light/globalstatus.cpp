@@ -213,7 +213,11 @@ void GlobalStatus::printOutput() {
     printCriticalSections();
     printSyscalls();
     printFriendliness();
+
+#ifdef PREDICTION
     Predictor::printOutput();
+#endif
+
 //    fflush(ProgramStatus::outputFile);
     fprintf(stderr, "writing completed\n");
 }
@@ -261,12 +265,12 @@ void GlobalStatus::printOutput() {
 //    }
 ////
 //    if(MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage) {
-//        fprintf(ProgramStatus::matrixFile, "%lu%% ", MemoryWaste::totalValue.internalFragment*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage);
-//        fprintf(ProgramStatus::matrixFile, "%lu%% ", MemoryWaste::totalValue.memoryBlowup*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage);
-//        fprintf(ProgramStatus::matrixFile, "%lu%% ", MemoryWaste::totalValue.externalFragment*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage);
-//        fprintf(ProgramStatus::matrixFile, "%lu%% ", 100 - MemoryWaste::totalValue.internalFragment*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage
-//                                                     - MemoryWaste::totalValue.memoryBlowup*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage
-//                                                     - MemoryWaste::totalValue.externalFragment*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage);
+//        fprintf(ProgramStatus::matrixFile, "%lu%% ", ObjTable::totalValue.internalFragment*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage);
+//        fprintf(ProgramStatus::matrixFile, "%lu%% ", ObjTable::totalValue.memoryBlowup*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage);
+//        fprintf(ProgramStatus::matrixFile, "%lu%% ", ObjTable::totalValue.externalFragment*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage);
+//        fprintf(ProgramStatus::matrixFile, "%lu%% ", 100 - ObjTable::totalValue.internalFragment*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage
+//                                                     - ObjTable::totalValue.memoryBlowup*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage
+//                                                     - ObjTable::totalValue.externalFragment*100/MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage);
 //        fprintf(ProgramStatus::matrixFile, "%lu ", MemoryUsage::maxGlobalMemoryUsage.totalMemoryUsage/ONE_KB);
 //    } else {
 //        fprintf(ProgramStatus::matrixFile, "-1 -1 -1 -1 -1 ");

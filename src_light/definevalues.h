@@ -4,6 +4,7 @@
 #define OPEN_SAMPLING_EVENT 1
 #define OPEN_SAMPLING_FOR_ALLOCS 1
 #define RANDOM_PERIOD_FOR_ALLOCS 100
+#define PREDICTION 1
 //#define CACHE_UTIL 1
 
 //#define OPEN_DEBUG 1
@@ -58,8 +59,6 @@
 #define MAX_BT_ADDR_NUM 160
 
 #define MAX_REGION_NUM 256
-
-//#define LEAST_TOUCHING_THREADS 15
 
 enum ObjectSizeType: unsigned char{
     SMALL,

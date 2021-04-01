@@ -4,11 +4,15 @@ extern thread_local HashMap <void *, DetailLockData, PrivateHeap> lockUsage;
 
 int xthreadx::thread_create(pthread_t * tid, const pthread_attr_t * attr, threadFunction * fn, void * arg) {
     ThreadLocalStatus::addARunningThread();
+
+#ifdef PREDICTION
     if(ThreadLocalStatus::fromSerialToParallel()) {
         Predictor::outsideCyclesStop();
         Predictor::stopSerial();
         Predictor::outsideCycleStart();
     }
+#endif
+
     thread_t * children = (thread_t *) MyMalloc::xthreadMalloc();
     children->thread = tid;
     children->startArg = arg;
@@ -16,10 +20,6 @@ int xthreadx::thread_create(pthread_t * tid, const pthread_attr_t * attr, thread
 
 
     int result = RealX::pthread_create(tid, attr, xthreadx::startThread, (void *)children);
-
-//    if(result) {
-//        fprintf(stderr, "error: pthread_create failed: %s\n", strerror(errno));
-//    }
 
     return result;
 }
@@ -53,14 +53,20 @@ void * xthreadx::startThread(void * arg) {
     MyMalloc::initializeForThreadLocalHashMemory(ThreadLocalStatus::runningThreadIndex);
     lockUsage.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_LOCK_NUM);
 
+#ifdef PREDICTION
     Predictor::threadInit();
+#endif
 
 
 #ifdef OPEN_SAMPLING_EVENT
         initPMU2();
 
 #endif
+
+#ifdef PREDICTION
     Predictor::outsideCycleStart();
+#endif
+
     ProgramStatus::setProfilerInitializedTrue();
 
     result = current->startRoutine(current->startArg);
@@ -75,9 +81,10 @@ bool lastThreadDepended;
 
 void xthreadx::threadExit() {
 
+#ifdef PREDICTION
     Predictor::outsideCyclesStop();
     Predictor::threadEnd();
-
+#endif
 
 #ifdef OPEN_SAMPLING_EVENT
     stopSampling();
@@ -90,14 +97,15 @@ void xthreadx::threadExit() {
 int xthreadx::thread_join(pthread_t thread, void ** retval) {
     int result = RealX::pthread_join (thread, retval);
     ThreadLocalStatus::subARunningThread();
+
+#ifdef PREDICTION
         if(ThreadLocalStatus::fromParallelToSerial()) {
             Predictor::outsideCyclesStop();
             Predictor::threadEnd();
             Predictor::stopParallel();
             Predictor::outsideCycleStart();
         }
-
-//fprintf(stderr, "lastThreadDepended = %u\n", lastThreadDepended);
+#endif
 
     return result;
 

@@ -105,6 +105,11 @@ public:
 
 
   void initialize(hashFuncPtr hfunc, keycmpFuncPtr kcmp, const size_t size = 4096) {
+
+      if(_initialized) {
+          return;
+      }
+
     _buckets = NULL;
 //    _bucketsTotalUsed = 0;
     _bucketsTotal = size;

@@ -58,87 +58,76 @@ void AllocatingStatus::updateFreeingTypeBeforeRealFunction(AllocationFunction al
     allocatingType.doingAllocation = true;
 }
 
-
-void AllocatingStatus::startCountCountingEvents() {
-    cyclesBeforeRealFunction = rdtscp();
-}
-
 void AllocatingStatus::updateAllocatingStatusBeforeRealFunction(AllocationFunction allocationFunction, unsigned int objectSize) {
+
     updateAllocatingTypeBeforeRealFunction(allocationFunction, objectSize);
 #ifdef OPEN_SAMPLING_FOR_ALLOCS
     sampledForCountingEvent = ThreadLocalStatus::randomProcessForCountingEvent();
 #else
     sampledForCountingEvent = true;
 #endif
-    startCountCountingEvents();
+    cyclesBeforeRealFunction = rdtscp();
 }
 
 void AllocatingStatus::updateFreeingStatusBeforeRealFunction(AllocationFunction allocationFunction, void * objectAddress) {
+
     updateFreeingTypeBeforeRealFunction(allocationFunction, objectAddress);
-    AllocatingStatus::updateMemoryStatusBeforeFree();
+    updateMemoryStatusBeforeFree();
     if(allocationFunction == FREE) {
 #ifdef OPEN_SAMPLING_FOR_ALLOCS
         sampledForCountingEvent = ThreadLocalStatus::randomProcessForCountingEvent();
 #else
         sampledForCountingEvent = true;
 #endif
-        startCountCountingEvents();
+        cyclesBeforeRealFunction = rdtscp();
     }
 }
 
+void AllocatingStatus::updateAllocatingStatusAfterRealFunction(void * objectAddress) {
 
-void AllocatingStatus::updateAllocatingTypeAfterRealFunction(void * objectAddress) {
-    allocatingType.objectAddress = objectAddress;
-}
-
-void AllocatingStatus::updateFreeingTypeAfterRealFunction() {
-    allocatingType.doingAllocation = false;
-}
-
-void AllocatingStatus::calculateCycleInRealFunction() {
+    cyclesAfterRealFunction = rdtscp();
     cyclesInRealFunction = cyclesAfterRealFunction - cyclesBeforeRealFunction;
     if(cyclesInRealFunction > cyclesMinus) {
         cyclesInRealFunction -= cyclesMinus;
     } else {
         cyclesInRealFunction = 0;
     }
-    cyclesMinus = 0;
-}
-
-void AllocatingStatus::removeAbnormalCycleValues() {
     if(cyclesInRealFunction > ABNORMAL_VALUE) {
         cyclesInRealFunction = 0;
     }
-}
 
-void AllocatingStatus::stopCountCountingEvents() {
-    cyclesAfterRealFunction = rdtscp();
-    calculateCycleInRealFunction();
-    removeAbnormalCycleValues();
-}
-
-void AllocatingStatus::updateAllocatingStatusAfterRealFunction(void * objectAddress) {
-    stopCountCountingEvents();
     if(allocatingType.allocatingFunction == MALLOC || allocatingType.allocatingFunction == REALLOC) {
-        updateAllocatingTypeAfterRealFunction(objectAddress);
+        allocatingType.objectAddress = objectAddress;
         updateMemoryStatusAfterAllocation();
     }
+
     allocatingType.doingAllocation = false;
 }
 
 void AllocatingStatus::updateFreeingStatusAfterRealFunction() {
-    stopCountCountingEvents();
-    updateFreeingTypeAfterRealFunction();
+
+    cyclesAfterRealFunction = rdtscp();
+    cyclesInRealFunction = cyclesAfterRealFunction - cyclesBeforeRealFunction;
+    if(cyclesInRealFunction > cyclesMinus) {
+        cyclesInRealFunction -= cyclesMinus;
+    } else {
+        cyclesInRealFunction = 0;
+    }
+    if(cyclesInRealFunction > ABNORMAL_VALUE) {
+        cyclesInRealFunction = 0;
+    }
+
+    allocatingType.doingAllocation = false;
 }
 
 void AllocatingStatus::updateMemoryStatusAfterAllocation() {
 
-    allocatingType.isReuse = MemoryWaste::allocUpdate(allocatingType.objectSize, allocatingType.objectAddress);
+    allocatingType.isReuse = ObjTable::allocUpdate(allocatingType.objectSize, allocatingType.objectAddress);
     ShadowMemory::updateObject(allocatingType.objectAddress, allocatingType.objectSize, false);
 }
 
 void AllocatingStatus::updateMemoryStatusBeforeFree() {
-    allocatingType.objectSize = MemoryWaste::freeUpdate(allocatingType.objectAddress);
+    allocatingType.objectSize = ObjTable::freeUpdate(allocatingType.objectAddress);
     if(allocatingType.objectSize) {
         ShadowMemory::updateObject(allocatingType.objectAddress, allocatingType.objectSize, true);
     }

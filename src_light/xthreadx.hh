@@ -5,7 +5,7 @@
 
 #include "memsample.h"
 #include "real.hh"
-#include "memwaste.h"
+#include "objTable.h"
 #include "mymalloc.h"
 #include "threadlocalstatus.h"
 #include "globalstatus.h"

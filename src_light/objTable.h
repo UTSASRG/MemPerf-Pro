@@ -1,6 +1,6 @@
 
-#ifndef MMPROF_MEMWASTE_H
-#define MMPROF_MEMWASTE_H
+#ifndef MMPROF_OBJTABLE_H
+#define MMPROF_OBJTABLE_H
 
 #include <stdio.h>
 #include "hashmap.hh"
@@ -21,7 +21,7 @@ struct HashLocksSet {
     void unlock(void * address);
 };
 
-class MemoryWaste{
+class ObjTable{
 public:
 
     static HashLocksSet hashLocksSet;
@@ -33,4 +33,4 @@ public:
 
 };
 
-#endif //MMPROF_MEMWASTE_H
+#endif //MMPROF_OBJTABLE_H

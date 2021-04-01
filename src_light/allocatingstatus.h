@@ -2,7 +2,7 @@
 #define MMPROF_ALLOCATIONSTATUS_H
 
 #include "shadowmemory.hh"
-#include "memwaste.h"
+#include "objTable.h"
 #include "threadlocalstatus.h"
 #include "structs.h"
 #include "predictor.h"
@@ -174,11 +174,7 @@ private:
     static thread_local SystemCallData systemCallData[NUM_OF_SYSTEMCALLTYPES];
 
     static void updateAllocatingTypeBeforeRealFunction(AllocationFunction allocationFunction, unsigned int objectSize);
-    static void updateAllocatingTypeAfterRealFunction(void * objectAddress);
     static void updateFreeingTypeBeforeRealFunction(AllocationFunction allocationFunction, void * objectAddress);
-
-    static void updateFreeingTypeAfterRealFunction();
-    static void startCountCountingEvents();
 
     static void updateMemoryStatusAfterAllocation();
     static void updateMemoryStatusBeforeFree();
@@ -189,10 +185,6 @@ private:
     static void addUpSyscallsInfoToThreadLocalData();
     static void addUpOtherFunctionsInfoToThreadLocalData();
     static void addUpCountingEventsToThreadLocalData();
-    static void calculateCycleInRealFunction();
-    static void removeAbnormalCycleValues();
-
-    static void stopCountCountingEvents();
 
     static void setAllocationTypeForOutputData();
     static void setAllocationTypeForPrediction();

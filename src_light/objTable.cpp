@@ -1,8 +1,8 @@
 
-#include "memwaste.h"
+#include "objTable.h"
 
 extern HashMap<void*, uint32_t, PrivateHeap> objStatusMap;
-HashLocksSet MemoryWaste::hashLocksSet;
+HashLocksSet ObjTable::hashLocksSet;
 
 void HashLocksSet::lock(void *address) {
     size_t hashKey = HashFuncs::hashAddr(address, sizeof(void*)) & (MAX_OBJ_NUM-1);
@@ -14,13 +14,14 @@ void HashLocksSet::unlock(void *address) {
     locks[hashKey].unlock();
 }
 
-void MemoryWaste::initialize() {
+void ObjTable::initialize() {
     objStatusMap.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_OBJ_NUM);
 }
 
 
-bool MemoryWaste::allocUpdate(unsigned int size, void * address) {
-//    return false;
+bool ObjTable::allocUpdate(unsigned int size, void * address) {
+
+    return true;
 
     bool reused;
 
@@ -43,9 +44,9 @@ bool MemoryWaste::allocUpdate(unsigned int size, void * address) {
 }
 
 
-uint32_t MemoryWaste::freeUpdate(void* address) {
+uint32_t ObjTable::freeUpdate(void* address) {
 
-//    return 8;
+    return 8;
 
 //    hashLocksSet.lock(address);
     uint32_t * status = objStatusMap.find(address, sizeof(void *));

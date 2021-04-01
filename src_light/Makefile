@@ -3,8 +3,8 @@ SRCS = 	\
 		allocatingstatus.cpp \
 		globalstatus.cpp \
 		memsample.c \
-		memwaste.cpp \
 		mymalloc.cpp \
+		objTable.cpp \
 		predictor.cpp \
 		programstatus.cpp \
 		real.cpp \
@@ -22,8 +22,8 @@ INCS = \
 		hashlist.hh \
 		hashmap.hh \
 		memsample.h \
-		memwaste.h \
 		mymalloc.h \
+		objTable.h \
 		predictor.h \
 		privateheap.hh \
 		programstatus.h \
