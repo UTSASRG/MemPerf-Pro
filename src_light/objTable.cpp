@@ -21,9 +21,9 @@ void ObjTable::initialize() {
 
 bool ObjTable::allocUpdate(unsigned int size, void * address) {
 
-    return true;
+//    return true;
 
-    bool reused;
+    bool reused = true;
 
 //    hashLocksSet.lock(address);
     uint32_t * status = objStatusMap.find(address, sizeof(unsigned long));
@@ -31,22 +31,21 @@ bool ObjTable::allocUpdate(unsigned int size, void * address) {
         hashLocksSet.lock(address);
         status = objStatusMap.findOrAdd(address, sizeof(unsigned long));
         hashLocksSet.unlock(address);
-        *status = size;
+//        *status = size;
         reused = false;
     }
     else {
 //        hashLocksSet.unlock(address);
-        *status = size;
-        reused = true;
     }
+
+    *status = size;
 
     return reused;
 }
 
 
 uint32_t ObjTable::freeUpdate(void* address) {
-
-    return 8;
+//    return 8;
 
 //    hashLocksSet.lock(address);
     uint32_t * status = objStatusMap.find(address, sizeof(void *));

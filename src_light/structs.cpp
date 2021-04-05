@@ -11,11 +11,6 @@ void SystemCallData::add(SystemCallData newSystemCallData) {
     this->cycles += newSystemCallData.cycles;
 }
 
-void SystemCallData::cleanup() {
-    this->num = 0;
-    this->cycles = 0;
-}
-
 void OverviewLockData::add(OverviewLockData newOverviewLockData) {
     numOfLocks += newOverviewLockData.numOfLocks;
     for(uint8_t allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
@@ -29,17 +24,17 @@ DetailLockData DetailLockData::newDetailLockData(LockTypes lockType) {
     return DetailLockData{lockType, {0}, {0}, 0, 0, 0};
 }
 
-bool DetailLockData::aContentionHappening() {
-    return (++numOfContendingThreads >= 2);
-}
+//bool DetailLockData::aContentionHappening() {
+//    return (++numOfContendingThreads >= 2);
+//}
 
-void DetailLockData::checkAndUpdateMaxNumOfContendingThreads() {
-    maxNumOfContendingThreads = MAX(numOfContendingThreads, maxNumOfContendingThreads);
-}
+//void DetailLockData::checkAndUpdateMaxNumOfContendingThreads() {
+//    maxNumOfContendingThreads = MAX(numOfContendingThreads, maxNumOfContendingThreads);
+//}
 
-void DetailLockData::quitFromContending() {
-    numOfContendingThreads--;
-}
+//void DetailLockData::quitFromContending() {
+//    numOfContendingThreads--;
+//}
 
 bool DetailLockData::isAnImportantLock() {
     for(uint8_t allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
@@ -60,10 +55,10 @@ void DetailLockData::add(DetailLockData newDetailLockData) {
 }
 
 
-void CriticalSectionStatus::add(CriticalSectionStatus newCriticalSectionStatus) {
-    numOfCriticalSections += newCriticalSectionStatus.numOfCriticalSections;
-    totalCyclesOfCriticalSections += newCriticalSectionStatus.totalCyclesOfCriticalSections;
-}
+//void CriticalSectionStatus::add(CriticalSectionStatus newCriticalSectionStatus) {
+//    numOfCriticalSections += newCriticalSectionStatus.numOfCriticalSections;
+//    totalCyclesOfCriticalSections += newCriticalSectionStatus.totalCyclesOfCriticalSections;
+//}
 
 void CacheConflictDetector::add(CacheConflictDetector newCacheConflictDetector) {
     for(uint8_t cacheIndex = 0; cacheIndex < NUM_CACHELINES_PER_PAGE; ++cacheIndex) {

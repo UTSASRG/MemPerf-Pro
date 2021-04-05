@@ -114,7 +114,6 @@ __attribute__((destructor)) void libmallochelp_finalizer () {
 //Helper Main
 int helper_main (int argc, char ** argv, char ** envp) {
 
-	// Register our cleanup routine as an on-exit handler.
 	atexit(exitHandler);
 	
 	// Determine allocator style

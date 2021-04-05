@@ -8,7 +8,7 @@ unsigned int GlobalStatus::numOfFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
 unsigned int GlobalStatus::numOfSampledCountingFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
 uint64_t GlobalStatus::cycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
 OverviewLockData GlobalStatus::overviewLockData[NUM_OF_LOCKTYPES];
-CriticalSectionStatus GlobalStatus::criticalSectionStatus[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
+//CriticalSectionStatus GlobalStatus::criticalSectionStatus[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
 SystemCallData GlobalStatus::systemCallData[NUM_OF_SYSTEMCALLTYPES][NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
 FriendlinessStatus GlobalStatus::friendlinessStatus;
 int64_t GlobalStatus::potentialMemoryLeakFunctions;
@@ -21,7 +21,7 @@ void GlobalStatus::globalize() {
         cycles[allocationType] += ThreadLocalStatus::cycles[allocationType];
         numOfFunctions[allocationType] += ThreadLocalStatus::numOfFunctions[allocationType];
         numOfSampledCountingFunctions[allocationType] += ThreadLocalStatus::numOfSampledCountingFunctions[allocationType];
-        criticalSectionStatus[allocationType].add(ThreadLocalStatus::criticalSectionStatus[allocationType]);
+//        criticalSectionStatus[allocationType].add(ThreadLocalStatus::criticalSectionStatus[allocationType]);
         for(int syscallType = 0; syscallType < NUM_OF_SYSTEMCALLTYPES; ++syscallType) {
             systemCallData[syscallType][allocationType].add(ThreadLocalStatus::systemCallData[syscallType][allocationType]);
         }
@@ -143,19 +143,19 @@ void GlobalStatus::printDetailLocks() {
     }
 }
 
-void GlobalStatus::printCriticalSections() {
-    printTitle((char*)"CRITICAL SECTION");
-    for(unsigned int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
-        if(criticalSectionStatus[allocationType].numOfCriticalSections > 0) {
-            fprintf(ProgramStatus::outputFile, "critical section in %s            %20u\n", allocationTypeOutputString[allocationType], criticalSectionStatus[allocationType].numOfCriticalSections);
-            fprintf(ProgramStatus::outputFile, "critical section per %s           %20.1lf\n", allocationTypeOutputString[allocationType], (double)criticalSectionStatus[allocationType].numOfCriticalSections/(double)numOfSampledCountingFunctions[allocationType]);
-            fprintf(ProgramStatus::outputFile, "critical section cycles in %s     %20lu\n", allocationTypeOutputString[allocationType], criticalSectionStatus[allocationType].totalCyclesOfCriticalSections);
-            fprintf(ProgramStatus::outputFile, "cycles per critical section in %s %20lu\n", allocationTypeOutputString[allocationType], criticalSectionStatus[allocationType].totalCyclesOfCriticalSections/criticalSectionStatus[allocationType].numOfCriticalSections);
-            fprintf(ProgramStatus::outputFile, "critical section cycles per %s    %20lu\n", allocationTypeOutputString[allocationType], criticalSectionStatus[allocationType].totalCyclesOfCriticalSections/numOfSampledCountingFunctions[allocationType]);
-            fprintf(ProgramStatus::outputFile, "\n");
-        }
-    }
-}
+//void GlobalStatus::printCriticalSections() {
+//    printTitle((char*)"CRITICAL SECTION");
+//    for(unsigned int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
+//        if(criticalSectionStatus[allocationType].numOfCriticalSections > 0) {
+//            fprintf(ProgramStatus::outputFile, "critical section in %s            %20u\n", allocationTypeOutputString[allocationType], criticalSectionStatus[allocationType].numOfCriticalSections);
+//            fprintf(ProgramStatus::outputFile, "critical section per %s           %20.1lf\n", allocationTypeOutputString[allocationType], (double)criticalSectionStatus[allocationType].numOfCriticalSections/(double)numOfSampledCountingFunctions[allocationType]);
+//            fprintf(ProgramStatus::outputFile, "critical section cycles in %s     %20lu\n", allocationTypeOutputString[allocationType], criticalSectionStatus[allocationType].totalCyclesOfCriticalSections);
+//            fprintf(ProgramStatus::outputFile, "cycles per critical section in %s %20lu\n", allocationTypeOutputString[allocationType], criticalSectionStatus[allocationType].totalCyclesOfCriticalSections/criticalSectionStatus[allocationType].numOfCriticalSections);
+//            fprintf(ProgramStatus::outputFile, "critical section cycles per %s    %20lu\n", allocationTypeOutputString[allocationType], criticalSectionStatus[allocationType].totalCyclesOfCriticalSections/numOfSampledCountingFunctions[allocationType]);
+//            fprintf(ProgramStatus::outputFile, "\n");
+//        }
+//    }
+//}
 
 void GlobalStatus::printSyscalls() {
     printTitle((char*)"SYSCALL");
@@ -203,14 +203,14 @@ void GlobalStatus::printFriendliness() {
 
 void GlobalStatus::printOutput() {
     fprintf(stderr, "writing output file.....\n");
-    fprintf(stderr, "%d threads\n", ThreadLocalStatus::maxNumOfRunningThread);
-    fprintf(stderr, "%d threads\n", ThreadLocalStatus::totalNumOfThread);
+//    fprintf(stderr, "%d threads\n", ThreadLocalStatus::maxNumOfRunningThread);
+//    fprintf(stderr, "%d threads\n", ThreadLocalStatus::totalNumOfThread);
     ProgramStatus::printOutput();
     printNumOfAllocations();
     printCountingEvents();
     printOverviewLocks();
     printDetailLocks();
-    printCriticalSections();
+//    printCriticalSections();
     printSyscalls();
     printFriendliness();
 

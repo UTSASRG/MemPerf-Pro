@@ -27,6 +27,17 @@ FILE * Predictor::predictorInfoFile;
 bool Predictor::lastThreadDepend;
 unsigned short Predictor::lastThreadIndex;
 
+
+ObjectSizeType Predictor::getObjectSizeTypeForPrediction(unsigned int size) {
+    if(size > replacedLargeObjectThreshold) {
+        return LARGE;
+    }
+    if(ProgramStatus::hasMiddleObjectThreshold() && size >= replacedMiddleObjectThreshold) {
+        return MEDIUM;
+    }
+    return SMALL;
+}
+
 void Predictor::globalInit() {
     openPredictorInfoFile();
     totalCycle = 0;

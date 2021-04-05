@@ -70,7 +70,6 @@ public:
     void setFull();
     void setEmpty();
     uint8_t getUsedBytes();
-    void updateCache(bool isFree, uint8_t num_bytes);
 #endif
 
 };
@@ -84,7 +83,8 @@ public:
 #ifdef CACHE_UTIL
     CacheMapEntry * cache_map_entry;
 
-    static void updateCacheLines(uint64_t page_index, uint8_t cache_index, uint8_t firstCacheLineOffset, unsigned int size, bool isFree);
+    static void mallocUpdateCacheLines(uint64_t page_index, uint8_t cache_index, uint8_t firstCacheLineOffset, unsigned int size);
+    static void freeUpdateCacheLines(uint64_t page_index, uint8_t cache_index, uint8_t firstCacheLineOffset, unsigned int size);
     CacheMapEntry * getCacheMapEntry(bool mvBumpPtr = true);
 #endif
 
@@ -100,7 +100,8 @@ public:
 
 class ShadowMemory {
 private:
-    static void updatePages(uintptr_t uintaddr, uint64_t page_index, int64_t size, bool isFree);
+    static void mallocUpdatePages(uintptr_t uintaddr, uint64_t page_index, int64_t size);
+    static void freeUpdatePages(uintptr_t uintaddr, uint64_t page_index, int64_t size);
 
     static PageMapEntry * page_map_begin;
     static PageMapEntry * page_map_end;
@@ -131,7 +132,8 @@ public:
     static PageMapEntry * doPageMapBumpPointer();
     static uint64_t getPageIndex(uint64_t addr);
     static PageMapEntry * getPageMapEntry(uint64_t page_idx);
-    static void updateObject(void * address, unsigned int size, bool isFree);
+    static void mallocUpdateObject(void * address, unsigned int size);
+    static void freeUpdateObject(void * address, unsigned int size);
 };
 
 #endif // __SHADOWMAP_H__

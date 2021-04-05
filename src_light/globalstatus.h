@@ -21,7 +21,7 @@ public:
     static unsigned int numOfSampledCountingFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
     static uint64_t cycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
     static OverviewLockData overviewLockData[NUM_OF_LOCKTYPES];
-    static CriticalSectionStatus criticalSectionStatus[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
+//    static CriticalSectionStatus criticalSectionStatus[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
     static SystemCallData systemCallData[NUM_OF_SYSTEMCALLTYPES][NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
     static FriendlinessStatus friendlinessStatus;
     static int64_t potentialMemoryLeakFunctions;
@@ -36,7 +36,7 @@ public:
     static void printCountingEvents();
     static void printOverviewLocks();
     static void printDetailLocks();
-    static void printCriticalSections();
+//    static void printCriticalSections();
     static void printSyscalls();
     static void printFriendliness();
     static void printOutput();

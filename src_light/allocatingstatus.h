@@ -16,7 +16,7 @@ private:
     static thread_local uint64_t cyclesBeforeRealFunction;
     static thread_local uint64_t cyclesAfterRealFunction;
     static thread_local uint64_t cyclesInRealFunction;
-    static thread_local uint64_t cyclesMinus;
+//    static thread_local uint64_t cyclesMinus;
 #ifdef OPEN_DEBUG
     static spinlock debugLock;
 #endif
@@ -40,12 +40,6 @@ private:
             this->cycles += cycles;
         }
 
-        void cleanUp() {
-            numOfLocks = 0;
-            numOfCalls = 0;
-            numOfCallsWithContentions = 0;
-            cycles = 0;
-        }
 #ifdef OPEN_DEBUG
         void debugPrint() {
             fprintf(stderr, "numOfLocks = %u, numOfCalls = %u, numOfCallsWithContentions = %u, cycles = %lu\n",
@@ -54,7 +48,7 @@ private:
 #endif
     };
 
-#define LENGTH_OF_QUEUE 500
+#define LENGTH_OF_QUEUE 10
 
     struct QueueOfDetailLockDataInAllocatingStatus {
 
@@ -140,37 +134,37 @@ private:
 #endif
     };
 
-    struct CriticalSectionStatusInAllocatingStatus {
-        unsigned int numOfOwningLocks;
-        unsigned int numOfCriticalSections;
-        uint64_t cyclesBeforeCriticalSection;
-        uint64_t cyclesAfterCriticalSection;
-        uint64_t totalCyclesOfCriticalSections;
-
-        void checkAndStartRecordingACriticalSection() {
-            if(++numOfOwningLocks == 1) {
-                cyclesBeforeCriticalSection = rdtscp();
-            }
-        }
-
-        void checkAndStopRecordingACriticalSection() {
-            if(--numOfOwningLocks == 0) {
-                cyclesAfterCriticalSection = rdtscp();
-                numOfCriticalSections++;
-                totalCyclesOfCriticalSections += cyclesAfterCriticalSection - cyclesBeforeCriticalSection;
-            }
-        }
-
-        void cleanUp() {
-            numOfCriticalSections = 0;
-            totalCyclesOfCriticalSections = 0;
-        }
-    };
+//    struct CriticalSectionStatusInAllocatingStatus {
+//        unsigned int numOfOwningLocks;
+//        unsigned int numOfCriticalSections;
+//        uint64_t cyclesBeforeCriticalSection;
+//        uint64_t cyclesAfterCriticalSection;
+//        uint64_t totalCyclesOfCriticalSections;
+//
+//        void checkAndStartRecordingACriticalSection() {
+//            if(++numOfOwningLocks == 1) {
+//                cyclesBeforeCriticalSection = rdtscp();
+//            }
+//        }
+//
+//        void checkAndStopRecordingACriticalSection() {
+//            if(--numOfOwningLocks == 0) {
+//                cyclesAfterCriticalSection = rdtscp();
+//                numOfCriticalSections++;
+//                totalCyclesOfCriticalSections += cyclesAfterCriticalSection - cyclesBeforeCriticalSection;
+//            }
+//        }
+//
+//        void cleanUp() {
+//            numOfCriticalSections = 0;
+//            totalCyclesOfCriticalSections = 0;
+//        }
+//    };
 
     static thread_local LockTypes nowRunningLockType;
     static thread_local QueueOfDetailLockDataInAllocatingStatus queueOfDetailLockData;
     static thread_local OverviewLockDataInAllocatingStatus overviewLockData[NUM_OF_LOCKTYPES];
-    static thread_local CriticalSectionStatusInAllocatingStatus criticalSectionStatus;
+//    static thread_local CriticalSectionStatusInAllocatingStatus criticalSectionStatus;
     static thread_local SystemCallData systemCallData[NUM_OF_SYSTEMCALLTYPES];
 
     static void updateAllocatingTypeBeforeRealFunction(AllocationFunction allocationFunction, unsigned int objectSize);
@@ -189,11 +183,7 @@ private:
     static void setAllocationTypeForOutputData();
     static void setAllocationTypeForPrediction();
 
-    static void cleanOverviewLockDataInAllocatingStatus();
-    static void cleanDetailLockDataInAllocatingStatus();
-    static void cleanCriticalSectionDataInAllocatingStatus();
     static void cleanLockFunctionsInfoInAllocatingStatus();
-    static void cleanSyscallsInfoInAllocatingStatus();
 
 public:
 
@@ -225,12 +215,12 @@ public:
     static bool debugMutexAddressInTheQueue(pthread_mutex_t * mutex);
 #endif
     static void checkAndStartRecordingACriticalSection();
-    static void checkAndStopRecordingACriticalSection();
+//    static void checkAndStopRecordingACriticalSection();
 #ifdef OPEN_DEBUG
     static void debugPrint();
     static size_t debugReturnSize();
 #endif
-    static void minusCycles(uint64_t cycles);
+//    static void minusCycles(uint64_t cycles);
 
 };
 

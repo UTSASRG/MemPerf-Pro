@@ -8,39 +8,34 @@ thread_local bool AllocatingStatus::sampledForCountingEvent;
 thread_local uint64_t AllocatingStatus::cyclesBeforeRealFunction;
 thread_local uint64_t AllocatingStatus::cyclesAfterRealFunction;
 thread_local uint64_t AllocatingStatus::cyclesInRealFunction;
-thread_local uint64_t AllocatingStatus::cyclesMinus;
+//thread_local uint64_t AllocatingStatus::cyclesMinus;
 thread_local LockTypes AllocatingStatus::nowRunningLockType;
 thread_local AllocatingStatus::QueueOfDetailLockDataInAllocatingStatus AllocatingStatus::queueOfDetailLockData;
 thread_local AllocatingStatus::OverviewLockDataInAllocatingStatus AllocatingStatus::overviewLockData[NUM_OF_LOCKTYPES];
-thread_local AllocatingStatus::CriticalSectionStatusInAllocatingStatus AllocatingStatus::criticalSectionStatus;
+//thread_local AllocatingStatus::CriticalSectionStatusInAllocatingStatus AllocatingStatus::criticalSectionStatus;
 thread_local SystemCallData AllocatingStatus::systemCallData[NUM_OF_SYSTEMCALLTYPES];
 
 bool AllocatingStatus::isFirstFunction() {
     if(firstAllocation == false) {
         firstAllocation = true;
         return true;
-    } else {
-        return false;
     }
+    return false;
 }
 
 
 void AllocatingStatus::QueueOfDetailLockDataInAllocatingStatus::writingNewDataInTheQueue(DetailLockData * addressOfHashLockData) {
-    if(queueTail == LENGTH_OF_QUEUE-1) {
-        writingIntoHashTable();
-        cleanUpQueue();
-    }
+//    if(queueTail == LENGTH_OF_QUEUE-1) {
+//        writingIntoHashTable();
+//        cleanUpQueue();
+//    }
     queueTail++;
+//    memset(&queue[queueTail], 0, sizeof(QueueOfDetailLockDataInAllocatingStatus::DetailLockDataInAllocatingStatus));
     queue[queueTail].addressOfHashLockData = addressOfHashLockData;
-    queue[queueTail].numOfCalls = 0;
-    queue[queueTail].numOfCallsWithContentions = 0;
-    queue[queueTail].cycles = 0;
-
-    queue[queueTail].lockTimeStamp = 0;
-    queue[queueTail].unlockTimeStamp = 0;
 }
 
 void AllocatingStatus::QueueOfDetailLockDataInAllocatingStatus::cleanUpQueue() {
+    memset(queue, 0, sizeof(QueueOfDetailLockDataInAllocatingStatus::DetailLockDataInAllocatingStatus) * (queueTail + 1));
     queueTail = -1;
 }
 
@@ -48,7 +43,6 @@ void AllocatingStatus::QueueOfDetailLockDataInAllocatingStatus::cleanUpQueue() {
 void AllocatingStatus::updateAllocatingTypeBeforeRealFunction(AllocationFunction allocationFunction, unsigned int objectSize) {
     allocatingType.allocatingFunction = allocationFunction;
     allocatingType.objectSize = objectSize;
-    allocatingType.objectSizeType = ProgramStatus::getObjectSizeType(objectSize);
     allocatingType.doingAllocation = true;
 }
 
@@ -87,11 +81,12 @@ void AllocatingStatus::updateAllocatingStatusAfterRealFunction(void * objectAddr
 
     cyclesAfterRealFunction = rdtscp();
     cyclesInRealFunction = cyclesAfterRealFunction - cyclesBeforeRealFunction;
-    if(cyclesInRealFunction > cyclesMinus) {
-        cyclesInRealFunction -= cyclesMinus;
-    } else {
-        cyclesInRealFunction = 0;
-    }
+//    if(cyclesInRealFunction > cyclesMinus) {
+//        cyclesInRealFunction -= cyclesMinus;
+//    }
+//    else {
+//        cyclesInRealFunction = 0;
+//    }
     if(cyclesInRealFunction > ABNORMAL_VALUE) {
         cyclesInRealFunction = 0;
     }
@@ -108,11 +103,12 @@ void AllocatingStatus::updateFreeingStatusAfterRealFunction() {
 
     cyclesAfterRealFunction = rdtscp();
     cyclesInRealFunction = cyclesAfterRealFunction - cyclesBeforeRealFunction;
-    if(cyclesInRealFunction > cyclesMinus) {
-        cyclesInRealFunction -= cyclesMinus;
-    } else {
-        cyclesInRealFunction = 0;
-    }
+//    if(cyclesInRealFunction > cyclesMinus) {
+//        cyclesInRealFunction -= cyclesMinus;
+//    }
+//    else {
+//        cyclesInRealFunction = 0;
+//    }
     if(cyclesInRealFunction > ABNORMAL_VALUE) {
         cyclesInRealFunction = 0;
     }
@@ -123,206 +119,61 @@ void AllocatingStatus::updateFreeingStatusAfterRealFunction() {
 void AllocatingStatus::updateMemoryStatusAfterAllocation() {
 
     allocatingType.isReuse = ObjTable::allocUpdate(allocatingType.objectSize, allocatingType.objectAddress);
-    ShadowMemory::updateObject(allocatingType.objectAddress, allocatingType.objectSize, false);
+    ShadowMemory::mallocUpdateObject(allocatingType.objectAddress, allocatingType.objectSize);
 }
 
 void AllocatingStatus::updateMemoryStatusBeforeFree() {
     allocatingType.objectSize = ObjTable::freeUpdate(allocatingType.objectAddress);
     if(allocatingType.objectSize) {
-        ShadowMemory::updateObject(allocatingType.objectAddress, allocatingType.objectSize, true);
+        ShadowMemory::freeUpdateObject(allocatingType.objectAddress, allocatingType.objectSize);
     }
 }
 
 void AllocatingStatus::setAllocationTypeForOutputData() {
     if(allocatingType.allocatingFunction == MALLOC) {
-
-        if(allocatingType.objectSizeType == LARGE) {
-            if(ThreadLocalStatus::isCurrentlySingleThread()) {
-                allocationTypeForOutputData = SERIAL_LARGE_MALLOC;
-            } else {
-                allocationTypeForOutputData = PARALLEL_LARGE_MALLOC;
-            }
-        } else if(allocatingType.objectSizeType == SMALL) {
-            if(allocatingType.isReuse) {
-                if(ThreadLocalStatus::isCurrentlySingleThread()) {
-                    allocationTypeForOutputData = SERIAL_SMALL_REUSED_MALLOC;
-                } else {
-                    allocationTypeForOutputData = PARALLEL_SMALL_REUSED_MALLOC;
-                }
-            } else {
-                if(ThreadLocalStatus::isCurrentlySingleThread()) {
-                    allocationTypeForOutputData = SERIAL_SMALL_NEW_MALLOC;
-                } else {
-                    allocationTypeForOutputData = PARALLEL_SMALL_NEW_MALLOC;
-                }
-            }
-        } else {
-            if(allocatingType.isReuse) {
-                if(ThreadLocalStatus::isCurrentlySingleThread()) {
-                    allocationTypeForOutputData = SERIAL_MEDIUM_REUSED_MALLOC;
-                } else {
-                    allocationTypeForOutputData = PARALLEL_MEDIUM_REUSED_MALLOC;
-                }
-            } else {
-                if(ThreadLocalStatus::isCurrentlySingleThread()) {
-                    allocationTypeForOutputData = SERIAL_MEDIUM_NEW_MALLOC;
-                } else {
-                    allocationTypeForOutputData = PARALLEL_MEDIUM_NEW_MALLOC;
-                }
-            }
-        }
+        allocationTypeForOutputData = (AllocationTypeForOutputData)(ThreadLocalStatus::isCurrentlyParallelThread() * 5 + allocatingType.objectSizeType * 2
+                + (allocatingType.objectSizeType != LARGE && allocatingType.isReuse));
 
     } else if(allocatingType.allocatingFunction == FREE) {
-
-        if(allocatingType.objectSizeType == LARGE) {
-            if(ThreadLocalStatus::isCurrentlySingleThread()) {
-                allocationTypeForOutputData = SERIAL_LARGE_FREE;
-            } else {
-                allocationTypeForOutputData = PARALLEL_LARGE_FREE;
-            }
-        } else if(allocatingType.objectSizeType == SMALL) {
-            if(ThreadLocalStatus::isCurrentlySingleThread()) {
-                allocationTypeForOutputData = SERIAL_SMALL_FREE;
-            } else {
-                allocationTypeForOutputData = PARALLEL_SMALL_FREE;
-            }
-        } else {
-            if(ThreadLocalStatus::isCurrentlySingleThread()) {
-                allocationTypeForOutputData = SERIAL_MEDIUM_FREE;
-            } else {
-                allocationTypeForOutputData = PARALLEL_MEDIUM_FREE;
-            }
-        }
+        allocationTypeForOutputData = (AllocationTypeForOutputData)(10 + ThreadLocalStatus::isCurrentlyParallelThread() * 3 + allocatingType.objectSizeType);
 
     } else if(allocatingType.allocatingFunction == CALLOC) {
-
-        if(ThreadLocalStatus::isCurrentlySingleThread()) {
-            allocationTypeForOutputData = SERIAL_NORMAL_CALLOC;
-        } else {
-            allocationTypeForOutputData = PARALLEL_NORMAL_CALLOC;
-        }
+        allocationTypeForOutputData = (AllocationTypeForOutputData)(16 + ThreadLocalStatus::isCurrentlyParallelThread());
 
     } else if(allocatingType.allocatingFunction == REALLOC) {
-
-        if(ThreadLocalStatus::isCurrentlySingleThread()) {
-            allocationTypeForOutputData = SERIAL_NORMAL_REALLOC;
-        } else {
-            allocationTypeForOutputData = PARALLEL_NORMAL_REALLOC;
-        }
+        allocationTypeForOutputData = (AllocationTypeForOutputData)(18 + ThreadLocalStatus::isCurrentlyParallelThread());
 
     } else if(allocatingType.allocatingFunction == POSIX_MEMALIGN) {
-
-        if(ThreadLocalStatus::isCurrentlySingleThread()) {
-            allocationTypeForOutputData = SERIAL_NORMAL_POSIX_MEMALIGN;
-        } else {
-            allocationTypeForOutputData = PARALLEL_NORMAL_POSIX_MEMALIGN;
-        }
+        allocationTypeForOutputData = (AllocationTypeForOutputData)(20 + ThreadLocalStatus::isCurrentlyParallelThread());
 
     } else {
-
-        if(ThreadLocalStatus::isCurrentlySingleThread()) {
-            allocationTypeForOutputData = SERIAL_NORMAL_MEMALIGN;
-        } else {
-            allocationTypeForOutputData = PARALLEL_NORMAL_MEMALIGN;
-        }
-
+        allocationTypeForOutputData = (AllocationTypeForOutputData)(22 + ThreadLocalStatus::isCurrentlyParallelThread());
     }
 }
 
 void AllocatingStatus::setAllocationTypeForPrediction() {
-    if(allocatingType.allocatingFunction == MALLOC) {
+    if(allocatingType.objectSizeType == allocatingType.objectSizeTypeForPrediction) {
+        allocationTypeForPrediction = allocationTypeForOutputData;
+    } else if(allocatingType.objectSizeType > allocatingType.objectSizeTypeForPrediction) {
+        if(allocatingType.allocatingFunction == MALLOC) {
+            allocationTypeForPrediction = (AllocationTypeForOutputData)(
+                    (int)allocationTypeForOutputData - (allocatingType.objectSizeType - allocatingType.objectSizeTypeForPrediction) * 2);
 
-        if(allocatingType.objectSizeType > Predictor::replacedLargeObjectThreshold) {
-            if(ThreadLocalStatus::isCurrentlySingleThread()) {
-                allocationTypeForPrediction = SERIAL_LARGE_MALLOC;
-            } else {
-                allocationTypeForPrediction = PARALLEL_LARGE_MALLOC;
-            }
-        } else if(allocatingType.objectSizeType <= Predictor::replacedMiddleObjectThreshold) {
-            if(allocatingType.isReuse) {
-                if(ThreadLocalStatus::isCurrentlySingleThread()) {
-                    allocationTypeForPrediction = SERIAL_SMALL_REUSED_MALLOC;
-                } else {
-                    allocationTypeForPrediction = PARALLEL_SMALL_REUSED_MALLOC;
-                }
-            } else {
-                if(ThreadLocalStatus::isCurrentlySingleThread()) {
-                    allocationTypeForPrediction = SERIAL_SMALL_NEW_MALLOC;
-                } else {
-                    allocationTypeForPrediction = PARALLEL_SMALL_NEW_MALLOC;
-                }
-            }
-        } else {
-            if(allocatingType.isReuse) {
-                if(ThreadLocalStatus::isCurrentlySingleThread()) {
-                    allocationTypeForPrediction = SERIAL_MEDIUM_REUSED_MALLOC;
-                } else {
-                    allocationTypeForPrediction = PARALLEL_MEDIUM_REUSED_MALLOC;
-                }
-            } else {
-                if(ThreadLocalStatus::isCurrentlySingleThread()) {
-                    allocationTypeForPrediction = SERIAL_MEDIUM_NEW_MALLOC;
-                } else {
-                    allocationTypeForPrediction = PARALLEL_MEDIUM_NEW_MALLOC;
-                }
-            }
+        } else if(allocatingType.allocatingFunction == FREE) {
+            allocationTypeForPrediction = (AllocationTypeForOutputData)(
+                    (int)allocationTypeForOutputData - (allocatingType.objectSizeType - allocatingType.objectSizeTypeForPrediction));
         }
-
-    } else if(allocatingType.allocatingFunction == FREE) {
-
-        if(allocatingType.objectSizeType > Predictor::replacedLargeObjectThreshold) {
-            if(ThreadLocalStatus::isCurrentlySingleThread()) {
-                allocationTypeForPrediction = SERIAL_LARGE_FREE;
-            } else {
-                allocationTypeForPrediction = PARALLEL_LARGE_FREE;
-            }
-        } else if(allocatingType.objectSizeType <= Predictor::replacedMiddleObjectThreshold) {
-            if(ThreadLocalStatus::isCurrentlySingleThread()) {
-                allocationTypeForPrediction = SERIAL_SMALL_FREE;
-            } else {
-                allocationTypeForPrediction = PARALLEL_SMALL_FREE;
-            }
-        } else {
-            if(ThreadLocalStatus::isCurrentlySingleThread()) {
-                allocationTypeForPrediction = SERIAL_MEDIUM_FREE;
-            } else {
-                allocationTypeForPrediction = PARALLEL_MEDIUM_FREE;
-            }
-        }
-
-    } else if(allocatingType.allocatingFunction == CALLOC) {
-
-        if(ThreadLocalStatus::isCurrentlySingleThread()) {
-            allocationTypeForPrediction = SERIAL_NORMAL_CALLOC;
-        } else {
-            allocationTypeForPrediction = PARALLEL_NORMAL_CALLOC;
-        }
-
-    } else if(allocatingType.allocatingFunction == REALLOC) {
-
-        if(ThreadLocalStatus::isCurrentlySingleThread()) {
-            allocationTypeForPrediction = SERIAL_NORMAL_REALLOC;
-        } else {
-            allocationTypeForPrediction = PARALLEL_NORMAL_REALLOC;
-        }
-
-    } else if(allocatingType.allocatingFunction == POSIX_MEMALIGN) {
-
-        if(ThreadLocalStatus::isCurrentlySingleThread()) {
-            allocationTypeForPrediction = SERIAL_NORMAL_POSIX_MEMALIGN;
-        } else {
-            allocationTypeForPrediction = PARALLEL_NORMAL_POSIX_MEMALIGN;
-        }
-
     } else {
+        if(allocatingType.allocatingFunction == MALLOC) {
+            allocationTypeForPrediction = (AllocationTypeForOutputData)(
+                    (int)allocationTypeForOutputData + (allocatingType.objectSizeTypeForPrediction - allocatingType.objectSizeType) * 2);
 
-        if(ThreadLocalStatus::isCurrentlySingleThread()) {
-            allocationTypeForPrediction = SERIAL_NORMAL_MEMALIGN;
-        } else {
-            allocationTypeForPrediction = PARALLEL_NORMAL_MEMALIGN;
+        } else if(allocatingType.allocatingFunction == FREE) {
+            allocationTypeForPrediction = (AllocationTypeForOutputData)(
+                    (int)allocationTypeForOutputData + (allocatingType.objectSizeTypeForPrediction - allocatingType.objectSizeType));
         }
-
     }
+
 }
 
 void AllocatingStatus::addUpOverviewLockDataToThreadLocalData() {
@@ -338,46 +189,26 @@ void AllocatingStatus::addUpDetailLockDataToHashTable() {
     queueOfDetailLockData.writingIntoHashTable();
 }
 
-void AllocatingStatus::addUpCriticalSectionDataToThreadLocalData() {
-    ThreadLocalStatus::criticalSectionStatus[allocationTypeForOutputData].numOfCriticalSections += criticalSectionStatus.numOfCriticalSections;
-    ThreadLocalStatus::criticalSectionStatus[allocationTypeForOutputData].totalCyclesOfCriticalSections += criticalSectionStatus.totalCyclesOfCriticalSections;
-}
+//void AllocatingStatus::addUpCriticalSectionDataToThreadLocalData() {
+//    ThreadLocalStatus::criticalSectionStatus[allocationTypeForOutputData].numOfCriticalSections += criticalSectionStatus.numOfCriticalSections;
+//    ThreadLocalStatus::criticalSectionStatus[allocationTypeForOutputData].totalCyclesOfCriticalSections += criticalSectionStatus.totalCyclesOfCriticalSections;
+//}
 
 void AllocatingStatus::addUpLockFunctionsInfoToThreadLocalData() {
     addUpOverviewLockDataToThreadLocalData();
     addUpDetailLockDataToHashTable();
-    addUpCriticalSectionDataToThreadLocalData();
-}
-
-void AllocatingStatus::cleanOverviewLockDataInAllocatingStatus() {
-    for(int lockType = 0; lockType < NUM_OF_LOCKTYPES; ++lockType) {
-        overviewLockData[lockType].cleanUp();
-    }
-}
-
-void AllocatingStatus::cleanDetailLockDataInAllocatingStatus() {
-    queueOfDetailLockData.cleanUpQueue();
-}
-
-void AllocatingStatus::cleanCriticalSectionDataInAllocatingStatus() {
-    criticalSectionStatus.cleanUp();
+//    addUpCriticalSectionDataToThreadLocalData();
 }
 
 void AllocatingStatus::cleanLockFunctionsInfoInAllocatingStatus() {
-    cleanOverviewLockDataInAllocatingStatus();
-    cleanDetailLockDataInAllocatingStatus();
-    cleanCriticalSectionDataInAllocatingStatus();
+    memset(overviewLockData, 0, sizeof(OverviewLockDataInAllocatingStatus) * NUM_OF_LOCKTYPES);
+    queueOfDetailLockData.cleanUpQueue();
+//    criticalSectionStatus.cleanUp();
 }
 
 void AllocatingStatus::addUpSyscallsInfoToThreadLocalData() {
     for(int syscallType = 0; syscallType < NUM_OF_SYSTEMCALLTYPES; ++syscallType) {
         ThreadLocalStatus::systemCallData[syscallType][allocationTypeForOutputData].add(systemCallData[syscallType]);
-    }
-}
-
-void AllocatingStatus::cleanSyscallsInfoInAllocatingStatus() {
-    for(int syscallType = 0; syscallType < NUM_OF_SYSTEMCALLTYPES; ++syscallType) {
-        systemCallData[syscallType].cleanup();
     }
 }
 
@@ -388,17 +219,19 @@ void AllocatingStatus::addUpOtherFunctionsInfoToThreadLocalData() {
 
 
 void AllocatingStatus::updateAllocatingInfoToThreadLocalData() {
+    allocatingType.objectSizeType = ProgramStatus::getObjectSizeType(allocatingType.objectSize);
     setAllocationTypeForOutputData();
     ThreadLocalStatus::numOfFunctions[allocationTypeForOutputData]++;
     if(sampledForCountingEvent) {
         addUpOtherFunctionsInfoToThreadLocalData();
         addUpCountingEventsToThreadLocalData();
         cleanLockFunctionsInfoInAllocatingStatus();
-        cleanSyscallsInfoInAllocatingStatus();
+        memset(systemCallData, 0, sizeof(SystemCallData) * NUM_OF_SYSTEMCALLTYPES);
     }
 }
 
 void AllocatingStatus::updateAllocatingInfoToPredictor() {
+    allocatingType.objectSizeTypeForPrediction = Predictor::getObjectSizeTypeForPrediction(allocatingType.objectSize);
     AllocatingStatus::setAllocationTypeForPrediction();
     Predictor::numOfFunctions[allocationTypeForPrediction]++;
     Predictor::functionCycles[allocationTypeForPrediction] += cyclesInRealFunction;
@@ -411,7 +244,7 @@ void AllocatingStatus::addUpCountingEventsToThreadLocalData() {
 }
 
 bool AllocatingStatus::outsideTrackedAllocation() {
-    return ! allocatingType.doingAllocation;
+    return !allocatingType.doingAllocation;
 }
 
 void AllocatingStatus::addOneSyscallToSyscallData(SystemCallTypes systemCallTypes, uint64_t cycles) {
@@ -437,50 +270,15 @@ void AllocatingStatus::recordLockCallAndCycles(unsigned int numOfCalls, uint64_t
     queueOfDetailLockData.addCallAndCycles(numOfCalls, cycles);
 }
 
-#ifdef OPEN_DEBUG
-void AllocatingStatus::debugRecordMutexAddress(uint64_t lockTimeStamp, pthread_mutex_t * mutex) {
-    queueOfDetailLockData.debugAddMutexAddress(lockTimeStamp, mutex);
-}
+//void AllocatingStatus::checkAndStartRecordingACriticalSection() {
+//    criticalSectionStatus.checkAndStartRecordingACriticalSection();
+//}
 
-void AllocatingStatus::debugRecordUnlockTimeStamp(uint64_t unlockTimeStamp, pthread_mutex_t * mutex) {
-    queueOfDetailLockData.debugAddUnlockTimeStamp(unlockTimeStamp, mutex);
-}
+//void AllocatingStatus::checkAndStopRecordingACriticalSection() {
+//    criticalSectionStatus.checkAndStopRecordingACriticalSection();
+//}
 
-bool AllocatingStatus::debugMutexAddressInTheQueue(pthread_mutex_t * mutex) {
-    return queueOfDetailLockData.debugMutexAddressInTheQueue(mutex);
-}
-#endif
 
-void AllocatingStatus::checkAndStartRecordingACriticalSection() {
-    criticalSectionStatus.checkAndStartRecordingACriticalSection();
-}
-
-void AllocatingStatus::checkAndStopRecordingACriticalSection() {
-    criticalSectionStatus.checkAndStopRecordingACriticalSection();
-}
-
-#ifdef OPEN_DEBUG
-void AllocatingStatus::debugPrint() {
-    fprintf(stderr, "allocating output type = %u\n", allocationTypeForOutputData);
-    for(int lockType = 0; lockType < NUM_OF_LOCKTYPES; ++lockType) {
-        fprintf(stderr, "lockType = %d ", lockType);
-        overviewLockData[lockType].debugPrint();
-    }
-
-    queueOfDetailLockData.debugPrint();
-
-    for(int syscallType = 0; syscallType < NUM_OF_SYSTEMCALLTYPES; ++syscallType) {
-        fprintf(stderr, "syscallType = %d ", syscallType);
-        systemCallData[syscallType].debugPrint();
-    }
-
-}
-
-size_t AllocatingStatus::debugReturnSize() {
-    return(allocatingType.objectSize);
-}
-#endif
-
-void AllocatingStatus::minusCycles(uint64_t cycles) {
-    cyclesMinus += cycles;
-}
+//void AllocatingStatus::minusCycles(uint64_t cycles) {
+//    cyclesMinus += cycles;
+//}

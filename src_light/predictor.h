@@ -31,6 +31,7 @@ public:
     static bool lastThreadDepend;
     static unsigned short lastThreadIndex;
 
+    static ObjectSizeType getObjectSizeTypeForPrediction(unsigned int size);
     static void globalInit();
     static void threadInit();
     static void cleanStageData();

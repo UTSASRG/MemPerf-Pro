@@ -15,7 +15,7 @@ extern thread_local bool isCountingInit;
 class ThreadLocalStatus {
 public:
     static unsigned short totalNumOfThread;
-    static unsigned short maxNumOfRunningThread;
+//    static unsigned short maxNumOfRunningThread;
     static unsigned short totalNumOfRunningThread;
     static thread_local short runningThreadIndex;
     static spinlock lock;
@@ -24,7 +24,7 @@ public:
     static thread_local unsigned int numOfSampledCountingFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
     static thread_local uint64_t cycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
     static thread_local OverviewLockData overviewLockData[NUM_OF_LOCKTYPES];
-    static thread_local CriticalSectionStatus criticalSectionStatus[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
+//    static thread_local CriticalSectionStatus criticalSectionStatus[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
     static thread_local SystemCallData systemCallData[NUM_OF_SYSTEMCALLTYPES][NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
     static thread_local FriendlinessStatus friendlinessStatus;
     static thread_local std::default_random_engine random;
@@ -34,6 +34,8 @@ public:
     static void addARunningThread();
     static void subARunningThread();
     static bool isCurrentlySingleThread();
+    static bool isCurrentlyParallelThread();
+
     static bool fromSerialToParallel();
     static bool fromParallelToSerial();
 
