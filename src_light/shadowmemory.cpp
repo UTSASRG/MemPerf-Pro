@@ -268,7 +268,10 @@ void ShadowMemory::printOutput() {
     for(auto entry: coherencyCaches) {
         uint64_t cacheIndex = entry.getKey();
         CoherencyData * status = entry.getValue();
-        if(status->ts * 100 / status->time > 10) {
+        if(status->time < 10) {
+            continue;
+        }
+        if(status->ts * 100 / status->time > 15) {
             fprintf(ProgramStatus::outputFile, "%p: %u %u%% Application True Sharing\n", (void*)(cacheIndex<<LOG2_CACHELINE_SIZE), status->ts, status->ts*100/status->time);
 
             for(uint8_t i = 0; i < 8; ++i) {
@@ -281,7 +284,7 @@ void ShadowMemory::printOutput() {
                 }
             }
         }
-        if(status->fs * 100 / status->time > 10) {
+        if(status->fs * 100 / status->time > 15) {
             uint64_t cacheStart = cacheIndex << LOG2_CACHELINE_SIZE;
             uint64_t cacheEnd = cacheStart + CACHELINE_SIZE - 1;
             bool multiObj = false;
