@@ -4,6 +4,7 @@
 thread_local HashMap <void *, DetailLockData, PrivateHeap> lockUsage;
 HashMap <void *, DetailLockData, PrivateHeap> globalLockUsage;
 HashMap <void*, uint32_t, PrivateHeap> objStatusMap;
+HashMap<uint64_t, CoherencyData, PrivateHeap> coherencyCaches;
 
 //// pre-init private allocator memory
 typedef int (*main_fn_t)(int, char **, char **);
@@ -112,7 +113,7 @@ extern "C" {
             if(ThreadLocalStatus::runningThreadIndex) {
 
 #ifdef PREDICTION
-                Predictor::outsideCyclesStop();
+//                Predictor::outsideCyclesStop();
 #endif
 
                 AllocatingStatus::updateAllocatingStatusBeforeRealFunction(MALLOC, sz);
@@ -122,13 +123,13 @@ extern "C" {
 
 #ifdef PREDICTION
                 AllocatingStatus::updateAllocatingInfoToPredictor();
-                Predictor::outsideCycleStart();
+//                Predictor::outsideCycleStart();
 #endif
 
             } else {
 
 #ifdef PREDICTION
-                Predictor::outsideCyclesStop();
+//                Predictor::outsideCyclesStop();
 #endif
 
                 AllocatingStatus::updateAllocatingStatusBeforeRealFunction(MALLOC, sz);
@@ -145,14 +146,14 @@ extern "C" {
 #endif
 
 #ifdef PREDICTION
-                Predictor::outsideCycleStart();
+//                Predictor::outsideCycleStart();
 #endif
 
             }
         } else {
 
 #ifdef PREDICTION
-            Predictor::outsideCyclesStop();
+//            Predictor::outsideCyclesStop();
 #endif
 
             AllocatingStatus::updateAllocatingStatusBeforeRealFunction(MALLOC, sz);
@@ -162,7 +163,7 @@ extern "C" {
 
 #ifdef PREDICTION
             AllocatingStatus::updateAllocatingInfoToPredictor();
-            Predictor::outsideCycleStart();
+//            Predictor::outsideCycleStart();
 #endif
 
         }
@@ -186,7 +187,7 @@ extern "C" {
         }
 
 #ifdef PREDICTION
-        Predictor::outsideCyclesStop();
+//        Predictor::outsideCyclesStop();
 #endif
 
         AllocatingStatus::updateAllocatingStatusBeforeRealFunction(CALLOC, nelem*elsize);
@@ -196,7 +197,7 @@ extern "C" {
 
 #ifdef PREDICTION
         AllocatingStatus::updateAllocatingInfoToPredictor();
-        Predictor::outsideCycleStart();
+//        Predictor::outsideCycleStart();
 #endif
 
 		return object;
@@ -215,7 +216,7 @@ extern "C" {
         }
 
 #ifdef PREDICTION
-        Predictor::outsideCyclesStop();
+//        Predictor::outsideCyclesStop();
 #endif
 
         AllocatingStatus::updateFreeingStatusBeforeRealFunction(FREE, ptr);
@@ -225,7 +226,7 @@ extern "C" {
 
 #ifdef PREDICTION
         AllocatingStatus::updateAllocatingInfoToPredictor();
-        Predictor::outsideCycleStart();
+//        Predictor::outsideCycleStart();
 #endif
 
     }
@@ -247,7 +248,7 @@ extern "C" {
         }
 
 #ifdef PREDICTION
-        Predictor::outsideCyclesStop();
+//        Predictor::outsideCyclesStop();
 #endif
 
 		if(ptr) {
@@ -260,7 +261,7 @@ extern "C" {
 
 #ifdef PREDICTION
         AllocatingStatus::updateAllocatingInfoToPredictor();
-        Predictor::outsideCycleStart();
+//        Predictor::outsideCycleStart();
 #endif
 
         return object;
@@ -277,7 +278,7 @@ extern "C" {
         }
 
 #ifdef PREDICTION
-        Predictor::outsideCyclesStop();
+//        Predictor::outsideCyclesStop();
 #endif
 
         AllocatingStatus::updateAllocatingStatusBeforeRealFunction(POSIX_MEMALIGN, size);
@@ -287,7 +288,7 @@ extern "C" {
 
 #ifdef PREDICTION
         AllocatingStatus::updateAllocatingInfoToPredictor();
-        Predictor::outsideCycleStart();
+//        Predictor::outsideCycleStart();
 #endif
 
         return retval;
@@ -309,7 +310,7 @@ extern "C" {
      }
 
 #ifdef PREDICTION
-     Predictor::outsideCyclesStop();
+//     Predictor::outsideCyclesStop();
 #endif
 
      AllocatingStatus::updateAllocatingStatusBeforeRealFunction(MEMALIGN, size);
@@ -319,7 +320,7 @@ extern "C" {
 
 #ifdef PREDICTION
      AllocatingStatus::updateAllocatingInfoToPredictor();
-     Predictor::outsideCycleStart();
+//     Predictor::outsideCycleStart();
 #endif
 
      return object;

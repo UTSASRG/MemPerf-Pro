@@ -8,7 +8,7 @@
 class Predictor {
 
 public:
-    static uint64_t totalCycle;
+//    static uint64_t totalCycle;
     static uint64_t criticalCycle;
     static uint64_t replacedCriticalCycle;
     static uint64_t criticalCycleDepend;
@@ -16,7 +16,8 @@ public:
     static uint64_t threadCycle[MAX_THREAD_NUMBER];
     static uint64_t threadReplacedCycle[MAX_THREAD_NUMBER];
     static thread_local unsigned int numOfFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
-    static thread_local uint64_t functionCycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
+//    static thread_local uint64_t functionCycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
+    static thread_local uint64_t totalFunctionCycles;
     static size_t replacedFunctionCycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];///avg
 
     static unsigned short replacedMiddleObjectThreshold;

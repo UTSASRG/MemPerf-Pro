@@ -9,6 +9,8 @@
 #include "spinlock.hh"
 #include "threadlocalstatus.h"
 
+extern HashMap<uint64_t, CoherencyData, PrivateHeap> coherencyCaches;
+
 PageMapEntry * ShadowMemory::page_map_begin = nullptr;
 PageMapEntry * ShadowMemory::page_map_end = nullptr;
 PageMapEntry * ShadowMemory::page_map_bump_ptr = nullptr;
@@ -51,6 +53,9 @@ bool ShadowMemory::initialize() {
 #endif
 
 //	fprintf(stderr, "MAX_PAGE_MAP_ENTRIES = %lu\n", MAX_PAGE_MAP_ENTRIES);
+
+    coherencyCaches.initialize(HashFuncs::hash64Int, HashFuncs::compare64Int, NUM_COHERENCY_CACHES);
+
 
 	isInitialized = true;
 
@@ -161,6 +166,19 @@ void ShadowMemory::cleanupPages(uintptr_t uintaddr, size_t length) {
     }
 }
 
+void HashLocksSetForCoherency::lock(uint64_t index) {
+    size_t hashKey = HashFuncs::hash64Int(index, sizeof(uint64_t)) & (NUM_COHERENCY_CACHES-1);
+    locks[hashKey].lock();
+}
+
+void HashLocksSetForCoherency::unlock(uint64_t index) {
+    size_t hashKey = HashFuncs::hash64Int(index, sizeof(uint64_t)) & (NUM_COHERENCY_CACHES-1);
+    locks[hashKey].unlock();
+}
+
+HashLocksSetForCoherency ShadowMemory::hashLocksSetForCoherency;
+short lastThread = -1;
+
 void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType) {
 
     uint64_t pageIdx = getPageIndex(uintaddr);
@@ -179,7 +197,7 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType)
     CacheMapEntry * cme;
 
     if((cme = pme->getCacheMapEntry(false)) == nullptr) {
-            return;
+        return;
     }
 
     cme += tuple.cache_index;
@@ -197,6 +215,107 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType)
     ThreadLocalStatus::friendlinessStatus.recordANewSampling(pme->getUsedBytes());
 #endif
 
+    if(lastThread != -1 && lastThread != ThreadLocalStatus::runningThreadIndex) {
+        ThreadLocalStatus::friendlinessStatus.numThreadSwitch++;
+        //        ThreadLocalStatus::friendlinessStatus.numOfSampledStoringInstructions++;
+        uint64_t cacheIndex = uintaddr >> LOG2_CACHELINE_SIZE;
+        uint8_t wordIndex = (uint8_t)((uintaddr & CACHELINE_SIZE_MASK) >> 3);
+        CoherencyData * status = coherencyCaches.find(cacheIndex, sizeof(uint64_t));
+        if(status == nullptr) {
+            if(accessType == E_MEM_STORE) {
+                hashLocksSetForCoherency.lock(cacheIndex);
+                status = coherencyCaches.insert(cacheIndex, sizeof(uint64_t),
+                                       CoherencyData{wordIndex, ThreadLocalStatus::runningThreadIndex, 0, 0, 1, {0}});
+                hashLocksSetForCoherency.unlock(cacheIndex);
+            }
+        } else {
+            if(accessType == E_MEM_STORE || status->ts >= 5 || status->fs >= 5) {
+                if (status->word == wordIndex && status->tid != ThreadLocalStatus::runningThreadIndex) {
+                    ThreadLocalStatus::friendlinessStatus.numOfTrueSharing++;
+                    status->tid = ThreadLocalStatus::runningThreadIndex;
+                    status->ts++;
+                } else if (status->word != wordIndex) {
+                    if (status->tid != ThreadLocalStatus::runningThreadIndex) {
+                        ThreadLocalStatus::friendlinessStatus.numOfFalseSharing++;
+                        status->word = wordIndex;
+                        status->tid = ThreadLocalStatus::runningThreadIndex;
+                        status->fs++;
+                    } else {
+                        status->word = wordIndex;
+                    }
+                }
+
+            }
+            status->time++;
+        }
+
+        if(status && (accessType == E_MEM_STORE || status->ts >= 5 || status->fs >= 5)) {
+            uint8_t i;
+            for (i = 0; i < 16 && status->tidsPerWord[wordIndex][i] &&
+                        status->tidsPerWord[wordIndex][i] != ThreadLocalStatus::runningThreadIndex; ++i) { ; }
+            if (i < 16 && status->tidsPerWord[wordIndex][i] != ThreadLocalStatus::runningThreadIndex) {
+                status->tidsPerWord[wordIndex][i] = ThreadLocalStatus::runningThreadIndex;
+            }
+        }
+    }
+    lastThread = ThreadLocalStatus::runningThreadIndex;
+}
+
+extern HashMap<void*, uint32_t, PrivateHeap> objStatusMap;
+
+void ShadowMemory::printOutput() {
+    fprintf(ProgramStatus::outputFile, "\n");
+    for(auto entry: coherencyCaches) {
+        uint64_t cacheIndex = entry.getKey();
+        CoherencyData * status = entry.getValue();
+        if(status->ts * 100 / status->time > 10) {
+            fprintf(ProgramStatus::outputFile, "%p: %u %u%% Application True Sharing\n", (void*)(cacheIndex<<LOG2_CACHELINE_SIZE), status->ts, status->ts*100/status->time);
+
+            for(uint8_t i = 0; i < 8; ++i) {
+                if(status->tidsPerWord[i][0]) {
+                    fprintf(ProgramStatus::outputFile, "Word %u: ", i);
+                    for(uint8_t j = 0; j < 16 && status->tidsPerWord[i][j]; ++j) {
+                        fprintf(ProgramStatus::outputFile, "%d ", status->tidsPerWord[i][j]);
+                    }
+                    fprintf(ProgramStatus::outputFile, "\n");
+                }
+            }
+        }
+        if(status->fs * 100 / status->time > 10) {
+            uint64_t cacheStart = cacheIndex << LOG2_CACHELINE_SIZE;
+            uint64_t cacheEnd = cacheStart + CACHELINE_SIZE - 1;
+            bool multiObj = false;
+            bool foundObj = false;
+            for(auto obj: objStatusMap) {
+                uint64_t start = (uint64_t)obj.getKey();
+                uint32_t size = *(obj.getValue());
+                uint64_t end = start + size - 1;
+                if(cacheStart <= start && start <= cacheEnd || cacheStart <= end && end <= cacheEnd) {
+                    if(foundObj) {
+                        multiObj = foundObj;
+                        break;
+                    }
+                    foundObj = true;
+                }
+            }
+
+            if(multiObj) {
+                fprintf(ProgramStatus::outputFile, "%p: %u %u%% Allocator False Sharing\n", (void*)(cacheIndex<<LOG2_CACHELINE_SIZE), status->fs, status->fs*100/status->time);
+            } else {
+                fprintf(ProgramStatus::outputFile, "%p: %u %u%% Application False Sharing\n", (void*)(cacheIndex<<LOG2_CACHELINE_SIZE), status->fs, status->fs*100/status->time);
+            }
+
+            for(uint8_t i = 0; i < 8; ++i) {
+                if(status->tidsPerWord[i][0]) {
+                    fprintf(ProgramStatus::outputFile, "Word %u: ", i);
+                    for(uint8_t j = 0; j < 16 && status->tidsPerWord[i][j]; ++j) {
+                        fprintf(ProgramStatus::outputFile, "%d ", status->tidsPerWord[i][j]);
+                    }
+                    fprintf(ProgramStatus::outputFile, "\n");
+                }
+            }
+        }
+    }
 }
 
 void PageMapEntry::clear() {

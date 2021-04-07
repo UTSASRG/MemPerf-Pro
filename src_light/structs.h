@@ -86,10 +86,11 @@ struct CacheConflictDetector {
 
 struct FriendlinessStatus {
     unsigned int numOfSampling;
-    unsigned int numOfSampledStoringInstructions;
-    unsigned int numOfSampledCacheLines;
-    unsigned int numOfSampledFalseSharingInstructions[NUM_OF_FALSESHARINGTYPE];
-    unsigned int numOfSampledFalseSharingCacheLines[NUM_OF_FALSESHARINGTYPE];
+//    unsigned int numOfSampledStoringInstructions;
+//    unsigned int numOfSampledCacheLines;
+    unsigned int numOfFalseSharing;
+    unsigned int numOfTrueSharing;
+    unsigned int numThreadSwitch;
     uint64_t totalMemoryUsageOfSampledPages;
 
 #ifdef CACHE_UTIL
@@ -210,6 +211,15 @@ constexpr char * falseSharingTypeOutputString[NUM_OF_FALSESHARINGTYPE] = {
         (char*)"object false sharing ",
         (char*)"active false sharing ",
         (char*)"passive false sharing"
+};
+
+struct CoherencyData {
+    uint8_t word;
+    short tid;
+    uint16_t ts;
+    uint16_t fs;
+    uint16_t time;
+    short tidsPerWord[8][16];
 };
 
 #endif //SRC_STRUCTS_H

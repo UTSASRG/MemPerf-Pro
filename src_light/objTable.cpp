@@ -27,16 +27,16 @@ bool ObjTable::allocUpdate(unsigned int size, void * address) {
 
 //    hashLocksSet.lock(address);
     uint32_t * status = objStatusMap.find(address, sizeof(unsigned long));
-    if(!status) {
+    if(status == nullptr) {
         hashLocksSet.lock(address);
         status = objStatusMap.findOrAdd(address, sizeof(unsigned long));
         hashLocksSet.unlock(address);
 //        *status = size;
         reused = false;
     }
-    else {
+//    else {
 //        hashLocksSet.unlock(address);
-    }
+//    }
 
     *status = size;
 

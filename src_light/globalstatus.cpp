@@ -4,7 +4,7 @@ extern thread_local HashMap <void *, DetailLockData, PrivateHeap> lockUsage;
 extern HashMap <void *, DetailLockData, PrivateHeap> globalLockUsage;
 
 spinlock GlobalStatus::lock;
-unsigned int GlobalStatus::numOfFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
+//unsigned int GlobalStatus::numOfFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
 unsigned int GlobalStatus::numOfSampledCountingFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
 uint64_t GlobalStatus::cycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
 OverviewLockData GlobalStatus::overviewLockData[NUM_OF_LOCKTYPES];
@@ -19,7 +19,7 @@ void GlobalStatus::globalize() {
 
     for(int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
         cycles[allocationType] += ThreadLocalStatus::cycles[allocationType];
-        numOfFunctions[allocationType] += ThreadLocalStatus::numOfFunctions[allocationType];
+//        numOfFunctions[allocationType] += ThreadLocalStatus::numOfFunctions[allocationType];
         numOfSampledCountingFunctions[allocationType] += ThreadLocalStatus::numOfSampledCountingFunctions[allocationType];
 //        criticalSectionStatus[allocationType].add(ThreadLocalStatus::criticalSectionStatus[allocationType]);
         for(int syscallType = 0; syscallType < NUM_OF_SYSTEMCALLTYPES; ++syscallType) {
@@ -51,9 +51,9 @@ void GlobalStatus::countPotentialMemoryLeakFunctions() {
         if(allocationType == SERIAL_SMALL_FREE || allocationType == PARALLEL_SMALL_FREE
         || allocationType == SERIAL_MEDIUM_FREE || allocationType == PARALLEL_MEDIUM_FREE
         || allocationType == SERIAL_LARGE_FREE || allocationType == PARALLEL_LARGE_FREE ) {
-            potentialMemoryLeakFunctions -= numOfFunctions[allocationType];
+            potentialMemoryLeakFunctions -= numOfSampledCountingFunctions[allocationType];
         } else {
-            potentialMemoryLeakFunctions += numOfFunctions[allocationType];
+            potentialMemoryLeakFunctions += numOfSampledCountingFunctions[allocationType];
         }
     }
     if(potentialMemoryLeakFunctions < 0) {
@@ -77,8 +77,8 @@ void GlobalStatus::printTitle(char *content, uint64_t commentNumber) {
 void GlobalStatus::printNumOfAllocations() {
     printTitle((char*)"ALLOCATION NUM");
     for(uint8_t allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
-        if(numOfFunctions[allocationType]) {
-            fprintf(ProgramStatus::outputFile, "%s           %20u\n", allocationTypeOutputString[allocationType], numOfFunctions[allocationType]);
+        if(numOfSampledCountingFunctions[allocationType]) {
+            fprintf(ProgramStatus::outputFile, "%s           %20u\n", allocationTypeOutputString[allocationType], numOfSampledCountingFunctions[allocationType]);
         }
     }
     countPotentialMemoryLeakFunctions();
@@ -186,16 +186,18 @@ void GlobalStatus::printFriendliness() {
                 friendlinessStatus.totalMemoryUsageOfSampledCacheLines*100/friendlinessStatus.numOfSampling/CACHELINE_SIZE);
 #endif
 
-        fprintf(ProgramStatus::outputFile, "accessed store instructions  %20u\n", friendlinessStatus.numOfSampledStoringInstructions);
-        fprintf(ProgramStatus::outputFile, "accessed cache lines         %20u\n", friendlinessStatus.numOfSampledCacheLines);
+//        fprintf(ProgramStatus::outputFile, "accessed store instructions  %20u\n", friendlinessStatus.numOfSampledStoringInstructions);
+//        fprintf(ProgramStatus::outputFile, "accessed cache lines         %20u\n", friendlinessStatus.numOfSampledCacheLines);
         fprintf(ProgramStatus::outputFile, "\n");
-        if(friendlinessStatus.numOfSampledStoringInstructions > 0) {
-            for(int falseSharingType = 0; falseSharingType < NUM_OF_FALSESHARINGTYPE; ++falseSharingType) {
-                fprintf(ProgramStatus::outputFile, "accessed %s instructions %20u %3u%%\n", falseSharingTypeOutputString[falseSharingType], friendlinessStatus.numOfSampledFalseSharingInstructions[falseSharingType], friendlinessStatus.numOfSampledFalseSharingInstructions[falseSharingType]*100/friendlinessStatus.numOfSampledStoringInstructions);
-                fprintf(ProgramStatus::outputFile, "accessed %s cache lines  %20u %3u%%\n", falseSharingTypeOutputString[falseSharingType], friendlinessStatus.numOfSampledFalseSharingCacheLines[falseSharingType], friendlinessStatus.numOfSampledFalseSharingCacheLines[falseSharingType]*100/friendlinessStatus.numOfSampledCacheLines);
-                fprintf(ProgramStatus::outputFile, "\n");
+        if(friendlinessStatus.numThreadSwitch > 0) {
+            fprintf(ProgramStatus::outputFile, "true sharing instructions %20u %3u%%\n", friendlinessStatus.numOfTrueSharing, friendlinessStatus.numOfTrueSharing*100/friendlinessStatus.numThreadSwitch);
+            fprintf(ProgramStatus::outputFile, "false sharing instructions %20u %3u%%\n", friendlinessStatus.numOfFalseSharing, friendlinessStatus.numOfFalseSharing*100/friendlinessStatus.numThreadSwitch);
+            fprintf(ProgramStatus::outputFile, "\n");
+            if(friendlinessStatus.numOfTrueSharing*100/friendlinessStatus.numThreadSwitch || friendlinessStatus.numOfFalseSharing*100/friendlinessStatus.numThreadSwitch) {
+                ShadowMemory::printOutput();
             }
         }
+
     }
     friendlinessStatus.cacheConflictDetector.print(friendlinessStatus.numOfSampling);
 #endif
@@ -213,7 +215,6 @@ void GlobalStatus::printOutput() {
 //    printCriticalSections();
     printSyscalls();
     printFriendliness();
-
 #ifdef PREDICTION
     Predictor::printOutput();
 #endif

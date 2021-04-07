@@ -20,7 +20,7 @@ public:
     static thread_local short runningThreadIndex;
     static spinlock lock;
 
-    static thread_local unsigned int numOfFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
+//    static thread_local unsigned int numOfFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
     static thread_local unsigned int numOfSampledCountingFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
     static thread_local uint64_t cycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
     static thread_local OverviewLockData overviewLockData[NUM_OF_LOCKTYPES];
@@ -42,7 +42,7 @@ public:
     static void setRandomPeriodForAllocations();
     static bool randomProcessForCountingEvent();
     static bool randomProcessForLargeCountingEvent();
-    static bool randomProcess(unsigned short randomPeriod);
+//    static bool randomProcess(unsigned short randomPeriod);
 
 };
 

@@ -1,5 +1,6 @@
 #include "allocatingstatus.h"
 
+//thread_local uint8_t AllocatingStatus::numFunc;
 thread_local bool AllocatingStatus::firstAllocation;
 thread_local AllocatingType AllocatingStatus::allocatingType;
 thread_local AllocationTypeForOutputData AllocatingStatus::allocationTypeForOutputData;
@@ -55,11 +56,13 @@ void AllocatingStatus::updateFreeingTypeBeforeRealFunction(AllocationFunction al
 void AllocatingStatus::updateAllocatingStatusBeforeRealFunction(AllocationFunction allocationFunction, unsigned int objectSize) {
 
     updateAllocatingTypeBeforeRealFunction(allocationFunction, objectSize);
+//    numFunc++;
 #ifdef OPEN_SAMPLING_FOR_ALLOCS
     sampledForCountingEvent = ThreadLocalStatus::randomProcessForCountingEvent();
 #else
     sampledForCountingEvent = true;
 #endif
+
     cyclesBeforeRealFunction = rdtscp();
 }
 
@@ -67,6 +70,7 @@ void AllocatingStatus::updateFreeingStatusBeforeRealFunction(AllocationFunction 
 
     updateFreeingTypeBeforeRealFunction(allocationFunction, objectAddress);
     updateMemoryStatusBeforeFree();
+//    numFunc++;
     if(allocationFunction == FREE) {
 #ifdef OPEN_SAMPLING_FOR_ALLOCS
         sampledForCountingEvent = ThreadLocalStatus::randomProcessForCountingEvent();
@@ -81,12 +85,6 @@ void AllocatingStatus::updateAllocatingStatusAfterRealFunction(void * objectAddr
 
     cyclesAfterRealFunction = rdtscp();
     cyclesInRealFunction = cyclesAfterRealFunction - cyclesBeforeRealFunction;
-//    if(cyclesInRealFunction > cyclesMinus) {
-//        cyclesInRealFunction -= cyclesMinus;
-//    }
-//    else {
-//        cyclesInRealFunction = 0;
-//    }
     if(cyclesInRealFunction > ABNORMAL_VALUE) {
         cyclesInRealFunction = 0;
     }
@@ -103,12 +101,6 @@ void AllocatingStatus::updateFreeingStatusAfterRealFunction() {
 
     cyclesAfterRealFunction = rdtscp();
     cyclesInRealFunction = cyclesAfterRealFunction - cyclesBeforeRealFunction;
-//    if(cyclesInRealFunction > cyclesMinus) {
-//        cyclesInRealFunction -= cyclesMinus;
-//    }
-//    else {
-//        cyclesInRealFunction = 0;
-//    }
     if(cyclesInRealFunction > ABNORMAL_VALUE) {
         cyclesInRealFunction = 0;
     }
@@ -151,6 +143,7 @@ void AllocatingStatus::setAllocationTypeForOutputData() {
     }
 }
 
+#ifdef PREDICTION
 void AllocatingStatus::setAllocationTypeForPrediction() {
     if(allocatingType.objectSizeType == allocatingType.objectSizeTypeForPrediction) {
         allocationTypeForPrediction = allocationTypeForOutputData;
@@ -175,6 +168,29 @@ void AllocatingStatus::setAllocationTypeForPrediction() {
     }
 
 }
+
+void AllocatingStatus::setAllocationTypeForPredictionRaw() {
+        if(allocatingType.allocatingFunction == MALLOC) {
+            allocationTypeForPrediction = (AllocationTypeForOutputData)(ThreadLocalStatus::isCurrentlyParallelThread() * 5 + allocatingType.objectSizeTypeForPrediction * 2
+                                                                        + (allocatingType.objectSizeType != LARGE && allocatingType.isReuse));
+
+        } else if(allocatingType.allocatingFunction == FREE) {
+            allocationTypeForPrediction = (AllocationTypeForOutputData)(10 + ThreadLocalStatus::isCurrentlyParallelThread() * 3 + allocatingType.objectSizeTypeForPrediction);
+
+        } else if(allocatingType.allocatingFunction == CALLOC) {
+            allocationTypeForPrediction = (AllocationTypeForOutputData)(16 + ThreadLocalStatus::isCurrentlyParallelThread());
+
+        } else if(allocatingType.allocatingFunction == REALLOC) {
+            allocationTypeForPrediction = (AllocationTypeForOutputData)(18 + ThreadLocalStatus::isCurrentlyParallelThread());
+
+        } else if(allocatingType.allocatingFunction == POSIX_MEMALIGN) {
+            allocationTypeForPrediction = (AllocationTypeForOutputData)(20 + ThreadLocalStatus::isCurrentlyParallelThread());
+
+        } else {
+            allocationTypeForPrediction = (AllocationTypeForOutputData)(22 + ThreadLocalStatus::isCurrentlyParallelThread());
+        }
+}
+#endif
 
 void AllocatingStatus::addUpOverviewLockDataToThreadLocalData() {
     for(int lockType = 0; lockType < NUM_OF_LOCKTYPES; ++lockType) {
@@ -219,10 +235,10 @@ void AllocatingStatus::addUpOtherFunctionsInfoToThreadLocalData() {
 
 
 void AllocatingStatus::updateAllocatingInfoToThreadLocalData() {
-    allocatingType.objectSizeType = ProgramStatus::getObjectSizeType(allocatingType.objectSize);
-    setAllocationTypeForOutputData();
-    ThreadLocalStatus::numOfFunctions[allocationTypeForOutputData]++;
     if(sampledForCountingEvent) {
+        allocatingType.objectSizeType = ProgramStatus::getObjectSizeType(allocatingType.objectSize);
+        setAllocationTypeForOutputData();
+//    ThreadLocalStatus::numOfFunctions[allocationTypeForOutputData]++;
         addUpOtherFunctionsInfoToThreadLocalData();
         addUpCountingEventsToThreadLocalData();
         cleanLockFunctionsInfoInAllocatingStatus();
@@ -230,12 +246,20 @@ void AllocatingStatus::updateAllocatingInfoToThreadLocalData() {
     }
 }
 
+#ifdef PREDICTION
 void AllocatingStatus::updateAllocatingInfoToPredictor() {
-    allocatingType.objectSizeTypeForPrediction = Predictor::getObjectSizeTypeForPrediction(allocatingType.objectSize);
-    AllocatingStatus::setAllocationTypeForPrediction();
-    Predictor::numOfFunctions[allocationTypeForPrediction]++;
-    Predictor::functionCycles[allocationTypeForPrediction] += cyclesInRealFunction;
+        allocatingType.objectSizeTypeForPrediction = Predictor::getObjectSizeTypeForPrediction(allocatingType.objectSize);
+        if(sampledForCountingEvent) {
+            AllocatingStatus::setAllocationTypeForPrediction();
+        } else {
+            AllocatingStatus::setAllocationTypeForPredictionRaw();
+        }
+    if(Predictor::replacedFunctionCycles[allocationTypeForPrediction]) {
+        Predictor::numOfFunctions[allocationTypeForPrediction]++;
+        Predictor::totalFunctionCycles += cyclesInRealFunction;
+    }
 }
+#endif
 
 
 void AllocatingStatus::addUpCountingEventsToThreadLocalData() {

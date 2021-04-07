@@ -1,6 +1,5 @@
 #include "predictor.h"
 
-uint64_t Predictor::totalCycle;
 uint64_t Predictor::criticalCycle;
 uint64_t Predictor::replacedCriticalCycle;
 uint64_t Predictor::criticalCycleDepend;
@@ -10,7 +9,7 @@ uint64_t Predictor::threadCycle[MAX_THREAD_NUMBER];
 uint64_t Predictor::threadReplacedCycle[MAX_THREAD_NUMBER];
 
 thread_local unsigned int Predictor::numOfFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
-thread_local uint64_t Predictor::functionCycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
+thread_local uint64_t Predictor::totalFunctionCycles;
 size_t Predictor::replacedFunctionCycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
 
 unsigned short Predictor::replacedMiddleObjectThreshold;
@@ -40,14 +39,13 @@ ObjectSizeType Predictor::getObjectSizeTypeForPrediction(unsigned int size) {
 
 void Predictor::globalInit() {
     openPredictorInfoFile();
-    totalCycle = 0;
     criticalCycle = 0;
     replacedCriticalCycle = 0;
     criticalCycleDepend = 0;
     replacedCriticalCycleDepend = 0;
 
     memset(numOfFunctions, 0, sizeof(unsigned int) * NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA);
-    memset(functionCycles, 0, sizeof(uint64_t) * NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA);
+    totalFunctionCycles = 0;
 
     outsideCycle = 0;
 }
@@ -55,7 +53,7 @@ void Predictor::globalInit() {
 void Predictor::threadInit() {
 
     memset(numOfFunctions, 0, sizeof(unsigned int) * NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA);
-    memset(functionCycles, 0, sizeof(uint64_t) * NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA);
+    totalFunctionCycles = 0;
 
     outsideCycle = 0;
 }
@@ -65,7 +63,7 @@ void Predictor::cleanStageData() {
     memset(threadReplacedCycle, 0, sizeof(uint64_t) * ThreadLocalStatus::totalNumOfThread);
 
     memset(numOfFunctions, 0, sizeof(unsigned int) * NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA);
-    memset(functionCycles, 0, sizeof(uint64_t) * NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA);
+    totalFunctionCycles = 0;
 
     outsideCycle = 0;
 
@@ -80,29 +78,26 @@ void Predictor::outsideCycleStart() {
 }
 
 void Predictor::outsideCyclesStop() {
-    if(outsideStartCycle) {
-        outsideStopCycle = rdtscp();
-        if(outsideStopCycle > outsideStartCycle) {
-            outsideCycle += outsideStopCycle - outsideStartCycle;
-        }
+    outsideStopCycle = rdtscp();
+    if(outsideStopCycle > outsideStartCycle) {
+        outsideCycle += outsideStopCycle - outsideStartCycle;
     }
 }
 
 void Predictor::threadEnd() {
     threadCycle[ThreadLocalStatus::runningThreadIndex] += outsideCycle;
     threadReplacedCycle[ThreadLocalStatus::runningThreadIndex] += outsideCycle;
+    threadReplacedCycle[ThreadLocalStatus::runningThreadIndex] -= totalFunctionCycles;
     for(unsigned int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
-        threadCycle[ThreadLocalStatus::runningThreadIndex] += functionCycles[allocationType];
-        if(replacedFunctionCycles[allocationType] == 0) {
-            threadReplacedCycle[ThreadLocalStatus::runningThreadIndex] += functionCycles[allocationType];
-        } else {
-            threadReplacedCycle[ThreadLocalStatus::runningThreadIndex] += numOfFunctions[allocationType] * replacedFunctionCycles[allocationType];
+        if(replacedFunctionCycles[allocationType]) {
+            threadReplacedCycle[ThreadLocalStatus::runningThreadIndex] += (numOfFunctions[allocationType] * replacedFunctionCycles[allocationType]);
         }
     }
 
+    ///change this part
     if(ThreadLocalStatus::runningThreadIndex) {
         lastThreadDepend = false;
-        if(outsideCycle * 100 / threadCycle[ThreadLocalStatus::runningThreadIndex] >= 98) {
+        if(totalFunctionCycles * 100 / threadCycle[ThreadLocalStatus::runningThreadIndex] < 2) {
             lastThreadIndex = ThreadLocalStatus::runningThreadIndex;
             lastThreadDepend = true;
         }
@@ -111,21 +106,17 @@ void Predictor::threadEnd() {
 }
 
 void Predictor::stopSerial() {
-    totalCycle += outsideCycle;
     criticalCycle += outsideCycle;
-    replacedCriticalCycle += outsideCycle;
     criticalCycleDepend += outsideCycle;
+    replacedCriticalCycle += outsideCycle;
+    replacedCriticalCycle -= totalFunctionCycles;
     replacedCriticalCycleDepend += outsideCycle;
+    replacedCriticalCycleDepend -= totalFunctionCycles;
 
     for(unsigned int allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
-        criticalCycle += functionCycles[allocationType];
-        criticalCycleDepend += functionCycles[allocationType];
-        if(replacedFunctionCycles[allocationType] == 0) {
-            replacedCriticalCycle += functionCycles[allocationType];
-            replacedCriticalCycleDepend += functionCycles[allocationType];
-        } else {
-            replacedCriticalCycle += numOfFunctions[allocationType] * replacedFunctionCycles[allocationType];
-            replacedCriticalCycleDepend += numOfFunctions[allocationType] * replacedFunctionCycles[allocationType];
+        if(replacedFunctionCycles[allocationType]) {
+            replacedCriticalCycle += (numOfFunctions[allocationType] * replacedFunctionCycles[allocationType]);
+            replacedCriticalCycleDepend += (numOfFunctions[allocationType] * replacedFunctionCycles[allocationType]);
         }
     }
     cleanStageData();
@@ -143,21 +134,15 @@ void Predictor::stopParallel() {
             criticalStageCycle = MAX(criticalStageCycle, threadCycle[index]);
             criticalReplacedStageCycle = MAX(criticalReplacedStageCycle, threadReplacedCycle[index]);
             if(lastThreadDepend && index != lastThreadIndex) {
-                    criticalStageCycleDepend = MAX(criticalStageCycleDepend, threadCycle[index]);
-                    criticalReplacedStageCycleDepend = MAX(criticalReplacedStageCycleDepend, threadReplacedCycle[index]);
+                criticalStageCycleDepend = MAX(criticalStageCycleDepend, threadCycle[index]);
+                criticalReplacedStageCycleDepend = MAX(criticalReplacedStageCycleDepend, threadReplacedCycle[index]);
             }
         }
     }
 
-    for(unsigned short index = 0; index < ThreadLocalStatus::totalNumOfThread; ++index) {
-        if(threadCycle[index] && threadReplacedCycle[index]) {
-            totalCycle += threadCycle[index];
-        }
-    }
-
     criticalCycle += criticalStageCycle;
-    replacedCriticalCycle += criticalReplacedStageCycle;
     criticalCycleDepend += criticalStageCycleDepend;
+    replacedCriticalCycle += criticalReplacedStageCycle;
     replacedCriticalCycleDepend += criticalReplacedStageCycleDepend;
 
     cleanStageData();
@@ -192,7 +177,6 @@ void Predictor::printOutput() {
         fprintf(ProgramStatus::outputFile, "speed up 0%%\n");
     }
 
-    fprintf(ProgramStatus::outputFile, "total cycles               %20lu\n", totalCycle);
 }
 
 void Predictor::fopenPredictorInfoFile() {
@@ -212,11 +196,6 @@ void Predictor::readFunctionCyclesFromInfo(char*token) {
             replacedFunctionCycles[allocationType] = (size_t) atoi(token);
         }
     }
-//    replacedFunctionCycles[SERIAL_SMALL_NEW_MALLOC] = 118;
-//    replacedFunctionCycles[SERIAL_SMALL_FREE] = 326;
-//    replacedFunctionCycles[PARALLEL_SMALL_NEW_MALLOC] = 6919;
-//    replacedFunctionCycles[PARALLEL_SMALL_REUSED_MALLOC] = 125;
-//    replacedFunctionCycles[PARALLEL_SMALL_FREE] = 92;
 }
 
 void Predictor::readMiddleObjectThresholdFromInfo(char*token) {
@@ -244,7 +223,6 @@ void Predictor::readPredictorInfoFile() {
             readFunctionCyclesFromInfo(token);
             readMiddleObjectThresholdFromInfo(token);
             readLargeObjectThresholdFromInfo(token);
-//            readPageFaultCycleFromInfo(token);
         }
     }
 }

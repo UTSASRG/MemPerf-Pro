@@ -182,11 +182,13 @@ private:
 
     static void setAllocationTypeForOutputData();
     static void setAllocationTypeForPrediction();
+    static void setAllocationTypeForPredictionRaw();
 
     static void cleanLockFunctionsInfoInAllocatingStatus();
 
 public:
 
+//    static thread_local uint8_t numFunc;
     static thread_local AllocatingType allocatingType;
 
     static thread_local bool firstAllocation;

@@ -6,7 +6,7 @@ unsigned short ThreadLocalStatus::totalNumOfRunningThread;
 thread_local short ThreadLocalStatus::runningThreadIndex;
 spinlock ThreadLocalStatus::lock;
 
-thread_local unsigned int ThreadLocalStatus::numOfFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA] = {0};
+//thread_local unsigned int ThreadLocalStatus::numOfFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA] = {0};
 thread_local unsigned int ThreadLocalStatus::numOfSampledCountingFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA] = {0};
 thread_local uint64_t ThreadLocalStatus::cycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
 thread_local OverviewLockData ThreadLocalStatus::overviewLockData[NUM_OF_LOCKTYPES];
@@ -44,7 +44,7 @@ bool ThreadLocalStatus::isCurrentlySingleThread() {
 }
 
 bool ThreadLocalStatus::isCurrentlyParallelThread() {
-    return totalNumOfRunningThread > 1;
+    return ThreadLocalStatus::totalNumOfRunningThread > 1;
 }
 
 bool ThreadLocalStatus::fromSerialToParallel() {
@@ -61,9 +61,10 @@ void ThreadLocalStatus::setRandomPeriodForAllocations() {
 
 bool ThreadLocalStatus::randomProcessForCountingEvent() {
     return dis(random) == 0;
+//    return !AllocatingStatus::numFunc;
 }
 
-bool ThreadLocalStatus::randomProcess(unsigned short randomPeriod) {
-    return rand() % randomPeriod == 0;
-}
+//bool ThreadLocalStatus::randomProcess(unsigned short randomPeriod) {
+//    return rand() % randomPeriod == 0;
+//}
 

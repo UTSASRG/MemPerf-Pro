@@ -24,18 +24,6 @@ DetailLockData DetailLockData::newDetailLockData(LockTypes lockType) {
     return DetailLockData{lockType, {0}, {0}, 0, 0, 0};
 }
 
-//bool DetailLockData::aContentionHappening() {
-//    return (++numOfContendingThreads >= 2);
-//}
-
-//void DetailLockData::checkAndUpdateMaxNumOfContendingThreads() {
-//    maxNumOfContendingThreads = MAX(numOfContendingThreads, maxNumOfContendingThreads);
-//}
-
-//void DetailLockData::quitFromContending() {
-//    numOfContendingThreads--;
-//}
-
 bool DetailLockData::isAnImportantLock() {
     for(uint8_t allocationType = 0; allocationType < NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA; ++allocationType) {
         if(GlobalStatus::numOfSampledCountingFunctions[allocationType] && cycles[allocationType]/GlobalStatus::numOfSampledCountingFunctions[allocationType] > 500) {
@@ -53,12 +41,6 @@ void DetailLockData::add(DetailLockData newDetailLockData) {
         cycles[allocationType] += newDetailLockData.cycles[allocationType];
     }
 }
-
-
-//void CriticalSectionStatus::add(CriticalSectionStatus newCriticalSectionStatus) {
-//    numOfCriticalSections += newCriticalSectionStatus.numOfCriticalSections;
-//    totalCyclesOfCriticalSections += newCriticalSectionStatus.totalCyclesOfCriticalSections;
-//}
 
 void CacheConflictDetector::add(CacheConflictDetector newCacheConflictDetector) {
     for(uint8_t cacheIndex = 0; cacheIndex < NUM_CACHELINES_PER_PAGE; ++cacheIndex) {
@@ -115,11 +97,10 @@ void FriendlinessStatus::add(FriendlinessStatus newFriendlinessStatus) {
     totalMemoryUsageOfSampledCacheLines += newFriendlinessStatus.totalMemoryUsageOfSampledCacheLines;
 #endif
 
-    numOfSampledStoringInstructions += newFriendlinessStatus.numOfSampledStoringInstructions;
-    numOfSampledCacheLines += newFriendlinessStatus.numOfSampledCacheLines;
-    for(uint8_t falseSharingType = 0; falseSharingType < NUM_OF_FALSESHARINGTYPE; ++falseSharingType) {
-        numOfSampledFalseSharingInstructions[falseSharingType] += newFriendlinessStatus.numOfSampledFalseSharingInstructions[falseSharingType];
-        numOfSampledFalseSharingCacheLines[falseSharingType] += newFriendlinessStatus.numOfSampledFalseSharingCacheLines[falseSharingType];
-    }
+//    numOfSampledStoringInstructions += newFriendlinessStatus.numOfSampledStoringInstructions;
+//    numOfSampledCacheLines += newFriendlinessStatus.numOfSampledCacheLines;
+    numOfTrueSharing += newFriendlinessStatus.numOfTrueSharing;
+    numOfFalseSharing += newFriendlinessStatus.numOfFalseSharing;
+    numThreadSwitch += newFriendlinessStatus.numThreadSwitch;
     cacheConflictDetector.add(newFriendlinessStatus.cacheConflictDetector);
 }

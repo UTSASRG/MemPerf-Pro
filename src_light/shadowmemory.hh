@@ -49,6 +49,8 @@
 #define MAX_PAGE_MAP_ENTRIES (PAGE_MAP_SIZE / sizeof(PageMapEntry))
 #define MAX_CACHE_MAP_ENTRIES (CACHE_MAP_SIZE / sizeof(CacheMapEntry))
 
+#define NUM_COHERENCY_CACHES 20000
+
 extern char * allocator_name;
 
 inline size_t alignup(size_t size, size_t alignto) {
@@ -57,6 +59,12 @@ inline size_t alignup(size_t size, size_t alignto) {
 inline void * alignupPointer(void * ptr, size_t alignto) {
   return ((intptr_t)ptr%alignto == 0) ? ptr : (void *)(((intptr_t)ptr + (alignto - 1)) & ~(alignto - 1));
 }
+
+struct HashLocksSetForCoherency {
+    spinlock locks[NUM_COHERENCY_CACHES];
+    void lock(uint64_t index);
+    void unlock(uint64_t index);
+};
 
 class CacheMapEntry {
 
@@ -103,6 +111,7 @@ private:
     static void mallocUpdatePages(uintptr_t uintaddr, uint64_t page_index, int64_t size);
     static void freeUpdatePages(uintptr_t uintaddr, uint64_t page_index, int64_t size);
 
+    static HashLocksSetForCoherency hashLocksSetForCoherency;
     static PageMapEntry * page_map_begin;
     static PageMapEntry * page_map_end;
     static PageMapEntry * page_map_bump_ptr;
@@ -134,6 +143,7 @@ public:
     static PageMapEntry * getPageMapEntry(uint64_t page_idx);
     static void mallocUpdateObject(void * address, unsigned int size);
     static void freeUpdateObject(void * address, unsigned int size);
+    static void printOutput();
 };
 
 #endif // __SHADOWMAP_H__

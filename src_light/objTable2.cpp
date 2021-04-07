@@ -46,18 +46,6 @@ bool ObjTable::allocUpdate(uint32_t size, void * address) {
         hashLocksSet.unlock(chunkId);
     }
 
-
-//    uint32_t * status = hash->find(chunkOffset, sizeof(uint32_t));
-//    if(status == nullptr) {
-//        hash->insert(chunkOffset, sizeof(uint32_t), size);
-//        reuse = false;
-//    } else {
-//        *status = size;
-//        reuse = true;
-//    }
-
-
-//    return reuse;
 }
 
 
