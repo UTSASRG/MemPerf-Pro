@@ -91,18 +91,28 @@ struct FriendlinessStatus {
     unsigned int numOfFalseSharing;
     unsigned int numOfTrueSharing;
     unsigned int numThreadSwitch;
+
+#ifdef UTIL
     uint64_t totalMemoryUsageOfSampledPages;
 
 #ifdef CACHE_UTIL
     uint64_t totalMemoryUsageOfSampledCacheLines;
 #endif
 
+#endif
+
     CacheConflictDetector cacheConflictDetector;
+
+#ifdef UTIL
 
 #ifdef CACHE_UTIL
     void recordANewSampling(uint64_t memoryUsageOfCacheLine, uint64_t memoryUsageOfPage);
 #else
     void recordANewSampling(uint64_t memoryUsageOfPage);
+#endif
+
+#else
+    void recordANewSampling();
 #endif
 
     void add(FriendlinessStatus newFriendlinessStatus);

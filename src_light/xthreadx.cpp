@@ -67,7 +67,9 @@ void * xthreadx::startThread(void * arg) {
     Predictor::outsideCycleStart();
 #endif
 
-    ProgramStatus::setProfilerInitializedTrue();
+//    ProgramStatus::setProfilerInitializedTrue();
+ProgramStatus::profilerInitialized = true;
+//fprintf(stderr, "thread %d\n", ThreadLocalStatus::runningThreadIndex);
 
     result = current->startRoutine(current->startArg);
     threadExit();
@@ -77,7 +79,7 @@ void * xthreadx::startThread(void * arg) {
 
 spinlock lock;
 
-bool lastThreadDepended;
+//bool lastThreadDepended;
 
 void xthreadx::threadExit() {
 

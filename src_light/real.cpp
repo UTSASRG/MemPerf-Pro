@@ -8,9 +8,9 @@
 bool realInitialized;
 
 namespace RealX {
+    DEFINE_WRAPPER(calloc);
     DEFINE_WRAPPER(sbrk);
     DEFINE_WRAPPER(free);
-    DEFINE_WRAPPER(calloc);
     DEFINE_WRAPPER(malloc);
     DEFINE_WRAPPER(realloc);
     DEFINE_WRAPPER(memalign);
@@ -32,11 +32,11 @@ namespace RealX {
 
 	void initializer() {
 
-		if (realInitialized) return;
+//		if (realInitialized) return;
 
+        INIT_WRAPPER(calloc, RTLD_NEXT);
         INIT_WRAPPER(sbrk, RTLD_NEXT);
         INIT_WRAPPER(free, RTLD_NEXT);
-        INIT_WRAPPER(calloc, RTLD_NEXT);
         INIT_WRAPPER(malloc, RTLD_NEXT);
         INIT_WRAPPER(realloc, RTLD_NEXT);
         INIT_WRAPPER(memalign, RTLD_NEXT);

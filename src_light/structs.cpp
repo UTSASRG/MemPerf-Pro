@@ -76,6 +76,8 @@ void CacheConflictDetector::print(unsigned int totalHit) {
     fprintf(ProgramStatus::outputFile, "conflict miss score: %lf\n", maxScore);
 }
 
+#ifdef UTIL
+
 #ifdef CACHE_UTIL
 void FriendlinessStatus::recordANewSampling(uint64_t memoryUsageOfCacheLine, uint64_t memoryUsageOfPage) {
     numOfSampling++;
@@ -89,12 +91,23 @@ void FriendlinessStatus::recordANewSampling(uint64_t memoryUsageOfPage) {
 }
 #endif
 
+#else
+void FriendlinessStatus::recordANewSampling() {
+    numOfSampling++;
+}
+#endif
+
+
 void FriendlinessStatus::add(FriendlinessStatus newFriendlinessStatus) {
     numOfSampling += newFriendlinessStatus.numOfSampling;
+
+#ifdef UTIL
     totalMemoryUsageOfSampledPages += newFriendlinessStatus.totalMemoryUsageOfSampledPages;
 
 #ifdef CACHE_UTIL
     totalMemoryUsageOfSampledCacheLines += newFriendlinessStatus.totalMemoryUsageOfSampledCacheLines;
+#endif
+
 #endif
 
 //    numOfSampledStoringInstructions += newFriendlinessStatus.numOfSampledStoringInstructions;

@@ -46,8 +46,10 @@
 #define PAGE_MAP_SIZE (256 * ONE_GB)
 #define CACHE_MAP_SIZE (64 * ONE_GB)
 
+#ifdef UTIL
 #define MAX_PAGE_MAP_ENTRIES (PAGE_MAP_SIZE / sizeof(PageMapEntry))
 #define MAX_CACHE_MAP_ENTRIES (CACHE_MAP_SIZE / sizeof(CacheMapEntry))
+#endif
 
 #define NUM_COHERENCY_CACHES 20000
 
@@ -82,6 +84,7 @@ public:
 
 };
 
+#ifdef UTIL
 class PageMapEntry {
 public:
 
@@ -105,13 +108,19 @@ public:
     void setEmpty();
     void setFull();
 };
+#endif
 
 class ShadowMemory {
 private:
+
+#ifdef UTIL
     static void mallocUpdatePages(uintptr_t uintaddr, uint64_t page_index, int64_t size);
     static void freeUpdatePages(uintptr_t uintaddr, uint64_t page_index, int64_t size);
+#endif
 
     static HashLocksSetForCoherency hashLocksSetForCoherency;
+
+#ifdef UTIL
     static PageMapEntry * page_map_begin;
     static PageMapEntry * page_map_end;
     static PageMapEntry * page_map_bump_ptr;
@@ -122,16 +131,25 @@ private:
     static CacheMapEntry * cache_map_bump_ptr;
 #endif
 
+#endif
+
     static bool isInitialized;
 
 public:
+
+#ifdef UTIL
 
 #ifdef CACHE_UTIL
     static spinlock cache_map_lock;
 #endif
 
+#endif
+
     static void doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType);
     static bool initialize();
+
+#ifdef UTIL
+
     static void cleanupPages(uintptr_t uintaddr, size_t length);
 
 #ifdef CACHE_UTIL
@@ -139,11 +157,19 @@ public:
 #endif
 
     static PageMapEntry * doPageMapBumpPointer();
+
+#endif
+
     static uint64_t getPageIndex(uint64_t addr);
+
+#ifdef UTIL
     static PageMapEntry * getPageMapEntry(uint64_t page_idx);
     static void mallocUpdateObject(void * address, unsigned int size);
     static void freeUpdateObject(void * address, unsigned int size);
+#endif
+
     static void printOutput();
+
 };
 
 #endif // __SHADOWMAP_H__

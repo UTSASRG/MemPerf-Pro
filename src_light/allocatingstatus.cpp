@@ -111,14 +111,22 @@ void AllocatingStatus::updateFreeingStatusAfterRealFunction() {
 void AllocatingStatus::updateMemoryStatusAfterAllocation() {
 
     allocatingType.isReuse = ObjTable::allocUpdate(allocatingType.objectSize, allocatingType.objectAddress);
+
+#ifdef UTIL
     ShadowMemory::mallocUpdateObject(allocatingType.objectAddress, allocatingType.objectSize);
+#endif
+
 }
 
 void AllocatingStatus::updateMemoryStatusBeforeFree() {
     allocatingType.objectSize = ObjTable::freeUpdate(allocatingType.objectAddress);
+
+#ifdef UTIL
     if(allocatingType.objectSize) {
         ShadowMemory::freeUpdateObject(allocatingType.objectAddress, allocatingType.objectSize);
     }
+#endif
+
 }
 
 void AllocatingStatus::setAllocationTypeForOutputData() {

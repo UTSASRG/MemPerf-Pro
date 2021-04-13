@@ -178,12 +178,16 @@ void GlobalStatus::printFriendliness() {
     printTitle((char*)"FRIENDLINESS");
     fprintf(ProgramStatus::outputFile, "sampling access              %20u\n", friendlinessStatus.numOfSampling);
     if(friendlinessStatus.numOfSampling / 100) {
+
+#ifdef UTIL
         fprintf(ProgramStatus::outputFile, "page utilization                             %3lu%%\n",
                 friendlinessStatus.totalMemoryUsageOfSampledPages*100/friendlinessStatus.numOfSampling/PAGESIZE);
 
 #ifdef CACHE_UTIL
         fprintf(ProgramStatus::outputFile, "cache utilization                            %3lu%%\n",
                 friendlinessStatus.totalMemoryUsageOfSampledCacheLines*100/friendlinessStatus.numOfSampling/CACHELINE_SIZE);
+#endif
+
 #endif
 
 //        fprintf(ProgramStatus::outputFile, "accessed store instructions  %20u\n", friendlinessStatus.numOfSampledStoringInstructions);
@@ -193,7 +197,7 @@ void GlobalStatus::printFriendliness() {
             fprintf(ProgramStatus::outputFile, "true sharing instructions %20u %3u%%\n", friendlinessStatus.numOfTrueSharing, friendlinessStatus.numOfTrueSharing*100/friendlinessStatus.numThreadSwitch);
             fprintf(ProgramStatus::outputFile, "false sharing instructions %20u %3u%%\n", friendlinessStatus.numOfFalseSharing, friendlinessStatus.numOfFalseSharing*100/friendlinessStatus.numThreadSwitch);
             fprintf(ProgramStatus::outputFile, "\n");
-            if(friendlinessStatus.numOfTrueSharing*100/friendlinessStatus.numThreadSwitch || friendlinessStatus.numOfFalseSharing*100/friendlinessStatus.numThreadSwitch) {
+            if(friendlinessStatus.numOfTrueSharing*100/friendlinessStatus.numThreadSwitch > 15|| friendlinessStatus.numOfFalseSharing*100/friendlinessStatus.numThreadSwitch > 15) {
                 ShadowMemory::printOutput();
             }
         }

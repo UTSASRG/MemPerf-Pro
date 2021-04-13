@@ -69,6 +69,7 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
 #endif
 
     ProgramStatus::initIO(argv[0]);
+//        ProgramStatus::initIO(std::getenv("MALLOC_PROGRAM_FULL"));
     lockUsage.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_LOCK_NUM);
     globalLockUsage.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_LOCK_NUM);
     ObjTable::initialize();
@@ -101,7 +102,7 @@ extern "C" {
         if(sz == 0) {
             return NULL;
         }
-        if(ProgramStatus::profilerNotInitialized()) {
+        if(ThreadLocalStatus::runningThreadIndex == 0 && ProgramStatus::profilerNotInitialized()) {
             return MyMalloc::malloc(sz);
         }
         if(!AllocatingStatus::outsideTrackedAllocation() || ProgramStatus::conclusionHasStarted()) {
@@ -175,11 +176,13 @@ extern "C" {
 
 	void * yycalloc(size_t nelem, size_t elsize) {
 
+//	    fprintf(stderr, "yycalloc\n");
+
 		if((nelem * elsize) == 0) {
 				return NULL;
 		}
 
-		if (ProgramStatus::profilerNotInitialized()) {
+		if (ThreadLocalStatus::runningThreadIndex == 0 && ProgramStatus::profilerNotInitialized()) {
             return MyMalloc::malloc(nelem*elsize);
         }
         if(!AllocatingStatus::outsideTrackedAllocation() || ProgramStatus::conclusionHasStarted()) {
@@ -234,7 +237,7 @@ extern "C" {
 
 	void * yyrealloc(void * ptr, size_t sz) {
 
-        if (ProgramStatus::profilerNotInitialized()) {
+        if (ThreadLocalStatus::runningThreadIndex == 0 && ProgramStatus::profilerNotInitialized()) {
             MyMalloc::ifInProfilerMemoryThenFree(ptr);
             return MyMalloc::malloc(sz);
         }
@@ -301,7 +304,7 @@ extern "C" {
          return NULL;
      }
 
-     if(ProgramStatus::profilerNotInitialized()) {
+     if(ThreadLocalStatus::runningThreadIndex == 0 && ProgramStatus::profilerNotInitialized()) {
          return MyMalloc::malloc(size);
      }
 
@@ -382,9 +385,12 @@ int madvise(void *addr, size_t length, int advice) {
     if (AllocatingStatus::outsideTrackedAllocation()) {
         return RealX::madvise(addr, length, advice);
     }
+
+#ifdef UTIL
     if (advice == MADV_DONTNEED) {
         ShadowMemory::cleanupPages((uintptr_t) addr, length);
     }
+#endif
 
     if (!AllocatingStatus::sampledForCountingEvent) {
         int result = RealX::madvise(addr, length, advice);
@@ -439,7 +445,10 @@ int munmap(void *addr, size_t length) {
     if (AllocatingStatus::outsideTrackedAllocation()) {
         return RealX::munmap(addr, length);
     }
+
+#ifdef UTIL
     ShadowMemory::cleanupPages((intptr_t) addr, length);
+#endif
 
     if (!AllocatingStatus::sampledForCountingEvent) {
         return RealX::munmap(addr, length);

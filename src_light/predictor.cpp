@@ -48,6 +48,8 @@ void Predictor::globalInit() {
     totalFunctionCycles = 0;
 
     outsideCycle = 0;
+//    outsideStartCycle = 0;
+//    outsideStopCycle = 0;
 }
 
 void Predictor::threadInit() {
@@ -56,6 +58,8 @@ void Predictor::threadInit() {
     totalFunctionCycles = 0;
 
     outsideCycle = 0;
+//    outsideStartCycle = 0;
+//    outsideStopCycle = 0;
 }
 
 void Predictor::cleanStageData() {
@@ -79,8 +83,9 @@ void Predictor::outsideCycleStart() {
 
 void Predictor::outsideCyclesStop() {
     outsideStopCycle = rdtscp();
-    if(outsideStopCycle > outsideStartCycle) {
+    if(outsideStopCycle > outsideStartCycle && outsideStartCycle) {
         outsideCycle += outsideStopCycle - outsideStartCycle;
+//        fprintf(stderr, "outsideCycle += %lu, %lu - %lu\n", outsideStopCycle - outsideStartCycle, outsideStopCycle, outsideStartCycle);
     }
 }
 
@@ -93,6 +98,8 @@ void Predictor::threadEnd() {
             threadReplacedCycle[ThreadLocalStatus::runningThreadIndex] += (numOfFunctions[allocationType] * replacedFunctionCycles[allocationType]);
         }
     }
+
+//    fprintf(stderr, "thread ends: %lu %lu %lu\n", threadCycle[ThreadLocalStatus::runningThreadIndex], threadReplacedCycle[ThreadLocalStatus::runningThreadIndex], totalFunctionCycles);
 
     ///change this part
     if(ThreadLocalStatus::runningThreadIndex) {
@@ -119,6 +126,7 @@ void Predictor::stopSerial() {
             replacedCriticalCycleDepend += (numOfFunctions[allocationType] * replacedFunctionCycles[allocationType]);
         }
     }
+//    fprintf(stderr, "stop serial: %lu %lu\n", criticalCycle, replacedCriticalCycle);
     cleanStageData();
 }
 
@@ -144,6 +152,8 @@ void Predictor::stopParallel() {
     criticalCycleDepend += criticalStageCycleDepend;
     replacedCriticalCycle += criticalReplacedStageCycle;
     replacedCriticalCycleDepend += criticalReplacedStageCycleDepend;
+
+//    fprintf(stderr, "stop parallel: %lu %lu %lu %lu\n", criticalCycle, replacedCriticalCycle, criticalStageCycle, criticalReplacedStageCycle);
 
     cleanStageData();
 }

@@ -10,7 +10,6 @@
 
 class ProgramStatus {
 private:
-    static thread_local bool profilerInitialized;
     static bool beginConclusion;
 
     static char matrixFileName[MAX_FILENAME_LEN];
@@ -32,6 +31,7 @@ private:
 
 public:
 
+    static thread_local bool profilerInitialized;
     static char programName[256];
     static FILE * outputFile;
     static char outputFileName[MAX_FILENAME_LEN];
