@@ -50,6 +50,7 @@ bool ProgramStatus::conclusionHasStarted() {
 
 void ProgramStatus::getInputInfoFileName(char * runningApplicationName) {
     char * runningAllocatorName = strrchr(runningApplicationName, '-')+1;
+    
     const char* benchmarkRoot = std::getenv("BENCHMARK_ROOT_DIR");
     std::stringstream sstream;
     if(benchmarkRoot==nullptr){

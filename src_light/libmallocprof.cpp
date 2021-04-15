@@ -68,8 +68,7 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
     }
 #endif
 
-    ProgramStatus::initIO(argv[0]);
-//        ProgramStatus::initIO(std::getenv("MALLOC_PROGRAM_FULL"));
+    ProgramStatus::initIO(std::getenv("MALLOC_PROGRAM_FULL"));
     lockUsage.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_LOCK_NUM);
     globalLockUsage.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_LOCK_NUM);
     ObjTable::initialize();

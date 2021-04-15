@@ -191,7 +191,19 @@ void Predictor::printOutput() {
 
 void Predictor::fopenPredictorInfoFile() {
     char predictorInfoFileName[MAX_FILENAME_LEN];
-    strcpy(predictorInfoFileName, "/home/jinzhou/mmprof/predictor.info");
+    
+    const char* benchmarkRoot = std::getenv("BENCHMARK_ROOT_DIR");
+    std::stringstream sstream;
+    if(benchmarkRoot==nullptr){
+         perror("Failed to find benchmark root path. Use benchmark suite or set BENCHMARK_ROOT_DIR environment variable");
+        abort();
+    }
+    sstream<<std::string(benchmarkRoot);
+    sstream<<"/myartifects/mmprof/predictor.info";
+
+    strcpy(predictorInfoFileName, sstream.str().c_str());
+    
+    
     fprintf(stderr, "Opening prediction info file %s...\n", predictorInfoFileName);
     if ((predictorInfoFile = fopen (predictorInfoFileName, "r")) == NULL) {
         perror("Failed to open prediction info file");
