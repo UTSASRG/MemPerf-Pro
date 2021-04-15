@@ -1,5 +1,7 @@
 # maprof: A General Allocator for Different Memory Allocators
 
+[Benchmark branch aims at removing relative path in mmprof and replace them with path compatible to multithreadingtests dev-steven ]
+
 Status:
 About allocator information. We should also check whether the library’s location. It will be bad to put everywhere. Also, it will be impossible to run canneal, fluidanimate, freqmine, 
  

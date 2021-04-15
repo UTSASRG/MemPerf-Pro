@@ -1,4 +1,5 @@
 #include "programstatus.h"
+#include <sstream>
 
 thread_local bool ProgramStatus::profilerInitialized;
 bool ProgramStatus::beginConclusion;
@@ -49,26 +50,36 @@ bool ProgramStatus::conclusionHasStarted() {
 
 void ProgramStatus::getInputInfoFileName(char * runningApplicationName) {
     char * runningAllocatorName = strrchr(runningApplicationName, '-')+1;
+    const char* benchmarkRoot = std::getenv("BENCHMARK_ROOT_DIR");
+    std::stringstream sstream;
+    if(benchmarkRoot==nullptr){
+    	 perror("Failed to find benchmark root path. Use benchmark suite or set BENCHMARK_ROOT_DIR environment variable");
+        abort();
+    }
+    
+    sstream<<std::string(benchmarkRoot);
     if(strcmp(runningAllocatorName, "libc228") == 0) {
-        strcpy(inputInfoFileName, "/home/jinzhou/mmprof/info/libc228.info");
+        sstream<<"/myartifects/mmprof/info/libc228.info";
     } else if(strcmp(runningAllocatorName, "libc221") == 0) {
-        strcpy(inputInfoFileName, "/home/jinzhou/mmprof/info/libc221.info");
+    	sstream<<"/myartifects/mmprof/info/libc221.info";
     } else if(strcmp(runningAllocatorName, "hoard") == 0) {
-        strcpy(inputInfoFileName, "/home/jinzhou/mmprof/info/libhoard.info");
+        sstream<<"/myartifects/mmprof/info/libhoard.info";
     } else if(strcmp(runningAllocatorName, "jemalloc") == 0) {
-        strcpy(inputInfoFileName, "/home/jinzhou/mmprof/info/libjemalloc.info");
+        sstream<<"/myartifects/mmprof/info/libjemalloc.info";
     } else if(strcmp(runningAllocatorName, "tcmalloc") == 0) {
-        strcpy(inputInfoFileName, "/home/jinzhou/mmprof/info/libtcmalloc.info");
+        sstream<<"/myartifects/mmprof/info/libtcmalloc.info";
     } else if(strcmp(runningAllocatorName, "dieharder") == 0) {
-        strcpy(inputInfoFileName, "/home/jinzhou/mmprof/info/libdieharder.info");
+        sstream<<"/myartifects/mmprof/info/libdieharder.info";
     } else if(strcmp(runningAllocatorName, "omalloc") == 0) {
-        strcpy(inputInfoFileName, "/home/jinzhou/mmprof/info/libomalloc.info");
+        sstream<<"/myartifects/mmprof/info/libomalloc.info";
     } else if (strcmp(runningAllocatorName, "numalloc") == 0) {
-        strcpy(inputInfoFileName, "/home/jinzhou/mmprof/info/libnumalloc.info");
+        sstream<<"/myartifects/mmprof/info/libnumalloc.info";
     } else {
         fprintf(stderr, "Info File Location Unknown\n");
         abort();
     }
+    strcpy(inputInfoFileName, sstream.str().c_str());
+
 
 //    if(ProgramStatus::matrixFileOpened) {
 //        fprintf(matrixFile, "%s ", runningAllocatorName);
@@ -169,8 +180,7 @@ void ProgramStatus::openInputInfoFile(char * runningApplicationName) {
 
 void ProgramStatus::openOutputFile() {
     extern char * program_invocation_name;
-//	snprintf(outputFileName, MAX_FILENAME_LEN, "%s_libmallocprof_%d_main_thread.txt", program_invocation_name, getpid());
-    snprintf(outputFileName, MAX_FILENAME_LEN, "/home/jinzhou/parsec/records/%s_libmallocprof_%d_main_thread.txt", program_invocation_name, getpid());
+	snprintf(outputFileName, MAX_FILENAME_LEN, "%s_libmallocprof_%d_main_thread.txt", program_invocation_name, getpid());
     fprintf(stderr, "%s\n", outputFileName);
     outputFile = fopen(outputFileName, "w");
     if(outputFile == nullptr) {
