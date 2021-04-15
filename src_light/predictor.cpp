@@ -1,4 +1,5 @@
 #include "predictor.h"
+#include <sstream>
 
 uint64_t Predictor::criticalCycle;
 uint64_t Predictor::replacedCriticalCycle;

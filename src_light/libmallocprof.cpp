@@ -1,6 +1,5 @@
 #include "libmallocprof.h"
 
-
 thread_local HashMap <void *, DetailLockData, PrivateHeap> lockUsage;
 HashMap <void *, DetailLockData, PrivateHeap> globalLockUsage;
 HashMap <void*, uint32_t, PrivateHeap> objStatusMap;

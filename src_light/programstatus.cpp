@@ -1,4 +1,5 @@
 #include "programstatus.h"
+#include <sstream>
 
 thread_local bool ProgramStatus::profilerInitialized;
 bool ProgramStatus::beginConclusion;
