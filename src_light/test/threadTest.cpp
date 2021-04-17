@@ -6,62 +6,37 @@
 #include <malloc.h>
 #include <cstdint>
 
-void* thread_start (void*);
-#define NUM_THREADS 2
-#define NUM_MALLOCS 1000
+#define NUM_THREADS 16
 
 void* thread_start (void*);
 
 int main() {
 
-	pthread_t threads[NUM_THREADS];
-	int create, join;
+	pthread_t * threads[NUM_THREADS];
 	void* result;
 
 	for (int i = 0; i < NUM_THREADS; i++) {
-
-		create = pthread_create (&threads[i], NULL, &thread_start, NULL);
-
-		if (create != 0) {
-
-			printf ("Error creating thread.\n");
-			abort ();
-		}
+		pthread_create (&threads[i], NULL, &thread_start, NULL);
 	}
 
 
 	for (int i = 0; i < NUM_THREADS; i++) {
-
-		join = pthread_join (threads[i], &result);
-
-		if (join != 0) {
-
-			printf ("Error joining thread.\n");
-			abort ();
-		}
+		pthread_join (threads[i], &result);
 	}
 
-//	malloc_stats ();
-
-	return EXIT_SUCCESS;
+	return 0;
 }
 
 void* thread_start (void* arg) {
 
-	size_t size = 128;
-	void* pointer[NUM_MALLOCS];
-//	void* pointer;
-	
-	for (int i = 0; i < NUM_MALLOCS; i++) {
-		pointer[i] = malloc (size);
-//		pointer = malloc (size);
-//		free (pointer);
-	}
-
-	for (int i = 0; i < NUM_MALLOCS; i++) {
-		free (pointer[i]);
-	}
-
-//	getchar();
+    bool * fields = (bool *)malloc(sizeof(bool) * 1024);
+    while (1) {
+        for(int i = 0; i < 1024; ++i) {
+            fields[i]++;
+        }
+    }
+    for(int i = 0; i < 1024; ++i) {
+        fprintf(stderr, "%u\n", fields[i]);
+    }
 	return nullptr;
 }

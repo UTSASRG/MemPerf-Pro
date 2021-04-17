@@ -29,9 +29,10 @@ public:
 //        void * startArg;
 //        void * result;
 //    } thread_t;
+    static pthread_t * threads[MAX_THREAD_NUMBER];
 	static int thread_create(pthread_t * tid, const pthread_attr_t * attr, threadFunction * fn, void * arg);
 	static void * startThread(void * arg);
-	static void threadExit();
+	static void threadExit(void * arg);
     static int thread_join(pthread_t thread, void ** retval);
 };
 

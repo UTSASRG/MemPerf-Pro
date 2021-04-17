@@ -46,6 +46,23 @@ void exitHandler() {
 
 }
 
+void mainStop(int signum) {
+    if(ThreadLocalStatus::runningThreadIndex == 0) {
+        fprintf(stderr, "killing all other threads\n");
+        for(uint16_t i = 1; i < ThreadLocalStatus::totalNumOfRunningThread; ++i) {
+            if(xthreadx::threads[i]) {
+                pthread_kill(*(xthreadx::threads[i]), SIGUSR2);
+//                pthread_cancel(*(xthreadx::threads[i]));
+            }
+        }
+    } else {
+        if(ThreadLocalStatus::runningThreadIndex != 0) {
+            fprintf(stderr, "t %d stopping\n", ThreadLocalStatus::runningThreadIndex);
+            pthread_exit(nullptr);
+        }
+    }
+}
+
 // MallocProf's main function
 int libmallocprof_main(int argc, char ** argv, char ** envp) {
     RealX::initializer();
@@ -82,6 +99,9 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
 
     ProgramStatus::setProfilerInitializedTrue();
 
+//#ifndef OPEN_SAMPLING_EVENT
+    signal(SIGUSR2, mainStop);
+//#endif
     atexit(exitHandler);
 
 	return real_main_mallocprof (argc, argv, envp);
@@ -651,4 +671,5 @@ void pthread_exit(void *retval) {
     RealX::pthread_exit(retval);
     __builtin_unreachable();
 }
+
 } // End of extern "C"

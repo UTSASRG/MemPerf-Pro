@@ -1,6 +1,7 @@
 #include "xthreadx.hh"
 
 extern thread_local HashMap <void *, DetailLockData, PrivateHeap> lockUsage;
+pthread_t * xthreadx::threads[MAX_THREAD_NUMBER];
 
 int xthreadx::thread_create(pthread_t * tid, const pthread_attr_t * attr, threadFunction * fn, void * arg) {
     ThreadLocalStatus::addARunningThread();
@@ -34,6 +35,8 @@ void * xthreadx::startThread(void * arg) {
     }
 
     ThreadLocalStatus::getARunningThreadIndex();
+    threads[ThreadLocalStatus::runningThreadIndex] = current->thread;
+
 
 #ifdef OPEN_SAMPLING_FOR_ALLOCS
     ThreadLocalStatus::setRandomPeriodForAllocations();
@@ -68,20 +71,25 @@ void * xthreadx::startThread(void * arg) {
 #endif
 
 //    ProgramStatus::setProfilerInitializedTrue();
-ProgramStatus::profilerInitialized = true;
-//fprintf(stderr, "thread %d\n", ThreadLocalStatus::runningThreadIndex);
+    ProgramStatus::profilerInitialized = true;
 
+    pthread_cleanup_push(threadExit, nullptr);
+
+    fprintf(stderr, "tid %d start\n", ThreadLocalStatus::runningThreadIndex);
     result = current->startRoutine(current->startArg);
-    threadExit();
 
+    pthread_cleanup_pop(1);
+//    threadExit(nullptr);
     return result;
 }
 
-spinlock lock;
-
 //bool lastThreadDepended;
 
-void xthreadx::threadExit() {
+void xthreadx::threadExit(void * arg) {
+
+fprintf(stderr, "thread %d clean\n", ThreadLocalStatus::runningThreadIndex);
+
+threads[ThreadLocalStatus::runningThreadIndex] = nullptr;
 
 #ifdef PREDICTION
     Predictor::outsideCyclesStop();
