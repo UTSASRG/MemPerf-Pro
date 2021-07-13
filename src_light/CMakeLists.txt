@@ -16,15 +16,6 @@ add_executable(mmprof
         libtestperf/xthread.hh
         prerun/libmallochelp.cpp
         prerun/runlib.cpp
-        test/alloc.cpp
-        test/alloc2.cpp
-        test/blackscholes-pthread.cpp
-        test/madvise.cpp
-        test/malloc-and-free.cpp
-        test/malloc-then-free.cpp
-        test/mmapmadvise.cpp
-        test/pmu-test.cpp
-        test/pmu-test2.cpp
         test/threadTest.cpp
         hashfuncs.hh
         hashmap.hh

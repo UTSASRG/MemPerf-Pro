@@ -11,10 +11,15 @@
 
 extern HashMap<uint64_t, CoherencyData, PrivateHeap> coherencyCaches;
 
+//void * ShadowMemory::addressRanges[NUM_ADDRESS_RANGE] = {0x550000000000UL};
+void * ShadowMemory::addressRanges[NUM_ADDRESS_RANGE] =
+        {(void*)0x80000000000UL, (void*)0x10000000000UL, (void*)0xa0000000000UL,
+         (void*)0x120000000000UL, (void*)0x140000000000UL};
+//         , (void*)0x7e0000000000, (void*)0x7f0000000000};
+
 #ifdef UTIL
-PageMapEntry * ShadowMemory::page_map_begin = nullptr;
-PageMapEntry * ShadowMemory::page_map_end = nullptr;
-PageMapEntry * ShadowMemory::page_map_bump_ptr = nullptr;
+PageMapEntry * ShadowMemory::page_map_begin[NUM_ADDRESS_RANGE];
+PageMapEntry * ShadowMemory::page_map_end[NUM_ADDRESS_RANGE];
 
 #ifdef CACHE_UTIL
 CacheMapEntry * ShadowMemory::cache_map_begin = nullptr;
@@ -40,14 +45,15 @@ bool ShadowMemory::initialize() {
     cache_map_lock.init();
 #endif
 
-	if((void *)(page_map_begin = (PageMapEntry *)mmap((void *)PAGE_MAP_START, PAGE_MAP_SIZE,
-									PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0)) == MAP_FAILED) {
-        fprintf(stderr, "errno %d\n", ENOMEM);
-        fprintf(stderr, "mmap of global page map failed. Adddress %lx size %lx error (%d) %s\n", PAGE_MAP_START, PAGE_MAP_SIZE, errno, strerror(errno));
-        abort();
+	for(uint8_t i = 0; i < NUM_ADDRESS_RANGE; ++i) {
+        if((void *)(page_map_begin[i] = (PageMapEntry *)mmap(addressRanges[i], PAGE_MAP_SIZE,
+                                                          PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0)) == MAP_FAILED) {
+            fprintf(stderr, "errno %d\n", ENOMEM);
+            fprintf(stderr, "mmap of global page map failed. Adddress %p size %lx error (%d) %s\n", addressRanges[i], PAGE_MAP_SIZE, errno, strerror(errno));
+            abort();
+        }
+        page_map_end[i] = page_map_begin[i] + MAX_PAGE_MAP_ENTRIES;
 	}
-	page_map_end = page_map_begin + MAX_PAGE_MAP_ENTRIES;
-	page_map_bump_ptr = page_map_begin;
 
 #ifdef CACHE_UTIL
 	if((void *)(cache_map_begin = (CacheMapEntry *)mmap((void *)CACHE_MAP_START, CACHE_MAP_SIZE,
@@ -76,15 +82,23 @@ void ShadowMemory::mallocUpdateObject(void * address, unsigned int size) {
     }
 
     uintptr_t uintaddr = (uintptr_t)address;
+//    fprintf(stderr, "size %u address %p\n", size, address);
 
-    uint64_t firstPageIdx = getPageIndex(uintaddr);
+    uint8_t firstPageRange;
+    uint64_t firstPageIdx;
+    getPageIndex(uintaddr, &firstPageRange, &firstPageIdx);
 
-    mallocUpdatePages(uintaddr, firstPageIdx, size);
+    if(firstPageRange == NUM_ADDRESS_RANGE) {
+        fprintf(stderr, "malloc address %p out of range\n", uintaddr);
+        return;
+    }
+
+    mallocUpdatePages(uintaddr, firstPageRange, firstPageIdx, size);
 
 #ifdef CACHE_UTIL
     uint8_t firstCacheLineOffset = (uintaddr & CACHELINE_SIZE_MASK);
     uint8_t curCacheLineIdx = ((uintaddr & PAGESIZE_MASK) >> LOG2_CACHELINE_SIZE);
-    PageMapEntry::mallocUpdateCacheLines(firstPageIdx, curCacheLineIdx, firstCacheLineOffset, size);
+    PageMapEntry::mallocUpdateCacheLines(firstPageRange, firstPageIdx, curCacheLineIdx, firstCacheLineOffset, size);
 #endif
 
 }
@@ -96,24 +110,30 @@ void ShadowMemory::freeUpdateObject(void * address, unsigned int size) {
 
     uintptr_t uintaddr = (uintptr_t)address;
 
-    uint64_t firstPageIdx = getPageIndex(uintaddr);
+    uint8_t firstPageRange;
+    uint64_t firstPageIdx;
+    getPageIndex(uintaddr, &firstPageRange, &firstPageIdx);
 
+    if(firstPageRange == NUM_ADDRESS_RANGE) {
+        fprintf(stderr, "free address %p out of range\n", uintaddr);
+        return;
+    }
 
-    freeUpdatePages(uintaddr, firstPageIdx, size);
+    freeUpdatePages(uintaddr, firstPageRange, firstPageIdx, size);
 
 #ifdef CACHE_UTIL
     uint8_t firstCacheLineOffset = (uintaddr & CACHELINE_SIZE_MASK);
     uint8_t curCacheLineIdx = ((uintaddr & PAGESIZE_MASK) >> LOG2_CACHELINE_SIZE);
-    PageMapEntry::freeUpdateCacheLines(firstPageIdx, curCacheLineIdx, firstCacheLineOffset, size);
+    PageMapEntry::freeUpdateCacheLines(firstPageRange, firstPageIdx, curCacheLineIdx, firstCacheLineOffset, size);
 #endif
 
 }
 
-void ShadowMemory::mallocUpdatePages(uintptr_t uintaddr, uint64_t page_index, int64_t size) {
+void ShadowMemory::mallocUpdatePages(uintptr_t uintaddr, uint8_t range, uint64_t page_index, int64_t size) {
 
     unsigned short firstPageOffset = uintaddr & PAGESIZE_MASK;
     unsigned int curPageBytes = MIN(PAGESIZE - firstPageOffset, size);
-    PageMapEntry * current = getPageMapEntry(page_index);
+    PageMapEntry * current = getPageMapEntry(range, page_index);
 
     current->addUsedBytes(curPageBytes);
     if(!current->isTouched()) {
@@ -139,11 +159,11 @@ void ShadowMemory::mallocUpdatePages(uintptr_t uintaddr, uint64_t page_index, in
     }
 }
 
-void ShadowMemory::freeUpdatePages(uintptr_t uintaddr, uint64_t page_index, int64_t size) {
+void ShadowMemory::freeUpdatePages(uintptr_t uintaddr, uint8_t range, uint64_t page_index, int64_t size) {
 
     unsigned short firstPageOffset = uintaddr & PAGESIZE_MASK;
     unsigned int curPageBytes = MIN(PAGESIZE - firstPageOffset, size);
-    PageMapEntry * current = getPageMapEntry(page_index);
+    PageMapEntry * current = getPageMapEntry(range, page_index);
 
     current->subUsedBytes(curPageBytes);
     size -= curPageBytes;
@@ -163,10 +183,12 @@ void ShadowMemory::freeUpdatePages(uintptr_t uintaddr, uint64_t page_index, int6
 
 void ShadowMemory::cleanupPages(uintptr_t uintaddr, size_t length) {
 
-    uint64_t pageIdx = getPageIndex(uintaddr);
+    uint8_t firstPageRange;
+    uint64_t firstPageIdx;
+    getPageIndex(uintaddr, &firstPageRange, &firstPageIdx);
 
     length = alignup(length, PAGESIZE);
-    PageMapEntry * current =  getPageMapEntry(pageIdx);
+    PageMapEntry * current =  getPageMapEntry(firstPageRange, firstPageIdx);
 
     while(length) {
         if(current->isTouched()) {
@@ -193,10 +215,13 @@ short lastThread = -1;
 
 void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType) {
 
-    uint64_t pageIdx = getPageIndex(uintaddr);
+    uint8_t pageRange;
+    uint64_t pageIdx;
+    getPageIndex(uintaddr, &pageRange, &pageIdx);
 
 #ifdef UTIL
-    if(pageIdx >= MAX_PAGE_MAP_ENTRIES) {
+    if(pageRange == NUM_ADDRESS_RANGE) {
+//        fprintf(stderr, " sampling address %p out of range\n", uintaddr);
         return;
     }
 #endif
@@ -204,7 +229,7 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType)
     uint8_t cacheIdx = ((uintaddr & PAGESIZE_MASK) >> LOG2_CACHELINE_SIZE);
 
 #ifdef UTIL
-    PageMapEntry * pme = getPageMapEntry(pageIdx);
+    PageMapEntry * pme = getPageMapEntry(pageRange, pageIdx);
 
     if(!pme->isTouched() || pme->getUsedBytes() == 0) {
         return;
@@ -381,13 +406,22 @@ void PageMapEntry::setTouched() {
 }
 #endif
 
-inline uint64_t ShadowMemory::getPageIndex(uint64_t addr) {
-    return (addr - 0x550000000000UL) >> LOG2_PAGESIZE;
+inline void ShadowMemory::getPageIndex(uint64_t addr, uint8_t * range, uint64_t * index) {
+    for(uint8_t i = 0; i < NUM_ADDRESS_RANGE; ++i) {
+        if(addr >= (uint64_t)addressRanges[i]) {
+           *index = (addr - (uint64_t)addressRanges[i]) >> LOG2_PAGESIZE;
+           if(*index <= MAX_PAGE_MAP_ENTRIES) {
+               *range = i;
+               return;
+           }
+        }
+    }
+    *range = NUM_ADDRESS_RANGE;
 }
 
 #ifdef UTIL
-inline PageMapEntry * ShadowMemory::getPageMapEntry(uint64_t page_idx) {
-    return page_map_begin + page_idx;
+inline PageMapEntry * ShadowMemory::getPageMapEntry(uint8_t range, uint64_t page_idx) {
+    return page_map_begin[range] + page_idx;
 }
 
 #ifdef CACHE_UTIL
@@ -422,9 +456,9 @@ void PageMapEntry::setFull() {
 }
 
 #ifdef CACHE_UTIL
-void PageMapEntry::mallocUpdateCacheLines(uint64_t page_index, uint8_t cache_index, uint8_t firstCacheLineOffset, unsigned int size) {
+void PageMapEntry::mallocUpdateCacheLines(uint8_t range, uint64_t page_index, uint8_t cache_index, uint8_t firstCacheLineOffset, unsigned int size) {
     int64_t size_remain = size;
-    PageMapEntry * targetPage = ShadowMemory::getPageMapEntry(page_index);
+    PageMapEntry * targetPage = ShadowMemory::getPageMapEntry(range, page_index);
     CacheMapEntry * current = targetPage->getCacheMapEntry(true) + cache_index;
 
     uint8_t curCacheLineBytes = MIN(CACHELINE_SIZE - firstCacheLineOffset, size_remain);
@@ -461,9 +495,9 @@ void PageMapEntry::mallocUpdateCacheLines(uint64_t page_index, uint8_t cache_ind
 
 }
 
-void PageMapEntry::freeUpdateCacheLines(uint64_t page_index, uint8_t cache_index, uint8_t firstCacheLineOffset, unsigned int size) {
+void PageMapEntry::freeUpdateCacheLines(uint8_t range, uint64_t page_index, uint8_t cache_index, uint8_t firstCacheLineOffset, unsigned int size) {
     int64_t size_remain = size;
-    PageMapEntry * targetPage = ShadowMemory::getPageMapEntry(page_index);
+    PageMapEntry * targetPage = ShadowMemory::getPageMapEntry(range, page_index);
     CacheMapEntry * current = targetPage->getCacheMapEntry(true) + cache_index;
 
     uint8_t curCacheLineBytes = MIN(CACHELINE_SIZE - firstCacheLineOffset, size_remain);

@@ -1,21 +1,16 @@
-# maprof: A General Allocator for Different Memory Allocators
+# MemPerf: A General Profiler for Memory Allocators
 
-Status:
-About allocator information. We should also check whether the library’s location. It will be bad to put everywhere. Also, it will be impossible to run canneal, fluidanimate, freqmine, 
- 
-LD_PRELOAD=/home/tongpingliu/projects/mmprof/src/libmallocprof.so ./canneal-jemalloc 15 15000 2000 ../../datasets/canneal/2500000.nets 6000
+## Sorry for the Inconvience!
+To use MemPerf, you need to configure several parts in the codes to let it runnable. I haven't built a easy-run interface since I may still update the codes for some new ideas to chase a paper acception, and you can find massive debugging lines inside the codes. I will definitely make it easy to use, clean, and completed after I get the paper accepted.
 
-With the error like this:
-Failed to open allocator info file. Make sure to run the prerun lib and
-the file (i.e. allocator.info) is in this directory. Quit: No such file or directory
+## So How to Use MemPerf Right Now?
+Currently the src/ folder is stale and discarded, you should use the codes in src_light/. Before doing compilaton, you need to check these:
+1. The definitions in definevalues.h. There are many things that need confirm: enabled functionalities, the perf event hex numbers, the sampling period, and all kinds of max values. Make sure the values fit your own environment.
+2. You need to specify the input .info file in the function getInputInfoFileName() in programstatus.cpp. Info files are located in the folder info/. If you are using an allocator that doesn't fit any of those, you need to write one by yourself. Also, you need to check the output path in the function openOutputFile() in the same file.
+3. Change the values in the array addressRanges in shadowmemory.cpp and the definition NUM_ADDRESS_RANGE in shadowmemory.h. They are the address ranges of the heap objects, which depend on your running environment and the allocator.
+After all the changes in the codes, you can re-compile the source codes by make. Currently we also have to re-compile the application:
+```
+g++ -O2 -pipe -g -g3 -ggdb3 -Wall -DNDEBUG --std=c++11 -fPIC -I$(ROOT)/include -Wno-unused-result -fno-omit-frame-pointer -Wl,--no-as-needed -lrt -rdynamic ./libmallocprof.so -rdynamic $(ALLOCATOR_PATH) -o test/$(TEST_BINARY) test/$(TEST_FILE
+```
 
-Crashes on bodytrack, dedup, ferret, reverse_index, streamcluster
-With the error:
-ERROR: incremented page map entry at 0x14003f708 to size 4416 > 4096
 
-Todo lists: 
-1. Remove the 3-level to 1-level (Page) 
-2. No differentiation of passive and positive false sharing 
-3. We can differentiate false sharing from true shairng. For false sharing, we can know whether this is caused by allocator or not. The starting address of an object will affect the false effect (performance). Please refer to Predator. 
-4. For cache level, using the hash table. Maybe we don't need to care about the false positives caused by the accumulated effect of multiple allocations. 
-5. Object table (hash table), have lots of conflict. You need to confirm whether this is the bottleneck. If it is bottleneck, check the corresponding implementation of CachePerf. such as ChunkTable. 

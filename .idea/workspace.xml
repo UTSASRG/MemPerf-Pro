@@ -5,15 +5,26 @@
   </component>
   <component name="CMakeSettings">
     <configurations>
-      <configuration PROFILE_NAME="Debug" CONFIG_NAME="Debug" />
+      <configuration PROFILE_NAME="Debug" CONFIG_NAME="Debug" ENABLED="true" />
     </configurations>
   </component>
   <component name="ChangeListManager">
     <list default="true" id="f07b8e7c-11f2-4582-b7c0-966bf3cde0cb" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/memoryusage.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/src/memoryusage.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/memoryusage.h" beforeDir="false" afterPath="$PROJECT_DIR$/src/memoryusage.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/shadowmemory.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/src/shadowmemory.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src_light/CMakeLists.txt" beforeDir="false" afterPath="$PROJECT_DIR$/src_light/CMakeLists.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src_light/Makefile" beforeDir="false" afterPath="$PROJECT_DIR$/src_light/Makefile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src_light/definevalues.h" beforeDir="false" afterPath="$PROJECT_DIR$/src_light/definevalues.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src_light/libmallocprof.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/src_light/libmallocprof.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src_light/programstatus.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/src_light/programstatus.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src_light/test/alloc.cpp" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src_light/test/alloc2.cpp" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src_light/test/blackscholes-pthread.cpp" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src_light/test/madvise.cpp" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src_light/test/malloc-and-free.cpp" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src_light/test/malloc-then-free.cpp" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src_light/test/mmapmadvise.cpp" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src_light/test/pmu-test.cpp" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src_light/test/pmu-test2.cpp" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -35,7 +46,14 @@
     <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
     <property name="WebServerToolWindowFactoryState" value="true" />
     <property name="cf.first.check.clang-format" value="false" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$/../../Eamp;C-ENG322-SEC01 FA20-Assignment2-GoFishGame-2412575" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/src_light" />
+  </component>
+  <component name="RunManager">
+    <configuration default="true" type="GradleAppRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" PASS_PARENT_ENVS_2="true">
+      <method v="2">
+        <option name="com.jetbrains.cidr.cpp.gradle.execution.GradleNativeBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
   </component>
   <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
   <component name="SvnConfiguration">
@@ -61,19 +79,8 @@
       <workItem from="1602114793786" duration="1136000" />
       <workItem from="1602815595298" duration="774000" />
       <workItem from="1602970343353" duration="49000" />
+      <workItem from="1626128820325" duration="390000" />
     </task>
     <servers />
-  </component>
-  <component name="WindowStateProjectService">
-    <state x="493" y="201" key="FileChooserDialogImpl" timestamp="1602970391128">
-      <screen x="0" y="0" width="1280" height="760" />
-    </state>
-    <state x="493" y="201" key="FileChooserDialogImpl/0.0.1280.760/335.-1080.1920.1040@0.0.1280.760" timestamp="1602970391128" />
-    <state x="1075" y="-805" key="FileChooserDialogImpl/0.0.1280.760/335.-1080.1920.1040@335.-1080.1920.1040" timestamp="1595346890745" />
-    <state x="493" y="201" key="FileChooserDialogImpl/0.0.1280.760@0.0.1280.760" timestamp="1602167179829" />
-    <state x="66" y="19" width="564" height="536" key="find.popup" timestamp="1598010895004">
-      <screen x="0" y="0" width="1280" height="760" />
-    </state>
-    <state x="66" y="19" width="564" height="536" key="find.popup/0.0.1280.760/335.-1080.1920.1040@0.0.1280.760" timestamp="1598010895004" />
   </component>
 </project>

@@ -56,7 +56,7 @@ TARGETS = libmallocprof.so
 
 # Libmallocprof
 libmallocprof.so: $(DEPS)
-	$(CXX) $(CFLAGS2) $(PROFILER_FLAGS) $(INCLUDE_DIRS) -shared -fPIC $(SRCS) -o new_lib/libmallocprof.so -ldl -lpthread
+	$(CXX) $(CFLAGS2) $(PROFILER_FLAGS) $(INCLUDE_DIRS) -shared -fPIC $(SRCS) -o libmallocprof.so -ldl -lpthread
 
 #test/test-tcmalloc-minimal-thread: libmallocprof.so test/$(THREADTEST_FILE)
 #	$(CXX) $(CFLAGS) -rdynamic ./libmallocprof.so -rdynamic /home/tpliu/jinzhou/allocators/libtcmalloc_minimal.so -o test/test-tcmalloc-minimal-thread test/$(THREADTEST_FILE) -lpthread

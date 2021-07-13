@@ -2,11 +2,11 @@
 #define MMPROF_DEFINEVALUES_H
 
 #define OPEN_SAMPLING_EVENT 1
-#define OPEN_SAMPLING_FOR_ALLOCS 1
+//#define OPEN_SAMPLING_FOR_ALLOCS 1
 #define RANDOM_PERIOD_FOR_ALLOCS 100
 #define PREDICTION 1
-//#define UTIL 1
-//#define CACHE_UTIL 1
+#define UTIL 1
+#define CACHE_UTIL 1
 
 //#define OPEN_DEBUG 1
 //#define OPEN_CPU_BINDING 1
@@ -25,8 +25,11 @@
 #define PAGESIZE_HUGE 2*ONE_MB
 #define NUM_CACHELINES_PER_PAGE 64
 
+//#define SAMPLING_PERIOD 25000000
+//#define SAMPLING_PERIOD 5000000
 #define SAMPLING_PERIOD 500000
-//#define SAMPLING_PERIOD 400000
+//#define SAMPLING_PERIOD 50000
+//#define SAMPLING_PERIOD 10000
 
 //#define MMAP_PAGES 2049 // must be in the form of 2^N + 1
 //#define MMAP_PAGES 513 // must be in the form of 2^N + 1

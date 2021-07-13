@@ -52,7 +52,6 @@ void mainStop(int signum) {
         for(uint16_t i = 1; i < ThreadLocalStatus::totalNumOfRunningThread; ++i) {
             if(xthreadx::threads[i]) {
                 pthread_kill(*(xthreadx::threads[i]), SIGUSR2);
-//                pthread_cancel(*(xthreadx::threads[i]));
             }
         }
     } else {

@@ -43,6 +43,10 @@
 #define CACHE_MAP_START (PAGE_MAP_START + PAGE_MAP_SIZE)
 #define OBJ_SIZE_MAP_START (CACHE_MAP_START + CACHE_MAP_SIZE)
 
+#define NUM_ADDRESS_RANGE 1
+//#define NUM_ADDRESS_RANGE 5
+
+
 #define PAGE_MAP_SIZE (256 * ONE_GB)
 #define CACHE_MAP_SIZE (64 * ONE_GB)
 
@@ -94,8 +98,8 @@ public:
 #ifdef CACHE_UTIL
     CacheMapEntry * cache_map_entry;
 
-    static void mallocUpdateCacheLines(uint64_t page_index, uint8_t cache_index, uint8_t firstCacheLineOffset, unsigned int size);
-    static void freeUpdateCacheLines(uint64_t page_index, uint8_t cache_index, uint8_t firstCacheLineOffset, unsigned int size);
+    static void mallocUpdateCacheLines(uint8_t range, uint64_t page_index, uint8_t cache_index, uint8_t firstCacheLineOffset, unsigned int size);
+    static void freeUpdateCacheLines(uint8_t range, uint64_t page_index, uint8_t cache_index, uint8_t firstCacheLineOffset, unsigned int size);
     CacheMapEntry * getCacheMapEntry(bool mvBumpPtr = true);
 #endif
 
@@ -114,16 +118,15 @@ class ShadowMemory {
 private:
 
 #ifdef UTIL
-    static void mallocUpdatePages(uintptr_t uintaddr, uint64_t page_index, int64_t size);
-    static void freeUpdatePages(uintptr_t uintaddr, uint64_t page_index, int64_t size);
+    static void mallocUpdatePages(uintptr_t uintaddr, uint8_t range, uint64_t page_index, int64_t size);
+    static void freeUpdatePages(uintptr_t uintaddr, uint8_t range, uint64_t page_index, int64_t size);
 #endif
 
     static HashLocksSetForCoherency hashLocksSetForCoherency;
 
 #ifdef UTIL
-    static PageMapEntry * page_map_begin;
-    static PageMapEntry * page_map_end;
-    static PageMapEntry * page_map_bump_ptr;
+    static PageMapEntry * page_map_begin[NUM_ADDRESS_RANGE];
+    static PageMapEntry * page_map_end[NUM_ADDRESS_RANGE];
 
 #ifdef CACHE_UTIL
     static CacheMapEntry * cache_map_begin;
@@ -136,6 +139,8 @@ private:
     static bool isInitialized;
 
 public:
+
+    static void * addressRanges[NUM_ADDRESS_RANGE];
 
 #ifdef UTIL
 
@@ -160,10 +165,10 @@ public:
 
 #endif
 
-    static uint64_t getPageIndex(uint64_t addr);
+    static void getPageIndex(uint64_t addr, uint8_t * range, uint64_t * index);
 
 #ifdef UTIL
-    static PageMapEntry * getPageMapEntry(uint64_t page_idx);
+    static PageMapEntry * getPageMapEntry(uint8_t range, uint64_t page_idx);
     static void mallocUpdateObject(void * address, unsigned int size);
     static void freeUpdateObject(void * address, unsigned int size);
 #endif
