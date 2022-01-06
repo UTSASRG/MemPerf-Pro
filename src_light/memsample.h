@@ -23,12 +23,12 @@
 #include "allocatingstatus.h"
 
 typedef struct {
-    bool samplesLost;
+//    bool samplesLost;
     int perf_fd;
     int perf_fd2;
-    int perf_fd_fault;
-    int perf_fd_cache;
-    int perf_fd_instr;
+//    int perf_fd_fault;
+//    int perf_fd_cache;
+//    int perf_fd_instr;
 
     uint64_t prev_head;
     char * data_buf_copy = NULL;

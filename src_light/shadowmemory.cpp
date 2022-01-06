@@ -98,7 +98,7 @@ void ShadowMemory::mallocUpdateObject(void * address, unsigned int size) {
     getPageIndex(uintaddr, &firstPageRange, &firstPageIdx);
 
     if(firstPageRange == NUM_ADDRESS_RANGE) {
-        fprintf(stderr, "malloc address %p out of range\n", uintaddr);
+//        fprintf(stderr, "malloc address %p out of range\n", uintaddr);
         return;
     }
 
@@ -124,7 +124,7 @@ void ShadowMemory::freeUpdateObject(void * address, unsigned int size, uint16_t 
     getPageIndex(uintaddr, &firstPageRange, &firstPageIdx);
 
     if(firstPageRange == NUM_ADDRESS_RANGE) {
-        fprintf(stderr, "free address %p out of range\n", uintaddr);
+//        fprintf(stderr, "free address %p out of range\n", uintaddr);
         return;
     }
 

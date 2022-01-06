@@ -405,16 +405,17 @@ long long perf_mmap_read() {
                 }
 #endif
             }
-        } else if(event->type == PERF_RECORD_LOST) {
+        }
+//        else if(event->type == PERF_RECORD_LOST) {
             // If this is the first time we have lost sample data
             // then emit a warning message
-            if(!perfInfo.samplesLost) {
-                fprintf(stderr, "perf sample data has been lost! "
-                                "increase your buffer size or read sample data more "
-                                "often\n");
-                perfInfo.samplesLost = true;
-            }
-        }
+//            if(!perfInfo.samplesLost) {
+//                fprintf(stderr, "perf sample data has been lost! "
+//                                "increase your buffer size or read sample data more "
+//                                "often\n");
+//                perfInfo.samplesLost = true;
+//            }
+//        }
 
         // Move the offset counter ahead by the size given in the event header.
         offset = starting_offset + event->size;

@@ -39,7 +39,7 @@ CC = gcc
 CXX = g++
 
 CFLAGS += -pipe -g -g3 -ggdb3 -Wall -DNDEBUG --std=c++11 -fPIC -I$(ROOcpu_set_t T)/include -Wno-unused-result -fno-omit-frame-pointer -Wl,--no-as-needed -lrt
-CFLAGS2 += -O0 -pipe -g -g3 -ggdb3 -Wall -DNDEBUG --std=c++11 -fPIC -I$(ROOT)/include -Wno-unused-result -fno-omit-frame-pointer -Wl,--no-as-needed -lrt
+CFLAGS2 += -O3 -pipe -g -g3 -ggdb3 -Wall -DNDEBUG --std=c++11 -fPIC -I$(ROOT)/include -Wno-unused-result -fno-omit-frame-pointer -Wl,--no-as-needed -lrt
 
 THREADTEST_FILE = threadTest.cpp
 TEST_FILE = alloc.cpp

@@ -60,7 +60,7 @@
 #define MAX_CACHE_MAP_ENTRIES 0
 #endif
 
-#define NUM_COHERENCY_CACHES 20000
+//#define NUM_COHERENCY_CACHES 20000
 
 extern char * allocator_name;
 
@@ -85,7 +85,6 @@ public:
     bool addedConflict;
     bool addedCoherency;
     int8_t num_used_bytes;
-//    uint8_t lastThreadIdx;
     uint8_t misses;
 
     void addUsedBytes(uint8_t num_bytes);
