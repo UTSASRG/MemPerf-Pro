@@ -187,11 +187,17 @@ void Predictor::printOutput() {
         fprintf(ProgramStatus::outputFile, "speed up 0%%\n");
     }
 
+    if(replacedCriticalCycle && replacedCriticalCycle < criticalCycle) {
+        fprintf(stderr, "%s: SPEED UP %3lu%%\n", ProgramStatus::outputFileName, (criticalCycle-replacedCriticalCycle)*100/replacedCriticalCycle);
+    } else {
+        fprintf(stderr, "%s: SPEED UP 0%%\n", ProgramStatus::outputFileName);
+    }
+
 }
 
 void Predictor::fopenPredictorInfoFile() {
     char predictorInfoFileName[MAX_FILENAME_LEN];
-    strcpy(predictorInfoFileName, "/home/jinzhou/mmprof/predictor.info");
+    strcpy(predictorInfoFileName, "/home/jinzhou/mmprof/predictor_naive.info");
     fprintf(stderr, "Opening prediction info file %s...\n", predictorInfoFileName);
     if ((predictorInfoFile = fopen (predictorInfoFileName, "r")) == NULL) {
         perror("Failed to open prediction info file");

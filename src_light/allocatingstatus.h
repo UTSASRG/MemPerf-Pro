@@ -1,6 +1,8 @@
 #ifndef MMPROF_ALLOCATIONSTATUS_H
 #define MMPROF_ALLOCATIONSTATUS_H
 
+
+#include <assert.h>
 #include "shadowmemory.hh"
 #include "objTable.h"
 #include "threadlocalstatus.h"
@@ -48,7 +50,7 @@ private:
 #endif
     };
 
-#define LENGTH_OF_QUEUE 10
+#define LENGTH_OF_QUEUE 1000
 
     struct QueueOfDetailLockDataInAllocatingStatus {
 

@@ -132,7 +132,7 @@ void sampleHandler(int signum, siginfo_t *info, void *p) {
 
 	pe_load.type = PERF_TYPE_RAW;
 	pe_load.size = sizeof(struct perf_event_attr);
-	pe_load.config = LOAD_ACCESS;
+	pe_load.config = LOAD_LATENCY;
 
 	bool sign = rand() % 2;
 	int percent = rand() % 1001;  // generates between 0 and 1000, representing 0% to 10%, respectively
@@ -160,7 +160,7 @@ void sampleHandler(int signum, siginfo_t *info, void *p) {
 	pe_load.enable_on_exec = 1;
 	pe_load.task = 0;
 	pe_load.watermark = 0;
-	pe_load.precise_ip = 1;
+	pe_load.precise_ip = 3;
 	pe_load.mmap_data = 0;
 	pe_load.sample_id_all = 0;
 	pe_load.exclude_host = 0;
@@ -178,6 +178,7 @@ void sampleHandler(int signum, siginfo_t *info, void *p) {
 
 	memcpy(&pe_store, &pe_load, sizeof(struct perf_event_attr));
 	pe_store.config = STORE_ACCESS;
+    pe_load.precise_ip = 1;
 	acquireGlobalPerfLock();
 	perfInfo.perf_fd2 = perf_event_open(&pe_store, 0, -1, -1, 0);
 	if(perfInfo.perf_fd2 == -1) {
@@ -384,6 +385,7 @@ long long perf_mmap_read() {
 
             if(sample_type & PERF_SAMPLE_DATA_SRC) {
                 uint64_t src = *(uint64_t *)(use_data_buf + offset);
+                bool miss = !(src & (PERF_MEM_LVL_L1 << PERF_MEM_LVL_SHIFT) && src & (PERF_MEM_LVL_HIT << PERF_MEM_LVL_SHIFT));
                 offset += sizeof(uint64_t);
 
                 if(src & (PERF_MEM_OP_LOAD))
@@ -396,6 +398,12 @@ long long perf_mmap_read() {
                     accessType = E_MEM_EXEC;
                 else
                     accessType = E_MEM_UNKNOWN;
+
+#ifdef OPEN_SAMPLING_EVENT
+                if((intpaddr > 0) && (intpaddr < LAST_USER_ADDR)) {
+                    ShadowMemory::doMemoryAccess(intpaddr, accessType, miss);
+                }
+#endif
             }
         } else if(event->type == PERF_RECORD_LOST) {
             // If this is the first time we have lost sample data
@@ -406,10 +414,6 @@ long long perf_mmap_read() {
                                 "often\n");
                 perfInfo.samplesLost = true;
             }
-        }
-
-        if((intpaddr > 0) && (intpaddr < LAST_USER_ADDR)) {
-            ShadowMemory::doMemoryAccess(intpaddr, accessType);
         }
 
         // Move the offset counter ahead by the size given in the event header.

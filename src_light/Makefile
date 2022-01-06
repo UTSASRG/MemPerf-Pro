@@ -39,7 +39,7 @@ CC = gcc
 CXX = g++
 
 CFLAGS += -pipe -g -g3 -ggdb3 -Wall -DNDEBUG --std=c++11 -fPIC -I$(ROOcpu_set_t T)/include -Wno-unused-result -fno-omit-frame-pointer -Wl,--no-as-needed -lrt
-CFLAGS2 += -Ofast -pipe -g -g3 -ggdb3 -Wall -DNDEBUG --std=c++11 -fPIC -I$(ROOT)/include -Wno-unused-result -fno-omit-frame-pointer -Wl,--no-as-needed -lrt
+CFLAGS2 += -O0 -pipe -g -g3 -ggdb3 -Wall -DNDEBUG --std=c++11 -fPIC -I$(ROOT)/include -Wno-unused-result -fno-omit-frame-pointer -Wl,--no-as-needed -lrt
 
 THREADTEST_FILE = threadTest.cpp
 TEST_FILE = alloc.cpp
@@ -56,7 +56,7 @@ TARGETS = libmallocprof.so
 
 # Libmallocprof
 libmallocprof.so: $(DEPS)
-	$(CXX) $(CFLAGS2) $(PROFILER_FLAGS) $(INCLUDE_DIRS) -shared -fPIC $(SRCS) -o libmallocprof.so -ldl -lpthread
+	$(CXX) $(CFLAGS2) $(INCLUDE_DIRS) -shared -fPIC $(SRCS) -o libmallocprof.so -ldl -lpthread
 
 #test/test-tcmalloc-minimal-thread: libmallocprof.so test/$(THREADTEST_FILE)
 #	$(CXX) $(CFLAGS) -rdynamic ./libmallocprof.so -rdynamic /home/tpliu/jinzhou/allocators/libtcmalloc_minimal.so -o test/test-tcmalloc-minimal-thread test/$(THREADTEST_FILE) -lpthread

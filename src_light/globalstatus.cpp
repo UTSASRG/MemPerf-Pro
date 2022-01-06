@@ -190,20 +190,11 @@ void GlobalStatus::printFriendliness() {
 
 #endif
 
-//        fprintf(ProgramStatus::outputFile, "accessed store instructions  %20u\n", friendlinessStatus.numOfSampledStoringInstructions);
-//        fprintf(ProgramStatus::outputFile, "accessed cache lines         %20u\n", friendlinessStatus.numOfSampledCacheLines);
         fprintf(ProgramStatus::outputFile, "\n");
-        if(friendlinessStatus.numThreadSwitch > 0) {
-            fprintf(ProgramStatus::outputFile, "true sharing instructions %20u %3u%%\n", friendlinessStatus.numOfTrueSharing, friendlinessStatus.numOfTrueSharing*100/friendlinessStatus.numThreadSwitch);
-            fprintf(ProgramStatus::outputFile, "false sharing instructions %20u %3u%%\n", friendlinessStatus.numOfFalseSharing, friendlinessStatus.numOfFalseSharing*100/friendlinessStatus.numThreadSwitch);
-            fprintf(ProgramStatus::outputFile, "\n");
-            if(friendlinessStatus.numOfTrueSharing*100/friendlinessStatus.numThreadSwitch > 15|| friendlinessStatus.numOfFalseSharing*100/friendlinessStatus.numThreadSwitch > 15) {
-                ShadowMemory::printOutput();
-            }
-        }
+        ShadowMemory::printOutput();
 
     }
-    friendlinessStatus.cacheConflictDetector.print(friendlinessStatus.numOfSampling);
+//    friendlinessStatus.cacheConflictDetector.print(friendlinessStatus.numOfSampling);
 #endif
 }
 

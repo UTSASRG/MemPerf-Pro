@@ -60,6 +60,7 @@ void ThreadLocalStatus::setRandomPeriodForAllocations() {
 }
 
 bool ThreadLocalStatus::randomProcessForCountingEvent() {
+//    return false;
     return dis(random) == 0;
 //    return !AllocatingStatus::numFunc;
 }

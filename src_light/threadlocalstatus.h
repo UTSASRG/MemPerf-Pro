@@ -3,7 +3,7 @@
 
 #include <stdlib.h>
 #include <time.h>
-#include<random>
+#include <random>
 
 #include "memsample.h"
 #include "allocatingstatus.h"

@@ -71,26 +71,12 @@ struct DetailLockData {
 //    void add(CriticalSectionStatus newCriticalSectionStatus);
 //};
 
-struct CacheConflictDetector {
-    uint32_t numOfHitForCaches[NUM_CACHELINES_PER_PAGE];
-    uint32_t numOfDifferentHitForCaches[NUM_CACHELINES_PER_PAGE];
-    uint32_t totalHitIntervalForCaches[NUM_CACHELINES_PER_PAGE];
-    uint32_t lastHitTimeForCaches[NUM_CACHELINES_PER_PAGE];
-    unsigned long lastHitMegaIndex[NUM_CACHELINES_PER_PAGE];
-    uint64_t lastHitPageIndex[NUM_CACHELINES_PER_PAGE];
-
-    void add(CacheConflictDetector newCacheConflictDetector);
-    void hit(uint64_t page_index, uint8_t cache_index, unsigned int time);
-    void print(unsigned int totalHit);
-};
-
 struct FriendlinessStatus {
     unsigned int numOfSampling;
 //    unsigned int numOfSampledStoringInstructions;
 //    unsigned int numOfSampledCacheLines;
-    unsigned int numOfFalseSharing;
-    unsigned int numOfTrueSharing;
-    unsigned int numThreadSwitch;
+//    unsigned int numOfFalseSharing;
+//    unsigned int numOfTrueSharing;
 
 #ifdef UTIL
     uint64_t totalMemoryUsageOfSampledPages;
@@ -100,8 +86,6 @@ struct FriendlinessStatus {
 #endif
 
 #endif
-
-    CacheConflictDetector cacheConflictDetector;
 
 #ifdef UTIL
 
@@ -223,13 +207,5 @@ constexpr char * falseSharingTypeOutputString[NUM_OF_FALSESHARINGTYPE] = {
         (char*)"passive false sharing"
 };
 
-struct CoherencyData {
-    uint8_t word;
-    short tid;
-    uint16_t ts;
-    uint16_t fs;
-    uint16_t time;
-    short tidsPerWord[8][16];
-};
 
 #endif //SRC_STRUCTS_H

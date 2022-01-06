@@ -1,18 +1,23 @@
 #ifndef MMPROF_DEFINEVALUES_H
 #define MMPROF_DEFINEVALUES_H
 
+//#define ON_DEBUG 1
+
 #define OPEN_SAMPLING_EVENT 1
-//#define OPEN_SAMPLING_FOR_ALLOCS 1
+#define OPEN_SAMPLING_FOR_ALLOCS 1
 #define RANDOM_PERIOD_FOR_ALLOCS 100
 #define PREDICTION 1
 #define UTIL 1
 #define CACHE_UTIL 1
+#define LOCK 1
 
 //#define OPEN_DEBUG 1
 //#define OPEN_CPU_BINDING 1
 
-#define LOAD_ACCESS 0x81d0
-#define STORE_ACCESS 0x82d0
+#define LOAD_LATENCY 0x1cd  ///mem_trans_retired.load_latency_gt_16
+//#define LOAD_ACCESS 0x81d0
+#define STORE_ACCESS 0x82d0 ///mem_inst_retired.all_stores
+
 #define LAST_USER_ADDR 0x7fffffffffff
 #define EIGHT_BYTES 8
 #define ONE_KB 1024l

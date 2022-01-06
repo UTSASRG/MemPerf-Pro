@@ -1,6 +1,7 @@
 #include "xthreadx.hh"
 
 extern thread_local HashMap <void *, DetailLockData, PrivateHeap> lockUsage;
+
 pthread_t * xthreadx::threads[MAX_THREAD_NUMBER];
 
 int xthreadx::thread_create(pthread_t * tid, const pthread_attr_t * attr, threadFunction * fn, void * arg) {
@@ -75,7 +76,7 @@ void * xthreadx::startThread(void * arg) {
 
     pthread_cleanup_push(threadExit, nullptr);
 
-    fprintf(stderr, "tid %d start\n", ThreadLocalStatus::runningThreadIndex);
+//    fprintf(stderr, "tid %d start\n", ThreadLocalStatus::runningThreadIndex);
     result = current->startRoutine(current->startArg);
 
     pthread_cleanup_pop(1);
@@ -87,7 +88,7 @@ void * xthreadx::startThread(void * arg) {
 
 void xthreadx::threadExit(void * arg) {
 
-fprintf(stderr, "thread %d clean\n", ThreadLocalStatus::runningThreadIndex);
+//fprintf(stderr, "thread %d clean\n", ThreadLocalStatus::runningThreadIndex);
 
 threads[ThreadLocalStatus::runningThreadIndex] = nullptr;
 

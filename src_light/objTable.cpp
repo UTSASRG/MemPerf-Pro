@@ -1,7 +1,7 @@
 
 #include "objTable.h"
 
-extern HashMap<void*, uint32_t, PrivateHeap> objStatusMap;
+extern HashMap<void*, ObjStat, PrivateHeap> objStatusMap;
 HashLocksSet ObjTable::hashLocksSet;
 
 void HashLocksSet::lock(void *address) {
@@ -23,36 +23,27 @@ bool ObjTable::allocUpdate(unsigned int size, void * address) {
 
 //    return true;
 
-    bool reused = true;
+    bool reused;
 
 //    hashLocksSet.lock(address);
-    uint32_t * status = objStatusMap.find(address, sizeof(unsigned long));
+    ObjStat * status = objStatusMap.find(address, sizeof(unsigned long));
     if(status == nullptr) {
         hashLocksSet.lock(address);
-        status = objStatusMap.findOrAdd(address, sizeof(unsigned long));
+        status = objStatusMap.insert(address, sizeof(unsigned long), ObjStat::newObj(ThreadLocalStatus::runningThreadIndex, size));
         hashLocksSet.unlock(address);
 //        *status = size;
         reused = false;
+    } else {
+        status->size = size;
+        status->tid = ThreadLocalStatus::runningThreadIndex;
+        reused = true;
     }
-//    else {
-//        hashLocksSet.unlock(address);
-//    }
-
-    *status = size;
 
     return reused;
 }
 
 
-uint32_t ObjTable::freeUpdate(void* address) {
-//    return 8;
-
-//    hashLocksSet.lock(address);
-    uint32_t * status = objStatusMap.find(address, sizeof(void *));
-    if(status == nullptr) {
-//        hashLocksSet.unlock(address);
-        return 0;
-    }
-//    hashLocksSet.unlock(address);
-    return *status;
+ObjStat* ObjTable::freeUpdate(void* address) {
+    ObjStat * status = objStatusMap.find(address, sizeof(void *));
+    return status;
 }

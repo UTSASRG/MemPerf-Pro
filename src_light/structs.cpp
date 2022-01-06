@@ -42,40 +42,6 @@ void DetailLockData::add(DetailLockData newDetailLockData) {
     }
 }
 
-void CacheConflictDetector::add(CacheConflictDetector newCacheConflictDetector) {
-    for(uint8_t cacheIndex = 0; cacheIndex < NUM_CACHELINES_PER_PAGE; ++cacheIndex) {
-        numOfHitForCaches[cacheIndex] += newCacheConflictDetector.numOfHitForCaches[cacheIndex];
-        numOfDifferentHitForCaches[cacheIndex] += newCacheConflictDetector.numOfDifferentHitForCaches[cacheIndex];
-        totalHitIntervalForCaches[cacheIndex] += newCacheConflictDetector.totalHitIntervalForCaches[cacheIndex];
-    }
-}
-
-void CacheConflictDetector::hit(uint64_t page_index, uint8_t cache_index, unsigned int time) {
-    numOfHitForCaches[cache_index]++;
-    if(lastHitPageIndex[cache_index] != page_index) {
-        if(lastHitMegaIndex[cache_index] || lastHitPageIndex[cache_index]) {
-            numOfDifferentHitForCaches[cache_index]++;
-            totalHitIntervalForCaches[cache_index] += time - lastHitTimeForCaches[cache_index];
-        }
-        lastHitPageIndex[cache_index] = page_index;
-    }
-    lastHitTimeForCaches[cache_index] = time;
-}
-
-void CacheConflictDetector::print(unsigned int totalHit) {
-    double standardScore = (double)100 / (double)64 / (double)64;
-    double maxScore = 0;
-    for(uint8_t cacheIndex = 0; cacheIndex < NUM_CACHELINES_PER_PAGE; ++cacheIndex) {
-        double RCD = (double)totalHitIntervalForCaches[cacheIndex] / (double)numOfDifferentHitForCaches[cacheIndex];
-        double hitRate = (double)numOfHitForCaches[cacheIndex]*100 / (double)totalHit;
-        double score = hitRate / RCD;
-        double relativeScore = score / standardScore;
-//        fprintf(stderr, "score = %lf, standardScore = %lf\n", score, standardScore);
-        maxScore = MAX(maxScore, relativeScore);
-    }
-    fprintf(ProgramStatus::outputFile, "conflict miss score: %lf\n", maxScore);
-}
-
 #ifdef UTIL
 
 #ifdef CACHE_UTIL
@@ -112,8 +78,7 @@ void FriendlinessStatus::add(FriendlinessStatus newFriendlinessStatus) {
 
 //    numOfSampledStoringInstructions += newFriendlinessStatus.numOfSampledStoringInstructions;
 //    numOfSampledCacheLines += newFriendlinessStatus.numOfSampledCacheLines;
-    numOfTrueSharing += newFriendlinessStatus.numOfTrueSharing;
-    numOfFalseSharing += newFriendlinessStatus.numOfFalseSharing;
-    numThreadSwitch += newFriendlinessStatus.numThreadSwitch;
-    cacheConflictDetector.add(newFriendlinessStatus.cacheConflictDetector);
+//    numOfTrueSharing += newFriendlinessStatus.numOfTrueSharing;
+//    numOfFalseSharing += newFriendlinessStatus.numOfFalseSharing;
+//    cacheConflictDetector.add(newFriendlinessStatus.cacheConflictDetector);
 }

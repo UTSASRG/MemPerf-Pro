@@ -21,6 +21,18 @@ struct HashLocksSet {
     void unlock(void * address);
 };
 
+struct ObjStat {
+    uint16_t tid;
+    uint32_t size;
+
+    static ObjStat newObj(uint16_t tid, uint32_t size) {
+        ObjStat obj;
+        obj.tid = tid;
+        obj.size = size;
+        return obj;
+    }
+};
+
 class ObjTable{
 public:
 
@@ -29,7 +41,7 @@ public:
     static void initialize();
 
     static bool allocUpdate(unsigned int size, void * address);
-    static uint32_t freeUpdate(void* address);
+    static ObjStat * freeUpdate(void* address);
 
 };
 

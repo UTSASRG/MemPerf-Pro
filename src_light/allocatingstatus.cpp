@@ -31,6 +31,7 @@ void AllocatingStatus::QueueOfDetailLockDataInAllocatingStatus::writingNewDataIn
 //        cleanUpQueue();
 //    }
     queueTail++;
+    assert(queueTail < LENGTH_OF_QUEUE);
 //    memset(&queue[queueTail], 0, sizeof(QueueOfDetailLockDataInAllocatingStatus::DetailLockDataInAllocatingStatus));
     queue[queueTail].addressOfHashLockData = addressOfHashLockData;
 }
@@ -119,13 +120,15 @@ void AllocatingStatus::updateMemoryStatusAfterAllocation() {
 }
 
 void AllocatingStatus::updateMemoryStatusBeforeFree() {
-    allocatingType.objectSize = ObjTable::freeUpdate(allocatingType.objectAddress);
-
+    ObjStat * objStat = ObjTable::freeUpdate(allocatingType.objectAddress);
+    if(objStat) {
+        allocatingType.objectSize = objStat->size;
 #ifdef UTIL
-    if(allocatingType.objectSize) {
-        ShadowMemory::freeUpdateObject(allocatingType.objectAddress, allocatingType.objectSize);
-    }
+        if(allocatingType.objectSize) {
+            ShadowMemory::freeUpdateObject(allocatingType.objectAddress, allocatingType.objectSize, objStat->tid);
+        }
 #endif
+    }
 
 }
 

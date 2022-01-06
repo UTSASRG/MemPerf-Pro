@@ -3,8 +3,7 @@
 
 thread_local HashMap <void *, DetailLockData, PrivateHeap> lockUsage;
 HashMap <void *, DetailLockData, PrivateHeap> globalLockUsage;
-HashMap <void*, uint32_t, PrivateHeap> objStatusMap;
-HashMap<uint64_t, CoherencyData, PrivateHeap> coherencyCaches;
+HashMap <void*, ObjStat, PrivateHeap> objStatusMap;
 
 //// pre-init private allocator memory
 typedef int (*main_fn_t)(int, char **, char **);
@@ -42,7 +41,6 @@ void exitHandler() {
     GlobalStatus::globalize();
     GlobalStatus::printOutput();
 //    GlobalStatus::printForMatrix();
-
 
 }
 
@@ -510,6 +508,7 @@ void *mremap(void *old_address, size_t old_size, size_t new_size, int flags, ...
 }
 }
 
+#ifdef LOCK
 extern "C" {
 int pthread_mutex_lock(pthread_mutex_t *mutex) {
     if (AllocatingStatus::outsideTrackedAllocation() || !AllocatingStatus::sampledForCountingEvent) {
@@ -651,6 +650,7 @@ int pthread_spin_unlock(pthread_spinlock_t *lock) {
     return RealX::pthread_spin_unlock(lock);
 }
 }
+#endif
 
 extern "C" {
 int pthread_create(pthread_t * tid, const pthread_attr_t * attr, void *(*start_routine)(void *), void * arg) {

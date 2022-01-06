@@ -46,7 +46,7 @@ void ProgramStatus::getInputInfoFileName(char * runningApplicationName) {
 //            strcpy(inputInfoFileName, "/home/jinzhou/mmprof/info/libc228.info");
     char * runningAllocatorName = strrchr(runningApplicationName, '-')+1;
 //    char * runningAllocatorName = std::getenv("ALLOCATOR_NAME");
-    if(strcmp(runningAllocatorName, "libc228") == 0) {
+    if(strcmp(runningAllocatorName, "libc228") == 0 || strcmp(runningAllocatorName, "pthread") == 0) {
         strcpy(inputInfoFileName, "/home/jinzhou/mmprof/info/libc228.info");
 //        strcpy(inputInfoFileName, "/media/umass/datasystem/steven/mmproftesting/mmprof/info/libc228.info");
     } else if(strcmp(runningAllocatorName, "libc221") == 0) {
