@@ -50,7 +50,7 @@ private:
 #endif
     };
 
-#define LENGTH_OF_QUEUE 1000
+#define LENGTH_OF_QUEUE 100
 
     struct QueueOfDetailLockDataInAllocatingStatus {
 

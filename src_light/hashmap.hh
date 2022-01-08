@@ -241,61 +241,61 @@ public:
 
   // Insert a hash table entry if it is not existing.
   // If the entry is already existing, return true
-//  bool insertIfAbsent(const KeyType& key, size_t keylen, ValueType value) {
-//    assert(_initialized == true);
-//    size_t hindex = hashIndex(key, keylen);
-//    struct HashBucket* first = getHashBucket(hindex);
-//    struct Entry* entry;
-//    bool isFound = true;
-//
-//#if LOCK_PROTECTION
-//    first->Lock();
-//#endif
-//
-//    // Check all _buckets with the same hindex.
-//    entry = getEntry(first, key, keylen);
-//    if(!entry) {
-//      isFound = false;
-//      insertEntry(first, key, keylen, value);
-//    }
-//
-//#if LOCK_PROTECTION
-//    first->Unlock();
-//#endif
-//    return isFound;
-//  }
+  bool insertIfAbsent(const KeyType& key, size_t keylen, ValueType value) {
+    assert(_initialized == true);
+    size_t hindex = hashIndex(key, keylen);
+    struct HashBucket* first = getHashBucket(hindex);
+    struct Entry* entry;
+    bool isFound = true;
 
-  // Free an entry with specified key
-//  bool erase(const KeyType& key, size_t keylen) {
-//    assert(_initialized == true);
-//    size_t hindex = hashIndex(key, keylen);
-//    struct HashBucket* first = getHashBucket(hindex);
-//    struct Entry* entry;
-//    bool isFound = false;
-//
-//#if LOCK_PROTECTION
-//    first->Lock();
-//#endif
-//
-//    entry = getEntry(first, key, keylen);
-//
-//    if(entry) {
-//      isFound = true;
-//
-//      // Check whether this entry is the first entry.
-//      // Remove this entry if existing.
-//      entry->erase();
-//
-//      SourceHeap::free(entry);
-//    }
-//
-//    first->count--;
-//
-//#if LOCK_PROTECTION
-//    first->Unlock();
-//#endif
-//    return isFound;
-//  }
+#if LOCK_PROTECTION
+    first->Lock();
+#endif
+
+    // Check all _buckets with the same hindex.
+    entry = getEntry(first, key, keylen);
+    if(!entry) {
+      isFound = false;
+      insertEntry(first, key, value);
+    }
+
+#if LOCK_PROTECTION
+    first->Unlock();
+#endif
+    return isFound;
+  }
+
+//   Free an entry with specified key
+  bool erase(const KeyType& key, size_t keylen) {
+    assert(_initialized == true);
+    size_t hindex = hashIndex(key, keylen);
+    struct HashBucket* first = getHashBucket(hindex);
+    struct Entry* entry;
+    bool isFound = false;
+
+#if LOCK_PROTECTION
+    first->Lock();
+#endif
+
+    entry = getEntry(first, key, keylen);
+
+    if(entry) {
+      isFound = true;
+
+      // Check whether this entry is the first entry.
+      // Remove this entry if existing.
+      entry->erase();
+
+      SourceHeap::free(entry);
+    }
+
+    first->count--;
+
+#if LOCK_PROTECTION
+    first->Unlock();
+#endif
+    return isFound;
+  }
 
   size_t getEntryNumber() { return _totalEntry; }
 

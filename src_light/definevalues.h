@@ -15,7 +15,7 @@
 //#define OPEN_CPU_BINDING 1
 
 #define LOAD_LATENCY 0x1cd  ///mem_trans_retired.load_latency_gt_16
-//#define LOAD_ACCESS 0x81d0
+#define LOAD_ACCESS 0x81d0
 #define STORE_ACCESS 0x82d0 ///mem_inst_retired.all_stores
 
 #define LAST_USER_ADDR 0x7fffffffffff

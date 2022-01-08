@@ -35,6 +35,8 @@ void * xthreadx::startThread(void * arg) {
         abort();
     }
 
+    ThreadLocalStatus::setStackBottom(0);
+
     ThreadLocalStatus::getARunningThreadIndex();
     threads[ThreadLocalStatus::runningThreadIndex] = current->thread;
 

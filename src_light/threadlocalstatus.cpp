@@ -16,6 +16,8 @@ thread_local FriendlinessStatus ThreadLocalStatus::friendlinessStatus;
 thread_local std::default_random_engine ThreadLocalStatus::random(time(NULL));
 thread_local std::uniform_int_distribution<int> ThreadLocalStatus::dis(0, RANDOM_PERIOD_FOR_ALLOCS-1);
 
+thread_local void * ThreadLocalStatus::stackBottom;
+
 void ThreadLocalStatus::getARunningThreadIndex() {
     lock.lock();
     runningThreadIndex = totalNumOfThread++;
@@ -65,7 +67,10 @@ bool ThreadLocalStatus::randomProcessForCountingEvent() {
 //    return !AllocatingStatus::numFunc;
 }
 
-//bool ThreadLocalStatus::randomProcess(unsigned short randomPeriod) {
-//    return rand() % randomPeriod == 0;
-//}
+void ThreadLocalStatus::setStackBottom(unsigned int null) {
+    stackBottom = &null;
+}
 
+uint64_t ThreadLocalStatus::getStackOffset(void * stackTop) {
+    return (uint64_t)stackBottom - (uint64_t)stackTop;
+}

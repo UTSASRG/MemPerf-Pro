@@ -13,6 +13,8 @@
 #include "threadlocalstatus.h"
 #include "memsample.h"
 #include "definevalues.h"
+#include "callsite.h"
+#include "objTable.h"
 
 #define NUM_CACHELINES_PER_PAGE_HUGE 32768
 
@@ -60,6 +62,16 @@
 #define MAX_CACHE_MAP_ENTRIES 0
 #endif
 
+struct ObjStat;
+namespace Callsite {
+    extern uint16_t numCallKey;
+
+    uint8_t getCallKey(uint8_t oldCallKey);
+    void * ConvertToVMA(void* addr);
+    void ssystem(char * command);
+    void printCallSite(uint8_t callKey);
+}
+
 //#define NUM_COHERENCY_CACHES 20000
 
 extern char * allocator_name;
@@ -81,18 +93,18 @@ class CacheMapEntry {
 
 public:
 
-#ifdef CACHE_UTIL
-    bool addedConflict;
-    bool addedCoherency;
+//#ifdef CACHE_UTIL
+//    bool addedConflict;
+//    bool addedCoherency;
     int8_t num_used_bytes;
-    uint8_t misses;
+    uint8_t misses; /// conflict = misses & (uint8_t)0x80, coherency = misses & (uint8_t)0x40;
 
     void addUsedBytes(uint8_t num_bytes);
     void subUsedBytes(uint8_t num_bytes);
     void setFull();
     void setEmpty();
     uint8_t getUsedBytes();
-#endif
+//#endif
 
 };
 
@@ -107,7 +119,7 @@ public:
     CacheMapEntry * cache_map_entry;
 
     static void mallocUpdateCacheLines(uint8_t range, uint64_t page_index, uint8_t cache_index, uint8_t firstCacheLineOffset, unsigned int size);
-    static void freeUpdateCacheLines(uint8_t range, uint64_t page_index, uint8_t cache_index, uint8_t firstCacheLineOffset, unsigned int size, uint16_t tid);
+    static void freeUpdateCacheLines(uint8_t range, uint64_t page_index, uint8_t cache_index, uint8_t firstCacheLineOffset, ObjStat objStat);
     CacheMapEntry * getCacheMapEntry(bool mvBumpPtr = true);
 #endif
 
@@ -179,7 +191,7 @@ public:
 #ifdef UTIL
     static PageMapEntry * getPageMapEntry(uint8_t range, uint64_t page_idx);
     static void mallocUpdateObject(void * address, unsigned int size);
-    static void freeUpdateObject(void * address, unsigned int size, uint16_t tid);
+    static void freeUpdateObject(void * address, ObjStat objStat);
 #endif
 
     static void printOutput();
@@ -189,10 +201,11 @@ public:
 struct CoherencyData {
     uint8_t word;
     short tid;
-    short allocateTid[2];
+    uint8_t callKey[2];
+    uint16_t allocateTid[2];
     uint16_t ts;
     uint16_t fs;
-    short tidsPerWord[8][16];
+    uint16_t tidsPerWord[8][16];
     CacheMapEntry * cme;
 };
 
@@ -205,6 +218,7 @@ struct ConflictData {
     uint8_t setOfCme[32];
     uint8_t numOfCmePerSet[64];
     uint8_t objNumPerSet[64];
+    uint8_t callKeyPerSet[64][2];
     uint16_t totalMisses;
     uint16_t missesPerSet[64];
     CacheMapEntry * cme[32];
@@ -213,34 +227,53 @@ struct ConflictData {
         uint8_t setId = (uint8_t)(((uint64_t)addr & MASK_PAGE) >> LOG2_CACHELINE);
         totalMisses++;
         missesPerSet[setId]++;
-        if(totalMisses >= 100 && missesPerSet[setId] * 40 >= totalMisses && !cme->addedConflict && !cme->addedCoherency) {
-            lockForCachelines.lock();
-            if(numOfCmePerSet[setId] < 4 && !cme->addedConflict) {
-                this->cme[numOfCme] = cme;
-                setOfCme[numOfCme] = setId;
-                numOfCme++;
-                assert(numOfCme < 32);
-                numOfCmePerSet[setId]++;
-                cme->addedConflict = true;
+        if(totalMisses >= 50 && missesPerSet[setId] * 20 >= totalMisses && !cme->addedConflict && !cme->addedCoherency) {
+            if(numOfCme < 32 && numOfCmePerSet[setId] < 16 && !cme->addedConflict) {
+                lockForCachelines.lock();
+                if(numOfCme < 32 && numOfCmePerSet[setId] < 16 && !cme->addedConflict) {
+                    this->cme[numOfCme] = cme;
+                    setOfCme[numOfCme] = setId;
+                    numOfCme++;
+                    numOfCmePerSet[setId]++;
+                    cme->addedConflict = true;
+                }
+                lockForCachelines.unlock();
             }
-            lockForCachelines.unlock();
         }
     }
 
-    void checkObj(uint16_t tid, CacheMapEntry * cme) {
+    void checkObj(uint16_t tid, CacheMapEntry * cme, uint8_t callKey) {
         uint8_t i;
         for(i = 0; i < numOfCme && this->cme[i] != cme; ++i) {} /// find index
         objNumPerSet[setOfCme[i]]++;
+//        fprintf(stderr, "%u %u\n", setOfCme[i], objNumPerSet[setOfCme[i]]);
+        if(callKeyPerSet[setOfCme[i]][0]) {
+            if(callKeyPerSet[setOfCme[i]][0] != callKey && !callKeyPerSet[setOfCme[i]][1]) {
+                callKeyPerSet[setOfCme[i]][1] = callKey;
+            }
+        } else {
+            callKeyPerSet[setOfCme[i]][0] = callKey;
+        }
     }
 
     void printOutput() {
-        if(totalMisses >= 100) {
+        fprintf(stderr, "numOfCme = %u, totalMisses = %u\n", numOfCme, totalMisses);
+//        for(uint8_t i = 0; i < 64; i++) {
+//            fprintf(stderr, "%u %u%%\n", i, missesPerSet[setOfCme[i]] * 100 / totalMisses);
+//        }
+        if(totalMisses >= 50) {
             for(uint8_t i = 0; i < numOfCme; ++i) {
-                if(!cme[i]->addedCoherency && missesPerSet[setOfCme[i]] * 40 >= totalMisses) {
-                    if(objNumPerSet[i] >= 2) {
-                        fprintf(ProgramStatus::outputFile, "\nset %u: %u%% Allocator Conflict Misses\n", i, missesPerSet[setOfCme[i]] * 100 / totalMisses);
+                if(!cme[i]->addedCoherency && missesPerSet[setOfCme[i]] * 20 >= totalMisses) {
+                    if(objNumPerSet[setOfCme[i]] >= 2) {
+                        fprintf(ProgramStatus::outputFile, "\nset %u: %u%% Allocator Conflict Misses\n", setOfCme[i], missesPerSet[setOfCme[i]] * 100 / totalMisses);
                     } else {
-                        fprintf(ProgramStatus::outputFile, "\nset %u: %u%% Application Conflict Misses\n", i, missesPerSet[setOfCme[i]] * 100 / totalMisses);
+                        fprintf(ProgramStatus::outputFile, "\nset %u: %u%% Application Conflict Misses\n", setOfCme[i], missesPerSet[setOfCme[i]] * 100 / totalMisses);
+                    }
+                    if(callKeyPerSet[setOfCme[i]][0]) {
+                        Callsite::printCallSite(callKeyPerSet[setOfCme[i]][0]);
+                    }
+                    if(callKeyPerSet[setOfCme[i]][1]) {
+                        Callsite::printCallSite(callKeyPerSet[setOfCme[i]][1]);
                     }
                     missesPerSet[setOfCme[i]] = 0;
                 }

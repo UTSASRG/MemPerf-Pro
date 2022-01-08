@@ -4,6 +4,7 @@
 thread_local HashMap <void *, DetailLockData, PrivateHeap> lockUsage;
 HashMap <void *, DetailLockData, PrivateHeap> globalLockUsage;
 HashMap <void*, ObjStat, PrivateHeap> objStatusMap;
+HashMap<uint8_t, void *, PrivateHeap> callTable;
 
 //// pre-init private allocator memory
 typedef int (*main_fn_t)(int, char **, char **);
@@ -62,6 +63,7 @@ void mainStop(int signum) {
 
 // MallocProf's main function
 int libmallocprof_main(int argc, char ** argv, char ** envp) {
+    ThreadLocalStatus::setStackBottom(0);
     RealX::initializer();
     ShadowMemory::initialize();
     ThreadLocalStatus::addARunningThread();
@@ -86,6 +88,7 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
 //        ProgramStatus::initIO(std::getenv("MALLOC_PROGRAM_FULL"));
     lockUsage.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_LOCK_NUM);
     globalLockUsage.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_LOCK_NUM);
+    callTable.initialize(HashFuncs::hash_uint8_t, HashFuncs::compare_uint8_t, NUM_CALLKEY);
     ObjTable::initialize();
     MyMalloc::initializeForThreadLocalHashMemory(ThreadLocalStatus::runningThreadIndex);
 

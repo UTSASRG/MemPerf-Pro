@@ -10,11 +10,10 @@
 #include "threadlocalstatus.h"
 
 //extern HashMap<uint64_t, CoherencyData, PrivateHeap> coherencyCaches;
-CoherencyData coherencyCaches[32];
+ConflictData conflictData;
 uint8_t numOfCoherencyCaches;
 spinlock lockForCoherencyCaches;
-
-ConflictData conflictData;
+CoherencyData coherencyCaches[32];
 
 //void * ShadowMemory::addressRanges[NUM_ADDRESS_RANGE] = {(void*)0x550000000000UL, (void*)0x7f0000000000UL};
 void * ShadowMemory::addressRanges[NUM_ADDRESS_RANGE] =
@@ -112,8 +111,8 @@ void ShadowMemory::mallocUpdateObject(void * address, unsigned int size) {
 
 }
 
-void ShadowMemory::freeUpdateObject(void * address, unsigned int size, uint16_t tid) {
-    if(size == 0) {
+void ShadowMemory::freeUpdateObject(void * address, ObjStat objStat) {
+    if(objStat.size == 0) {
         return;
     }
 
@@ -128,12 +127,12 @@ void ShadowMemory::freeUpdateObject(void * address, unsigned int size, uint16_t 
         return;
     }
 
-    freeUpdatePages(uintaddr, firstPageRange, firstPageIdx, size);
+    freeUpdatePages(uintaddr, firstPageRange, firstPageIdx, objStat.size);
 
 #ifdef CACHE_UTIL
     uint8_t firstCacheLineOffset = (uintaddr & CACHELINE_SIZE_MASK);
     uint8_t curCacheLineIdx = ((uintaddr & PAGESIZE_MASK) >> LOG2_CACHELINE_SIZE);
-    PageMapEntry::freeUpdateCacheLines(firstPageRange, firstPageIdx, curCacheLineIdx, firstCacheLineOffset, size, tid);
+    PageMapEntry::freeUpdateCacheLines(firstPageRange, firstPageIdx, curCacheLineIdx, firstCacheLineOffset, objStat);
 #endif
 
 }
@@ -230,12 +229,12 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType,
     uint64_t pageIdx;
     getPageIndex(uintaddr, &pageRange, &pageIdx);
 
-#ifdef UTIL
+//#ifdef UTIL
     if(pageRange == NUM_ADDRESS_RANGE) {
 //        fprintf(stderr, " sampling address %p out of range\n", uintaddr);
         return;
     }
-#endif
+//#endif
 
     uint8_t cacheIdx = ((uintaddr & PAGESIZE_MASK) >> LOG2_CACHELINE_SIZE);
 
@@ -243,14 +242,14 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType,
     fprintf(stderr, "pageIdx = %lu cacheIdx = %u addr = %p\n", pageIdx, cacheIdx, uintaddr);
 #endif
 
-#ifdef UTIL
+//#ifdef UTIL
     PageMapEntry * pme = getPageMapEntry(pageRange, pageIdx);
 
     if(!pme->isTouched() || pme->getUsedBytes() == 0) {
         return;
     }
 
-#ifdef CACHE_UTIL
+//#ifdef CACHE_UTIL
     CacheMapEntry * cme;
 
     if((cme = pme->getCacheMapEntry(false)) == nullptr) {
@@ -262,9 +261,9 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType,
     if(cme->getUsedBytes() == 0) {
         return;
     }
-#endif
+//#endif
 
-#endif
+//#endif
 
 #ifdef UTIL
 
@@ -284,12 +283,11 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType,
         conflictData.addMiss(uintaddr, cme);
 
 //        if(cme->lastThreadIdx && cme->lastThreadIdx != ThreadLocalStatus::runningThreadIndex) {
-            if(cme->misses >= 5) {
+            if(cme->misses >= 10) {
                 uint8_t wordIndex = (uint8_t)((uintaddr & CACHELINE_SIZE_MASK) >> 3);
-                CoherencyData *status;
+                CoherencyData * status = nullptr;
 
-                lockForCoherencyCaches.lock();
-                if(cme->addedCoherency) {
+                if(cme->misses > 10) {
                     uint8_t i;
                     for(i = 0; i < numOfCoherencyCaches && coherencyCaches[i].cme != cme; ++i) {} /// find index
                     status = &(coherencyCaches[i]);
@@ -301,26 +299,32 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType,
                             status->word = wordIndex;
                         }
                         status->tid = ThreadLocalStatus::runningThreadIndex;
+                        cme->addedCoherency = true;
                     }
 
-                } else {
-                    status = &(coherencyCaches[numOfCoherencyCaches]);
-                    numOfCoherencyCaches++;
-                    assert(numOfCoherencyCaches <= 32);
-                    cme->addedCoherency = true;
-
-                    status->word = wordIndex;
-                    status->tid = ThreadLocalStatus::runningThreadIndex;
-                    status->cme = cme;
+                } else if (numOfCoherencyCaches < 32) {
+                    lockForCoherencyCaches.lock();
+//                    fprintf(stderr, "numOfCoherencyCaches = %u\n", numOfCoherencyCaches);
+                    if (numOfCoherencyCaches < 32) {
+                        status = &(coherencyCaches[numOfCoherencyCaches]);
+                        numOfCoherencyCaches++;
+                    }
+                    lockForCoherencyCaches.unlock();
+                    if(status) {
+                        status->word = wordIndex;
+                        status->tid = ThreadLocalStatus::runningThreadIndex;
+                        status->cme = cme;
+                    }
                 }
 
-                uint8_t j;
-                for (j = 0; j < 16 && status->tidsPerWord[wordIndex][j] &&
-                            status->tidsPerWord[wordIndex][j] != ThreadLocalStatus::runningThreadIndex; ++j) { ; }
-                if (j < 16 && status->tidsPerWord[wordIndex][j] != ThreadLocalStatus::runningThreadIndex) {
-                    status->tidsPerWord[wordIndex][j] = ThreadLocalStatus::runningThreadIndex;
+                if(status) {
+                    uint8_t j;
+                    for (j = 0; j < 16 && status->tidsPerWord[wordIndex][j] &&
+                                status->tidsPerWord[wordIndex][j] != ThreadLocalStatus::runningThreadIndex; ++j) { ; }
+                    if (j < 16 && status->tidsPerWord[wordIndex][j] != ThreadLocalStatus::runningThreadIndex) {
+                        status->tidsPerWord[wordIndex][j] = ThreadLocalStatus::runningThreadIndex;
+                    }
                 }
-                lockForCoherencyCaches.unlock();
 
             }
         }
@@ -333,9 +337,9 @@ void ShadowMemory::printOutput() {
     fprintf(ProgramStatus::outputFile, "\n");
     conflictData.printOutput();
     fprintf(ProgramStatus::outputFile, "\n");
+    fprintf(stderr, "numOfCoherencyCaches = %u\n", numOfCoherencyCaches);
     for(uint8_t i = 0; i < numOfCoherencyCaches; ++i) {
         CoherencyData * status = &(coherencyCaches[i]);
-
         if(status->ts) {
             fprintf(ProgramStatus::outputFile, "\ncache line: %u True Sharing\n", status->ts);
         }
@@ -353,10 +357,16 @@ void ShadowMemory::printOutput() {
                 if(status->tidsPerWord[i][0]) {
                     fprintf(ProgramStatus::outputFile, "Word %u: ", i);
                     for(uint8_t j = 0; j < 16 && status->tidsPerWord[i][j]; ++j) {
-                        fprintf(ProgramStatus::outputFile, "%d ", status->tidsPerWord[i][j]);
+                        fprintf(ProgramStatus::outputFile, "%u ", status->tidsPerWord[i][j]);
                     }
                     fprintf(ProgramStatus::outputFile, "\n");
                 }
+            }
+            if(status->callKey[0]) {
+                Callsite::printCallSite(status->callKey[0]);
+            }
+            if(status->callKey[1]) {
+                Callsite::printCallSite(status->callKey[1]);
             }
         }
     }
@@ -486,8 +496,8 @@ void PageMapEntry::mallocUpdateCacheLines(uint8_t range, uint64_t page_index, ui
 
 }
 
-void PageMapEntry::freeUpdateCacheLines(uint8_t range, uint64_t page_index, uint8_t cache_index, uint8_t firstCacheLineOffset, unsigned int size, uint16_t tid) {
-    int64_t size_remain = size;
+void PageMapEntry::freeUpdateCacheLines(uint8_t range, uint64_t page_index, uint8_t cache_index, uint8_t firstCacheLineOffset, ObjStat objStat) {
+    int64_t size_remain = objStat.size;
     PageMapEntry * targetPage = ShadowMemory::getPageMapEntry(range, page_index);
     CacheMapEntry * current = targetPage->getCacheMapEntry(true) + cache_index;
 
@@ -496,7 +506,7 @@ void PageMapEntry::freeUpdateCacheLines(uint8_t range, uint64_t page_index, uint
 
     /// check conflict
     if(current->addedConflict) {
-        conflictData.checkObj(tid, current);
+        conflictData.checkObj(objStat.tid, current, objStat.callKey);
 //        current->addedConflict = false;
     }
     /// check coherency
@@ -504,13 +514,17 @@ void PageMapEntry::freeUpdateCacheLines(uint8_t range, uint64_t page_index, uint
         uint8_t i;
         for(i = 0; i < numOfCoherencyCaches && coherencyCaches[i].cme != current; ++i) {} /// find index
         CoherencyData * status = &(coherencyCaches[i]);
-//        fprintf(stderr, "%u %u %u %u\n", i, status->allocateTid[0], status->allocateTid[1], tid);
+//        fprintf(stderr, "%u %u %u %u\n", i, status->allocateTid[0], status->allocateTid[1], objStat.tid);
         if(status->allocateTid[0]) {
-            if(status->allocateTid[0] != tid && !status->allocateTid[1]) {
-                status->allocateTid[1] = tid;
+            if(status->allocateTid[0] != objStat.tid && !status->allocateTid[1]) {
+                status->allocateTid[1] = objStat.tid;
+            }
+            if(status->callKey[0] != objStat.callKey && !status->callKey[1]) {
+                status->callKey[1] = objStat.callKey;
             }
         } else {
-            status->allocateTid[0] = tid;
+            status->allocateTid[0] = objStat.tid;
+            status->callKey[0] = objStat.callKey;
         }
 //        current->addedCoherency = false;
     }
@@ -530,8 +544,8 @@ void PageMapEntry::freeUpdateCacheLines(uint8_t range, uint64_t page_index, uint
 
         /// check conflict
         if(current->addedConflict) {
-            conflictData.checkObj(tid, current);
-//            current->addedConflict = false;
+            conflictData.checkObj(objStat.tid, current, objStat.callKey);
+            current->addedConflict = false;
         }
 
         current->setEmpty();
@@ -551,7 +565,7 @@ void PageMapEntry::freeUpdateCacheLines(uint8_t range, uint64_t page_index, uint
 
         /// check conflict
         if(current->addedConflict) {
-            conflictData.checkObj(tid, current);
+            conflictData.checkObj(objStat.tid, current, objStat.callKey);
 //            current->addedConflict = false;
         }
         /// check coherency
@@ -559,15 +573,18 @@ void PageMapEntry::freeUpdateCacheLines(uint8_t range, uint64_t page_index, uint
             uint8_t i;
             for(i = 0; i < numOfCoherencyCaches && coherencyCaches[i].cme != current; ++i) {} /// find index
             CoherencyData * status = &(coherencyCaches[i]);
-//            fprintf(stderr, "%u %u %u %u\n", i, status->allocateTid[0], status->allocateTid[1], tid);
+//            fprintf(stderr, "%u %u %u %u\n", i, status->allocateTid[0], status->allocateTid[1], objStat.tid);
             if(status->allocateTid[0]) {
-                if(status->allocateTid[0] != tid && !status->allocateTid[1]) {
-                    status->allocateTid[1] = tid;
+                if(status->allocateTid[0] != objStat.tid && !status->allocateTid[1]) {
+                    status->allocateTid[1] = objStat.tid;
+                }
+                if(status->callKey[0] != objStat.callKey && !status->callKey[1]) {
+                    status->callKey[1] = objStat.callKey;
                 }
             } else {
-                status->allocateTid[0] = tid;
+                status->allocateTid[0] = objStat.tid;
+                status->callKey[0] = objStat.callKey;
             }
-//            current->addedCoherency = false;
         }
     }
 

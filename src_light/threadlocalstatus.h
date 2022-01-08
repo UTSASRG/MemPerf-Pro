@@ -30,6 +30,8 @@ public:
     static thread_local std::default_random_engine random;
     static thread_local std::uniform_int_distribution<int> dis;
 
+    static thread_local void * stackBottom;
+
     static void getARunningThreadIndex();
     static void addARunningThread();
     static void subARunningThread();
@@ -43,6 +45,8 @@ public:
     static bool randomProcessForCountingEvent();
     static bool randomProcessForLargeCountingEvent();
 //    static bool randomProcess(unsigned short randomPeriod);
+    static void setStackBottom(unsigned int null);
+    static uint64_t getStackOffset(void * stackTop);
 
 };
 

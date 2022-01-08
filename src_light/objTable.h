@@ -11,6 +11,7 @@
 #include "threadlocalstatus.h"
 #include "allocatingstatus.h"
 #include "structs.h"
+#include "callsite.h"
 
 class ProgramStatus;
 
@@ -22,11 +23,13 @@ struct HashLocksSet {
 };
 
 struct ObjStat {
+    uint8_t callKey;
     uint16_t tid;
     uint32_t size;
 
-    static ObjStat newObj(uint16_t tid, uint32_t size) {
+    static ObjStat newObj(uint8_t callKey, uint16_t tid, uint32_t size) {
         ObjStat obj;
+        obj.callKey = callKey;
         obj.tid = tid;
         obj.size = size;
         return obj;

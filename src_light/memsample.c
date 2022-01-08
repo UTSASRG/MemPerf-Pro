@@ -160,7 +160,7 @@ void sampleHandler(int signum, siginfo_t *info, void *p) {
 	pe_load.enable_on_exec = 1;
 	pe_load.task = 0;
 	pe_load.watermark = 0;
-	pe_load.precise_ip = 3;
+	pe_load.precise_ip = 1;
 	pe_load.mmap_data = 0;
 	pe_load.sample_id_all = 0;
 	pe_load.exclude_host = 0;

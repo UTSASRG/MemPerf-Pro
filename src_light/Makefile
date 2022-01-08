@@ -1,6 +1,7 @@
 SRCS = 	\
 		libmallocprof.cpp \
 		allocatingstatus.cpp \
+		callsite.cpp \
 		globalstatus.cpp \
 		memsample.c \
 		mymalloc.cpp \
@@ -16,6 +17,7 @@ SRCS = 	\
 INCS = \
 		libmallocprof.h \
 		allocatingstatus.h \
+		callsite.h \
 		definevalues.h \
 		globalstatus.h \
 		hashfuncs.hh \

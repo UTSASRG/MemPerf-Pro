@@ -41,7 +41,6 @@ void AllocatingStatus::QueueOfDetailLockDataInAllocatingStatus::cleanUpQueue() {
     queueTail = -1;
 }
 
-
 void AllocatingStatus::updateAllocatingTypeBeforeRealFunction(AllocationFunction allocationFunction, unsigned int objectSize) {
     allocatingType.allocatingFunction = allocationFunction;
     allocatingType.objectSize = objectSize;
@@ -123,9 +122,10 @@ void AllocatingStatus::updateMemoryStatusBeforeFree() {
     ObjStat * objStat = ObjTable::freeUpdate(allocatingType.objectAddress);
     if(objStat) {
         allocatingType.objectSize = objStat->size;
+//        allocatingType.objectSize = malloc_usable_size(allocatingType.objectAddress);
 #ifdef UTIL
         if(allocatingType.objectSize) {
-            ShadowMemory::freeUpdateObject(allocatingType.objectAddress, allocatingType.objectSize, objStat->tid);
+            ShadowMemory::freeUpdateObject(allocatingType.objectAddress, *objStat);
         }
 #endif
     }
