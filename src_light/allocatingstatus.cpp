@@ -30,10 +30,10 @@ void AllocatingStatus::QueueOfDetailLockDataInAllocatingStatus::writingNewDataIn
 //        writingIntoHashTable();
 //        cleanUpQueue();
 //    }
-    queueTail++;
-    assert(queueTail < LENGTH_OF_QUEUE);
-//    memset(&queue[queueTail], 0, sizeof(QueueOfDetailLockDataInAllocatingStatus::DetailLockDataInAllocatingStatus));
-    queue[queueTail].addressOfHashLockData = addressOfHashLockData;
+    if(queueTail < LENGTH_OF_QUEUE - 1) {
+        queueTail++;
+        queue[queueTail].addressOfHashLockData = addressOfHashLockData;
+    }
 }
 
 void AllocatingStatus::QueueOfDetailLockDataInAllocatingStatus::cleanUpQueue() {

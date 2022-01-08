@@ -19,7 +19,6 @@
 #define MAX_SOURCE_LENGTH 2048
 
 #define NUM_CALLKEY 256
-#define NUM_VICTIM_CALLKEY 16
 
 //#define RETURN_OFFSET 284 /// O0
 //#define RETURN_OFFSET 236 /// O2

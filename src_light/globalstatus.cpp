@@ -96,6 +96,7 @@ void GlobalStatus::printCountingEvents() {
 }
 
 void GlobalStatus::printOverviewLocks() {
+//    return;
     printTitle((char*)"LOCK TOTALS");
     for(int lockType = 0; lockType < NUM_OF_LOCKTYPES; ++lockType) {
 //        fprintf(ProgramStatus::outputFile, "%s num                          %20u\n\n", lockTypeOutputString[lockType], overviewLockData[lockType].numOfLocks);

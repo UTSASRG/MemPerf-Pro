@@ -15,12 +15,12 @@ uint8_t numOfCoherencyCaches;
 spinlock lockForCoherencyCaches;
 CoherencyData coherencyCaches[32];
 
-//void * ShadowMemory::addressRanges[NUM_ADDRESS_RANGE] = {(void*)0x550000000000UL, (void*)0x7f0000000000UL};
-void * ShadowMemory::addressRanges[NUM_ADDRESS_RANGE] =
-        {(void*)0x80000000000UL, (void*)0x10000000000UL, (void*)0xa0000000000UL,
-         (void*)0x120000000000UL, (void*)0x140000000000UL,
-         (void*)0x560000000000UL, (void*)0x7f0000000000UL,
-         (void*)0x550000000000UL};
+void * ShadowMemory::addressRanges[NUM_ADDRESS_RANGE] = {(void*)0x550000000000UL, (void*)0x7f0000000000UL};
+//void * ShadowMemory::addressRanges[NUM_ADDRESS_RANGE] =
+//        {(void*)0x80000000000UL, (void*)0x10000000000UL, (void*)0xa0000000000UL,
+//         (void*)0x120000000000UL, (void*)0x140000000000UL,
+//         (void*)0x560000000000UL, (void*)0x7f0000000000UL,
+//         (void*)0x550000000000UL};
 
 #ifdef UTIL
 PageMapEntry * ShadowMemory::page_map_begin[NUM_ADDRESS_RANGE];
@@ -144,26 +144,17 @@ void ShadowMemory::mallocUpdatePages(uintptr_t uintaddr, uint8_t range, uint64_t
     PageMapEntry * current = getPageMapEntry(range, page_index);
 
     current->addUsedBytes(curPageBytes);
-    if(!current->isTouched()) {
-        current->setTouched();
-    }
     size -= curPageBytes;
 
     while(size >= PAGESIZE) {
         current++;
         current->setFull();
-        if(!current->isTouched()) {
-            current->setTouched();
-        }
         size -= PAGESIZE;
     }
 
     if(size > 0) {
         current++;
         current->addUsedBytes(size);
-        if(!current->isTouched()) {
-            current->setTouched();
-        }
     }
 }
 
@@ -199,9 +190,7 @@ void ShadowMemory::cleanupPages(uintptr_t uintaddr, size_t length) {
     PageMapEntry * current =  getPageMapEntry(firstPageRange, firstPageIdx);
 
     while(length) {
-        if(current->isTouched()) {
-            current->clear();
-        }
+        current->clear();
         current++;
         length -= PAGESIZE;
     }
@@ -245,7 +234,7 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType,
 //#ifdef UTIL
     PageMapEntry * pme = getPageMapEntry(pageRange, pageIdx);
 
-    if(!pme->isTouched() || pme->getUsedBytes() == 0) {
+    if(pme->getUsedBytes() == 0) {
         return;
     }
 
@@ -278,16 +267,15 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType,
 #endif
 
     if(miss) {
-        cme->misses++;
 
         conflictData.addMiss(uintaddr, cme);
 
 //        if(cme->lastThreadIdx && cme->lastThreadIdx != ThreadLocalStatus::runningThreadIndex) {
-            if(cme->misses >= 10) {
+            if((cme->misses & (uint8_t)0x3f) >= 10) {
                 uint8_t wordIndex = (uint8_t)((uintaddr & CACHELINE_SIZE_MASK) >> 3);
                 CoherencyData * status = nullptr;
 
-                if(cme->misses > 10) {
+                if((cme->misses & (uint8_t)0x3f) > 10) {
                     uint8_t i;
                     for(i = 0; i < numOfCoherencyCaches && coherencyCaches[i].cme != cme; ++i) {} /// find index
                     status = &(coherencyCaches[i]);
@@ -299,7 +287,7 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType,
                             status->word = wordIndex;
                         }
                         status->tid = ThreadLocalStatus::runningThreadIndex;
-                        cme->addedCoherency = true;
+                        cme->misses |= (uint8_t)0x40;
                     }
 
                 } else if (numOfCoherencyCaches < 32) {
@@ -326,6 +314,8 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType,
                     }
                 }
 
+            } else {
+                cme->misses++;
             }
         }
 //        cme->lastThreadIdx = ThreadLocalStatus::runningThreadIndex;
@@ -381,8 +371,6 @@ void PageMapEntry::clear() {
         memset(cache_map_entry, 0, cache_entries_size);
     }
 #endif
-
-    touched = false;
     num_used_bytes = 0;
 }
 
@@ -396,14 +384,6 @@ unsigned short PageMapEntry::getUsedBytes() {
         return 0;
     }
     return num_used_bytes;
-}
-
-bool PageMapEntry::isTouched() {
-		return touched;
-}
-
-void PageMapEntry::setTouched() {
-		touched = true;
 }
 #endif
 
@@ -452,7 +432,7 @@ void PageMapEntry::setEmpty() {
     num_used_bytes = 0;
 }
 
-void PageMapEntry::setFull() {
+inline void PageMapEntry::setFull() {
     num_used_bytes = PAGESIZE;
 }
 
@@ -505,12 +485,12 @@ void PageMapEntry::freeUpdateCacheLines(uint8_t range, uint64_t page_index, uint
     current->subUsedBytes(curCacheLineBytes);
 
     /// check conflict
-    if(current->addedConflict) {
+    if(current->misses & (uint8_t)0x80) {
         conflictData.checkObj(objStat.tid, current, objStat.callKey);
 //        current->addedConflict = false;
     }
     /// check coherency
-    if(current->addedCoherency) {
+    if(current->misses & (uint8_t)0x40) {
         uint8_t i;
         for(i = 0; i < numOfCoherencyCaches && coherencyCaches[i].cme != current; ++i) {} /// find index
         CoherencyData * status = &(coherencyCaches[i]);
@@ -543,9 +523,9 @@ void PageMapEntry::freeUpdateCacheLines(uint8_t range, uint64_t page_index, uint
         }
 
         /// check conflict
-        if(current->addedConflict) {
+        if(current->misses & (uint8_t)0x80) {
             conflictData.checkObj(objStat.tid, current, objStat.callKey);
-            current->addedConflict = false;
+            current->misses &= (uint8_t)0x7f;
         }
 
         current->setEmpty();
@@ -564,12 +544,12 @@ void PageMapEntry::freeUpdateCacheLines(uint8_t range, uint64_t page_index, uint
         current->subUsedBytes(size_remain);
 
         /// check conflict
-        if(current->addedConflict) {
+        if(current->misses & (uint8_t)0x80) {
             conflictData.checkObj(objStat.tid, current, objStat.callKey);
 //            current->addedConflict = false;
         }
         /// check coherency
-        if(current->addedCoherency) {
+        if(current->misses & (uint8_t)0x40) {
             uint8_t i;
             for(i = 0; i < numOfCoherencyCaches && coherencyCaches[i].cme != current; ++i) {} /// find index
             CoherencyData * status = &(coherencyCaches[i]);

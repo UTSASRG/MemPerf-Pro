@@ -47,8 +47,8 @@
 #define CACHE_MAP_START (PAGE_MAP_START + PAGE_MAP_SIZE)
 #define OBJ_SIZE_MAP_START (CACHE_MAP_START + CACHE_MAP_SIZE)
 
-//#define NUM_ADDRESS_RANGE 2
-#define NUM_ADDRESS_RANGE 8
+#define NUM_ADDRESS_RANGE 2
+//#define NUM_ADDRESS_RANGE 8
 
 
 #define PAGE_MAP_SIZE (128 * ONE_GB)
@@ -97,7 +97,7 @@ public:
 //    bool addedConflict;
 //    bool addedCoherency;
     int8_t num_used_bytes;
-    uint8_t misses; /// conflict = misses & (uint8_t)0x80, coherency = misses & (uint8_t)0x40;
+    uint8_t misses; /// conflict = (misses & (uint8_t)0x80), coherency = (misses & (uint8_t)0x40), miss = (misses & (uint8_t)0x3f)
 
     void addUsedBytes(uint8_t num_bytes);
     void subUsedBytes(uint8_t num_bytes);
@@ -111,8 +111,6 @@ public:
 #ifdef UTIL
 class PageMapEntry {
 public:
-
-    bool touched = false;
     short num_used_bytes;
 
 #ifdef CACHE_UTIL
@@ -124,8 +122,6 @@ public:
 #endif
 
     void clear();
-    bool isTouched();
-    void setTouched();
     unsigned short getUsedBytes();
     void addUsedBytes(unsigned short num_bytes);
     void subUsedBytes(unsigned short num_bytes);
@@ -227,15 +223,16 @@ struct ConflictData {
         uint8_t setId = (uint8_t)(((uint64_t)addr & MASK_PAGE) >> LOG2_CACHELINE);
         totalMisses++;
         missesPerSet[setId]++;
-        if(totalMisses >= 50 && missesPerSet[setId] * 20 >= totalMisses && !cme->addedConflict && !cme->addedCoherency) {
-            if(numOfCme < 32 && numOfCmePerSet[setId] < 16 && !cme->addedConflict) {
+        if(totalMisses >= 50 && missesPerSet[setId] * 20 >= totalMisses && !(cme->misses & (uint8_t)0x80) && !(cme->misses & (uint8_t)0x40)) {
+            if(numOfCme < 32 && numOfCmePerSet[setId] < 16 && !(cme->misses & (uint8_t)0x80)) {
                 lockForCachelines.lock();
-                if(numOfCme < 32 && numOfCmePerSet[setId] < 16 && !cme->addedConflict) {
+                if(numOfCme < 32 && numOfCmePerSet[setId] < 16 && !(cme->misses & (uint8_t)0x80)) {
                     this->cme[numOfCme] = cme;
                     setOfCme[numOfCme] = setId;
                     numOfCme++;
                     numOfCmePerSet[setId]++;
-                    cme->addedConflict = true;
+//                    cme->addedConflict = true;
+                    cme->misses |= (uint8_t)0x80;
                 }
                 lockForCachelines.unlock();
             }
@@ -263,7 +260,7 @@ struct ConflictData {
 //        }
         if(totalMisses >= 50) {
             for(uint8_t i = 0; i < numOfCme; ++i) {
-                if(!cme[i]->addedCoherency && missesPerSet[setOfCme[i]] * 20 >= totalMisses) {
+                if(!(cme[i]->misses & (uint8_t)0x40) && missesPerSet[setOfCme[i]] * 20 >= totalMisses) {
                     if(objNumPerSet[setOfCme[i]] >= 2) {
                         fprintf(ProgramStatus::outputFile, "\nset %u: %u%% Allocator Conflict Misses\n", setOfCme[i], missesPerSet[setOfCme[i]] * 100 / totalMisses);
                     } else {

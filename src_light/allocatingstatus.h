@@ -50,7 +50,7 @@ private:
 #endif
     };
 
-#define LENGTH_OF_QUEUE 100
+#define LENGTH_OF_QUEUE 10
 
     struct QueueOfDetailLockDataInAllocatingStatus {
 
@@ -59,9 +59,9 @@ private:
             unsigned int numOfCalls;
             unsigned int numOfCallsWithContentions;
             uint64_t cycles;
+#ifdef OPEN_DEBUG
             uint64_t lockTimeStamp;
             uint64_t unlockTimeStamp;
-#ifdef OPEN_DEBUG
             pthread_mutex_t * debugMutexAddress;
 #endif
             DetailLockData * addressOfHashLockData;

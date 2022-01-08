@@ -58,7 +58,6 @@
 #define ENTRY_SIZE 8
 
 #define PAGE_BITS 12
-#define MY_METADATA_SIZE 4
 
 #define ABNORMAL_VALUE 100000000l
 #define MAX_OBJ_NUM 4194304

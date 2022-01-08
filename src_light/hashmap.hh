@@ -115,9 +115,9 @@ public:
     _bucketsTotal = size;
     _totalEntry = 0;
 
-    if(hfunc == NULL || kcmp == NULL) {
-      abort();
-    }
+//    if(hfunc == NULL || kcmp == NULL) {
+//      abort();
+//    }
 
     // Initialize those functions.
     _hashfunc = hfunc;
@@ -129,10 +129,10 @@ public:
 
     _buckets = (struct HashBucket*)RealX::mmap(NULL, mapsize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 //      _buckets = (struct HashBucket*)MyMalloc::hashMalloc(mapsize);
-    if(_buckets == NULL) { 
-      fprintf(stderr, "Fail to initialize the hash map\n");
-      exit(-1);
-    }
+//    if(_buckets == NULL) {
+//      fprintf(stderr, "Fail to initialize the hash map\n");
+//      exit(-1);
+//    }
 
     // Initialize all of these _buckets.
     struct HashBucket* bucket;
@@ -242,7 +242,7 @@ public:
   // Insert a hash table entry if it is not existing.
   // If the entry is already existing, return true
   bool insertIfAbsent(const KeyType& key, size_t keylen, ValueType value) {
-    assert(_initialized == true);
+//    assert(_initialized == true);
     size_t hindex = hashIndex(key, keylen);
     struct HashBucket* first = getHashBucket(hindex);
     struct Entry* entry;
@@ -267,7 +267,7 @@ public:
 
 //   Free an entry with specified key
   bool erase(const KeyType& key, size_t keylen) {
-    assert(_initialized == true);
+//    assert(_initialized == true);
     size_t hindex = hashIndex(key, keylen);
     struct HashBucket* first = getHashBucket(hindex);
     struct Entry* entry;
@@ -307,10 +307,10 @@ private:
   // Create a new Entry with specified key and value.
   struct Entry* createNewEntry(const KeyType& key, ValueType value) {
       struct Entry* entry = (struct Entry*)MyMalloc::hashMalloc(sizeof(struct Entry));
-    if(entry == NULL) {
-      fprintf(stderr, "fail to create entry\n");
-      exit(0);
-    }
+//    if(entry == NULL) {
+//      fprintf(stderr, "fail to create entry\n");
+//      exit(0);
+//    }
     // Initialize this new entry.
     entry->initialize(key, value);
     return entry;

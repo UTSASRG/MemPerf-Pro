@@ -20,6 +20,7 @@ void ObjTable::initialize() {
 
 
 bool ObjTable::allocUpdate(unsigned int size, void * address) {
+//    fprintf(stderr, "thread %u alloc %p size %u\n", ThreadLocalStatus::runningThreadIndex, address, size);
 
 //    return true;
 
@@ -31,12 +32,12 @@ bool ObjTable::allocUpdate(unsigned int size, void * address) {
         hashLocksSet.lock(address);
         status = objStatusMap.insert(address, sizeof(unsigned long), ObjStat::newObj(Callsite::getCallKey(0), ThreadLocalStatus::runningThreadIndex, size));
         hashLocksSet.unlock(address);
-        status->size = size;
+//        status->size = size;
         reused = false;
     } else {
         status->callKey = Callsite::getCallKey(status->callKey);
-        status->size = size;
         status->tid = ThreadLocalStatus::runningThreadIndex;
+        status->size = size;
         reused = true;
     }
 
@@ -46,5 +47,6 @@ bool ObjTable::allocUpdate(unsigned int size, void * address) {
 
 ObjStat* ObjTable::freeUpdate(void* address) {
     ObjStat * status = objStatusMap.find(address, sizeof(void *));
+//    fprintf(stderr, "thread %u free %p size %u\n", ThreadLocalStatus::runningThreadIndex, address, status->size);
     return status;
 }
