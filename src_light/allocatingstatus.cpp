@@ -1,6 +1,5 @@
 #include "allocatingstatus.h"
 
-//thread_local uint8_t AllocatingStatus::numFunc;
 thread_local bool AllocatingStatus::firstAllocation;
 thread_local AllocatingType AllocatingStatus::allocatingType;
 thread_local AllocationTypeForOutputData AllocatingStatus::allocationTypeForOutputData;
@@ -9,11 +8,9 @@ thread_local bool AllocatingStatus::sampledForCountingEvent;
 thread_local uint64_t AllocatingStatus::cyclesBeforeRealFunction;
 thread_local uint64_t AllocatingStatus::cyclesAfterRealFunction;
 thread_local uint64_t AllocatingStatus::cyclesInRealFunction;
-//thread_local uint64_t AllocatingStatus::cyclesMinus;
 thread_local LockTypes AllocatingStatus::nowRunningLockType;
 thread_local AllocatingStatus::QueueOfDetailLockDataInAllocatingStatus AllocatingStatus::queueOfDetailLockData;
 thread_local AllocatingStatus::OverviewLockDataInAllocatingStatus AllocatingStatus::overviewLockData[NUM_OF_LOCKTYPES];
-//thread_local AllocatingStatus::CriticalSectionStatusInAllocatingStatus AllocatingStatus::criticalSectionStatus;
 thread_local SystemCallData AllocatingStatus::systemCallData[NUM_OF_SYSTEMCALLTYPES];
 
 bool AllocatingStatus::isFirstFunction() {
@@ -111,10 +108,7 @@ void AllocatingStatus::updateFreeingStatusAfterRealFunction() {
 void AllocatingStatus::updateMemoryStatusAfterAllocation() {
 
     allocatingType.isReuse = ObjTable::allocUpdate(allocatingType.objectSize, allocatingType.objectAddress);
-
-#ifdef UTIL
     ShadowMemory::mallocUpdateObject(allocatingType.objectAddress, allocatingType.objectSize);
-#endif
 
 }
 
@@ -123,11 +117,9 @@ void AllocatingStatus::updateMemoryStatusBeforeFree() {
     if(objStat) {
         allocatingType.objectSize = objStat->size;
 //        allocatingType.objectSize = malloc_usable_size(allocatingType.objectAddress);
-#ifdef UTIL
         if(allocatingType.objectSize) {
             ShadowMemory::freeUpdateObject(allocatingType.objectAddress, *objStat);
         }
-#endif
     }
 
 }
@@ -304,16 +296,3 @@ void AllocatingStatus::recordLockCallAndCycles(unsigned int numOfCalls, uint64_t
     overviewLockData[nowRunningLockType].addCallAndCycles(numOfCalls, cycles);
     queueOfDetailLockData.addCallAndCycles(numOfCalls, cycles);
 }
-
-//void AllocatingStatus::checkAndStartRecordingACriticalSection() {
-//    criticalSectionStatus.checkAndStartRecordingACriticalSection();
-//}
-
-//void AllocatingStatus::checkAndStopRecordingACriticalSection() {
-//    criticalSectionStatus.checkAndStopRecordingACriticalSection();
-//}
-
-
-//void AllocatingStatus::minusCycles(uint64_t cycles) {
-//    cyclesMinus += cycles;
-//}

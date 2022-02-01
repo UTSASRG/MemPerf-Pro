@@ -3,6 +3,11 @@
 #include <errno.h>
 #include <assert.h>
 #include <stdint.h>
+//#include <iostream>
+//#include <cstdio>
+#include <algorithm>
+#include <functional>
+
 #include "shadowmemory.hh"
 #include "real.hh"
 #include "objTable.h"
@@ -15,25 +20,25 @@ uint8_t numOfCoherencyCaches;
 spinlock lockForCoherencyCaches;
 CoherencyData coherencyCaches[32];
 
-void * ShadowMemory::addressRanges[NUM_ADDRESS_RANGE] = {(void*)0x550000000000UL, (void*)0x7f0000000000UL};
-//void * ShadowMemory::addressRanges[NUM_ADDRESS_RANGE] =
-//        {(void*)0x80000000000UL, (void*)0x10000000000UL, (void*)0xa0000000000UL,
-//         (void*)0x120000000000UL, (void*)0x140000000000UL,
-//         (void*)0x560000000000UL, (void*)0x7f0000000000UL,
-//         (void*)0x550000000000UL};
+//void * ShadowMemory::addressRanges[NUM_ADDRESS_RANGE] = {(void*)0x550000000000UL, (void*)0x7f0000000000UL};
+void * ShadowMemory::addressRanges[NUM_ADDRESS_RANGE] =
+        {(void*)0x80000000000UL, (void*)0x10000000000UL, (void*)0xa0000000000UL,
+         (void*)0x120000000000UL, (void*)0x140000000000UL,
+         (void*)0x560000000000UL, (void*)0x7f0000000000UL,
+         (void*)0x550000000000UL};
 
-#ifdef UTIL
+//#ifdef UTIL
 PageMapEntry * ShadowMemory::page_map_begin[NUM_ADDRESS_RANGE];
 PageMapEntry * ShadowMemory::page_map_end[NUM_ADDRESS_RANGE];
 
-#ifdef CACHE_UTIL
+//#ifdef CACHE_UTIL
 CacheMapEntry * ShadowMemory::cache_map_begin = nullptr;
 CacheMapEntry * ShadowMemory::cache_map_end = nullptr;
 CacheMapEntry * ShadowMemory::cache_map_bump_ptr = nullptr;
 spinlock ShadowMemory::cache_map_lock;
-#endif
+//#endif
 
-#endif
+//#endif
 
 bool ShadowMemory::isInitialized;
 
@@ -44,11 +49,11 @@ bool ShadowMemory::initialize() {
 	    return false;
 	}
 
-#ifdef UTIL
+//#ifdef UTIL
 
-#ifdef CACHE_UTIL
+//#ifdef CACHE_UTIL
     cache_map_lock.init();
-#endif
+//#endif
 
 	for(uint8_t i = 0; i < NUM_ADDRESS_RANGE; ++i) {
         if((void *)(page_map_begin[i] = (PageMapEntry *)mmap(addressRanges[i], PAGE_MAP_SIZE,
@@ -60,16 +65,16 @@ bool ShadowMemory::initialize() {
         page_map_end[i] = page_map_begin[i] + MAX_PAGE_MAP_ENTRIES;
 	}
 
-#ifdef CACHE_UTIL
+//#ifdef CACHE_UTIL
 	if((void *)(cache_map_begin = (CacheMapEntry *)mmap((void *)CACHE_MAP_START, CACHE_MAP_SIZE,
 									PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0)) == MAP_FAILED) {
 			perror("mmap of cache map region failed");
 	}
 	cache_map_end = cache_map_begin + MAX_CACHE_MAP_ENTRIES;
 	cache_map_bump_ptr = cache_map_begin;
-#endif
+//#endif
 
-#endif
+//#endif
 //	fprintf(stderr, "MAX_PAGE_MAP_ENTRIES = %lu\n", MAX_PAGE_MAP_ENTRIES);
 
 //    coherencyCaches.initialize(HashFuncs::hash64Int, HashFuncs::compare64Int, NUM_COHERENCY_CACHES);
@@ -80,7 +85,6 @@ bool ShadowMemory::initialize() {
 	return true;
 }
 
-#ifdef UTIL
 void ShadowMemory::mallocUpdateObject(void * address, unsigned int size) {
     if(size == 0) {
         return;
@@ -126,14 +130,15 @@ void ShadowMemory::freeUpdateObject(void * address, ObjStat objStat) {
 //        fprintf(stderr, "free address %p out of range\n", uintaddr);
         return;
     }
-
+#ifdef UTIL
     freeUpdatePages(uintaddr, firstPageRange, firstPageIdx, objStat.size);
+#endif
 
-#ifdef CACHE_UTIL
+//#ifdef CACHE_UTIL
     uint8_t firstCacheLineOffset = (uintaddr & CACHELINE_SIZE_MASK);
     uint8_t curCacheLineIdx = ((uintaddr & PAGESIZE_MASK) >> LOG2_CACHELINE_SIZE);
     PageMapEntry::freeUpdateCacheLines(firstPageRange, firstPageIdx, curCacheLineIdx, firstCacheLineOffset, objStat);
-#endif
+//#endif
 
 }
 
@@ -158,6 +163,7 @@ void ShadowMemory::mallocUpdatePages(uintptr_t uintaddr, uint8_t range, uint64_t
     }
 }
 
+#ifdef UTIL
 void ShadowMemory::freeUpdatePages(uintptr_t uintaddr, uint8_t range, uint64_t page_index, int64_t size) {
 
     unsigned short firstPageOffset = uintaddr & PAGESIZE_MASK;
@@ -231,14 +237,14 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType,
     fprintf(stderr, "pageIdx = %lu cacheIdx = %u addr = %p\n", pageIdx, cacheIdx, uintaddr);
 #endif
 
-//#ifdef UTIL
     PageMapEntry * pme = getPageMapEntry(pageRange, pageIdx);
 
+//#ifdef UTIL
     if(pme->getUsedBytes() == 0) {
         return;
     }
+//#endif
 
-//#ifdef CACHE_UTIL
     CacheMapEntry * cme;
 
     if((cme = pme->getCacheMapEntry(false)) == nullptr) {
@@ -247,12 +253,11 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType,
 
     cme += cacheIdx;
 
+#ifdef CACHE_UTIL
     if(cme->getUsedBytes() == 0) {
         return;
     }
-//#endif
-
-//#endif
+#endif
 
 #ifdef UTIL
 
@@ -271,24 +276,13 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType,
         conflictData.addMiss(uintaddr, cme);
 
 //        if(cme->lastThreadIdx && cme->lastThreadIdx != ThreadLocalStatus::runningThreadIndex) {
-            if((cme->misses & (uint8_t)0x3f) >= 10) {
-                uint8_t wordIndex = (uint8_t)((uintaddr & CACHELINE_SIZE_MASK) >> 3);
+            if((cme->misses & (uint8_t)0x3f) >= 5) {
                 CoherencyData * status = nullptr;
-
-                if((cme->misses & (uint8_t)0x3f) > 10) {
+                if(cme->misses & (uint8_t)0x40) {
                     uint8_t i;
                     for(i = 0; i < numOfCoherencyCaches && coherencyCaches[i].cme != cme; ++i) {} /// find index
                     status = &(coherencyCaches[i]);
-                    if(status->tid != ThreadLocalStatus::runningThreadIndex) {
-                        if (status->word == wordIndex) {
-                            status->ts++;
-                        } else {
-                            status->fs++;
-                            status->word = wordIndex;
-                        }
-                        status->tid = ThreadLocalStatus::runningThreadIndex;
-                        cme->misses |= (uint8_t)0x40;
-                    }
+                    status->misses++;
 
                 } else if (numOfCoherencyCaches < 32) {
                     lockForCoherencyCaches.lock();
@@ -299,13 +293,14 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType,
                     }
                     lockForCoherencyCaches.unlock();
                     if(status) {
-                        status->word = wordIndex;
-                        status->tid = ThreadLocalStatus::runningThreadIndex;
+                        cme->misses |= (uint8_t)0x40;
                         status->cme = cme;
+                        status->misses = 5;
                     }
                 }
 
                 if(status) {
+                    uint8_t wordIndex = (uint8_t)((uintaddr & CACHELINE_SIZE_MASK) >> 3);
                     uint8_t j;
                     for (j = 0; j < 16 && status->tidsPerWord[wordIndex][j] &&
                                 status->tidsPerWord[wordIndex][j] != ThreadLocalStatus::runningThreadIndex; ++j) { ; }
@@ -323,56 +318,95 @@ void ShadowMemory::doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType,
 }
 #endif
 
+bool cmp(const uint8_t a, const uint8_t b) {return a > b; }
+
 void ShadowMemory::printOutput() {
-    fprintf(ProgramStatus::outputFile, "\n");
-    conflictData.printOutput();
-    fprintf(ProgramStatus::outputFile, "\n");
     fprintf(stderr, "numOfCoherencyCaches = %u\n", numOfCoherencyCaches);
+//    uint8_t tScores[32] = {0};
+    uint8_t fScores[32] = {0};
+//    uint8_t numOfTScores = 0;
+    uint8_t numOfFScores = 0;
+//    uint8_t totalTScore = 0;
+    uint8_t totalFScore = 0;
     for(uint8_t i = 0; i < numOfCoherencyCaches; ++i) {
         CoherencyData * status = &(coherencyCaches[i]);
-        if(status->ts) {
-            fprintf(ProgramStatus::outputFile, "\ncache line: %u True Sharing\n", status->ts);
-        }
-        if(status->fs) {
+        uint8_t score = status->misses * 100 / conflictData.totalMisses;
+        if(score) {
             if(status->allocateTid[1]) {
-                fprintf(ProgramStatus::outputFile, "\ncache line: %u Allocator False Sharing\n", status->fs);
-                fprintf(ProgramStatus::outputFile, "Objects Allocated By Thread %u and %u\n", status->allocateTid[0], status->allocateTid[1]);
+                fprintf(ProgramStatus::outputFile, "----------\nallocator cache %u%%, objects are allocated by thread %u and %u\n",
+                        score, status->allocateTid[0], status->allocateTid[1]);
             } else {
-                fprintf(ProgramStatus::outputFile, "\ncache line: %u Application False Sharing\n", status->fs);
+                fprintf(ProgramStatus::outputFile, "----------\napplication cache %u%%\n", score);
             }
-        }
 
-        if(status->ts || status->fs) {
-            for(uint8_t i = 0; i < 8; ++i) {
-                if(status->tidsPerWord[i][0]) {
-                    fprintf(ProgramStatus::outputFile, "Word %u: ", i);
-                    for(uint8_t j = 0; j < 16 && status->tidsPerWord[i][j]; ++j) {
-                        fprintf(ProgramStatus::outputFile, "%u ", status->tidsPerWord[i][j]);
-                    }
-                    fprintf(ProgramStatus::outputFile, "\n");
+            Callsite::printCallSite(status->callKey[0]);
+            Callsite::printCallSite(status->callKey[1]);
+
+            bool trueSharing = false, falseSharing = false;
+            uint16_t lastTid = 0;
+            for (uint8_t i = 0; i < NUM_WORD; ++i) {
+                uint8_t j;
+                for (j = 0; j < 16 && status->tidsPerWord[i][j]; ++j) { ; }
+
+                if(j >= 2) {
+                    trueSharing = true;
+                    status->cme->misses = 0;
+                }
+                if(lastTid == 0) {
+                    lastTid = status->tidsPerWord[i][0];
+                } else if(lastTid != status->tidsPerWord[i][0] || j >= 2) {
+                    falseSharing = true;
+                    status->cme->misses = 0;
                 }
             }
-            if(status->callKey[0]) {
-                Callsite::printCallSite(status->callKey[0]);
+
+            if(trueSharing) {
+                fprintf(ProgramStatus::outputFile, "True Sharing\n");
+//                tScores[numOfTScores++] += score;
             }
-            if(status->callKey[1]) {
-                Callsite::printCallSite(status->callKey[1]);
+            if(falseSharing) {
+                fprintf(ProgramStatus::outputFile, "False Sharing\n");
+                if(status->allocateTid[1]) {
+                    fScores[numOfFScores++] += score;
+                }
             }
         }
     }
+
+//    if(numOfTScores) {
+//        std::sort(tScores, tScores+numOfTScores, cmp);
+//        for(uint8_t i = 0, j = 1; i < numOfTScores; ++i, j*=2) {
+//            totalTScore += tScores[i] / j;
+//        }
+//        fprintf(ProgramStatus::outputFile, "True Sharing Score = %u\n", totalTScore);
+//    }
+
+    if(numOfFScores) {
+        std::sort(fScores, fScores+numOfFScores, cmp);
+        for(uint8_t i = 0, j = 1; i < numOfFScores; ++i, j*=2) {
+            totalFScore += fScores[i] / j;
+        }
+        fprintf(ProgramStatus::outputFile, "False Sharing Score = %u\n", totalFScore);
+    }
+
+    fprintf(ProgramStatus::outputFile, "\n");
+    conflictData.printOutput();
+    fprintf(ProgramStatus::outputFile, "\n");
+
 }
 
 #ifdef UTIL
 void PageMapEntry::clear() {
 
-#ifdef CACHE_UTIL
+//#ifdef CACHE_UTIL
     if(cache_map_entry) {
         size_t cache_entries_size = NUM_CACHELINES_PER_PAGE * sizeof(CacheMapEntry);
         memset(cache_map_entry, 0, cache_entries_size);
     }
-#endif
+//#endif
     num_used_bytes = 0;
 }
+#endif
 
 unsigned short PageMapEntry::getUsedBytes() {
 
@@ -385,7 +419,6 @@ unsigned short PageMapEntry::getUsedBytes() {
     }
     return num_used_bytes;
 }
-#endif
 
 void ShadowMemory::getPageIndex(uint64_t addr, uint8_t * range, uint64_t * index) {
     for(uint8_t i = 0; i < NUM_ADDRESS_RANGE; ++i) {
@@ -400,12 +433,12 @@ void ShadowMemory::getPageIndex(uint64_t addr, uint8_t * range, uint64_t * index
     *range = NUM_ADDRESS_RANGE;
 }
 
-#ifdef UTIL
+
 inline PageMapEntry * ShadowMemory::getPageMapEntry(uint8_t range, uint64_t page_idx) {
     return page_map_begin[range] + page_idx;
 }
 
-#ifdef CACHE_UTIL
+//#ifdef CACHE_UTIL
 inline CacheMapEntry * ShadowMemory::doCacheMapBumpPointer() {
 
     CacheMapEntry * curPtrValue = cache_map_bump_ptr;
@@ -418,12 +451,14 @@ inline CacheMapEntry * ShadowMemory::doCacheMapBumpPointer() {
     }
     return curPtrValue;
 }
-#endif
+//#endif
+
 
 void PageMapEntry::addUsedBytes(unsigned short num_bytes) {
     num_used_bytes += num_bytes;
 }
 
+#ifdef UTIL
 void PageMapEntry::subUsedBytes(unsigned short num_bytes) {
     num_used_bytes -= num_bytes;
 }
@@ -431,10 +466,12 @@ void PageMapEntry::subUsedBytes(unsigned short num_bytes) {
 void PageMapEntry::setEmpty() {
     num_used_bytes = 0;
 }
+#endif
 
 inline void PageMapEntry::setFull() {
     num_used_bytes = PAGESIZE;
 }
+
 
 #ifdef CACHE_UTIL
 void PageMapEntry::mallocUpdateCacheLines(uint8_t range, uint64_t page_index, uint8_t cache_index, uint8_t firstCacheLineOffset, unsigned int size) {
@@ -475,6 +512,7 @@ void PageMapEntry::mallocUpdateCacheLines(uint8_t range, uint64_t page_index, ui
     }
 
 }
+#endif
 
 void PageMapEntry::freeUpdateCacheLines(uint8_t range, uint64_t page_index, uint8_t cache_index, uint8_t firstCacheLineOffset, ObjStat objStat) {
     int64_t size_remain = objStat.size;
@@ -482,7 +520,10 @@ void PageMapEntry::freeUpdateCacheLines(uint8_t range, uint64_t page_index, uint
     CacheMapEntry * current = targetPage->getCacheMapEntry(true) + cache_index;
 
     uint8_t curCacheLineBytes = MIN(CACHELINE_SIZE - firstCacheLineOffset, size_remain);  /// The first cache line
+
+#ifdef CACHE_UTIL
     current->subUsedBytes(curCacheLineBytes);
+#endif
 
     /// check conflict
     if(current->misses & (uint8_t)0x80) {
@@ -528,7 +569,9 @@ void PageMapEntry::freeUpdateCacheLines(uint8_t range, uint64_t page_index, uint
             current->misses &= (uint8_t)0x7f;
         }
 
+#ifdef CACHE_UTIL
         current->setEmpty();
+#endif
         size_remain -= CACHELINE_SIZE;
         cache_index++;
 
@@ -541,7 +584,10 @@ void PageMapEntry::freeUpdateCacheLines(uint8_t range, uint64_t page_index, uint
         } else {
             current++;
         }
+
+#ifdef CACHE_UTIL
         current->subUsedBytes(size_remain);
+#endif
 
         /// check conflict
         if(current->misses & (uint8_t)0x80) {
@@ -586,6 +632,7 @@ inline CacheMapEntry * PageMapEntry::getCacheMapEntry(bool mvBumpPtr) {
     return cache_map_entry;
 }
 
+#ifdef CACHE_UTIL
 inline void CacheMapEntry::addUsedBytes(uint8_t num_bytes) {
     num_used_bytes += num_bytes;
 }
@@ -614,4 +661,4 @@ uint8_t CacheMapEntry::getUsedBytes() {
 
 #endif
 
-#endif
+//#endif

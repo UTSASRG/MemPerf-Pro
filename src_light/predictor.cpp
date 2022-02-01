@@ -138,12 +138,21 @@ void Predictor::stopParallel() {
 
 
     for(unsigned int index = 1; index < ThreadLocalStatus::totalNumOfThread; ++index) {
+//        if(threadCycle[index] && threadReplacedCycle[index]) {
+//            criticalStageCycle = MAX(criticalStageCycle, threadCycle[index]);
+//            criticalReplacedStageCycle = MAX(criticalReplacedStageCycle, threadReplacedCycle[index]);
+//            if(lastThreadDepend && index != lastThreadIndex) {
+//                criticalStageCycleDepend = MAX(criticalStageCycleDepend, threadCycle[index]);
+//                criticalReplacedStageCycleDepend = MAX(criticalReplacedStageCycleDepend, threadReplacedCycle[index]);
+//            }
+//        }
+
         if(threadCycle[index] && threadReplacedCycle[index]) {
-            criticalStageCycle = MAX(criticalStageCycle, threadCycle[index]);
-            criticalReplacedStageCycle = MAX(criticalReplacedStageCycle, threadReplacedCycle[index]);
+            criticalStageCycle += threadCycle[index];
+            criticalReplacedStageCycle += threadReplacedCycle[index];
             if(lastThreadDepend && index != lastThreadIndex) {
-                criticalStageCycleDepend = MAX(criticalStageCycleDepend, threadCycle[index]);
-                criticalReplacedStageCycleDepend = MAX(criticalReplacedStageCycleDepend, threadReplacedCycle[index]);
+                criticalStageCycleDepend += threadCycle[index];
+                criticalReplacedStageCycleDepend += threadReplacedCycle[index];
             }
         }
     }
@@ -197,8 +206,8 @@ void Predictor::printOutput() {
 
 void Predictor::fopenPredictorInfoFile() {
     char predictorInfoFileName[MAX_FILENAME_LEN];
-    strcpy(predictorInfoFileName, "/home/jinzhou/mmprof/predictor.info");
-//    strcpy(predictorInfoFileName, "/home/jinzhou/mmprof/predictor_naive.info");
+//    strcpy(predictorInfoFileName, "/home/jinzhou/mmprof/predictor.info");
+    strcpy(predictorInfoFileName, "/home/jinzhou/mmprof/predictor_naive.info");
     fprintf(stderr, "Opening prediction info file %s...\n", predictorInfoFileName);
     if ((predictorInfoFile = fopen (predictorInfoFileName, "r")) == NULL) {
         perror("Failed to open prediction info file");

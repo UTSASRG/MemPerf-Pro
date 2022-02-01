@@ -11,6 +11,7 @@
 #include <new>
 #include <sched.h>
 #include <stdlib.h>
+
 #include "programstatus.h"
 #include "mymalloc.h"
 #include "allocatingstatus.h"
@@ -25,6 +26,5 @@
 #include "memsample.h"
 #include "shadowmemory.hh"
 #include "definevalues.h"
-#include "libmallocprof.h"
 
 #endif /* end of include guard: __LIBMALLOCPROF_H__ */

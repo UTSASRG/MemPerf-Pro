@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <malloc.h>
 #include <assert.h>
+#include <atomic>
 
 #include "libmallocprof.h"
 #include "spinlock.hh"
@@ -47,20 +48,17 @@
 #define CACHE_MAP_START (PAGE_MAP_START + PAGE_MAP_SIZE)
 #define OBJ_SIZE_MAP_START (CACHE_MAP_START + CACHE_MAP_SIZE)
 
-#define NUM_ADDRESS_RANGE 2
-//#define NUM_ADDRESS_RANGE 8
+//#define NUM_ADDRESS_RANGE 2
+#define NUM_ADDRESS_RANGE 8
 
 
 #define PAGE_MAP_SIZE (128 * ONE_GB)
 #define CACHE_MAP_SIZE (64 * ONE_GB)
 
-#ifdef UTIL
+//#ifdef UTIL
 #define MAX_PAGE_MAP_ENTRIES (PAGE_MAP_SIZE / sizeof(PageMapEntry))
 #define MAX_CACHE_MAP_ENTRIES (CACHE_MAP_SIZE / sizeof(CacheMapEntry))
-#else
-#define MAX_PAGE_MAP_ENTRIES 0
-#define MAX_CACHE_MAP_ENTRIES 0
-#endif
+//#endif
 
 struct ObjStat;
 namespace Callsite {
@@ -93,64 +91,66 @@ class CacheMapEntry {
 
 public:
 
-//#ifdef CACHE_UTIL
-//    bool addedConflict;
-//    bool addedCoherency;
-    int8_t num_used_bytes;
     uint8_t misses; /// conflict = (misses & (uint8_t)0x80), coherency = (misses & (uint8_t)0x40), miss = (misses & (uint8_t)0x3f)
 
+#ifdef CACHE_UTIL
+    int8_t num_used_bytes;
     void addUsedBytes(uint8_t num_bytes);
     void subUsedBytes(uint8_t num_bytes);
     void setFull();
     void setEmpty();
     uint8_t getUsedBytes();
-//#endif
+#endif
 
 };
 
-#ifdef UTIL
+
 class PageMapEntry {
 public:
+//#ifdef UTIL
     short num_used_bytes;
-
-#ifdef CACHE_UTIL
+//#endif
     CacheMapEntry * cache_map_entry;
-
+#ifdef CACHE_UTIL
     static void mallocUpdateCacheLines(uint8_t range, uint64_t page_index, uint8_t cache_index, uint8_t firstCacheLineOffset, unsigned int size);
+#endif
     static void freeUpdateCacheLines(uint8_t range, uint64_t page_index, uint8_t cache_index, uint8_t firstCacheLineOffset, ObjStat objStat);
     CacheMapEntry * getCacheMapEntry(bool mvBumpPtr = true);
-#endif
 
+#ifdef UTIL
     void clear();
+#endif
     unsigned short getUsedBytes();
     void addUsedBytes(unsigned short num_bytes);
+#ifdef UTIL
     void subUsedBytes(unsigned short num_bytes);
     void setEmpty();
+#endif
     void setFull();
 };
-#endif
+
 
 class ShadowMemory {
 private:
 
-#ifdef UTIL
     static void mallocUpdatePages(uintptr_t uintaddr, uint8_t range, uint64_t page_index, int64_t size);
+#ifdef UTIL
     static void freeUpdatePages(uintptr_t uintaddr, uint8_t range, uint64_t page_index, int64_t size);
 #endif
 
 //    static HashLocksSetForCoherency hashLocksSetForCoherency;
 
-#ifdef UTIL
+//#ifdef UTIL
     static PageMapEntry * page_map_begin[NUM_ADDRESS_RANGE];
     static PageMapEntry * page_map_end[NUM_ADDRESS_RANGE];
 
-#ifdef CACHE_UTIL
+//#ifdef CACHE_UTIL
     static CacheMapEntry * cache_map_begin;
     static CacheMapEntry * cache_map_end;
     static CacheMapEntry * cache_map_bump_ptr;
-#endif
+//#endif
 
-#endif
+//#endif
 
     static bool isInitialized;
 
@@ -158,50 +158,48 @@ public:
 
     static void * addressRanges[NUM_ADDRESS_RANGE];
 
-#ifdef UTIL
+//#ifdef UTIL
 
-#ifdef CACHE_UTIL
+//#ifdef CACHE_UTIL
     static spinlock cache_map_lock;
-#endif
+//#endif
 
-#endif
+//#endif
 #ifdef OPEN_SAMPLING_EVENT
     static void doMemoryAccess(uintptr_t uintaddr, eMemAccessType accessType, bool miss);
 #endif
     static bool initialize();
 
 #ifdef UTIL
-
     static void cleanupPages(uintptr_t uintaddr, size_t length);
-
-#ifdef CACHE_UTIL
-    static CacheMapEntry * doCacheMapBumpPointer();
 #endif
+
+//#ifdef CACHE_UTIL
+    static CacheMapEntry * doCacheMapBumpPointer();
+//#endif
 
     static PageMapEntry * doPageMapBumpPointer();
 
-#endif
+
 
     static void getPageIndex(uint64_t addr, uint8_t * range, uint64_t * index);
 
-#ifdef UTIL
     static PageMapEntry * getPageMapEntry(uint8_t range, uint64_t page_idx);
     static void mallocUpdateObject(void * address, unsigned int size);
     static void freeUpdateObject(void * address, ObjStat objStat);
-#endif
-
     static void printOutput();
 
 };
 
+bool cmp(uint8_t a, uint8_t b);
+
+#define NUM_WORD 8
+
 struct CoherencyData {
-    uint8_t word;
-    short tid;
     uint8_t callKey[2];
+    uint16_t misses;
     uint16_t allocateTid[2];
-    uint16_t ts;
-    uint16_t fs;
-    uint16_t tidsPerWord[8][16];
+    uint16_t tidsPerWord[NUM_WORD][16];
     CacheMapEntry * cme;
 };
 
@@ -259,10 +257,15 @@ struct ConflictData {
 //            fprintf(stderr, "%u %u%%\n", i, missesPerSet[setOfCme[i]] * 100 / totalMisses);
 //        }
         if(totalMisses >= 50) {
+            uint8_t totalMissScore = 0;
+            uint8_t scores[20];
+            uint8_t numOfScores = 0;
             for(uint8_t i = 0; i < numOfCme; ++i) {
-                if(!(cme[i]->misses & (uint8_t)0x40) && missesPerSet[setOfCme[i]] * 20 >= totalMisses) {
+                if(cme[i]->misses && missesPerSet[setOfCme[i]] * 20 >= totalMisses) {
                     if(objNumPerSet[setOfCme[i]] >= 2) {
                         fprintf(ProgramStatus::outputFile, "\nset %u: %u%% Allocator Conflict Misses\n", setOfCme[i], missesPerSet[setOfCme[i]] * 100 / totalMisses);
+                        scores[numOfScores++] = missesPerSet[setOfCme[i]] * 100 / totalMisses;
+                        missesPerSet[setOfCme[i]] = 0;
                     } else {
                         fprintf(ProgramStatus::outputFile, "\nset %u: %u%% Application Conflict Misses\n", setOfCme[i], missesPerSet[setOfCme[i]] * 100 / totalMisses);
                     }
@@ -272,9 +275,14 @@ struct ConflictData {
                     if(callKeyPerSet[setOfCme[i]][1]) {
                         Callsite::printCallSite(callKeyPerSet[setOfCme[i]][1]);
                     }
-                    missesPerSet[setOfCme[i]] = 0;
                 }
             }
+            std::sort(scores, scores+numOfScores, cmp);
+            for(uint8_t i = 0, j = 1; i < numOfScores; ++i, j*=2) {
+//                fprintf(stderr, " %u", scores[i]);
+                totalMissScore += scores[i] / j;
+            }
+            fprintf(ProgramStatus::outputFile, "Conflict Score = %u\n", totalMissScore);
         }
     }
 };

@@ -1,6 +1,5 @@
 #include "libmallocprof.h"
 
-
 thread_local HashMap <void *, DetailLockData, PrivateHeap> lockUsage;
 HashMap <void *, DetailLockData, PrivateHeap> globalLockUsage;
 HashMap <void*, ObjStat, PrivateHeap> objStatusMap;
@@ -11,10 +10,7 @@ typedef int (*main_fn_t)(int, char **, char **);
 main_fn_t real_main_mallocprof;
 
 extern "C" {
-//	 Function prototypes
 	void exitHandler();
-
-//	 Function aliases
 	void free(void *) __attribute__ ((weak, alias("yyfree")));
 	void * calloc(size_t, size_t) __attribute__ ((weak, alias("yycalloc")));
 	void * malloc(size_t) __attribute__ ((weak, alias("yymalloc")));
@@ -41,7 +37,6 @@ void exitHandler() {
 
     GlobalStatus::globalize();
     GlobalStatus::printOutput();
-//    GlobalStatus::printForMatrix();
 
 }
 
@@ -68,7 +63,7 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
     ShadowMemory::initialize();
     ThreadLocalStatus::addARunningThread();
     ThreadLocalStatus::getARunningThreadIndex();
-
+//
 #ifdef OPEN_SAMPLING_FOR_ALLOCS
     ThreadLocalStatus::setRandomPeriodForAllocations();
 #endif
@@ -85,9 +80,10 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
 #endif
 
     ProgramStatus::initIO(argv[0]);
-//        ProgramStatus::initIO(std::getenv("MALLOC_PROGRAM_FULL"));
+#ifdef LOCK
     lockUsage.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_LOCK_NUM);
     globalLockUsage.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_LOCK_NUM);
+#endif
     callTable.initialize(HashFuncs::hash_uint8_t, HashFuncs::compare_uint8_t, NUM_CALLKEY);
     ObjTable::initialize();
     MyMalloc::initializeForThreadLocalHashMemory(ThreadLocalStatus::runningThreadIndex);
@@ -98,12 +94,9 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
 #endif
 
     ProgramStatus::setProfilerInitializedTrue();
-
-//#ifndef OPEN_SAMPLING_EVENT
     signal(SIGUSR2, mainStop);
-//#endif
     atexit(exitHandler);
-
+//
 	return real_main_mallocprof (argc, argv, envp);
 }
 
@@ -116,7 +109,6 @@ extern "C" int libmallocprof_libc_start_main(main_fn_t main_fn, int argc, char *
 	return real_libc_start_main(libmallocprof_main, argc, argv, init, fini, rtld_fini, stack_end);
 }
 
-//// Memory management functions
 extern "C" {
 	void * yymalloc(size_t sz) {
         if(sz == 0) {
@@ -631,7 +623,6 @@ int pthread_mutex_trylock(pthread_mutex_t *mutex) {
     return result;
 }
 
-// PTHREAD_MUTEX_UNLOCK
 int pthread_mutex_unlock(pthread_mutex_t *mutex) {
     if(AllocatingStatus::outsideTrackedAllocation()|| !AllocatingStatus::sampledForCountingEvent) {
         if (!realInitialized) RealX::initializer();

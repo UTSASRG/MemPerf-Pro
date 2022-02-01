@@ -18,7 +18,7 @@ private:
     static thread_local uint64_t cyclesBeforeRealFunction;
     static thread_local uint64_t cyclesAfterRealFunction;
     static thread_local uint64_t cyclesInRealFunction;
-//    static thread_local uint64_t cyclesMinus;
+
 #ifdef OPEN_DEBUG
     static spinlock debugLock;
 #endif
@@ -136,33 +136,6 @@ private:
 #endif
     };
 
-//    struct CriticalSectionStatusInAllocatingStatus {
-//        unsigned int numOfOwningLocks;
-//        unsigned int numOfCriticalSections;
-//        uint64_t cyclesBeforeCriticalSection;
-//        uint64_t cyclesAfterCriticalSection;
-//        uint64_t totalCyclesOfCriticalSections;
-//
-//        void checkAndStartRecordingACriticalSection() {
-//            if(++numOfOwningLocks == 1) {
-//                cyclesBeforeCriticalSection = rdtscp();
-//            }
-//        }
-//
-//        void checkAndStopRecordingACriticalSection() {
-//            if(--numOfOwningLocks == 0) {
-//                cyclesAfterCriticalSection = rdtscp();
-//                numOfCriticalSections++;
-//                totalCyclesOfCriticalSections += cyclesAfterCriticalSection - cyclesBeforeCriticalSection;
-//            }
-//        }
-//
-//        void cleanUp() {
-//            numOfCriticalSections = 0;
-//            totalCyclesOfCriticalSections = 0;
-//        }
-//    };
-
     static thread_local LockTypes nowRunningLockType;
     static thread_local QueueOfDetailLockDataInAllocatingStatus queueOfDetailLockData;
     static thread_local OverviewLockDataInAllocatingStatus overviewLockData[NUM_OF_LOCKTYPES];
@@ -219,12 +192,10 @@ public:
     static bool debugMutexAddressInTheQueue(pthread_mutex_t * mutex);
 #endif
     static void checkAndStartRecordingACriticalSection();
-//    static void checkAndStopRecordingACriticalSection();
 #ifdef OPEN_DEBUG
     static void debugPrint();
     static size_t debugReturnSize();
 #endif
-//    static void minusCycles(uint64_t cycles);
 
 };
 

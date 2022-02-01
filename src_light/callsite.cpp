@@ -61,6 +61,9 @@ namespace Callsite {
     }
 
     void printCallSite(uint8_t callKey) {
+        if(!callKey) {
+            return;
+        }
         void ** callsite = callTable.find(callKey, sizeof(uint8_t));
         if(callsite && *callsite) {
             char command[512];
