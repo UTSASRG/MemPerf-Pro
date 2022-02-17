@@ -26,5 +26,6 @@
 #include "memsample.h"
 #include "shadowmemory.hh"
 #include "definevalues.h"
+#include "memoryusage.h"
 
 #endif /* end of include guard: __LIBMALLOCPROF_H__ */

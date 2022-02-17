@@ -85,9 +85,17 @@ bool ShadowMemory::initialize() {
 	return true;
 }
 
+#ifdef MEMORY
+unsigned int ShadowMemory::mallocUpdateObject(void * address, unsigned int size) {
+#else
 void ShadowMemory::mallocUpdateObject(void * address, unsigned int size) {
+#endif
     if(size == 0) {
+#ifdef MEMORY
+        return 0;
+#else
         return;
+#endif
     }
 
     uintptr_t uintaddr = (uintptr_t)address;
@@ -102,10 +110,19 @@ void ShadowMemory::mallocUpdateObject(void * address, unsigned int size) {
 
     if(firstPageRange == NUM_ADDRESS_RANGE) {
 //        fprintf(stderr, "malloc address %p out of range\n", uintaddr);
+#ifdef MEMORY
+        return 0;
+#else
         return;
+#endif
     }
 
+#ifdef MEMORY
+    unsigned int touchedPageSize = mallocUpdatePages(uintaddr, firstPageRange, firstPageIdx, size);
+#else
     mallocUpdatePages(uintaddr, firstPageRange, firstPageIdx, size);
+#endif
+
 
 #ifdef CACHE_UTIL
     uint8_t firstCacheLineOffset = (uintaddr & CACHELINE_SIZE_MASK);
@@ -113,6 +130,9 @@ void ShadowMemory::mallocUpdateObject(void * address, unsigned int size) {
     PageMapEntry::mallocUpdateCacheLines(firstPageRange, firstPageIdx, curCacheLineIdx, firstCacheLineOffset, size);
 #endif
 
+#ifdef MEMORY
+    return touchedPageSize;
+#endif
 }
 
 void ShadowMemory::freeUpdateObject(void * address, ObjStat objStat) {
@@ -142,7 +162,15 @@ void ShadowMemory::freeUpdateObject(void * address, ObjStat objStat) {
 
 }
 
+#ifdef MEMORY
+unsigned int ShadowMemory::mallocUpdatePages(uintptr_t uintaddr, uint8_t range, uint64_t page_index, int64_t size) {
+#else
 void ShadowMemory::mallocUpdatePages(uintptr_t uintaddr, uint8_t range, uint64_t page_index, int64_t size) {
+#endif
+
+#ifdef MEMORY
+    unsigned int touchedPages = 0;
+#endif
 
     unsigned short firstPageOffset = uintaddr & PAGESIZE_MASK;
     unsigned int curPageBytes = MIN(PAGESIZE - firstPageOffset, size);
@@ -151,16 +179,35 @@ void ShadowMemory::mallocUpdatePages(uintptr_t uintaddr, uint8_t range, uint64_t
     current->addUsedBytes(curPageBytes);
     size -= curPageBytes;
 
+#ifdef MEMORY
+    if(!current->isTouched()) {
+        current->setTouched();
+        touchedPages++;
+    }
+#endif
+
     while(size >= PAGESIZE) {
         current++;
         current->setFull();
         size -= PAGESIZE;
+
+#ifdef MEMORY
+        if(!current->isTouched()) {
+            current->setTouched();
+            touchedPages++;
+        }
+#endif
+
     }
 
     if(size > 0) {
         current++;
         current->addUsedBytes(size);
     }
+
+#ifdef MEMORY
+    return touchedPages * PAGESIZE;
+#endif
 }
 
 #ifdef UTIL
@@ -186,7 +233,15 @@ void ShadowMemory::freeUpdatePages(uintptr_t uintaddr, uint8_t range, uint64_t p
 
 }
 
+#ifdef MEMORY
+size_t ShadowMemory::cleanupPages(uintptr_t uintaddr, size_t length) {
+#else
 void ShadowMemory::cleanupPages(uintptr_t uintaddr, size_t length) {
+#endif
+
+#ifdef MEMORY
+    unsigned int freedPageNum = 0;
+#endif
 
     uint8_t firstPageRange;
     uint64_t firstPageIdx;
@@ -199,7 +254,15 @@ void ShadowMemory::cleanupPages(uintptr_t uintaddr, size_t length) {
         current->clear();
         current++;
         length -= PAGESIZE;
+#ifdef MEMORY
+        if(current->isTouched()) {
+            freedPageNum++;
+        }
+#endif
     }
+#ifdef MEMORY
+    return freedPageNum*PAGESIZE;
+#endif
 }
 #endif
 
@@ -405,6 +468,20 @@ void PageMapEntry::clear() {
     }
 //#endif
     num_used_bytes = 0;
+#ifdef MEMORY
+    touched = false;
+#endif
+}
+#endif
+
+#ifdef MEMORY
+bool PageMapEntry::isTouched() {
+    return touched;
+}
+
+void PageMapEntry::setTouched() {
+
+    touched = true;
 }
 #endif
 

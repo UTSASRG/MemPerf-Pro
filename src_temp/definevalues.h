@@ -3,6 +3,8 @@
 
 //#define ON_DEBUG 1
 
+#define MEMORY
+
 #define OPEN_SAMPLING_EVENT 1
 #define OPEN_SAMPLING_FOR_ALLOCS 1
 #define RANDOM_PERIOD_FOR_ALLOCS 100

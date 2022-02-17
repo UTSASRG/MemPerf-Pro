@@ -4,6 +4,7 @@ SRCS = 	\
 		allocatingstatus.cpp \
 		callsite.cpp \
 		globalstatus.cpp \
+		memoryusage.cpp \
 		memsample.c \
 		mymalloc.cpp \
 		objTable.cpp \
@@ -24,6 +25,7 @@ INCS = \
 		hashfuncs.hh \
 		hashlist.hh \
 		hashmap.hh \
+		memoryusage.h \
 		memsample.h \
 		mymalloc.h \
 		objTable.h \

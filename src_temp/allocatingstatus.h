@@ -8,6 +8,7 @@
 #include "threadlocalstatus.h"
 #include "structs.h"
 #include "predictor.h"
+#include "memoryusage.h"
 
 
 class AllocatingStatus {

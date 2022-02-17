@@ -107,9 +107,10 @@ public:
 
 class PageMapEntry {
 public:
-//#ifdef UTIL
+#ifdef MEMORY
+    bool touched;
+#endif
     short num_used_bytes;
-//#endif
     CacheMapEntry * cache_map_entry;
 #ifdef CACHE_UTIL
     static void mallocUpdateCacheLines(uint8_t range, uint64_t page_index, uint8_t cache_index, uint8_t firstCacheLineOffset, unsigned int size);
@@ -119,6 +120,10 @@ public:
 
 #ifdef UTIL
     void clear();
+#endif
+#ifdef MEMORY
+    bool isTouched();
+    void setTouched();
 #endif
     unsigned short getUsedBytes();
     void addUsedBytes(unsigned short num_bytes);
@@ -132,8 +137,11 @@ public:
 
 class ShadowMemory {
 private:
-
+#ifdef MEMORY
+    static unsigned int mallocUpdatePages(uintptr_t uintaddr, uint8_t range, uint64_t page_index, int64_t size);
+#else
     static void mallocUpdatePages(uintptr_t uintaddr, uint8_t range, uint64_t page_index, int64_t size);
+#endif
 #ifdef UTIL
     static void freeUpdatePages(uintptr_t uintaddr, uint8_t range, uint64_t page_index, int64_t size);
 #endif
@@ -171,7 +179,11 @@ public:
     static bool initialize();
 
 #ifdef UTIL
+#ifdef MEMORY
+    static size_t cleanupPages(uintptr_t uintaddr, size_t length);
+#else
     static void cleanupPages(uintptr_t uintaddr, size_t length);
+#endif
 #endif
 
 //#ifdef CACHE_UTIL
@@ -185,7 +197,11 @@ public:
     static void getPageIndex(uint64_t addr, uint8_t * range, uint64_t * index);
 
     static PageMapEntry * getPageMapEntry(uint8_t range, uint64_t page_idx);
+#ifdef MEMORY
+    static unsigned int mallocUpdateObject(void * address, unsigned int size);
+#else
     static void mallocUpdateObject(void * address, unsigned int size);
+#endif
     static void freeUpdateObject(void * address, ObjStat objStat);
     static void printOutput();
 

@@ -400,7 +400,12 @@ int madvise(void *addr, size_t length, int advice) {
 
 #ifdef UTIL
     if (advice == MADV_DONTNEED) {
+#ifdef MEMORY
+        size_t freedPageSize = ShadowMemory::cleanupPages((uintptr_t) addr, length);
+        MemoryUsage::subTotalSizeFromMemoryUsage(freedPageSize);
+#else
         ShadowMemory::cleanupPages((uintptr_t) addr, length);
+#endif
     }
 #endif
 
@@ -459,7 +464,12 @@ int munmap(void *addr, size_t length) {
     }
 
 #ifdef UTIL
+#ifdef MEMORY
+    size_t freedPageSize = ShadowMemory::cleanupPages((intptr_t) addr, length);
+    MemoryUsage::subTotalSizeFromMemoryUsage(freedPageSize);
+#else
     ShadowMemory::cleanupPages((intptr_t) addr, length);
+#endif
 #endif
 
     if (!AllocatingStatus::sampledForCountingEvent) {

@@ -39,7 +39,9 @@ void GlobalStatus::globalize() {
         }
     }
     friendlinessStatus.add(ThreadLocalStatus::friendlinessStatus);
-
+#ifdef MEMORY
+    MemoryUsage::globalize();
+#endif
     lock.unlock();
 }
 
@@ -213,6 +215,9 @@ void GlobalStatus::printOutput() {
     printFriendliness();
 #ifdef PREDICTION
     Predictor::printOutput();
+#endif
+#ifdef MEMORY
+    MemoryUsage::printOutput();
 #endif
 
 //    fflush(ProgramStatus::outputFile);

@@ -108,7 +108,12 @@ void AllocatingStatus::updateFreeingStatusAfterRealFunction() {
 void AllocatingStatus::updateMemoryStatusAfterAllocation() {
 
     allocatingType.isReuse = ObjTable::allocUpdate(allocatingType.objectSize, allocatingType.objectAddress);
+#ifdef MEMORY
+    unsigned int touchedPageSize = ShadowMemory::mallocUpdateObject(allocatingType.objectAddress, allocatingType.objectSize);
+    MemoryUsage::addToMemoryUsage(allocatingType.objectSize, touchedPageSize);
+#else
     ShadowMemory::mallocUpdateObject(allocatingType.objectAddress, allocatingType.objectSize);
+#endif
 
 }
 
@@ -116,9 +121,11 @@ void AllocatingStatus::updateMemoryStatusBeforeFree() {
     ObjStat * objStat = ObjTable::freeUpdate(allocatingType.objectAddress);
     if(objStat) {
         allocatingType.objectSize = objStat->size;
-//        allocatingType.objectSize = malloc_usable_size(allocatingType.objectAddress);
         if(allocatingType.objectSize) {
             ShadowMemory::freeUpdateObject(allocatingType.objectAddress, *objStat);
+#ifdef MEMORY
+            MemoryUsage::subRealSizeFromMemoryUsage(allocatingType.objectSize);
+#endif
         }
     }
 
