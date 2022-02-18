@@ -4,6 +4,7 @@
 //#define ON_DEBUG 1
 
 #define MEMORY
+#define OPEN_BACKTRACE
 
 #define OPEN_SAMPLING_EVENT 1
 #define OPEN_SAMPLING_FOR_ALLOCS 1
@@ -12,6 +13,8 @@
 #define UTIL 1
 #define CACHE_UTIL 1
 #define LOCK 1
+
+#define MAX_BT_ADDR_NUM 160
 
 //#define OPEN_DEBUG 1
 //#define OPEN_CPU_BINDING 1

@@ -44,9 +44,10 @@ void MemoryUsage::addToMemoryUsage(unsigned int size, unsigned int newTouchePage
          maxGlobalMemoryUsage = globalMemoryUsage;
 //         updateTimes++;
 
-//#ifdef OPEN_BACKTRACE
-//         Backtrace::recordMem();
-//#endif
+#ifdef OPEN_BACKTRACE
+         Backtrace::recordMem();
+#endif
+
 //         MemoryWaste::compareMemoryUsageAndRecordStatus(maxGlobalMemoryUsage);
 //#ifdef PRINT_LEAK_OBJECTS
 //         if(MemoryWaste::minAddr != (uint64_t)-1 && MemoryWaste::maxAddr) {

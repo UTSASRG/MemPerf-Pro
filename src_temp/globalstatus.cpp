@@ -219,6 +219,9 @@ void GlobalStatus::printOutput() {
 #ifdef MEMORY
     MemoryUsage::printOutput();
 #endif
+#ifdef OPEN_BACKTRACE
+    Backtrace::printOutput();
+#endif
 
 //    fflush(ProgramStatus::outputFile);
     fprintf(stderr, "writing completed\n");

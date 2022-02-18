@@ -107,7 +107,12 @@ void AllocatingStatus::updateFreeingStatusAfterRealFunction() {
 
 void AllocatingStatus::updateMemoryStatusAfterAllocation() {
 
+#ifdef OPEN_BACKTRACE
+    uint8_t callsiteKey = Backtrace::doABackTrace(allocatingType.objectSize);
+#endif
+
     allocatingType.isReuse = ObjTable::allocUpdate(allocatingType.objectSize, allocatingType.objectAddress);
+
 #ifdef MEMORY
     unsigned int touchedPageSize = ShadowMemory::mallocUpdateObject(allocatingType.objectAddress, allocatingType.objectSize);
     MemoryUsage::addToMemoryUsage(allocatingType.objectSize, touchedPageSize);

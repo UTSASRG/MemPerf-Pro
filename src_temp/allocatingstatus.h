@@ -9,6 +9,7 @@
 #include "structs.h"
 #include "predictor.h"
 #include "memoryusage.h"
+#include "backtrace.h"
 
 
 class AllocatingStatus {

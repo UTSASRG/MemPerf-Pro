@@ -4,6 +4,10 @@ thread_local HashMap <void *, DetailLockData, PrivateHeap> lockUsage;
 HashMap <void *, DetailLockData, PrivateHeap> globalLockUsage;
 HashMap <void*, ObjStat, PrivateHeap> objStatusMap;
 HashMap<uint8_t, void *, PrivateHeap> callTable;
+#ifdef OPEN_BACKTRACE
+HashMap <uint8_t, BackTraceMemory, PrivateHeap> BTMemMap;
+HashMap <uint8_t, BackTraceMemory, PrivateHeap> BTMemMapRecord;
+#endif
 
 //// pre-init private allocator memory
 typedef int (*main_fn_t)(int, char **, char **);
@@ -91,6 +95,10 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
 #ifdef PREDICTION
     Predictor::globalInit();
     Predictor::outsideCycleStart();
+#endif
+
+#ifdef OPEN_BACKTRACE
+    Backtrace::init();
 #endif
 
     ProgramStatus::setProfilerInitializedTrue();
