@@ -5,13 +5,16 @@ SRCS = 	\
 		backtrace.cpp \
 		callsite.cpp \
 		globalstatus.cpp \
+		leakcheck.cpp \
 		memoryusage.cpp \
 		memsample.c \
+		memwaste.cpp \
 		mymalloc.cpp \
 		objTable.cpp \
 		predictor.cpp \
 		programstatus.cpp \
 		real.cpp \
+		selfmap.cpp \
 		shadowmemory.cpp \
 		structs.cpp \
 		threadlocalstatus.cpp \
@@ -27,13 +30,16 @@ INCS = \
 		hashfuncs.hh \
 		hashlist.hh \
 		hashmap.hh \
+		leakcheck.hh \
 		memoryusage.h \
 		memsample.h \
+		memwaste.h \
 		mymalloc.h \
 		objTable.h \
 		predictor.h \
 		programstatus.h \
 		real.hh \
+		selfmap.hh \
 		shadowmemory.hh \
 		spinlock.hh \
 		structs.h \

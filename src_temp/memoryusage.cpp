@@ -48,22 +48,18 @@ void MemoryUsage::addToMemoryUsage(unsigned int size, unsigned int newTouchePage
          Backtrace::recordMem();
 #endif
 
-//         MemoryWaste::compareMemoryUsageAndRecordStatus(maxGlobalMemoryUsage);
-//#ifdef PRINT_LEAK_OBJECTS
-//         if(MemoryWaste::minAddr != (uint64_t)-1 && MemoryWaste::maxAddr) {
-//             if(ThreadLocalStatus::numOfFunctions[0] + ThreadLocalStatus::numOfFunctions[1] + ThreadLocalStatus::numOfFunctions[2] +
-//             ThreadLocalStatus::numOfFunctions[3] +ThreadLocalStatus::numOfFunctions[4] +
-//             ThreadLocalStatus::numOfFunctions[12] + ThreadLocalStatus::numOfFunctions[13] + ThreadLocalStatus::numOfFunctions[14] + ThreadLocalStatus::numOfFunctions[15] +
-//             ThreadLocalStatus::numOfFunctions[16] <= 1000) {
-//                 ;
-//             }  else {
-//                 leakcheck::doSlowLeakCheck(MemoryWaste::minAddr, MemoryWaste::maxAddr);
-//                 leakcheck::sweep();
-//                 fprintf(stderr, "thread %d potential leak = %luKb\n", ThreadLocalStatus::runningThreadIndex, leakcheck::_totalLeakageSize/ONE_KB);
-////             }
-//             }
-//         }
-//#endif
+         MemoryWaste::compareMemoryUsageAndRecordStatus(maxGlobalMemoryUsage);
+#ifdef PRINT_LEAK_OBJECTS
+         if(MemoryWaste::minAddr != (uint64_t)-1 && MemoryWaste::maxAddr) {
+             if(ThreadLocalStatus::numOfFunctions[0] + ThreadLocalStatus::numOfFunctions[1] + ThreadLocalStatus::numOfFunctions[2] +
+             ThreadLocalStatus::numOfFunctions[3] +ThreadLocalStatus::numOfFunctions[4] +
+             ThreadLocalStatus::numOfFunctions[12] + ThreadLocalStatus::numOfFunctions[13] + ThreadLocalStatus::numOfFunctions[14] + ThreadLocalStatus::numOfFunctions[15] +
+             ThreadLocalStatus::numOfFunctions[16] > 1000) {
+                 leakcheck::doSlowLeakCheck(MemoryWaste::minAddr, MemoryWaste::maxAddr);
+                 leakcheck::sweep();
+                 fprintf(stderr, "thread %d potential leak = %luKb\n", ThreadLocalStatus::runningThreadIndex, leakcheck::_totalLeakageSize/ONE_KB);
+         }
+#endif
         mtx.unlock();
      }
 

@@ -16,8 +16,9 @@
 #include "threadlocalstatus.h"
 #include "libmallocprof.h"
 
-#define MAX_SOURCE_LENGTH 2048
+#ifndef OPEN_BACKTRACE
 
+#define MAX_SOURCE_LENGTH 2048
 #define NUM_CALLKEY 256
 
 //#define RETURN_OFFSET 284 /// O0
@@ -39,5 +40,7 @@ namespace Callsite {
     void ssystem(char * command);
     void printCallSite(uint8_t callKey);
 }
+
+#endif
 
 #endif //SAMPLING_CPP_CALLSITE_H

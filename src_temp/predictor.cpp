@@ -206,8 +206,8 @@ void Predictor::printOutput() {
 
 void Predictor::fopenPredictorInfoFile() {
     char predictorInfoFileName[MAX_FILENAME_LEN];
-//    strcpy(predictorInfoFileName, "/home/jinzhou/mmprof/predictor.info");
-    strcpy(predictorInfoFileName, "/home/jinzhou/mmprof/predictor_naive.info");
+    strcpy(predictorInfoFileName, "/home/jinzhou/mmprof/predictor.info");
+//    strcpy(predictorInfoFileName, "/home/jinzhou/mmprof/predictor_naive.info");
     fprintf(stderr, "Opening prediction info file %s...\n", predictorInfoFileName);
     if ((predictorInfoFile = fopen (predictorInfoFileName, "r")) == NULL) {
         perror("Failed to open prediction info file");

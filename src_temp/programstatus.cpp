@@ -9,10 +9,21 @@ char ProgramStatus::outputFileName[MAX_FILENAME_LEN];
 unsigned short ProgramStatus::middleObjectThreshold;
 unsigned int ProgramStatus::largeObjectThreshold;
 
+#ifdef MEMORY
+unsigned short ProgramStatus::largeObjectAlignment;
+thread_local struct SizeClassSizeAndIndex ProgramStatus::cacheForGetClassSizeAndIndex;
+#endif
+
 char ProgramStatus::programName[256];
 //bool ProgramStatus::matrixFileOpened;
 //FILE * ProgramStatus::matrixFile;
 FILE * ProgramStatus::outputFile;
+
+#ifdef MEMORY
+bool ProgramStatus::allocatorStyleIsBibop;
+unsigned short ProgramStatus::numberOfClassSizes;
+unsigned int ProgramStatus::classSizes[8270];
+#endif
 
 
 void ProgramStatus::setProfilerInitializedTrue() {
@@ -43,6 +54,40 @@ bool ProgramStatus::conclusionHasStarted() {
 //}
 
 void ProgramStatus::getInputInfoFileName(char * runningApplicationName) {
+
+#ifdef MEMORY
+    //            strcpy(inputInfoFileName, "/home/jinzhou/mmprof/info/libc228.info");
+    char * runningAllocatorName = strrchr(runningApplicationName, '-')+1;
+//    char * runningAllocatorName = std::getenv("ALLOCATOR_NAME");
+    if(strcmp(runningAllocatorName, "libc228") == 0 || strcmp(runningAllocatorName, "pthread") == 0) {
+        strcpy(inputInfoFileName, "/home/jinzhou/mmprof/info_memory/libc228.info");
+//        strcpy(inputInfoFileName, "/media/umass/datasystem/steven/mmproftesting/mmprof/info/libc228.info");
+    } else if(strcmp(runningAllocatorName, "libc221") == 0) {
+        strcpy(inputInfoFileName, "/home/jinzhou/mmprof/info_memory/libc221.info");
+//        strcpy(inputInfoFileName, "/media/umass/datasystem/steven/mmproftesting/mmprof/info/libc221.info");
+    } else if(strcmp(runningAllocatorName, "hoard") == 0) {
+        strcpy(inputInfoFileName, "/home/jinzhou/mmprof/info_memory/libhoard.info");
+//        strcpy(inputInfoFileName, "/media/umass/datasystem/steven/mmproftesting/mmprof/info/libhoard.info");
+    } else if(strcmp(runningAllocatorName, "jemalloc") == 0) {
+        strcpy(inputInfoFileName, "/home/jinzhou/mmprof/info_memory/libjemalloc.info");
+//        strcpy(inputInfoFileName, "/media/umass/datasystem/steven/mmproftesting/mmprof/info/libjemalloc.info");
+    } else if(strcmp(runningAllocatorName, "tcmalloc") == 0) {
+        strcpy(inputInfoFileName, "/home/jinzhou/mmprof/info_memory/libtcmalloc.info");
+//        strcpy(inputInfoFileName, "/media/umass/datasystem/steven/mmproftesting/mmprof/info/libtcmalloc.info");
+    } else if(strcmp(runningAllocatorName, "dieharder") == 0) {
+        strcpy(inputInfoFileName, "/home/jinzhou/mmprof/info_memory/libdieharder.info");
+//        strcpy(inputInfoFileName, "/media/umass/datasystem/steven/mmproftesting/mmprof/info/libdieharder.info");
+    } else if(strcmp(runningAllocatorName, "omalloc") == 0) {
+        strcpy(inputInfoFileName, "/home/jinzhou/mmprof/info_memory/libomalloc.info");
+//        strcpy(inputInfoFileName, "/media/umass/datasystem/steven/mmproftesting/mmprof/info/libomalloc.info");
+    } else if (strcmp(runningAllocatorName, "numalloc") == 0) {
+        strcpy(inputInfoFileName, "/home/jinzhou/mmprof/info_memory/libnumalloc.info");
+//        strcpy(inputInfoFileName, "/media/umass/datasystem/steven/mmproftesting/mmprof/info/libnumalloc.info");
+    } else {
+        fprintf(stderr, "Info File Location Unknown\n");
+        abort();
+    }
+#else
 //            strcpy(inputInfoFileName, "/home/jinzhou/mmprof/info/libc228.info");
     char * runningAllocatorName = strrchr(runningApplicationName, '-')+1;
 //    char * runningAllocatorName = std::getenv("ALLOCATOR_NAME");
@@ -74,6 +119,7 @@ void ProgramStatus::getInputInfoFileName(char * runningApplicationName) {
         fprintf(stderr, "Info File Location Unknown\n");
         abort();
     }
+#endif
 
 //    if(ProgramStatus::matrixFileOpened) {
 //        fprintf(matrixFile, "%s ", runningAllocatorName);
@@ -89,6 +135,42 @@ void ProgramStatus::fopenInputInfoFile() {
     }
 }
 
+#ifdef MEMORY
+void ProgramStatus::readAllocatorStyleFromInfo(char * token) {
+    if ((strcmp(token, "style")) == 0) {
+
+        token = strtok(NULL, " ");
+
+        if ((strcmp(token, "bibop\n")) == 0) {
+            allocatorStyleIsBibop = true;
+        } else {
+            allocatorStyleIsBibop = false;
+        }
+    }
+}
+
+void ProgramStatus::readAllocatorClassSizesFromInfo(char * token) {
+    if ((strcmp(token, "class_sizes")) == 0) {
+
+        token = strtok(NULL, " ");
+        numberOfClassSizes = atoi(token);
+
+        if(allocatorStyleIsBibop) {
+            for (unsigned short i = 0; i < numberOfClassSizes; i++) {
+                token = strtok(NULL, " ");
+                classSizes[i] = (unsigned int) atoi(token);
+            }
+        } else {
+            classSizes[0] = 24;
+            for (unsigned short i = 1; i < numberOfClassSizes; i++) {
+                classSizes[i] = classSizes[i-1] + 16;
+            }
+        }
+    }
+    numberOfClassSizes++;
+}
+#endif
+
 void ProgramStatus::readMiddleObjectThresholdFromInfo(char *token) {
     if ((strcmp(token, "middle_object_threshold")) == 0) {
         token = strtok(NULL, " ");
@@ -103,6 +185,15 @@ void ProgramStatus::readLargeObjectThresholdFromInfo(char * token) {
     }
 }
 
+#ifdef MEMORY
+void ProgramStatus::readLargeObjectAlignmentFromInfo(char *token) {
+    if ((strcmp(token, "large_object_alignment")) == 0) {
+        token = strtok(NULL, " ");
+        largeObjectAlignment = (unsigned short) atoi(token);
+    }
+}
+#endif
+
 void ProgramStatus::readInputInfoFile() {
 
     size_t bufferSize = 53248;
@@ -111,8 +202,17 @@ void ProgramStatus::readInputInfoFile() {
     while (getline(&buffer, &bufferSize, ProgramStatus::inputInfoFile) > 0) {
         char *token = strtok(buffer, " ");
         if(token) {
+#ifdef MEMORY
+            readAllocatorStyleFromInfo(token);
+#endif
             readMiddleObjectThresholdFromInfo(token);
+#ifdef MEMORY
+            readAllocatorClassSizesFromInfo(token);
+#endif
             readLargeObjectThresholdFromInfo(token);
+#ifdef MEMORY
+            readLargeObjectAlignmentFromInfo(token);
+#endif
         }
     }
 
@@ -173,3 +273,43 @@ ObjectSizeType ProgramStatus::getObjectSizeType(unsigned int size) {
 inline size_t alignup(size_t size, size_t alignto) {
     return (size % alignto == 0) ? size : ((size + (alignto - 1)) & ~(alignto - 1));
 }
+
+#ifdef MEMORY
+SizeClassSizeAndIndex ProgramStatus::getClassSizeAndIndex(unsigned int size) {
+
+    if(size == cacheForGetClassSizeAndIndex.size) {
+        return cacheForGetClassSizeAndIndex;
+    }
+
+    unsigned int classSize = 0;
+    unsigned short classSizeIndex = 0;
+
+    if(size > largeObjectThreshold) {
+        classSize = (size/largeObjectAlignment)*largeObjectAlignment + ((bool)size%largeObjectAlignment)*largeObjectAlignment;
+        classSizeIndex = numberOfClassSizes-1;
+        return SizeClassSizeAndIndex{classSizeIndex, size, classSize};
+    }
+
+    if(allocatorStyleIsBibop) {
+        for (unsigned short index = 0; index < numberOfClassSizes-1; index++) {
+            if (size <= classSizes[index]) {
+                classSize = classSizes[index];
+                classSizeIndex = index;
+                break;
+            }
+        }
+    }
+    else {
+        if(size <= 24) {
+            classSize = 24;
+            classSizeIndex = 0;
+        } else {
+            classSizeIndex = (size - 24) / 16 + 1;
+            classSize = classSizes[classSizeIndex];
+        }
+    }
+    cacheForGetClassSizeAndIndex.updateValues(size, classSize, classSizeIndex);
+    return cacheForGetClassSizeAndIndex;
+}
+
+#endif

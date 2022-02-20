@@ -5,6 +5,15 @@
 #include "definevalues.h"
 #include "programstatus.h"
 
+#ifdef MEMORY
+struct SizeClassSizeAndIndex {
+    unsigned short classSizeIndex;
+    unsigned int size;
+    unsigned int classSize;
+
+    void updateValues(unsigned int size, unsigned int classSize, unsigned short classSizeIndex);
+};
+#endif
 
 struct AllocatingTypeWithSizeGotFromObjTable {
     bool isReuse;

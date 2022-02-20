@@ -7,7 +7,7 @@
 #include "definevalues.h"
 #include "globalstatus.h"
 //#include "structs.h"
-//#include "leakcheck.hh"
+#include "leakcheck.hh"
 
 #ifdef MEMORY
 

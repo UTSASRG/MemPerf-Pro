@@ -5,6 +5,8 @@
 
 #include "callsite.h"
 
+#ifndef OPEN_BACKTRACE
+
 extern HashMap <uint8_t, void *, PrivateHeap> callTable;
 
 void CallKeyHashLocksSet::lock(uint8_t key) {
@@ -75,6 +77,8 @@ namespace Callsite {
         }
     }
 }
+
+#endif
 
 #endif //SRC_LIGHT_CALLSITE_H
 

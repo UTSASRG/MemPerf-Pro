@@ -135,10 +135,21 @@ void ShadowMemory::mallocUpdateObject(void * address, unsigned int size) {
 #endif
 }
 
+#ifdef MEMORY_WASTE
+void ShadowMemory::freeUpdateObject(void * address, ObjectStatus objStat) {
+#else
 void ShadowMemory::freeUpdateObject(void * address, ObjStat objStat) {
+#endif
+
+#ifdef MEMORY_WASTE
+    if(objStat.sizeClassSizeAndIndex.size == 0) {
+        return;
+    }
+#else
     if(objStat.size == 0) {
         return;
     }
+#endif
 
     uintptr_t uintaddr = (uintptr_t)address;
 
@@ -151,7 +162,12 @@ void ShadowMemory::freeUpdateObject(void * address, ObjStat objStat) {
         return;
     }
 #ifdef UTIL
+
+#ifdef MEMORY_WASTE
+    freeUpdatePages(uintaddr, firstPageRange, firstPageIdx, objStat.sizeClassSizeAndIndex.size);
+#else
     freeUpdatePages(uintaddr, firstPageRange, firstPageIdx, objStat.size);
+#endif
 #endif
 
 //#ifdef CACHE_UTIL
@@ -401,9 +417,13 @@ void ShadowMemory::printOutput() {
             } else {
                 fprintf(ProgramStatus::outputFile, "----------\napplication cache %u%%\n", score);
             }
-
+#ifdef MEMORY_WASTE
+            Backtrace::printCallSite(status->callKey[0]);
+            Backtrace::printCallSite(status->callKey[1]);
+#else
             Callsite::printCallSite(status->callKey[0]);
             Callsite::printCallSite(status->callKey[1]);
+#endif
 
             bool trueSharing = false, falseSharing = false;
             uint16_t lastTid = 0;
@@ -591,8 +611,17 @@ void PageMapEntry::mallocUpdateCacheLines(uint8_t range, uint64_t page_index, ui
 }
 #endif
 
+#ifdef MEMORY_WASTE
+void PageMapEntry::freeUpdateCacheLines(uint8_t range, uint64_t page_index, uint8_t cache_index, uint8_t firstCacheLineOffset, ObjectStatus objStat) {
+#else
 void PageMapEntry::freeUpdateCacheLines(uint8_t range, uint64_t page_index, uint8_t cache_index, uint8_t firstCacheLineOffset, ObjStat objStat) {
+#endif
+
+#ifdef MEMORY_WASTE
+    int64_t size_remain = objStat.sizeClassSizeAndIndex.size;
+#else
     int64_t size_remain = objStat.size;
+#endif
     PageMapEntry * targetPage = ShadowMemory::getPageMapEntry(range, page_index);
     CacheMapEntry * current = targetPage->getCacheMapEntry(true) + cache_index;
 
@@ -604,7 +633,11 @@ void PageMapEntry::freeUpdateCacheLines(uint8_t range, uint64_t page_index, uint
 
     /// check conflict
     if(current->misses & (uint8_t)0x80) {
+#ifdef MEMORY_WASTE
+        conflictData.checkObj(objStat.sizeClassSizeAndIndex.size, current, objStat.callKey);
+#else
         conflictData.checkObj(objStat.tid, current, objStat.callKey);
+#endif
 //        current->addedConflict = false;
     }
     /// check coherency

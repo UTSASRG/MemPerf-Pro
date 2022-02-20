@@ -14,8 +14,11 @@
 #include "threadlocalstatus.h"
 #include "memsample.h"
 #include "definevalues.h"
+#include "backtrace.h"
 #include "callsite.h"
 #include "objTable.h"
+#include "memwaste.h"
+
 
 #define NUM_CACHELINES_PER_PAGE_HUGE 32768
 
@@ -60,6 +63,12 @@
 #define MAX_CACHE_MAP_ENTRIES (CACHE_MAP_SIZE / sizeof(CacheMapEntry))
 //#endif
 
+#ifdef MEMORY_WASTE
+struct ObjectStatus;
+namespace Backtrace {
+    void printCallSite(uint8_t callKey);
+}
+#else
 struct ObjStat;
 namespace Callsite {
     extern uint16_t numCallKey;
@@ -69,6 +78,7 @@ namespace Callsite {
     void ssystem(char * command);
     void printCallSite(uint8_t callKey);
 }
+#endif
 
 //#define NUM_COHERENCY_CACHES 20000
 
@@ -115,7 +125,12 @@ public:
 #ifdef CACHE_UTIL
     static void mallocUpdateCacheLines(uint8_t range, uint64_t page_index, uint8_t cache_index, uint8_t firstCacheLineOffset, unsigned int size);
 #endif
+
+#ifdef MEMORY_WASTE
+    static void freeUpdateCacheLines(uint8_t range, uint64_t page_index, uint8_t cache_index, uint8_t firstCacheLineOffset, ObjectStatus objStat);
+#else
     static void freeUpdateCacheLines(uint8_t range, uint64_t page_index, uint8_t cache_index, uint8_t firstCacheLineOffset, ObjStat objStat);
+#endif
     CacheMapEntry * getCacheMapEntry(bool mvBumpPtr = true);
 
 #ifdef UTIL
@@ -202,7 +217,13 @@ public:
 #else
     static void mallocUpdateObject(void * address, unsigned int size);
 #endif
+
+#ifdef MEMORY_WASTE
+    static void freeUpdateObject(void * address, ObjectStatus objStat);
+#else
     static void freeUpdateObject(void * address, ObjStat objStat);
+#endif
+
     static void printOutput();
 
 };
@@ -286,10 +307,18 @@ struct ConflictData {
                         fprintf(ProgramStatus::outputFile, "\nset %u: %u%% Application Conflict Misses\n", setOfCme[i], missesPerSet[setOfCme[i]] * 100 / totalMisses);
                     }
                     if(callKeyPerSet[setOfCme[i]][0]) {
+#ifdef MEMORY_WASTE
+                        Backtrace::printCallSite(callKeyPerSet[setOfCme[i]][0]);
+#else
                         Callsite::printCallSite(callKeyPerSet[setOfCme[i]][0]);
+#endif
                     }
                     if(callKeyPerSet[setOfCme[i]][1]) {
+#ifdef MEMORY_WASTE
+                        Backtrace::printCallSite(callKeyPerSet[setOfCme[i]][1]);
+#else
                         Callsite::printCallSite(callKeyPerSet[setOfCme[i]][1]);
+#endif
                     }
                 }
             }

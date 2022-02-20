@@ -1,6 +1,14 @@
 #include "structs.h"
 #include "globalstatus.h"
 
+#ifdef MEMORY
+void SizeClassSizeAndIndex::updateValues(unsigned int size, unsigned int classSize, unsigned short classSizeIndex) {
+    this->size = size;
+    this->classSize = classSize;
+    this->classSizeIndex = classSizeIndex;
+}
+#endif
+
 void SystemCallData::addOneSystemCall(uint64_t cycles) {
     this->num++;
     this->cycles += cycles;

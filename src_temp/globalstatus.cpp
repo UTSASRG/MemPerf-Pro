@@ -222,7 +222,10 @@ void GlobalStatus::printOutput() {
 #ifdef OPEN_BACKTRACE
     Backtrace::printOutput();
 #endif
-
+#ifdef MEMORY_WASTE
+    MemoryWaste::printOutput();
+    MemoryWaste::detectMemoryLeak();
+#endif
 //    fflush(ProgramStatus::outputFile);
     fprintf(stderr, "writing completed\n");
 }

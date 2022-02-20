@@ -10,6 +10,7 @@
 #include "predictor.h"
 #include "memoryusage.h"
 #include "backtrace.h"
+#include "memwaste.h"
 
 
 class AllocatingStatus {

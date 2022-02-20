@@ -20,3 +20,5 @@ cscope.*
 paper/figures/~$workflow.pptx
 src_temp/.idea/src_light.iml
 *.iml
+.idea/workspace.xml
+*.xml

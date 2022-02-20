@@ -5,6 +5,8 @@
 
 #define MEMORY
 #define OPEN_BACKTRACE
+#define MEMORY_WASTE
+//#define PRINT_LEAK_OBJECTS
 
 #define OPEN_SAMPLING_EVENT 1
 #define OPEN_SAMPLING_FOR_ALLOCS 1
@@ -15,6 +17,7 @@
 #define LOCK 1
 
 #define MAX_BT_ADDR_NUM 160
+#define MAX_REGION_NUM 256
 
 //#define OPEN_DEBUG 1
 //#define OPEN_CPU_BINDING 1

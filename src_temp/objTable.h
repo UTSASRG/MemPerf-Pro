@@ -13,6 +13,8 @@
 #include "structs.h"
 #include "callsite.h"
 
+#ifndef MEMORY_WASTE
+
 class ProgramStatus;
 
 
@@ -47,5 +49,7 @@ public:
     static ObjStat * freeUpdate(void* address);
 
 };
+
+#endif
 
 #endif //MMPROF_OBJTABLE_H

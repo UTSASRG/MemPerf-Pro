@@ -18,10 +18,21 @@ private:
 
     static unsigned short middleObjectThreshold;
     static unsigned int largeObjectThreshold;
+#ifdef MEMORY
+    static unsigned short largeObjectAlignment;
+    static thread_local struct SizeClassSizeAndIndex cacheForGetClassSizeAndIndex;
+#endif
 
     static void openMatrixFile();
     static void getInputInfoFileName(char * runningApplicationName);
     static void fopenInputInfoFile();
+
+#ifdef MEMORY
+    static void readAllocatorStyleFromInfo(char*token);
+    static void readAllocatorClassSizesFromInfo(char*token);
+    static void readLargeObjectAlignmentFromInfo(char*token);
+#endif
+
     static void readMiddleObjectThresholdFromInfo(char*token);
     static void readLargeObjectThresholdFromInfo(char*token);
     static void readInputInfoFile();
@@ -36,6 +47,12 @@ public:
     static FILE * outputFile;
     static char outputFileName[MAX_FILENAME_LEN];
 
+#ifdef MEMORY
+    static bool allocatorStyleIsBibop;
+    static unsigned short numberOfClassSizes;
+    static unsigned int classSizes[8270];
+#endif
+
     static void setProfilerInitializedTrue();
     static void setBeginConclusionTrue();
     static void setThreadInitializedTrue();
@@ -49,6 +66,9 @@ public:
     static bool hasMiddleObjectThreshold();
     static ObjectSizeType getObjectSizeType(unsigned int size);
 
+#ifdef MEMORY
+    static struct SizeClassSizeAndIndex getClassSizeAndIndex(unsigned int size);
+#endif
 };
 
 #endif //MMPROF_PROGRAMSTATUS_H

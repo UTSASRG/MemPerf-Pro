@@ -19,6 +19,9 @@
 
 #ifdef OPEN_BACKTRACE
 
+#define MAX_SOURCE_LENGTH 2048
+#define NUM_CALLKEY 256
+
 struct BackTraceMemory {
     uint8_t numberOfFrame;
 //    unsigned int memAllocated;
@@ -34,19 +37,19 @@ struct BTAddrMemPair {
     void * frames[7];
 };
 
-class Backtrace {
-private:
-//    static spinlock lock;
-//    static spinlock recordLock;
-    static bool compare(BTAddrMemPair a, BTAddrMemPair b);
-    static void* ConvertToVMA(void* addr);
-    static void ssystem(char* command);
-public:
-    static void init();
-    static uint8_t doABackTrace(unsigned int size);
-    static void subMem(uint8_t callsiteKey, unsigned int size);
-    static void recordMem();
-    static void printOutput();
+namespace Backtrace {
+//     spinlock lock;
+//     spinlock recordLock;
+    bool compare(BTAddrMemPair a, BTAddrMemPair b);
+    void* ConvertToVMA(void* addr);
+     void ssystem(char* command);
+     void ssystem2(char* command);
+     void init();
+     uint8_t doABackTrace(unsigned int size);
+     void subMem(uint8_t callsiteKey, unsigned int size);
+     void recordMem();
+     void printOutput();
+     void printCallSite(uint8_t callKey);
 };
 
 #endif

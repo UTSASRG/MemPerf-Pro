@@ -111,7 +111,11 @@ void AllocatingStatus::updateMemoryStatusAfterAllocation() {
     uint8_t callsiteKey = Backtrace::doABackTrace(allocatingType.objectSize);
 #endif
 
+#ifdef MEMORY_WASTE
+    allocatingType.isReuse = MemoryWaste::allocUpdate(allocatingType.objectSize, allocatingType.objectAddress, callsiteKey);
+#else
     allocatingType.isReuse = ObjTable::allocUpdate(allocatingType.objectSize, allocatingType.objectAddress);
+#endif
 
 #ifdef MEMORY
     unsigned int touchedPageSize = ShadowMemory::mallocUpdateObject(allocatingType.objectAddress, allocatingType.objectSize);
@@ -123,16 +127,24 @@ void AllocatingStatus::updateMemoryStatusAfterAllocation() {
 }
 
 void AllocatingStatus::updateMemoryStatusBeforeFree() {
+#ifdef MEMORY_WASTE
+    ObjectStatus * objStat = MemoryWaste::freeUpdate(allocatingType.objectAddress);
+    if(objStat) {
+        allocatingType.objectSize = objStat->sizeClassSizeAndIndex.size;
+        if(allocatingType.objectSize) {
+            ShadowMemory::freeUpdateObject(allocatingType.objectAddress, *objStat);
+            MemoryUsage::subRealSizeFromMemoryUsage(allocatingType.objectSize);
+        }
+    }
+#else
     ObjStat * objStat = ObjTable::freeUpdate(allocatingType.objectAddress);
     if(objStat) {
         allocatingType.objectSize = objStat->size;
         if(allocatingType.objectSize) {
             ShadowMemory::freeUpdateObject(allocatingType.objectAddress, *objStat);
-#ifdef MEMORY
-            MemoryUsage::subRealSizeFromMemoryUsage(allocatingType.objectSize);
-#endif
         }
     }
+#endif
 
 }
 

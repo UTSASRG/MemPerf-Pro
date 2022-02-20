@@ -2,11 +2,15 @@
 
 thread_local HashMap <void *, DetailLockData, PrivateHeap> lockUsage;
 HashMap <void *, DetailLockData, PrivateHeap> globalLockUsage;
-HashMap <void*, ObjStat, PrivateHeap> objStatusMap;
 HashMap<uint8_t, void *, PrivateHeap> callTable;
 #ifdef OPEN_BACKTRACE
 HashMap <uint8_t, BackTraceMemory, PrivateHeap> BTMemMap;
 HashMap <uint8_t, BackTraceMemory, PrivateHeap> BTMemMapRecord;
+#endif
+#ifdef MEMORY_WASTE
+HashMap <void*, ObjectStatus, PrivateHeap> objStatusMap;
+#else
+HashMap <void*, ObjStat, PrivateHeap> objStatusMap;
 #endif
 
 //// pre-init private allocator memory
@@ -89,16 +93,26 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
     globalLockUsage.initialize(HashFuncs::hashAddr, HashFuncs::compareAddr, MAX_LOCK_NUM);
 #endif
     callTable.initialize(HashFuncs::hash_uint8_t, HashFuncs::compare_uint8_t, NUM_CALLKEY);
-    ObjTable::initialize();
+
     MyMalloc::initializeForThreadLocalHashMemory(ThreadLocalStatus::runningThreadIndex);
 
-#ifdef PREDICTION
-    Predictor::globalInit();
-    Predictor::outsideCycleStart();
+#ifdef MEMORY_WASTE
+    MemoryWaste::initialize();
+#else
+    ObjTable::initialize();
 #endif
 
 #ifdef OPEN_BACKTRACE
     Backtrace::init();
+#endif
+
+#ifdef PRINT_LEAK_OBJECTS
+    signal(SIGUSR1, leakcheck::handler);
+#endif
+
+#ifdef PREDICTION
+    Predictor::globalInit();
+    Predictor::outsideCycleStart();
 #endif
 
     ProgramStatus::setProfilerInitializedTrue();

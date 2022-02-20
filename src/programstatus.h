@@ -48,8 +48,6 @@ public:
     static unsigned short numberOfClassSizes;
     static unsigned int classSizes[8270];
 
-    static bool useHugePage;
-
     static void setProfilerInitializedTrue();
     static void setBeginConclusionTrue();
     static void setThreadInitializedTrue();

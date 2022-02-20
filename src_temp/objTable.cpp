@@ -1,6 +1,8 @@
 
 #include "objTable.h"
 
+#ifndef MEMORY_WASTE
+
 extern HashMap <void*, ObjStat, PrivateHeap> objStatusMap;
 HashLocksSet ObjTable::hashLocksSet;
 
@@ -50,3 +52,5 @@ ObjStat* ObjTable::freeUpdate(void* address) {
 //    fprintf(stderr, "thread %u free %p size %u\n", ThreadLocalStatus::runningThreadIndex, address, status->size);
     return status;
 }
+
+#endif
