@@ -111,11 +111,9 @@ void Backtrace::debugPrintOutput() {
             memcpy(BTqueue[numOfBT].frames, status->frames, 7 * (sizeof(void *)));
             BTqueue[numOfBT].numberOfFrame = status->numberOfFrame;
             numOfBT++;
-            if (numOfBT == 4096) {
-                if (numOfBT == MAX_BT_ADDR_NUM) {
-                    fprintf(stderr, "increase BTqueue length\n");
-                    abort();
-                }
+            if (numOfBT == MAX_BT_ADDR_NUM) {
+                fprintf(stderr, "increase BTqueue length\n");
+                abort();
             }
         }
     }

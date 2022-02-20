@@ -40,7 +40,7 @@ void leakcheck::doSlowLeakCheck(unsigned long begin, unsigned long end) {
 //    fprintf(stderr, "heap pointers\n");
     searchHeapPointers(&context);
 //    fprintf(stderr, "stack\n");
-//fprintf(stderr, "thread stack from %p to %p\n", ThreadLocalStatus::stackStartAddress, &context);
+//fprintf(stderr, "thread stack from %p to %p\n", ThreadLocalStatus::stackBottom, &context);
     searchHeapPointersInsideStack(&context);
 //    mark();
 //    sweep();
@@ -156,7 +156,7 @@ void leakcheck::searchHeapPointers(ucontext_t* context) {
 }
 
 void leakcheck::searchHeapPointersInsideStack(void* start) {
-    void* stop = ThreadLocalStatus::stackStartAddress;
+    void* stop = ThreadLocalStatus::stackBottom;
 //    fprintf(stderr, "%lu check stack range: %p - %p\n", ThreadLocalStatus::runningThreadIndex, start, stop);
     searchHeapPointers((unsigned long)start, (unsigned long)stop);
 }
