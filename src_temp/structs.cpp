@@ -1,6 +1,17 @@
 #include "structs.h"
 #include "globalstatus.h"
 
+#ifdef COUNTING
+void PerfReadInfo::add(struct PerfReadInfo newPerfReadInfo) {
+    faults += newPerfReadInfo.faults;
+    l1cache_load += newPerfReadInfo.l1cache_load;
+    l1cache_load_miss += newPerfReadInfo.l1cache_load_miss;
+//    llc_load += newPerfReadInfo.llc_load;
+//    llc_load_miss += newPerfReadInfo.llc_load_miss;
+    instructions += newPerfReadInfo.instructions;
+}
+#endif
+
 #ifdef MEMORY
 void SizeClassSizeAndIndex::updateValues(unsigned int size, unsigned int classSize, unsigned short classSizeIndex) {
     this->size = size;

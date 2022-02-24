@@ -17,11 +17,15 @@ class GlobalStatus {
 
 public:
     static spinlock lock;
+
+#ifdef COUNTING
+    static PerfReadInfo countingEvents[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
+#endif
+
 //    static unsigned int numOfFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
     static unsigned int numOfSampledCountingFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
     static uint64_t cycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
     static OverviewLockData overviewLockData[NUM_OF_LOCKTYPES];
-//    static CriticalSectionStatus criticalSectionStatus[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
     static SystemCallData systemCallData[NUM_OF_SYSTEMCALLTYPES][NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
     static FriendlinessStatus friendlinessStatus;
     static int64_t potentialMemoryLeakFunctions;

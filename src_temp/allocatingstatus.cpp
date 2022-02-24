@@ -13,6 +13,12 @@ thread_local AllocatingStatus::QueueOfDetailLockDataInAllocatingStatus Allocatin
 thread_local AllocatingStatus::OverviewLockDataInAllocatingStatus AllocatingStatus::overviewLockData[NUM_OF_LOCKTYPES];
 thread_local SystemCallData AllocatingStatus::systemCallData[NUM_OF_SYSTEMCALLTYPES];
 
+#ifdef COUNTING
+thread_local PerfReadInfo AllocatingStatus::countingDataBeforeRealFunction;
+thread_local PerfReadInfo AllocatingStatus::countingDataAfterRealFunction;
+thread_local PerfReadInfo AllocatingStatus::countingDataInRealFunction;
+#endif
+
 bool AllocatingStatus::isFirstFunction() {
     if(firstAllocation == false) {
         firstAllocation = true;
@@ -60,6 +66,12 @@ void AllocatingStatus::updateAllocatingStatusBeforeRealFunction(AllocationFuncti
     sampledForCountingEvent = true;
 #endif
 
+#ifdef COUNTING
+    if(sampledForCountingEvent) {
+        startCountCountingEvents();
+    }
+#endif
+
     cyclesBeforeRealFunction = rdtscp();
 }
 
@@ -74,6 +86,13 @@ void AllocatingStatus::updateFreeingStatusBeforeRealFunction(AllocationFunction 
 #else
         sampledForCountingEvent = true;
 #endif
+
+#ifdef COUNTING
+        if(sampledForCountingEvent) {
+            startCountCountingEvents();
+        }
+#endif
+
         cyclesBeforeRealFunction = rdtscp();
     }
 }
@@ -81,6 +100,13 @@ void AllocatingStatus::updateFreeingStatusBeforeRealFunction(AllocationFunction 
 void AllocatingStatus::updateAllocatingStatusAfterRealFunction(void * objectAddress) {
 
     cyclesAfterRealFunction = rdtscp();
+
+#ifdef COUNTING
+    if(sampledForCountingEvent) {
+        stopCountCountingEvents();
+    }
+#endif
+
     cyclesInRealFunction = cyclesAfterRealFunction - cyclesBeforeRealFunction;
     if(cyclesInRealFunction > ABNORMAL_VALUE) {
         cyclesInRealFunction = 0;
@@ -97,6 +123,13 @@ void AllocatingStatus::updateAllocatingStatusAfterRealFunction(void * objectAddr
 void AllocatingStatus::updateFreeingStatusAfterRealFunction() {
 
     cyclesAfterRealFunction = rdtscp();
+
+#ifdef COUNTING
+    if(sampledForCountingEvent) {
+        stopCountCountingEvents();
+    }
+#endif
+
     cyclesInRealFunction = cyclesAfterRealFunction - cyclesBeforeRealFunction;
     if(cyclesInRealFunction > ABNORMAL_VALUE) {
         cyclesInRealFunction = 0;
@@ -292,6 +325,9 @@ void AllocatingStatus::updateAllocatingInfoToPredictor() {
 void AllocatingStatus::addUpCountingEventsToThreadLocalData() {
     ThreadLocalStatus::numOfSampledCountingFunctions[allocationTypeForOutputData]++;
     ThreadLocalStatus::cycles[allocationTypeForOutputData] += cyclesInRealFunction;
+#ifdef COUNTING
+    ThreadLocalStatus::countingEvents[allocationTypeForOutputData].add(countingDataInRealFunction);
+#endif
 }
 
 bool AllocatingStatus::outsideTrackedAllocation() {
@@ -320,3 +356,49 @@ void AllocatingStatus::recordLockCallAndCycles(unsigned int numOfCalls, uint64_t
     overviewLockData[nowRunningLockType].addCallAndCycles(numOfCalls, cycles);
     queueOfDetailLockData.addCallAndCycles(numOfCalls, cycles);
 }
+
+#ifdef COUNTING
+
+void AllocatingStatus::startCountCountingEvents() {
+    getPerfCounts(&countingDataBeforeRealFunction);
+}
+
+void AllocatingStatus::stopCountCountingEvents() {
+    getPerfCounts(&countingDataAfterRealFunction);
+    calculateCountingDataInRealFunction();
+    removeAbnormalCountingEventValues();
+}
+
+void AllocatingStatus::calculateCountingDataInRealFunction() {
+    countingDataInRealFunction.faults = countingDataAfterRealFunction.faults - countingDataBeforeRealFunction.faults;
+    countingDataInRealFunction.l1cache_load = countingDataAfterRealFunction.l1cache_load - countingDataBeforeRealFunction.l1cache_load;
+    countingDataInRealFunction.l1cache_load_miss = countingDataAfterRealFunction.l1cache_load_miss - countingDataBeforeRealFunction.l1cache_load_miss;
+//    countingDataInRealFunction.llc_load = countingDataAfterRealFunction.llc_load - countingDataBeforeRealFunction.llc_load;
+//    countingDataInRealFunction.llc_load_miss = countingDataAfterRealFunction.llc_load_miss - countingDataBeforeRealFunction.llc_load_miss;
+    countingDataInRealFunction.instructions = countingDataAfterRealFunction.instructions - countingDataBeforeRealFunction.instructions;
+}
+
+void AllocatingStatus::removeAbnormalCountingEventValues() {
+    if(cyclesInRealFunction > ABNORMAL_VALUE) {
+        cyclesInRealFunction = 0;
+    }
+    if(countingDataInRealFunction.faults > ABNORMAL_VALUE) {
+        countingDataInRealFunction.faults = 0;
+    }
+    if(countingDataInRealFunction.l1cache_load > ABNORMAL_VALUE) {
+        countingDataInRealFunction.l1cache_load = 0;
+    }
+    if(countingDataInRealFunction.l1cache_load_miss > ABNORMAL_VALUE) {
+        countingDataInRealFunction.l1cache_load_miss = 0;
+    }
+//    if(countingDataInRealFunction.llc_load > ABNORMAL_VALUE) {
+//        countingDataInRealFunction.llc_load = 0;
+//    }
+//    if(countingDataInRealFunction.llc_load_miss > ABNORMAL_VALUE) {
+//        countingDataInRealFunction.llc_load_miss = 0;
+//    }
+    if(countingDataInRealFunction.instructions > ABNORMAL_VALUE) {
+        countingDataInRealFunction.instructions = 0;
+    }
+}
+#endif

@@ -5,6 +5,19 @@
 #include "definevalues.h"
 #include "programstatus.h"
 
+#ifdef COUNTING
+struct PerfReadInfo {
+    uint64_t faults = 0;
+    uint64_t l1cache_load = 0;
+    uint64_t l1cache_load_miss = 0;
+//    uint64_t llc_load = 0;
+//    uint64_t llc_load_miss = 0;
+    uint64_t instructions = 0;
+
+    void add(struct PerfReadInfo newPerfReadInfo);
+};
+#endif
+
 #ifdef MEMORY
 struct SizeClassSizeAndIndex {
     unsigned short classSizeIndex;

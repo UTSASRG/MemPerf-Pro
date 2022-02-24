@@ -10,8 +10,6 @@
 #include "definevalues.h"
 #include "structs.h"
 
-extern thread_local bool isCountingInit;
-
 class ThreadLocalStatus {
 public:
     static unsigned short totalNumOfThread;
@@ -19,6 +17,10 @@ public:
     static unsigned short totalNumOfRunningThread;
     static thread_local short runningThreadIndex;
     static spinlock lock;
+
+#ifdef COUNTING
+    static thread_local PerfReadInfo countingEvents[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
+#endif
 
 //    static thread_local unsigned int numOfFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
     static thread_local unsigned int numOfSampledCountingFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];

@@ -4,7 +4,7 @@
 
 #include "memsample.h"
 
-#define PERF_GROUP_SIZE 3
+#define PERF_GROUP_SIZE 4
 
 
 long long perf_mmap_read();
@@ -15,8 +15,10 @@ long perf_event_open(struct perf_event_attr *hw_event, pid_t pid, int cpu, int g
 
 spinlock _perf_spin_lock;
 thread_local perf_info perfInfo;
-thread_local bool isCountingInit = false;
-thread_local bool isSamplingInit = false;
+thread_local bool isSamplingInit;
+#ifdef COUNTING
+thread_local bool isCountingInit;
+#endif
 int sample_type = PERF_SAMPLE_ADDR | PERF_SAMPLE_DATA_SRC;
 
 int read_format = PERF_FORMAT_GROUP;
@@ -38,9 +40,6 @@ inline void releaseGlobalPerfLock() {
 
 inline int create_perf_event(perf_event_attr * attr, int group) {
 	int fd = perf_event_open(attr, 0, -1, group, 0);
-	if(fd == -1) {
-        isCountingInit = false;
-	}
 	return fd;
 }
 
@@ -88,7 +87,7 @@ void initPMU2(void) {
 
 void sampleHandler(int signum, siginfo_t *info, void *p) {
 
-    if(!isSamplingInit ) {
+    if(!isSamplingInit) {
         return;
     }
 //    if(!perfInfo.initialized || !isSamplingInit ) {
@@ -428,5 +427,98 @@ long long perf_mmap_read() {
 
     return head;
 }
+
+
+#ifdef COUNTING
+void getPerfCounts (PerfReadInfo * i) {
+
+    if (!isCountingInit) {
+        return;
+    }
+
+    struct read_format buffer;
+
+    if (read(perfInfo.perf_fd_fault, &buffer, sizeof(struct read_format)) == -1) {
+        perror("perf read failed");
+    }
+
+    memcpy(i, &(buffer.values), sizeof(buffer.values));
+
+}
+
+void setupCounting(void) {
+
+    if(isCountingInit) {
+        return;
+    }
+    isCountingInit = true;
+
+    struct perf_event_attr pe_fault;
+    struct perf_event_attr pe_l1cache_load, pe_l1cache_load_miss;
+//    struct perf_event_attr pe_llc_load, pe_llc_load_miss;
+    struct perf_event_attr pe_instr;
+    memset(&pe_fault, 0, sizeof(struct perf_event_attr));
+
+    pe_fault.type = PERF_TYPE_SOFTWARE;
+    pe_fault.size = sizeof(struct perf_event_attr);
+    pe_fault.config = PERF_COUNT_SW_PAGE_FAULTS;
+    pe_fault.read_format = PERF_FORMAT_GROUP;
+    pe_fault.disabled = 0;
+    pe_fault.exclusive = 0;
+    pe_fault.exclude_user = 0;
+    pe_fault.exclude_kernel = 1;
+    pe_fault.exclude_hv = 1;
+    pe_fault.precise_ip = 1;
+    pe_fault.freq = 1;
+    pe_fault.sample_freq = 1;
+    pe_fault.sample_id_all = 0;
+    pe_fault.exclude_host = 0;
+    pe_fault.exclude_guest = 1;
+
+    memcpy(&pe_l1cache_load, &pe_fault, sizeof(struct perf_event_attr));
+    memcpy(&pe_l1cache_load_miss, &pe_fault, sizeof(struct perf_event_attr));
+//    memcpy(&pe_llc_load, &pe_fault, sizeof(struct perf_event_attr));
+//    memcpy(&pe_llc_load_miss, &pe_fault, sizeof(struct perf_event_attr));
+    memcpy(&pe_instr, &pe_fault, sizeof(struct perf_event_attr));
+
+    pe_l1cache_load.type = PERF_TYPE_HW_CACHE;
+    pe_l1cache_load.config = PERF_COUNT_HW_CACHE_L1D | (PERF_COUNT_HW_CACHE_OP_READ << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16);
+
+    pe_l1cache_load_miss.type = PERF_TYPE_HW_CACHE;
+    pe_l1cache_load_miss.config = PERF_COUNT_HW_CACHE_L1D | (PERF_COUNT_HW_CACHE_OP_READ << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16);
+
+//    pe_llc_load.type = PERF_TYPE_HW_CACHE;
+//    pe_llc_load.config = PERF_COUNT_HW_CACHE_LL | (PERF_COUNT_HW_CACHE_OP_READ << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16);
+//
+//    pe_llc_load_miss.type = PERF_TYPE_HW_CACHE;
+//    pe_llc_load_miss.config = PERF_COUNT_HW_CACHE_LL | (PERF_COUNT_HW_CACHE_OP_READ << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16);
+
+    pe_instr.type = PERF_TYPE_HARDWARE;
+	pe_instr.config = PERF_COUNT_HW_INSTRUCTIONS;
+
+    perfInfo.perf_fd_fault = create_perf_event(&pe_fault, -1);
+    perfInfo.perf_fd_l1cache_load = create_perf_event(&pe_l1cache_load, perfInfo.perf_fd_fault);
+    perfInfo.perf_fd_l1cache_load_miss = create_perf_event(&pe_l1cache_load_miss, perfInfo.perf_fd_fault);
+//    perfInfo.perf_fd_llc_load = create_perf_event(&pe_llc_load, perfInfo.perf_fd_fault);
+//    perfInfo.perf_fd_llc_load_miss = create_perf_event(&pe_llc_load_miss, perfInfo.perf_fd_fault);
+    perfInfo.perf_fd_instr = create_perf_event(&pe_instr, perfInfo.perf_fd_fault);
+
+}
+
+void stopCounting(void) {
+    if(!isCountingInit) {
+        return;
+    }
+
+    isCountingInit = false;
+
+    close(perfInfo.perf_fd_fault);
+    close(perfInfo.perf_fd_l1cache_load);
+    close(perfInfo.perf_fd_l1cache_load_miss);
+//    close(perfInfo.perf_fd_llc_load);
+//    close(perfInfo.perf_fd_llc_load_miss);
+    close(perfInfo.perf_fd_instr);
+}
+#endif
 
 #endif

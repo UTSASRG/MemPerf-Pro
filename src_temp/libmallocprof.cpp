@@ -26,8 +26,10 @@ extern "C" {
 	void * memalign(size_t, size_t) __attribute__ ((weak, alias("yymemalign")));
 	int posix_memalign(void **, size_t, size_t) __attribute__ ((weak,
 				alias("yyposix_memalign")));
+#ifdef SYSCALL
     void * mmap(void *addr, size_t length, int prot, int flags,
             int fd, off_t offset) __attribute__ ((weak, alias("yymmap")));
+#endif
 }
 
 void exitHandler() {
@@ -41,6 +43,10 @@ void exitHandler() {
 
 #ifdef OPEN_SAMPLING_EVENT
 	stopSampling();
+#endif
+
+#ifdef COUNTING
+    stopCounting();
 #endif
 
     GlobalStatus::globalize();
@@ -113,6 +119,10 @@ int libmallocprof_main(int argc, char ** argv, char ** envp) {
 #ifdef PREDICTION
     Predictor::globalInit();
     Predictor::outsideCycleStart();
+#endif
+
+#ifdef COUNTING
+    setupCounting();
 #endif
 
     ProgramStatus::setProfilerInitializedTrue();
@@ -391,6 +401,7 @@ void operator delete[] (void * ptr) __THROW {
 }
 
 extern "C" {
+#ifdef SYSCALL
 void *yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset) {
     if (!realInitialized) RealX::initializer();
     if (ProgramStatus::profilerNotInitialized()) {
@@ -413,6 +424,7 @@ void *yymmap(void *addr, size_t length, int prot, int flags, int fd, off_t offse
 
     return retval;
 }
+#endif
 
 int madvise(void *addr, size_t length, int advice) {
     if (!realInitialized) RealX::initializer();
@@ -431,20 +443,25 @@ int madvise(void *addr, size_t length, int advice) {
     }
 #endif
 
+#ifdef SYSCALL
     if (!AllocatingStatus::sampledForCountingEvent) {
         int result = RealX::madvise(addr, length, advice);
         return result;
     }
+
     uint64_t timeStart = rdtscp();
     int result = RealX::madvise(addr, length, advice);
     uint64_t timeStop = rdtscp();
 
     //AllocatingStatus::minusCycles(120);
     AllocatingStatus::addOneSyscallToSyscallData(MADVISE, timeStop - timeStart);
-
+#else
+    int result = RealX::madvise(addr, length, advice);
+#endif
     return result;
 }
 
+#ifdef SYSCALL
 void *sbrk(intptr_t increment) {
     if (!realInitialized) RealX::initializer();
     if (AllocatingStatus::outsideTrackedAllocation() || !AllocatingStatus::sampledForCountingEvent) {
@@ -476,6 +493,7 @@ int mprotect(void *addr, size_t len, int prot) {
 
     return ret;
 }
+#endif
 
 int munmap(void *addr, size_t length) {
 
@@ -494,6 +512,7 @@ int munmap(void *addr, size_t length) {
 #endif
 #endif
 
+#ifdef SYSCALL
     if (!AllocatingStatus::sampledForCountingEvent) {
         return RealX::munmap(addr, length);
     }
@@ -504,11 +523,14 @@ int munmap(void *addr, size_t length) {
 
     //AllocatingStatus::minusCycles(120);
     AllocatingStatus::addOneSyscallToSyscallData(MUNMAP, timeStop - timeStart);
-
+#else
+    int ret = RealX::munmap(addr, length);
+#endif
 
     return ret;
 }
 
+#ifdef SYSCALL
 void *mremap(void *old_address, size_t old_size, size_t new_size, int flags, ...) {
 
     fprintf(stderr, "mremap %lu -> %lu\n", old_size, new_size);
@@ -533,6 +555,7 @@ void *mremap(void *old_address, size_t old_size, size_t new_size, int flags, ...
 
     return ret;
 }
+#endif
 }
 
 #ifdef LOCK

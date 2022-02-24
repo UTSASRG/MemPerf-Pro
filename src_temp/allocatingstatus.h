@@ -145,6 +145,12 @@ private:
 //    static thread_local CriticalSectionStatusInAllocatingStatus criticalSectionStatus;
     static thread_local SystemCallData systemCallData[NUM_OF_SYSTEMCALLTYPES];
 
+#ifdef COUNTING
+    static thread_local PerfReadInfo countingDataBeforeRealFunction;
+    static thread_local PerfReadInfo countingDataAfterRealFunction;
+    static thread_local PerfReadInfo countingDataInRealFunction;
+#endif
+
     static void updateAllocatingTypeBeforeRealFunction(AllocationFunction allocationFunction, unsigned int objectSize);
     static void updateFreeingTypeBeforeRealFunction(AllocationFunction allocationFunction, void * objectAddress);
 
@@ -198,6 +204,13 @@ public:
 #ifdef OPEN_DEBUG
     static void debugPrint();
     static size_t debugReturnSize();
+#endif
+
+#ifdef COUNTING
+    static void startCountCountingEvents();
+    static void stopCountCountingEvents();
+    static void calculateCountingDataInRealFunction();
+    static void removeAbnormalCountingEventValues();
 #endif
 
 };

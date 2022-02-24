@@ -66,7 +66,10 @@ void * xthreadx::startThread(void * arg) {
 
 #ifdef OPEN_SAMPLING_EVENT
         initPMU2();
+#endif
 
+#ifdef COUNTING
+        setupCounting();
 #endif
 
 #ifdef PREDICTION
@@ -101,6 +104,10 @@ threads[ThreadLocalStatus::runningThreadIndex] = nullptr;
 
 #ifdef OPEN_SAMPLING_EVENT
     stopSampling();
+#endif
+
+#ifdef COUNTING
+    stopCounting();
 #endif
 
     GlobalStatus::globalize();

@@ -6,6 +6,10 @@ unsigned short ThreadLocalStatus::totalNumOfRunningThread;
 thread_local short ThreadLocalStatus::runningThreadIndex;
 spinlock ThreadLocalStatus::lock;
 
+#ifdef COUNTING
+thread_local PerfReadInfo ThreadLocalStatus::countingEvents[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
+#endif
+
 //thread_local unsigned int ThreadLocalStatus::numOfFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA] = {0};
 thread_local unsigned int ThreadLocalStatus::numOfSampledCountingFunctions[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA] = {0};
 thread_local uint64_t ThreadLocalStatus::cycles[NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
