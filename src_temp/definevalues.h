@@ -19,7 +19,9 @@
 #define UTIL 1
 #define CACHE_UTIL 1
 
-#define MAX_BT_ADDR_NUM 160
+//#define FREQUENT_UPDATE_MEMORY
+
+#define MAX_BT_ADDR_NUM 256
 #define MAX_REGION_NUM 256
 
 //#define OPEN_DEBUG 1

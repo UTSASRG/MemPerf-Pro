@@ -28,7 +28,14 @@ void TotalMemoryUsage::ifLowerThanReplace(TotalMemoryUsage newTotalMemoryUsage) 
 void MemoryUsage::addToMemoryUsage(unsigned int size, unsigned int newTouchePageBytes) {
     threadLocalMemoryUsage.realMemoryUsage += size;
     threadLocalMemoryUsage.totalMemoryUsage += newTouchePageBytes;
+/*
+        fprintf(stderr, "%u %u %ld %ld %ld %ld\n",
+                size, newTouchePageBytes,
+                threadLocalMemoryUsage.realMemoryUsage, threadLocalMemoryUsage.totalMemoryUsage,
+                maxThreadLocalMemoryUsage.realMemoryUsage, maxThreadLocalMemoryUsage.totalMemoryUsage);
+*/
     if(maxThreadLocalMemoryUsage.isLowerThan(threadLocalMemoryUsage)) {
+//        fprintf(stderr, "replace\n");
         maxThreadLocalMemoryUsage = threadLocalMemoryUsage;
     }
 
@@ -37,15 +44,19 @@ void MemoryUsage::addToMemoryUsage(unsigned int size, unsigned int newTouchePage
 
     maxRealMemoryUsage = MAX(maxRealMemoryUsage, globalMemoryUsage.realMemoryUsage);
 
+#ifdef FREQUENT_UPDATE_MEMORY
+    if(globalMemoryUsage.totalMemoryUsage > maxGlobalMemoryUsage.totalMemoryUsage) {
+#else
      if(globalMemoryUsage.totalMemoryUsage >= 10*ONE_MB &&
      (globalMemoryUsage.totalMemoryUsage > maxGlobalMemoryUsage.totalMemoryUsage + 200*ONE_MB
      || globalMemoryUsage.totalMemoryUsage > maxGlobalMemoryUsage.totalMemoryUsage * 2) && mtx.try_lock()) {
-
+#endif
          maxGlobalMemoryUsage = globalMemoryUsage;
 //         updateTimes++;
-
+#ifndef FREQUENT_UPDATE_MEMORY
 #ifdef OPEN_BACKTRACE
          Backtrace::recordMem();
+#endif
 #endif
 
          MemoryWaste::compareMemoryUsageAndRecordStatus(maxGlobalMemoryUsage);
@@ -68,7 +79,10 @@ void MemoryUsage::addToMemoryUsage(unsigned int size, unsigned int newTouchePage
 //             }
 //         }
 #endif
+
+#ifndef FREQUENT_UPDATE_MEMORY
         mtx.unlock();
+#endif
      }
 
 }
@@ -79,11 +93,13 @@ void MemoryUsage::subRealSizeFromMemoryUsage(unsigned int size) {
 }
 
 void MemoryUsage::subTotalSizeFromMemoryUsage(unsigned int size) {
+//        fprintf(stderr, "sub %u\n", size);
     threadLocalMemoryUsage.totalMemoryUsage -= size;
     __atomic_sub_fetch(&globalMemoryUsage.totalMemoryUsage, size, __ATOMIC_RELAXED);
 }
 
 void MemoryUsage::globalize() {
+//        fprintf(stderr, "globalize %d %ld %ld\n", ThreadLocalStatus::runningThreadIndex, maxThreadLocalMemoryUsage.totalMemoryUsage, maxThreadLocalMemoryUsage.totalMemoryUsage);
     globalThreadLocalMemoryUsage.ifLowerThanReplace(maxThreadLocalMemoryUsage);
 }
 
