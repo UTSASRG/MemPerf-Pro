@@ -98,6 +98,7 @@ void leakcheck::sweep() {
 
                 //            fprintf(stderr, "leaked\n");
                 _totalLeakageSize += object->sizeClassSizeAndIndex.size;
+                Backtrace::addLeak(object->callKey, object->sizeClassSizeAndIndex.size);
 //          fprintf(stderr, "%lu free: %p, sz = %u\n", ThreadLocalStatus::runningThreadIndex, entryInHashTable.getKey(), object->sizeClassSizeAndIndex.size);
 //          RealX::free(entryInHashTable.getKey());
         }

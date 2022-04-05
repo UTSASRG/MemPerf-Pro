@@ -181,6 +181,9 @@ extern "C" {
 
         }
 
+//        fprintf(stderr, "malloc %d %p\n", sz, object);
+
+
         return object;
 
 	}
@@ -214,6 +217,8 @@ extern "C" {
         AllocatingStatus::updateAllocatingInfoToPredictor();
 //        Predictor::outsideCycleStart();
 #endif
+
+//        fprintf(stderr, "calloc %d %p\n", nelem*elsize, object);
 
 		return object;
 	}

@@ -311,12 +311,12 @@ ObjectStatus * MemoryWaste::freeUpdate(void* address) {
     currentSizeClassSizeAndIndex = status->sizeClassSizeAndIndex;
 
     currentStatus.internalFragment[arrayIndex()] -= (int64_t)status->internalFragment();
-#ifdef OPEN_BACKTRACE
+//#ifdef OPEN_BACKTRACE
 //    if(status->callsiteKey) {
         Backtrace::subMem(status->callKey, status->sizeClassSizeAndIndex.size);
 //        status->callsiteKey = 0;
 //    }
-#endif
+//#endif
     status->allocated = false;
     hashLocksSet.unlock(address);
 

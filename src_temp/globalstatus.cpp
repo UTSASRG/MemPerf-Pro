@@ -258,6 +258,7 @@ void GlobalStatus::printOutput() {
 #endif
 #ifdef OPEN_BACKTRACE
     Backtrace::printOutput();
+    Backtrace::printLeak();
 #endif
 #ifdef MEMORY_WASTE
     MemoryWaste::printOutput();

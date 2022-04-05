@@ -141,7 +141,7 @@ void AllocatingStatus::updateFreeingStatusAfterRealFunction() {
 void AllocatingStatus::updateMemoryStatusAfterAllocation() {
 
 #ifdef OPEN_BACKTRACE
-    uint8_t callsiteKey = Backtrace::doABackTrace(allocatingType.objectSize);
+    uint8_t callsiteKey = Backtrace::doABackTrace((unsigned int)0);
 #endif
 
 #ifdef MEMORY_WASTE

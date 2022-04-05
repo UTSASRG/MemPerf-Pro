@@ -205,26 +205,29 @@ struct CoherencyData {
 
 #define MASK_PAGE 0xfff
 #define LOG2_CACHELINE 6
+#define CME 128
 
 struct ConflictData {
     spinlock lockForCachelines;
     uint8_t numOfCme;
-    uint8_t setOfCme[32];
+    uint8_t setOfCme[CME];
     uint8_t numOfCmePerSet[64];
     uint8_t objNumPerSet[64];
     uint8_t callKeyPerSet[64][2];
-    uint16_t totalMisses;
-    uint16_t missesPerSet[64];
-    CacheMapEntry * cme[32];
+    uint32_t totalMisses;
+    uint32_t missesPerSet[64];
+    CacheMapEntry * cme[CME];
 
     void addMiss(uint64_t addr, CacheMapEntry * cme) {
         uint8_t setId = (uint8_t)(((uint64_t)addr & MASK_PAGE) >> LOG2_CACHELINE);
+//        lockForCachelines.lock();
         totalMisses++;
+//        lockForCachelines.unlock();
         missesPerSet[setId]++;
         if(totalMisses >= 50 && missesPerSet[setId] * 20 >= totalMisses && !(cme->misses & (uint8_t)0x80) && !(cme->misses & (uint8_t)0x40)) {
-            if(numOfCme < 32 && numOfCmePerSet[setId] < 16 && !(cme->misses & (uint8_t)0x80)) {
+            if(numOfCme < CME && numOfCmePerSet[setId] < 16 && !(cme->misses & (uint8_t)0x80)) {
                 lockForCachelines.lock();
-                if(numOfCme < 32 && numOfCmePerSet[setId] < 16 && !(cme->misses & (uint8_t)0x80)) {
+                if(numOfCme < CME && numOfCmePerSet[setId] < 16 && !(cme->misses & (uint8_t)0x80)) {
                     this->cme[numOfCme] = cme;
                     setOfCme[numOfCme] = setId;
                     numOfCme++;
@@ -260,10 +263,14 @@ struct ConflictData {
             uint8_t totalMissScore = 0;
             uint8_t scores[20];
             uint8_t numOfScores = 0;
+//            for(int i = 0; i < 64; ++i) {
+//                fprintf(stderr, "%u\n", missesPerSet[setOfCme[i]]);
+//            }
             for(uint8_t i = 0; i < numOfCme; ++i) {
                 if(cme[i]->misses && missesPerSet[setOfCme[i]] * 20 >= totalMisses) {
                     if(objNumPerSet[setOfCme[i]] >= 2) {
-                        fprintf(ProgramStatus::outputFile, "\nset %u: %u%% Allocator Conflict Misses\n", setOfCme[i], missesPerSet[setOfCme[i]] * 100 / totalMisses);
+                        fprintf(ProgramStatus::outputFile, "\nset %u: %u%% Allocator Conflict Misses %u %u\n", setOfCme[i], missesPerSet[setOfCme[i]] * 100 / totalMisses,
+                                missesPerSet[setOfCme[i]], totalMisses);
                         scores[numOfScores++] = missesPerSet[setOfCme[i]] * 100 / totalMisses;
                         missesPerSet[setOfCme[i]] = 0;
                     } else {
@@ -278,7 +285,7 @@ struct ConflictData {
                 }
             }
             std::sort(scores, scores+numOfScores, cmp);
-            for(uint8_t i = 0, j = 1; i < numOfScores; ++i, j*=2) {
+            for(uint64_t i = 0, j = 1; i < numOfScores; ++i, j*=2) {
 //                fprintf(stderr, " %u", scores[i]);
                 totalMissScore += scores[i] / j;
             }

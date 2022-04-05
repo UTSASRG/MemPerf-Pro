@@ -44,8 +44,9 @@ bool ProgramStatus::conclusionHasStarted() {
 
 void ProgramStatus::getInputInfoFileName(char * runningApplicationName) {
 //            strcpy(inputInfoFileName, "/home/jinzhou/mmprof/info/libc228.info");
-    char * runningAllocatorName = strrchr(runningApplicationName, '-')+1;
-//    char * runningAllocatorName = std::getenv("ALLOCATOR_NAME");
+//    char * runningAllocatorName = strrchr(runningApplicationName, '-')+1;
+    char * runningAllocatorName = std::getenv("ALLOCATOR");
+//    fprintf(stderr, "%s\n", runningAllocatorName);
     if(strcmp(runningAllocatorName, "libc228") == 0 || strcmp(runningAllocatorName, "pthread") == 0) {
         strcpy(inputInfoFileName, "/home/jinzhou/mmprof/info/libc228.info");
 //        strcpy(inputInfoFileName, "/media/umass/datasystem/steven/mmproftesting/mmprof/info/libc228.info");
@@ -128,7 +129,8 @@ void ProgramStatus::openInputInfoFile(char * runningApplicationName) {
 
 void ProgramStatus::openOutputFile() {
     extern char * program_invocation_name;
-	snprintf(outputFileName, MAX_FILENAME_LEN, "%s_libmallocprof_%d_main_thread.txt", program_invocation_name, getpid());
+    fprintf(stderr, "Program = %s\n", program_invocation_name);
+	snprintf(outputFileName, MAX_FILENAME_LEN, "%s_libmallocprof_%d_main_thread.txt", std::getenv("ALLOCATOR"), getpid());
 //    snprintf(outputFileName, MAX_FILENAME_LEN, "/home/jinzhou/parsec/sample10x/%s_libmallocprof_%d_main_thread.txt", program_invocation_name, getpid());
 //    snprintf(outputFileName, MAX_FILENAME_LEN, "/home/jinzhou/parsec/realapp_records/todo2/%s_libmallocprof_%d_main_thread.txt", std::getenv("APPLICATION_NAME"), getpid());
 //    snprintf(outputFileName, MAX_FILENAME_LEN, "/media/umass/datasystem/steven/mmprof/records/%s_libmallocprof_%d_main_thread.txt", program_invocation_name, getpid());

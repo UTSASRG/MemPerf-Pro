@@ -26,6 +26,7 @@ struct BackTraceMemory {
     uint8_t numberOfFrame;
 //    unsigned int memAllocated;
     uint64_t memAllocated;
+    uint64_t memLeaked;
     void * frames[7];
     static BackTraceMemory newBackTraceMemory();
 };
@@ -45,10 +46,12 @@ namespace Backtrace {
      void ssystem(char* command);
      void ssystem2(char* command);
      void init();
-     uint8_t doABackTrace(unsigned int size);
+     uint8_t doABackTrace(unsigned int null);
+    void addLeak(uint8_t callsiteKey, unsigned int size);
      void subMem(uint8_t callsiteKey, unsigned int size);
      void recordMem();
      void printOutput();
+    void printLeak();
      void printCallSite(uint8_t callKey);
 };
 

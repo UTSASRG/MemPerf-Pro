@@ -14,7 +14,11 @@ thread_local OverviewLockData ThreadLocalStatus::overviewLockData[NUM_OF_LOCKTYP
 thread_local SystemCallData ThreadLocalStatus::systemCallData[NUM_OF_SYSTEMCALLTYPES][NUM_OF_ALLOCATIONTYPEFOROUTPUTDATA];
 thread_local FriendlinessStatus ThreadLocalStatus::friendlinessStatus;
 thread_local std::default_random_engine ThreadLocalStatus::random(time(NULL));
+#ifdef OPEN_SAMPLING_FOR_ALLOCS
 thread_local std::uniform_int_distribution<int> ThreadLocalStatus::dis(0, RANDOM_PERIOD_FOR_ALLOCS-1);
+#else
+thread_local std::uniform_int_distribution<int> ThreadLocalStatus::dis(0, 9);
+#endif
 
 thread_local void * ThreadLocalStatus::stackBottom;
 

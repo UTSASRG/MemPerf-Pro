@@ -10,6 +10,7 @@ extern HashMap <uint8_t, BackTraceMemory, PrivateHeap> BTMemMapRecord;
 BackTraceMemory BackTraceMemory::newBackTraceMemory() {
     BackTraceMemory newBackTraceMemory;
     newBackTraceMemory.memAllocated = 0;
+    newBackTraceMemory.memLeaked = 0;
     newBackTraceMemory.numberOfFrame = 0;
     return newBackTraceMemory;
 }
@@ -60,8 +61,8 @@ namespace Backtrace {
 
 #define OFFSET 268
 
-    uint8_t doABackTrace(unsigned int size) {
-        void *stackTop = &size;
+    uint8_t doABackTrace(unsigned int null) {
+        void *stackTop = &null;
         void *returnAddr = (void *) *((uint64_t * )((uint64_t) stackTop + (uint64_t) OFFSET));
         uint8_t callsiteKey = (uint8_t)((ThreadLocalStatus::getStackOffset(stackTop) + (uint64_t) returnAddr) >> 4);
         BackTraceMemory *status = BTMemMap.find(callsiteKey, sizeof(uint8_t));
@@ -80,6 +81,15 @@ namespace Backtrace {
         __atomic_add_fetch(&status->memAllocated, size, __ATOMIC_RELAXED);
 //    fprintf(stderr, "key = %u, add size = %u, size = %lu\n", callsiteKey, size, status->memAllocated);
         return callsiteKey;
+    }
+
+    void addLeak(uint8_t callsiteKey, unsigned int size) {
+        BackTraceMemory *status = BTMemMap.find(callsiteKey, sizeof(uint8_t));
+        if (!status) {
+            return;
+        }
+        __atomic_add_fetch(&status->memLeaked, size, __ATOMIC_RELAXED);
+//    fprintf(stderr, "key = %u, sub size = %u, size = %lu\n", callsiteKey, size, status->memAllocated);
     }
 
     void subMem(uint8_t callsiteKey, unsigned int size) {
@@ -117,6 +127,45 @@ namespace Backtrace {
         std::sort(BTqueue, BTqueue + numOfBT, compare);
 
         GlobalStatus::printTitle((char *) "MEMORY USAGE BACKTRACE AT PEAK");
+        char command[512];
+        for (uint8_t i = 0; i < MIN(5, numOfBT); ++i) {
+            if (BTqueue[i].memory) {
+                fflush(ProgramStatus::outputFile);
+                fprintf(ProgramStatus::outputFile, "\n------- %uK -------\n", BTqueue[i].memory);
+                sprintf(command, "addr2line -e %s -Ci ", ProgramStatus::programName);
+                for (uint8_t f = 4; f < BTqueue[i].numberOfFrame; ++f) {
+                    sprintf(command + strlen(command), "%p ", ConvertToVMA(BTqueue[i].frames[f]));
+                }
+                sprintf(command + strlen(command), "2>> %s\n", ProgramStatus::outputFileName);
+                ssystem(command);
+                fprintf(ProgramStatus::outputFile, "\n------------------\n");
+            }
+        }
+    }
+
+
+    void printLeak() {
+        uint8_t numOfBT = 0;
+        BTAddrMemPair BTqueue[MAX_BT_ADDR_NUM];
+
+        for (auto entryInHashTable: BTMemMapRecord) {
+            BackTraceMemory *status = entryInHashTable.getValue();
+//        if (status->memAllocated / 1024 && status->memAllocated / 1024 < ABNORMAL_VALUE) {
+            if (status->memLeaked / 1024) {
+                BTqueue[numOfBT].memory = status->memLeaked / 1024;
+                memcpy(BTqueue[numOfBT].frames, status->frames, 7 * (sizeof(void *)));
+                BTqueue[numOfBT].numberOfFrame = status->numberOfFrame;
+                numOfBT++;
+                if (numOfBT >= MAX_BT_ADDR_NUM) {
+                    fprintf(stderr, "increase BTqueue length\n");
+                    abort();
+                }
+            }
+        }
+
+        std::sort(BTqueue, BTqueue + numOfBT, compare);
+
+        GlobalStatus::printTitle((char *) "MEMORY LEAK BACKTRACE AT PEAK");
         char command[512];
         for (uint8_t i = 0; i < MIN(5, numOfBT); ++i) {
             if (BTqueue[i].memory) {
